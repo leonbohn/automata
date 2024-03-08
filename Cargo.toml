@@ -10,7 +10,6 @@ fxhash = "0.2"
 itertools = "0.12"
 tabled = { version = "0.15.0", features = ["ansi"] }
 owo-colors = "4.0.0"
-hoars = { version = "0.1", path = "../hoars", optional = true }
 test-log = { version = "0.2.14", features = ["trace"] }
 tempfile = { version = "3.9.0", optional = true }
 impl-tools = "0.10"
@@ -21,6 +20,7 @@ bimap = "0.6.3"
 fastrand = "2"
 # fork = { version = "0.1", optional = true }
 # show-image = { version = "0.13", optional = true }
+hoars = { git = "https://github.com/leonbohn/hoars", optional = true }
 
 [features]
 default = ["det", "hoa", "graphviz", "random"]
