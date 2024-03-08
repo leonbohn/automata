@@ -21,3 +21,10 @@ The CI is configured that any pull request will run through a set of checks and 
 Specifically, the formatting is tested, then clippy is run and finally all tests will be run.
 To avoid unnecessary runs of the CI, these steps can be run locally before every commit.
 This can be done through the `check` script included in the base of the repository.
+
+#### Features
+The different feature flagst that can be enabled/disabled are
+- `hoa` which enables input and output of HOA files, using the [hoars](https://github.com/leonbohn/hoars) library
+- `random` allowing generation of random transition systems
+- `graphviz` through which DOT representation of transition systems/automata can be generated and visualised
+By default, all features are enabled.
