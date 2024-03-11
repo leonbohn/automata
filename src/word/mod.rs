@@ -3,7 +3,7 @@ use std::{
     hash::Hash,
 };
 
-use crate::{alphabet::Symbol, length::HasLength, FiniteLength, InfiniteLength, Length, Show};
+use crate::{alphabet::Symbol, Show};
 use impl_tools::autoimpl;
 use itertools::Itertools;
 

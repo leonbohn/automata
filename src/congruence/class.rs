@@ -86,13 +86,6 @@ impl<S: Symbol> std::fmt::Display for Class<S> {
         )
     }
 }
-impl<S> HasLength for Class<S> {
-    type Length = FiniteLength;
-
-    fn length(&self) -> Self::Length {
-        FiniteLength(self.0.len())
-    }
-}
 
 impl<S: Symbol> LinearWord<S> for Class<S> {
     fn nth(&self, position: usize) -> Option<S> {

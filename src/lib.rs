@@ -48,8 +48,7 @@ pub mod prelude {
             FiniteWord, LinearWord, OmegaWord, PeriodicOmegaWord, ReducedOmegaWord,
             ReducedParseError,
         },
-        Alphabet, Class, Color, FiniteLength, HasLength, InfiniteLength, Length, Pointed,
-        RightCongruence, Show, Void,
+        Alphabet, Class, Color, Pointed, RightCongruence, Show, Void,
     };
 }
 
@@ -58,14 +57,6 @@ pub mod alphabet;
 pub use alphabet::Alphabet;
 use impl_tools::autoimpl;
 use itertools::Itertools;
-
-/// Defines lengths of finite and infinite words.
-pub mod length;
-use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
-
-/// Module that contains definitions for dealing with lengths. This is particularly
-/// useful for dealing with infinite words.
-pub use length::{FiniteLength, HasLength, InfiniteLength, Length};
 
 /// This module defines transition systems and successor functions and such.
 #[macro_use]
@@ -94,6 +85,8 @@ pub mod hoa;
 /// Implements the generation of random transition systems.
 #[feature(random)]
 pub mod random;
+
+use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
 /// A color is simply a type that can be used to color states or transitions.
 pub trait Color: Clone + Eq + Ord + Hash + Show {

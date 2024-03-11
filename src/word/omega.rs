@@ -546,10 +546,7 @@ impl<S: Show> Debug for PeriodicOmegaWord<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        word::{omega::deduplicate, ReducedOmegaWord},
-        InfiniteLength,
-    };
+    use crate::word::{omega::deduplicate, ReducedOmegaWord};
 
     use super::deduplicate_inplace;
 

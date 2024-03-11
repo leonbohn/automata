@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{length::HasLength, prelude::Symbol, FiniteLength, Length};
+use crate::prelude::Symbol;
 
 use super::{omega::PeriodicOmegaWord, ConsumingInfixIterator, FiniteWord, LinearWord, OmegaWord};
 
@@ -202,7 +202,6 @@ mod tests {
     use crate::{
         upw,
         word::{FiniteWord, LinearWord, OmegaWord, ReducedOmegaWord},
-        FiniteLength,
     };
 
     #[test]
