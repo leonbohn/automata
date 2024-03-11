@@ -5,8 +5,7 @@ use crate::{
     congruence::ColoredClass,
     prelude::{CharAlphabet, Expression, Symbol},
     word::{FiniteWord, OmegaWord},
-    Alphabet, Class, Color, FiniteLength, Map, Partition, Pointed, RightCongruence, Set, Show,
-    Void,
+    Alphabet, Class, Color, Map, Partition, Pointed, RightCongruence, Set, Show, Void,
 };
 
 use super::{
@@ -1284,7 +1283,6 @@ mod tests {
             index_ts::MealyTS,
             Deterministic, Sproutable,
         },
-        FiniteLength,
     };
 
     #[test]

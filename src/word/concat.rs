@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use crate::{length::HasLength, prelude::Symbol, FiniteLength, Length};
+use crate::prelude::Symbol;
 
 use super::{FiniteWord, LinearWord, OmegaWord};
 

@@ -20,7 +20,7 @@ use crate::{
         TransitionSystem,
     },
     word::{OmegaWord, ReducedOmegaWord},
-    Color, FiniteLength, InfiniteLength, Length,
+    Color,
 };
 
 mod acceptance_type;

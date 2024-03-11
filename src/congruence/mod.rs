@@ -8,7 +8,7 @@ use crate::{
     prelude::{DFALike, IsEdge},
     ts::{transition_system::Indexes, Deterministic, EdgeColor, Sproutable, StateColor, DTS},
     word::FiniteWord,
-    Alphabet, Color, FiniteLength, HasLength, Map, Pointed, Show, TransitionSystem, Void, DFA,
+    Alphabet, Color, Map, Pointed, Show, TransitionSystem, Void, DFA,
 };
 
 mod class;
