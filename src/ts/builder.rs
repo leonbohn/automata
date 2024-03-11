@@ -23,16 +23,38 @@ use super::IntoEdge;
 ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 0)])
 ///     .into_dfa(0); // 0 is the initial state
 /// ```
-pub struct TSBuilder<Q = (), C = ()> {
+pub struct TSBuilder<Q = Void, C = Void> {
     edges: Vec<(usize, char, C, usize)>,
     default: Option<Q>,
     colors: Vec<(usize, Q)>,
 }
 
 impl<C> TSBuilder<Void, C> {
-    /// Creates a new `TSBuilder` with no edges, no colors and no default color.
+    /// Creates an empty instance of `Self`, where states are uncolored (have color [`Void`])
     pub fn without_state_colors() -> Self {
         TSBuilder {
+            edges: vec![],
+            default: Some(Void),
+            colors: vec![],
+        }
+    }
+}
+impl<Q> TSBuilder<Q, Void> {
+    /// Creates an empty instance of `Self`, where edges are uncolored (have color [`Void`])
+    pub fn without_edge_colors() -> Self {
+        TSBuilder {
+            edges: vec![],
+            default: None,
+            colors: vec![],
+        }
+    }
+}
+
+impl TSBuilder<Void, Void> {
+    /// Creates an empty instance of `Self`, where neither states nor edges have a color (i.e. both
+    /// are colored [`Void`]).
+    pub fn without_colors() -> Self {
+        Self {
             edges: vec![],
             default: Some(Void),
             colors: vec![],
