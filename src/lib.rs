@@ -31,7 +31,6 @@ pub mod prelude {
             IntoMooreMachine, MealyLike, MealyMachine, MooreLike, MooreMachine, NoColor,
             StateBasedDBA, StateBasedDPA, DBA, DFA, DPA,
         },
-        mapping::Morphism,
         ts::{
             dag::Dag,
             dot::Dottable,
@@ -85,9 +84,6 @@ pub use congruence::{Class, RightCongruence};
 /// Module that contains definitions for dealing with words.
 #[macro_use]
 pub mod word;
-
-/// Module that contains definitions for dealing with mappings.
-pub mod mapping;
 
 /// Contains implementations for different algorithms such as minimization.
 pub mod algorithms;
