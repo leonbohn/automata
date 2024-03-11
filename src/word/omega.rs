@@ -3,9 +3,13 @@ use std::{fmt::Debug, marker::PhantomData};
 use impl_tools::autoimpl;
 use itertools::Itertools;
 
-use crate::{prelude::Symbol, ts::Deterministic, Alphabet, Show};
+use crate::{
+    prelude::Symbol,
+    ts::{Congruence, Deterministic, SymbolOf},
+    Alphabet, Map, Show,
+};
 
-use super::{FiniteWord, LinearWord};
+use super::{FiniteWord, LinearWord, NormalizedOmegaWord};
 
 /// An omega word is an infinite word that can be indexed by a `usize`. We assume that all
 /// omega words can be represented as a concatenation of a finite prefix which we call spoke
@@ -60,7 +64,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     /// assert!(word.spoke().equals("ab"));
     /// assert!(word.cycle().equals("ac"));
     /// ```
-    fn normalized(&self) -> ReducedOmegaWord<S>
+    fn reduced(&self) -> ReducedOmegaWord<S>
     where
         S: Symbol,
     {
@@ -82,7 +86,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     where
         S: Symbol,
     {
-        self.normalized() == other.normalized()
+        self.reduced() == other.reduced()
     }
 
     /// Returns the spoke of the word, i.e. the finite prefix of the word before the loop index.
@@ -114,6 +118,52 @@ pub trait OmegaWord<S>: LinearWord<S> {
     /// represented by the cycle `a`.
     fn cycle_length(&self) -> usize {
         self.cycle().len()
+    }
+
+    /// Computes the normalization with regard to the given deterministic transition system `cong`.
+    /// Specifically, for an ultimately periodic word `ux^ω`, this procedure returns the ultimately
+    /// periodic word `u^i(x^j)^ω` such that `i` and `j` are the least natural numbers verifying that
+    /// `u^i` and `u^ix^j` lead the same state in `cong`.
+    ///
+    /// The function will return `None` if no normalization exists. This may be the case if the
+    /// transition system is incomplete.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::{prelude::*, word::NormalizedOmegaWord};
+    ///
+    /// let ts = TSBuilder::without_colors()
+    ///     .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
+    ///     .deterministic()
+    ///     .with_initial(0);
+    /// let word = upw!("b", "a");
+    /// let normalized = word.normalize_for(&ts).expect("must be normalizable");
+    /// assert_eq!(normalized.spoke_vec(), vec!['b']);
+    /// assert_eq!(normalized.cycle_vec(), vec!['a', 'a']);
+    /// ```
+    fn normalize_for<D>(&self, cong: D) -> Option<NormalizedOmegaWord<S>>
+    where
+        D: Congruence,
+        D::Alphabet: Alphabet<Symbol = S>,
+        S: Symbol,
+    {
+        let mut cur = cong.reached_state_index(self.spoke())?;
+        let mut count = 0;
+        let mut map = Map::default();
+        loop {
+            match map.insert(cur, count) {
+                None => {
+                    count += 1;
+                    cur = cong.reached_state_index_from(self.cycle(), cur)?;
+                }
+                Some(i) => {
+                    // the spoke is the spoke of self plus `i` times the cycle, while the
+                    // cycle is `count - i` times the cycle
+                    assert!(i < count);
+                    return Some(NormalizedOmegaWord::new(self.reduced(), i, count - i));
+                }
+            }
+        }
     }
 }
 
@@ -320,14 +370,14 @@ impl<S: Symbol> ReducedOmegaWord<S> {
     /// ```
     /// use automata::prelude::*;
     /// let non_normalized = ReducedOmegaWord::from_raw_parts(vec!['a', 'a'], 0);
-    /// assert!(!non_normalized.is_normalized()); // the constructed word is not normalized
-    /// let normalized = non_normalized.normalized();
-    /// assert!(normalized.is_normalized()); // the normalization is normalized
+    /// assert!(!non_normalized.is_reduced()); // the constructed word is not normalized
+    /// let normalized = non_normalized.reduced();
+    /// assert!(normalized.is_reduced()); // the normalization is normalized
     /// assert!(normalized != non_normalized); // they are not syntactically equal
     /// assert!(normalized.equals(non_normalized)); // but they are semantically equal
     /// ```
-    pub fn is_normalized(&self) -> bool {
-        self.normalized() == *self
+    pub fn is_reduced(&self) -> bool {
+        self.reduced() == *self
     }
 
     /// Creates a new instance from the given representation and loop index.

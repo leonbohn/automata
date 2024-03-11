@@ -27,7 +27,9 @@ pub struct NormalizedOmegaWord<S: Symbol> {
 
 impl<S: Symbol> NormalizedOmegaWord<S> {
     /// Creates a new instance from the given ultimately periodic word `ux^ω`. The resulting normalized word will be
-    /// `ux^i(x^j)^ω` where `i` is given by `pre_loop_count` and `j` is `loop_size`.
+    /// `ux^i(x^j)^ω` where `i` is given by `pre_loop_count` and `j` is `loop_size`. This method should
+    /// only really be called from inside the crate, for actually creating a normalization of an ultimately
+    /// periodic word one should use [`OmegaWord::normalize_for`] instead.
     ///
     /// # Example
     /// ```
