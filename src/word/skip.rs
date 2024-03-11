@@ -8,13 +8,13 @@ use super::{omega::PeriodicOmegaWord, ConsumingInfixIterator, FiniteWord, Linear
 /// word is infinite, the suffix is also infinite. If the underlying word is finite, the suffix
 /// is also finite.
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
-pub struct Offset<'a, S, W: LinearWord<S>> {
+pub struct Skip<'a, S, W: LinearWord<S>> {
     sequence: &'a W,
     offset: usize,
     _marker: std::marker::PhantomData<S>,
 }
 
-impl<'a, S, W: LinearWord<S>> Offset<'a, S, W> {
+impl<'a, S, W: LinearWord<S>> Skip<'a, S, W> {
     /// Creates a new suffix, which skips the first `offset` symbols of the given sequence.
     pub fn new(sequence: &'a W, offset: usize) -> Self {
         Self {
@@ -25,13 +25,13 @@ impl<'a, S, W: LinearWord<S>> Offset<'a, S, W> {
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Offset<'a, S, W> {
+impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Skip<'a, S, W> {
     fn nth(&self, position: usize) -> Option<S> {
         self.sequence.nth(self.offset + position)
     }
 }
 
-impl<'a, S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Offset<'a, S, W> {
+impl<'a, S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Skip<'a, S, W> {
     type Symbols<'this> = std::iter::Skip<W::Symbols<'this>> where Self: 'this;
 
     fn to_vec(&self) -> Vec<S> {
@@ -108,7 +108,7 @@ impl<S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Rotated<W> {
     }
 }
 
-impl<'a, S: Symbol, W: OmegaWord<S>> OmegaWord<S> for Offset<'a, S, W> {
+impl<'a, S: Symbol, W: OmegaWord<S>> OmegaWord<S> for Skip<'a, S, W> {
     type Spoke<'this> = Infix<'this, S, W>
     where
         Self: 'this;
@@ -218,22 +218,22 @@ mod tests {
         assert_eq!(pref.symbols().collect_vec(), vec!['a', 'b']);
 
         let word = upw!("ab", "ac");
-        assert_eq!(word.offset(3).prefix(4).to_vec(), vec!['c', 'a', 'c', 'a']);
+        assert_eq!(word.skip(3).prefix(4).to_vec(), vec!['c', 'a', 'c', 'a']);
         assert_eq!(
-            word.offset(1)
-                .offset(1)
-                .offset(1)
-                .offset(1)
-                .offset(4)
+            word.skip(1)
+                .skip(1)
+                .skip(1)
+                .skip(1)
+                .skip(4)
                 .prefix(2)
                 .to_vec(),
             vec!['a', 'c']
         );
-        let w = word.offset(3);
+        let w = word.skip(3);
         assert!(w.spoke().is_empty());
         assert_eq!(w.cycle().to_vec(), vec!['c', 'a']);
 
-        let offset_normalized = upw!("abba").offset(1).offset(20).normalized();
+        let offset_normalized = upw!("abba").skip(1).skip(20).normalized();
         assert!(offset_normalized.spoke().is_empty());
         assert_eq!(offset_normalized.cycle().to_vec(), vec!['b', 'b', 'a', 'a']);
     }

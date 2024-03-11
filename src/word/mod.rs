@@ -7,13 +7,14 @@ use crate::{alphabet::Symbol, Show};
 use impl_tools::autoimpl;
 use itertools::Itertools;
 
-mod subword;
-pub use subword::Offset;
+mod skip;
+pub use skip::Skip;
 
 mod concat;
 pub use concat::Concat;
 
 mod normalized;
+pub use normalized::NormalizedOmegaWord;
 
 mod finite;
 pub use finite::FiniteWord;
@@ -22,7 +23,7 @@ mod omega;
 pub use omega::{OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, ReducedParseError};
 use tracing::subscriber::SetGlobalDefaultError;
 
-pub use self::subword::Infix;
+pub use self::skip::Infix;
 
 /// A linear word is a word that can be indexed by a `usize`. This is the case for both finite and
 /// infinite words.
@@ -63,20 +64,20 @@ pub trait LinearWord<S>: Hash + Eq {
     }
 
     /// Removes the first symbol of `self` and returns it together with the remaining suffix.
-    fn pop_first(&self) -> (S, subword::Offset<'_, S, Self>)
+    fn pop_first(&self) -> (S, skip::Skip<'_, S, Self>)
     where
         Self: Sized,
     {
         let first = self.first().unwrap();
-        (first, self.offset(1))
+        (first, self.skip(1))
     }
 
     /// Creates an [`subword::Offset`] object, which is the suffix of `self` that starts at the given `offset`.
-    fn offset(&self, offset: usize) -> subword::Offset<'_, S, Self>
+    fn skip(&self, offset: usize) -> skip::Skip<'_, S, Self>
     where
         Self: Sized,
     {
-        subword::Offset::new(self, offset)
+        skip::Skip::new(self, offset)
     }
 }
 
