@@ -72,8 +72,8 @@ pub trait OmegaWord<S>: LinearWord<S> {
     /// ```
     /// use automata::prelude::*;
     /// let word = upw!("a"); // represents the periodic omega word a^𝜔 = aaa...
-    /// let offset1 = word.offset(1); // the word obtained by skipping the first symbol of `word`
-    /// let offset2 = word.offset(2);
+    /// let offset1 = word.skip(1); // the word obtained by skipping the first symbol of `word`
+    /// let offset2 = word.skip(2);
     ///
     /// assert!(offset1 != offset2); // two different offsets are syntactically distinct
     /// assert!(offset1.equals(offset2)); // but they are semantically equal
@@ -89,6 +89,18 @@ pub trait OmegaWord<S>: LinearWord<S> {
     fn spoke(&self) -> Self::Spoke<'_>;
     /// Returns the cycle of the word, i.e. the finite loop that is repeated infinitely often.
     fn cycle(&self) -> Self::Cycle<'_>;
+
+    /// Returns a vector consisting of the symbols making up the cycle of `self`. This simply collects
+    /// whatever symbols make up [`OmegaWord::cycle()`];
+    fn cycle_vec(&self) -> Vec<S> {
+        self.cycle().to_vec()
+    }
+
+    /// Returns a vector consisting of the symbols making up the spoke of `self`. This simply collects
+    /// whatever symbols make up [`OmegaWord::spoke()`];
+    fn spoke_vec(&self) -> Vec<S> {
+        self.spoke().to_vec()
+    }
 
     /// Returns the loop index of the word, i.e. the length of the spoke. This can be zero if
     /// the word is periodic.

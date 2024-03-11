@@ -6,14 +6,37 @@ use crate::prelude::*;
 
 use super::LinearWord;
 
-#[derive(Clone)]
-pub struct Normalized<S: Symbol> {
+/// Represents the normalization of an [`OmegaWord`] with regard to a transition system `T`. For an ultimately periodic word
+/// `ux^ω`, we say that `T` is normalized if `u` and `ux` lead to the same state in `T`, which means that `x` loops on the state
+/// that is reached after reading `u`.
+///
+/// For every transition system `T` and any ultimately periodic word `w = ux^ω`, there exists a unique minimal normalization of
+/// `w` with regard to `T`. Moreover, this normalization can be efficiently computed in polynomial time.
+///
+/// # Example
+/// Let `T` be a transition system that has two states (0 and 1), each of those has a self-loop on a symbol `b` and `a`-transitions lead
+/// back and forth between the two states. Consider a word `w = ba^ω`, meaning `u = b` and `x = a`. Clearly `w` is not normalized wrt `T`
+/// since `u` leads to `0` while `x` leads to `1`. The normalization of `w` wrt `T` would be `b(aa)^ω` since `aa` loops on the state `0`
+/// that is reached after reading `b` from the initial state `0`.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct NormalizedOmegaWord<S: Symbol> {
     upw: ReducedOmegaWord<S>,
     pre_loop_count: usize,
     loop_size: usize,
 }
 
-impl<S: Symbol> Normalized<S> {
+impl<S: Symbol> NormalizedOmegaWord<S> {
+    /// Creates a new instance from the given ultimately periodic word `ux^ω`. The resulting normalized word will be
+    /// `ux^i(x^j)^ω` where `i` is given by `pre_loop_count` and `j` is `loop_size`.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::{prelude::*, word::NormalizedOmegaWord};
+    /// let word = upw!("b", "a");
+    /// let normalized = NormalizedOmegaWord::new(word, 1, 2);
+    /// assert_eq!(normalized.spoke_vec(), vec!['b', 'a']);
+    /// assert_eq!(normalized.cycle_vec(), vec!['a', 'a']);
+    /// ```
     pub fn new(upw: ReducedOmegaWord<S>, pre_loop_count: usize, loop_size: usize) -> Self {
         assert!(loop_size > 0, "loop size must be positive");
         Self {
@@ -23,7 +46,7 @@ impl<S: Symbol> Normalized<S> {
         }
     }
 
-    pub fn base_iter(&self) -> impl Iterator<Item = S> + '_ {
+    fn base_iter(&self) -> impl Iterator<Item = S> + '_ {
         self.upw.spoke().symbols().chain(
             self.upw
                 .cycle()
@@ -33,7 +56,7 @@ impl<S: Symbol> Normalized<S> {
         )
     }
 
-    pub fn rec_iter(&self) -> impl Iterator<Item = S> + '_ {
+    fn rec_iter(&self) -> impl Iterator<Item = S> + '_ {
         self.upw
             .cycle()
             .symbols()
@@ -42,7 +65,31 @@ impl<S: Symbol> Normalized<S> {
     }
 }
 
-impl<S: Symbol> Debug for Normalized<S> {
+impl<S: Symbol> LinearWord<S> for NormalizedOmegaWord<S> {
+    fn nth(&self, position: usize) -> Option<S> {
+        self.upw.nth(position)
+    }
+}
+
+impl<S: Symbol> OmegaWord<S> for NormalizedOmegaWord<S> {
+    type Spoke<'this> = Vec<S>
+    where
+        Self: 'this;
+
+    type Cycle<'this> = Vec<S>
+    where
+        Self: 'this;
+
+    fn spoke(&self) -> Self::Spoke<'_> {
+        self.base_iter().collect()
+    }
+
+    fn cycle(&self) -> Self::Cycle<'_> {
+        self.rec_iter().collect()
+    }
+}
+
+impl<S: Symbol> Debug for NormalizedOmegaWord<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let base = self.base_iter().map(|s| s.show()).join("");
         let rec = self.rec_iter().map(|s| s.show()).join("");
@@ -52,12 +99,12 @@ impl<S: Symbol> Debug for Normalized<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{upw, word::normalized::Normalized};
+    use crate::{upw, word::normalized::NormalizedOmegaWord};
 
     #[test]
     fn debug_normalized() {
         let upw = upw!("ab", "c");
-        let nupw = Normalized::new(upw, 1, 2);
+        let nupw = NormalizedOmegaWord::new(upw, 1, 2);
         assert_eq!(format!("{:?}", nupw), "abc·cc~abc");
     }
 }
