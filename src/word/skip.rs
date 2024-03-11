@@ -233,7 +233,7 @@ mod tests {
         assert!(w.spoke().is_empty());
         assert_eq!(w.cycle().to_vec(), vec!['c', 'a']);
 
-        let offset_normalized = upw!("abba").skip(1).skip(20).normalized();
+        let offset_normalized = upw!("abba").skip(1).skip(20).reduced();
         assert!(offset_normalized.spoke().is_empty());
         assert_eq!(offset_normalized.cycle().to_vec(), vec!['b', 'b', 'a', 'a']);
     }
