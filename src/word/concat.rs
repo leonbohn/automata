@@ -63,7 +63,7 @@ impl<S: Symbol, X: FiniteWord<S>, Y: OmegaWord<S>> OmegaWord<S> for Concat<X, Y>
 
 #[cfg(test)]
 mod tests {
-    use crate::word::{FiniteWord, LinearWord};
+    use crate::word::FiniteWord;
 
     #[test]
     fn concatenations() {

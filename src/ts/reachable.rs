@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 
-use crate::{prelude::Expression, ts::StateColor, Alphabet, Set, TransitionSystem};
+use crate::{prelude::Expression, ts::StateColor, Set, TransitionSystem};
 
-use super::{transition_system::IsEdge, Deterministic, SymbolOf};
+use super::{transition_system::IsEdge, SymbolOf};
 
 /// Type alias for a minimal representative of a state which is its length-lexicographically minimal
 /// access sequence and its state index.
@@ -14,6 +14,7 @@ pub type MinimalRepresentative<Ts> = (Vec<SymbolOf<Ts>>, <Ts as TransitionSystem
 #[derive(Debug, Clone)]
 pub struct MinimalRepresentatives<Ts: TransitionSystem> {
     ts: Ts,
+    #[allow(unused)]
     origin: Ts::StateIndex,
     seen: Set<Ts::StateIndex>,
     queue: VecDeque<MinimalRepresentative<Ts>>,
@@ -44,7 +45,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((access, q)) = self.queue.pop_front() {
-            if let Some(mut it) = self.ts.edges_from(q) {
+            if let Some(it) = self.ts.edges_from(q) {
                 for edge in it {
                     let p = edge.target();
                     if self.seen.insert(p) {
@@ -123,11 +124,11 @@ where
 mod tests {
     use itertools::Itertools;
 
-    use crate::{alphabet::CharAlphabet, ts::Sproutable, Pointed, TransitionSystem, Void};
+    use crate::prelude::*;
 
     #[test]
     fn reachable_states() {
-        let mut dfa = crate::DFA::new_for_alphabet(CharAlphabet::from_iter("ab".chars()));
+        let mut dfa = DFA::new_for_alphabet(CharAlphabet::from_iter("ab".chars()));
         let q0 = dfa.add_state(false);
         let q1 = dfa.add_state(false);
         let q2 = dfa.add_state(true);

@@ -1,41 +1,28 @@
-use std::{any::Any, f32::consts::E, hash::Hash};
+use std::hash::Hash;
 
 use crate::{
-    automaton::Initialized,
-    congruence::ColoredClass,
-    prelude::{CharAlphabet, Expression, Symbol},
-    word::{FiniteWord, OmegaWord},
-    Alphabet, Class, Color, Map, Partition, Pointed, RightCongruence, Set, Show, Void,
+    automaton::Initialized, congruence::ColoredClass, prelude::Expression, Alphabet, Partition,
+    Pointed, RightCongruence, Void,
 };
 
 use super::{
     connected_components::{
         tarjan_scc_iterative, tarjan_scc_recursive, SccDecomposition, TarjanDAG,
     },
-    index_ts::HashTsState,
     nts::{NTEdge, NTSEdgesFromIter},
     operations::{
         ColorRestricted, MapEdgeColor, MapStateColor, MappedEdgesFromIter, MappedTransition,
         MatchingProduct, ProductEdgesFrom, ProductIndex, ProductStatesIter, ProductTransition,
         RestrictByStateIndex, RestrictedEdgesFromIter, StateIndexFilter, SubsetConstruction,
     },
-    predecessors::PredecessorIterable,
     reachable::{MinimalRepresentatives, ReachableStateIndices, ReachableStates},
-    run::successful::Successful,
-    Deterministic, IntoEdge, Quotient,
+    Deterministic, Quotient,
 };
 
-use super::{
-    finite::{ReachedColor, ReachedState},
-    path::Lasso,
-    CanInduce, EdgeColor, HashTs, IndexType, Induced, Path, StateColor,
-};
-
-use hoars::State;
-use impl_tools::autoimpl;
+use super::{EdgeColor, HashTs, IndexType, StateColor};
 use itertools::Itertools;
 
-/// Helper trait for extracting the [`Symbol`] type from an a transition system.
+/// Helper trait for extracting the [`crate::alphabet::Symbol`] type from an a transition system.
 pub type SymbolOf<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Symbol;
 /// Helper trait for extracting the [`Expression`] type from an a transition system.
 pub type ExpressionOf<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Expression;
@@ -43,7 +30,7 @@ pub type ExpressionOf<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Expr
 /// Encapsulates the transition function δ of a (finite) transition system. This is the main trait that
 /// is used to query a transition system. Transitions are labeled with a [`Alphabet::Expression`], which
 /// determines on which [`Alphabet::Symbol`]s the transition can be taken. Additionally, every transition
-/// is labeled with a [`Color`], which can be used to store additional information about it, like an
+/// is labeled with a [`crate::Color`], which can be used to store additional information about it, like an
 /// associated priority.
 ///
 /// # The difference between transitions and edges
@@ -573,8 +560,8 @@ pub trait TransitionSystem: Sized {
 }
 
 /// Trait that helps with accessing states in more elaborate [`TransitionSystem`]s. For
-/// example in a [`crate::RightCongruence`], we have more information than the [`Color`]
-/// on a state, we have its [`Class`] as well. Since we would like to be able to
+/// example in a [`crate::RightCongruence`], we have more information than the [`crate::Color`]
+/// on a state, we have its [`crate::Class`] as well. Since we would like to be able to
 /// access a state of a congruence not only by its index, but also by its classname
 /// or any other [word](`crate::prelude::LinearWord`) of finite length, this trait is necessary.
 ///
@@ -588,7 +575,7 @@ pub trait Indexes<Ts: TransitionSystem> {
 
 impl<Ts: TransitionSystem> Indexes<Ts> for Ts::StateIndex {
     #[inline(always)]
-    fn to_index(&self, ts: &Ts) -> Option<<Ts as TransitionSystem>::StateIndex> {
+    fn to_index(&self, _ts: &Ts) -> Option<<Ts as TransitionSystem>::StateIndex> {
         Some(*self)
     }
 }
@@ -821,7 +808,7 @@ pub struct TransitionsFrom<'a, D: TransitionSystem + 'a> {
 impl<'a, D: TransitionSystem + 'a> Iterator for TransitionsFrom<'a, D> {
     type Item = (D::StateIndex, SymbolOf<D>, D::EdgeColor, D::StateIndex);
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(sym) = self.symbols.as_mut().and_then(|mut it| it.next()) {
+        if let Some(sym) = self.symbols.as_mut().and_then(|it| it.next()) {
             return Some((
                 self.source,
                 sym,
@@ -849,7 +836,7 @@ impl<'a, D: TransitionSystem + 'a> TransitionsFrom<'a, D> {
     /// Creates a new instance from a reference to a transition system and the index of the state
     /// from which the transitions should be taken.
     pub fn new(det: &'a D, state: D::StateIndex) -> Self {
-        let Some(mut edges) = det.edges_from(state) else {
+        let Some(edges) = det.edges_from(state) else {
             panic!(
                 "We should at least get an iterator. Probably the state {state} does not exist."
             );
@@ -1275,15 +1262,7 @@ impl<'a, Ts: TransitionSystem> DeterministicEdgesFrom<'a, Ts> {
 mod tests {
 
     use super::TransitionSystem;
-    use crate::{
-        alphabet,
-        tests::wiki_dfa,
-        ts::{
-            finite::{ReachedColor, ReachedState},
-            index_ts::MealyTS,
-            Deterministic, Sproutable,
-        },
-    };
+    use crate::{tests::wiki_dfa, ts::Deterministic};
 
     #[test]
     fn transitions_from() {
@@ -1293,18 +1272,9 @@ mod tests {
 
     #[test]
     fn run() {
-        let mut ts: MealyTS<_, usize, usize> =
-            MealyTS::new(alphabet::CharAlphabet::from_iter(['a', 'b']));
-        let s0 = ts.add_state(());
-        let s1 = ts.add_state(());
-        ts.add_edge(s0, 'a', s1, 0usize);
-        ts.add_edge(s0, 'b', s0, 1usize);
-        ts.add_edge(s1, 'a', s1, 0usize);
-        ts.add_edge(s1, 'b', s0, 1usize);
-
-        let ts = ts.with_initial(s0);
+        let ts = wiki_dfa();
         assert!(ts.finite_run("abba").is_ok());
-        assert_eq!(ts.reached_state_index("ab"), Some(s0));
-        assert_eq!(ts.reached_state_index("bbb"), Some(s0));
+        assert_eq!(ts.reached_state_index("ab"), Some(3));
+        assert_eq!(ts.reached_state_index("bbb"), Some(5));
     }
 }

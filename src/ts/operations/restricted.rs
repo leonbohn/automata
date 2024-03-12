@@ -240,7 +240,7 @@ impl<D: PredecessorIterable<EdgeColor = usize>> PredecessorIterable for ColorRes
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
+    fn predecessors<Idx: Indexes<Self>>(&self, _state: Idx) -> Option<Self::EdgesToIter<'_>> {
         todo!()
     }
 }

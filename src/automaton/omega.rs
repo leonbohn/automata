@@ -1,9 +1,8 @@
 use bit_set::BitSet;
-use hoars::HoaAutomaton;
 use itertools::Itertools;
 use tracing::warn;
 
-use crate::{congruence::FORC, hoa::HoaAlphabet, prelude::*, Set};
+use crate::{congruence::FORC, prelude::*, Set};
 
 use super::Initialized;
 
@@ -40,7 +39,7 @@ impl Show for AcceptanceMask {
         self.iter().map(|i| format!("{{{i}}}")).join(", ")
     }
 
-    fn show_collection<'a, I>(iter: I) -> String
+    fn show_collection<'a, I>(_iter: I) -> String
     where
         Self: 'a,
         I: IntoIterator<Item = &'a Self>,
@@ -91,6 +90,7 @@ pub struct OmegaAutomaton<A: Alphabet> {
 
 pub struct DeterministicOmegaAutomaton<A: Alphabet> {
     pub(super) ts: Initialized<DTS<A, usize, AcceptanceMask>>,
+    #[allow(unused)]
     pub(super) acc: OmegaAcceptanceCondition,
 }
 

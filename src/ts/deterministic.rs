@@ -1,5 +1,4 @@
-use std::{hash::Hash, marker::PhantomData};
-use tracing::trace;
+use std::hash::Hash;
 
 use itertools::Itertools;
 
@@ -20,9 +19,6 @@ use super::operations::ProductTransition;
 use super::operations::RestrictByStateIndex;
 use super::operations::StateIndexFilter;
 use super::path::Lasso;
-use super::path::LassoIn;
-use super::path::PathIn;
-use super::reachable::MinimalRepresentative;
 use super::sproutable::{IndexedAlphabet, Sproutable};
 use super::IntoHashTs;
 use super::Path;
@@ -180,7 +176,7 @@ pub trait Deterministic: TransitionSystem {
     /// - [`Err`] if the run is unsuccessful, meaning a symbol is encountered for which no
     /// transition exists.
     ///
-    /// It returns a [`PathIn`] in either case, which is a path in the transition system. So it is possible
+    /// It returns a [`crate::ts::path::PathIn`] in either case, which is a path in the transition system. So it is possible
     /// to inspect the path, e.g. to find out which state was reached or which transitions were taken.
     /// For more information, see [`crate::prelude::Path`].
     #[allow(clippy::type_complexity)]
@@ -210,13 +206,12 @@ pub trait Deterministic: TransitionSystem {
         W: FiniteWord<SymbolOf<Self>>,
         Idx: Indexes<Self>,
     {
-        let mut current = origin
+        let origin = origin
             .to_index(self)
             .expect("run must start in state that exists");
-        let mut path = Path::empty_in_with_capacity(self, current, word.len());
+        let mut path = Path::empty_in_with_capacity(self, origin, word.len());
         for symbol in word.symbols() {
-            if let Some(o) = path.extend_in(&self, symbol) {
-                current = o.target();
+            if let Some(_o) = path.extend_in(&self, symbol) {
                 continue;
             }
             return Err(path);
@@ -468,8 +463,6 @@ pub trait Deterministic: TransitionSystem {
                 },
             }
         }
-
-        unreachable!()
     }
 
     /// Returns a string representation of the transition table of the transition system.
@@ -583,7 +576,6 @@ pub trait Deterministic: TransitionSystem {
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Sproutable::collect_from`] for details.
     fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
-        use crate::ts::Sproutable;
         let (ts, _map) = DTS::collect_from(self);
         ts
     }
@@ -598,7 +590,6 @@ pub trait Deterministic: TransitionSystem {
         EdgeColor<Self>: Hash + Eq,
         StateColor<Self>: Hash + Eq,
     {
-        use crate::ts::Sproutable;
         let (ts, _map) = HashTs::collect_from(self);
         ts
     }

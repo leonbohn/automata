@@ -120,7 +120,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         self.edges.get_or_init(|| {
             let mut edges = Set::default();
             for q in &self.states {
-                let mut it = self.ts.edges_from(*q).expect("State must exist");
+                let it = self.ts.edges_from(*q).expect("State must exist");
                 for edge in it {
                     let p = edge.target();
                     if self.states.contains(&p) {
@@ -143,7 +143,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         self.transitions.get_or_init(|| {
             let mut edges = Set::default();
             for q in &self.states {
-                let mut it = self.ts.edges_from(*q).expect("State must exist");
+                let it = self.ts.edges_from(*q).expect("State must exist");
                 for edge in it {
                     let p = edge.target();
                     for a in edge.expression().symbols() {
@@ -219,7 +219,6 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         let ts = self.ts;
         debug_assert!(!self.is_empty());
 
-        let mut should_continue = false;
         let mut queue = Map::default();
         for (p, a, _, q) in self.interior_transitions() {
             queue
@@ -335,12 +334,8 @@ impl<'a, Ts: TransitionSystem> Debug for Scc<'a, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
 
-    use crate::{
-        ts::{Deterministic, NTS},
-        Set, TransitionSystem,
-    };
+    use crate::{ts::NTS, Set, TransitionSystem};
 
     #[test]
     fn interior_transitions() {

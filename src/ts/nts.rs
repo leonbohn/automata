@@ -1,10 +1,7 @@
-use std::{collections::BTreeMap, ffi::FromBytesUntilNulError, hash::Hash};
+use std::hash::Hash;
 
 use crate::{prelude::*, Set, Void};
 use itertools::Itertools;
-use owo_colors::OwoColorize;
-
-use super::transition_system::FullTransition;
 
 /// Type alias for the constituent parts of an [`NTS`] with the same associated types as the
 /// transition sytem `D`.
@@ -266,7 +263,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
         set
     }
 
-    pub(crate) fn nts_remove_state(&mut self, state: usize) -> Option<Q> {
+    pub(crate) fn nts_remove_state(&mut self, _state: usize) -> Option<Q> {
         // let mut current = self.first_edge(state);
         // while let Some(idx) = current {
         //     let edge = &self.edges[idx];
