@@ -19,12 +19,6 @@ pub type CollectDTS<Ts> = DTS<
 
 impl<A: Alphabet, Q: Clone, C: Clone> Deterministic for DTS<A, Q, C> {}
 
-impl<A: Alphabet, Q: Clone, C: Clone> DTS<A, Q, C> {
-    fn collect_dts(self) -> DTS<A, Q, C> {
-        self
-    }
-}
-
 impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for DTS<A, Q, C> {
     type StateIndex = usize;
 

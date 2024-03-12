@@ -1,12 +1,9 @@
 use std::{fmt::Debug, hash::Hash};
 
-use itertools::Itertools;
-
 use crate::{
     alphabet::Alphabet,
-    prelude::Initialized,
     ts::{transition_system::IsEdge, Deterministic},
-    Color, Map, Set, Show,
+    Color, Map, Set,
 };
 
 use super::{
@@ -113,16 +110,6 @@ pub type IntoHashTs<Ts> = HashTs<
     <Ts as TransitionSystem>::EdgeColor,
 >;
 
-/// Type alias for a [`HashTs`] with initial states. Given a [`TransitionSystem`] `Ts`, returns a [`HashTs`] with the
-/// same alphabet, edge and state colors, wrapped in a [`Initialized`] type.
-pub type IntoInitialHashTs<Ts> = Initialized<
-    HashTs<
-        <Ts as TransitionSystem>::Alphabet,
-        <Ts as TransitionSystem>::StateColor,
-        <Ts as TransitionSystem>::EdgeColor,
-    >,
->;
-
 impl<A, C, Q, Idx> std::fmt::Debug for HashTs<A, Q, C, Idx>
 where
     A: Alphabet,
@@ -141,9 +128,6 @@ where
         )
     }
 }
-
-pub type MealyTS<A, C, Idx = usize> = HashTs<A, (), C, Idx>;
-pub type MooreTS<A, C, Idx = usize> = HashTs<A, C, (), Idx>;
 
 impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C, Idx> {
     /// Creates a new transition system with the given alphabet.
@@ -174,7 +158,7 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
     pub(crate) fn hashts_remove_transitions(
         &mut self,
         from: Idx,
-        symbol: SymbolOf<Self>,
+        _symbol: SymbolOf<Self>,
     ) -> Set<(ExpressionOf<Self>, C, Idx)> {
         let mut edges = self
             .states
@@ -193,11 +177,13 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
     }
 
     /// Creates a `HASHTS` from the given alphabet and states.
+    #[allow(unused)]
     pub(crate) fn from_parts(alphabet: A, states: Map<Idx, HashTsState<A, Q, C, Idx>>) -> Self {
         Self { alphabet, states }
     }
 
     /// Decomposes the `HASHTS` into its constituent parts.
+    #[allow(unused)]
     #[allow(clippy::type_complexity)]
     pub(crate) fn into_parts(self) -> (A, Map<Idx, HashTsState<A, Q, C, Idx>>) {
         (self.alphabet, self.states)
@@ -259,6 +245,7 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
 
 impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone + Hash + Eq> HashTs<A, Q, C, Idx> {
     /// Returns an iterator over the [`EdgeIndex`]es of the edges leaving the given state.
+    #[allow(unused)]
     pub(crate) fn index_ts_edges_from(
         &self,
         source: Idx,
@@ -369,45 +356,5 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for HashTs<A, Q, C,
         } else {
             false
         }
-    }
-}
-
-trait Increment {
-    fn increment(&mut self);
-}
-
-impl<X> Increment for X
-where
-    X: std::ops::AddAssign<u8>,
-{
-    fn increment(&mut self) {
-        *self += 1;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        alphabet,
-        ts::{
-            index_ts::MealyTS, transition_system::IsEdge, Deterministic, Sproutable,
-            TransitionSystem,
-        },
-    };
-
-    #[test]
-    fn build_ts() {
-        let mut ts: MealyTS<_, usize, _> =
-            MealyTS::new(alphabet::CharAlphabet::from_iter(['a', 'b']));
-        let s0 = ts.add_state(());
-        let s1 = ts.add_state(());
-        let _e0 = ts.add_edge(s0, 'a', s1, 0usize);
-        let _e1 = ts.add_edge(s0, 'b', s0, 1usize);
-        let _e2 = ts.add_edge(s1, 'a', s1, 0usize);
-        let _e3 = ts.add_edge(s1, 'b', s0, 1usize);
-        println!("{:?}", ts);
-        assert!(ts.transition(s0, 'a').is_some());
-        assert_eq!(ts.transition(s1, 'a').unwrap().target(), s1);
-        assert_eq!(ts.index_ts_edges_from(s0).unwrap().count(), 2);
     }
 }

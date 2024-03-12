@@ -1,16 +1,15 @@
+use crate::{Class, Color, Map, RightCongruence, Show, Void};
+use std::fmt::Display;
+
 /// Contains the most central trait for this module, the trait [`TransitionSystem`].
 #[macro_use]
 pub mod transition_system;
-use std::{fmt::Display, hash::Hash, ops::Deref};
 
 use impl_tools::autoimpl;
-use itertools::Itertools;
 pub use transition_system::{DeterministicEdgesFrom, ExpressionOf, SymbolOf, TransitionSystem};
 
 /// Defines implementations for common operations on automata/transition systems.
 pub mod operations;
-
-use crate::{Class, Color, Map, RightCongruence, Show, Void};
 
 mod index_ts;
 pub use index_ts::{HashTs, IntoHashTs};
@@ -175,6 +174,4 @@ pub trait Congruence: Deterministic + Pointed {
 impl<Sim: Deterministic + Pointed> Congruence for Sim {}
 
 #[cfg(test)]
-pub mod tests {
-    use crate::prelude::DFA;
-}
+pub mod tests {}

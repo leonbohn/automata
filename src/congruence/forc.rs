@@ -1,10 +1,6 @@
 use std::fmt::Debug;
 
-use owo_colors::OwoColorize;
-
-use crate::{
-    ts::transition_system::Indexes, Alphabet, Class, Color, Map, RightCongruence, Show, Void,
-};
+use crate::{ts::transition_system::Indexes, Alphabet, Map, RightCongruence, Void};
 
 /// A family of right congruences (FORC) consists of a *leading* right congruence and for each
 /// class of this congruence a *progress* right congruence.
@@ -66,7 +62,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> FORC<A, Q, C> {
 }
 
 impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> std::fmt::Debug for FORC<A, Q, C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // write!(f, "{}\n{:?}", "LEADING".bold(), self.leading())?;
         // for (c, rc) in self.prc_iter() {
         //     let class_name = self.leading.class_name(*c).unwrap();

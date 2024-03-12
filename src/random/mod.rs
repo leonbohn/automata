@@ -1,6 +1,8 @@
-use tracing::{debug, info, trace};
+#![allow(unused)]
 
-use crate::{prelude::*, Map, Void};
+use tracing::{debug, info};
+
+use crate::prelude::*;
 
 /// Uses sprout-like algorithm to generate a random transition system. `symbols` determines the
 /// number of distinct symbols in the [`CharAlphabet`]. `probability` determines the probability

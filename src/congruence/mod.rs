@@ -1,14 +1,13 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
-use itertools::{Itertools, MapInto};
+use itertools::Itertools;
 
 use crate::{
     alphabet::{CharAlphabet, Symbol},
-    automaton::IntoDFA,
-    prelude::{DFALike, IsEdge},
+    prelude::{DFALike, IsEdge, DFA},
     ts::{transition_system::Indexes, Deterministic, EdgeColor, Sproutable, StateColor, DTS},
     word::FiniteWord,
-    Alphabet, Color, Map, Pointed, Show, TransitionSystem, Void, DFA,
+    Alphabet, Pointed, Show, TransitionSystem, Void,
 };
 
 mod class;
@@ -17,9 +16,11 @@ pub use class::{Class, ColoredClass};
 mod forc;
 pub use forc::FORC;
 
+#[allow(unused)]
 mod transitionprofile;
 pub use transitionprofile::{Accumulates, RunProfile, RunSignature, TransitionMonoid};
 
+#[allow(unused)]
 mod cayley;
 
 /// A right congruence is an equivalence relation that is compatible with the right concatenation. We
@@ -41,13 +42,13 @@ impl<S: Symbol + Show> Show for ColoredClass<S, Void> {
         self.class.show()
     }
 
-    fn show_collection<'a, I>(iter: I) -> String
+    fn show_collection<'a, I>(_iter: I) -> String
     where
         Self: 'a,
         I: IntoIterator<Item = &'a Self>,
         I::IntoIter: DoubleEndedIterator,
     {
-        todo!()
+        unimplemented!()
     }
 }
 
@@ -186,7 +187,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for RightCongruence<A, Q, C> {
     }
 
     fn new_for_alphabet(alphabet: Self::Alphabet) -> Self {
-        let mut ts = DTS::new_for_alphabet(alphabet);
+        let ts = DTS::new_for_alphabet(alphabet);
         Self { ts }
     }
     fn add_edge<X, Y, CI>(

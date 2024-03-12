@@ -1,11 +1,7 @@
-use std::collections::{
-    hash_map::{Entry, RandomState},
-    BTreeSet, VecDeque,
-};
+use std::collections::{hash_map::Entry, BTreeSet, VecDeque};
 
-use fxhash::FxBuildHasher;
 use itertools::Itertools;
-use tracing::{error, trace};
+use tracing::trace;
 
 use crate::{
     prelude::Expression,
@@ -13,7 +9,7 @@ use crate::{
         connected_components::Scc, predecessors::PredecessorIterable, transition_system::IsEdge,
         IndexType,
     },
-    Alphabet, Map, Set, Show, TransitionSystem,
+    Map, Set, Show, TransitionSystem,
 };
 
 use super::SccDecomposition;
@@ -68,7 +64,7 @@ impl<Idx: IndexType> Tarjan<Idx> {
         if let Some(it) = ts.edges_from(v) {
             for edge in it {
                 let q = edge.target();
-                for a in edge.expression().symbols() {
+                for _a in edge.expression().symbols() {
                     if self.data.get(&q).and_then(|data| data.rootindex).is_none() {
                         self.visit(ts, q, f);
                     }
@@ -146,6 +142,7 @@ where
     SccDecomposition::new(ts, sccs)
 }
 
+#[allow(unused)]
 pub(crate) fn kosaraju<Ts>(ts: &Ts, start: Ts::StateIndex) -> SccDecomposition<'_, Ts>
 where
     Ts: TransitionSystem + PredecessorIterable,
@@ -197,7 +194,7 @@ pub(crate) fn tarjan_scc_iterative<Ts>(ts: &Ts) -> SccDecomposition<'_, Ts>
 where
     Ts: TransitionSystem,
 {
-    let mut current = 0;
+    let mut current: usize;
     let mut sccs = vec![];
 
     let mut indices = Map::default();
@@ -212,7 +209,7 @@ where
     let mut queue = Vec::with_capacity(ts.size());
 
     // we do an outermost loop that executes as long as states have not seen all states
-    'reachable: while let Some(&next) = unvisited.first() {
+    while let Some(&next) = unvisited.first() {
         assert!(queue.is_empty());
         trace!("adding {} to queue", next.show());
         current = 0;
@@ -366,11 +363,11 @@ mod tests {
         assert!(reachable.contains(&2));
 
         let start = Instant::now();
-        let sccs = kosaraju(&ts, ts.initial());
+        let _sccs = kosaraju(&ts, ts.initial());
         println!("Kosaraju took {} microseconds", start.elapsed().as_micros());
 
         let start = Instant::now();
-        let sccs = tarjan_scc_recursive(&ts);
+        let _sccs = tarjan_scc_recursive(&ts);
         println!(
             "Tarjan recursive took {} microseconds",
             start.elapsed().as_micros()

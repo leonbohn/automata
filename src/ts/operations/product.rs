@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use itertools::Itertools;
 
 use crate::prelude::*;
@@ -80,6 +78,7 @@ pub struct ProductStatesIter<'a, L: TransitionSystem, R: TransitionSystem> {
     left: L::StateIndices<'a>,
     right: R::StateIndices<'a>,
     left_state: Option<L::StateIndex>,
+    #[allow(unused)]
     lts: &'a L,
     rts: &'a R,
 }

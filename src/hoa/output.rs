@@ -20,6 +20,6 @@ impl<D: DPALike<Alphabet = HoaAlphabet>> ToHoa for IntoDPA<D> {
     }
 }
 
-fn hoa_alphabet_to_header_item(alphabet: &HoaAlphabet) -> hoars::HeaderItem {
+fn hoa_alphabet_to_header_item(_alphabet: &HoaAlphabet) -> hoars::HeaderItem {
     todo!()
 }

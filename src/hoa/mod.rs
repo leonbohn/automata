@@ -2,18 +2,9 @@
 pub mod input;
 pub mod output;
 
-use std::ops::Deref;
-
-use crate::{
-    automaton::{AcceptanceMask, IntoDPA, OmegaAcceptanceCondition, OmegaAutomaton},
-    prelude::{DPALike, Expression, Initialized, DPA},
-    ts::{Sproutable, DTS, NTS},
-    Alphabet, Map, Pointed, Show, TransitionSystem,
-};
-use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddValuation, BddVariable, BddVariableSet};
-use bit_set::BitSet;
-use hoars::{AcceptanceCondition, HoaAutomaton, LabelExpression, ALPHABET, MAX_APS, VARS};
-use itertools::Itertools;
+use crate::{prelude::*, Map};
+use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddValuation, BddVariable};
+use hoars::{HoaAutomaton, ALPHABET, MAX_APS, VARS};
 
 /// A propositional alphabet, where a symbol is a valuation of all propositional variables.
 ///
@@ -69,7 +60,7 @@ pub(crate) fn bdd_valuation_to_hoa_symbol(valuation: &BddValuation) -> HoaSymbol
     let mut repr = 0;
     for i in 0..MAX_APS {
         if valuation.value(VARS[i]) {
-            repr |= (1 << i);
+            repr |= 1 << i;
         }
     }
     HoaSymbol { repr, aps }
@@ -98,7 +89,7 @@ impl PartialOrd for HoaSymbol {
     }
 }
 impl Ord for HoaSymbol {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, _other: &Self) -> std::cmp::Ordering {
         todo!()
     }
 }
@@ -107,7 +98,7 @@ impl Show for HoaSymbol {
         todo!()
     }
 
-    fn show_collection<'a, I>(iter: I) -> String
+    fn show_collection<'a, I>(_iter: I) -> String
     where
         Self: 'a,
         I: IntoIterator<Item = &'a Self>,
@@ -181,7 +172,7 @@ impl PartialOrd for HoaExpression {
     }
 }
 impl Ord for HoaExpression {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, _other: &Self) -> std::cmp::Ordering {
         todo!()
     }
 }
@@ -190,7 +181,7 @@ impl Show for HoaExpression {
         todo!()
     }
 
-    fn show_collection<'a, I>(iter: I) -> String
+    fn show_collection<'a, I>(_iter: I) -> String
     where
         Self: 'a,
         I: IntoIterator<Item = &'a Self>,
@@ -202,6 +193,7 @@ impl Show for HoaExpression {
 
 pub struct HoaExpressionIter<'a> {
     iter: BddSatisfyingValuations<'a>,
+    #[allow(unused)]
     aps: usize,
 }
 
@@ -271,8 +263,8 @@ impl Alphabet for HoaAlphabet {
     type Expression = HoaExpression;
 
     fn search_edge<X>(
-        map: &Map<Self::Expression, X>,
-        sym: Self::Symbol,
+        _map: &Map<Self::Expression, X>,
+        _sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         todo!()
     }
@@ -302,15 +294,15 @@ impl Alphabet for HoaAlphabet {
         true
     }
 
-    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
+    fn matches(&self, _expression: &Self::Expression, _symbol: Self::Symbol) -> bool {
         todo!()
     }
 
-    fn expression(symbol: Self::Symbol) -> Self::Expression {
+    fn expression(_symbol: Self::Symbol) -> Self::Expression {
         todo!()
     }
 
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression {
+    fn make_expression(&self, _symbol: Self::Symbol) -> &Self::Expression {
         todo!()
     }
 }

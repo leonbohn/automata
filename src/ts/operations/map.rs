@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{prelude::*, ts::nts::NTSPartsFor};
+use crate::prelude::*;
 
 /// A transition system that maps the edge colors of a given transition system to a new type.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,7 +88,7 @@ where
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
+    fn predecessors<Idx: Indexes<Self>>(&self, _state: Idx) -> Option<Self::EdgesToIter<'_>> {
         todo!()
     }
 }

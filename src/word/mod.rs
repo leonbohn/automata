@@ -1,11 +1,7 @@
-use std::{
-    fmt::{Debug, Display},
-    hash::Hash,
-};
+use std::hash::Hash;
 
-use crate::{alphabet::Symbol, Show};
+use crate::alphabet::Symbol;
 use impl_tools::autoimpl;
-use itertools::Itertools;
 
 mod skip;
 pub use skip::Skip;
@@ -21,7 +17,6 @@ pub use finite::FiniteWord;
 
 mod omega;
 pub use omega::{OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, ReducedParseError};
-use tracing::subscriber::SetGlobalDefaultError;
 
 pub use self::skip::Infix;
 
@@ -72,7 +67,7 @@ pub trait LinearWord<S>: Hash + Eq {
         (first, self.skip(1))
     }
 
-    /// Creates an [`subword::Offset`] object, which is the suffix of `self` that starts at the given `offset`.
+    /// Creates an [`crate::word::Skip`] object, which is the suffix of `self` that starts at the given `offset`.
     fn skip(&self, offset: usize) -> skip::Skip<'_, S, Self>
     where
         Self: Sized,
@@ -95,7 +90,7 @@ pub struct ConsumingInfixIterator<'a, S: Symbol, W: LinearWord<S>> {
 }
 
 impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for ConsumingInfixIterator<'a, S, W> {
-    fn nth(&self, position: usize) -> Option<S> {
+    fn nth(&self, _position: usize) -> Option<S> {
         todo!()
     }
 }
@@ -155,11 +150,12 @@ macro_rules! upw {
 
 #[cfg(test)]
 mod tests {
+    use crate::word::{FiniteWord, LinearWord};
 
     #[test]
     fn macro_upw() {
         let w = upw!("a", "bbbb");
         let ww = upw!("ab", "b");
-        // assert_eq!(w.prefix(6).finite_to_vec(), ww.prefix(6).finite_to_vec());
+        assert_eq!(w.prefix(6).to_vec(), ww.prefix(6).to_vec());
     }
 }

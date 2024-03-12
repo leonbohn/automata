@@ -2,9 +2,7 @@
 use itertools::Itertools;
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
-use crate::{prelude::*, Void};
-
-use super::{Automaton, MooreLike};
+use crate::prelude::*;
 
 /// Represents the semantics of a Mealy machine. Concretely, this type returns for
 /// a finite run, the last transition color that is taken. It panics if the run has
@@ -43,7 +41,6 @@ where
                 let Some(sym) = edge.expression().symbols().next() else {
                     continue 'edges;
                 };
-                let mut it = other.edges_from(r).unwrap();
 
                 match other.transition(r, sym) {
                     Some(e) => {
@@ -76,7 +73,7 @@ where
 /// Implemented by objects which can be viewed as a MealyMachine, i.e. a finite transition system
 /// which has outputs of type usize on its edges.
 pub trait MealyLike: Congruence {
-    fn mealy_bisimilar<M>(&self, other: M) -> bool
+    fn mealy_bisimilar<M>(&self, _other: M) -> bool
     where
         M: Congruence,
         EdgeColor<M>: Color,
@@ -164,7 +161,7 @@ mod tests {
             .deterministic()
             .with_initial(0)
             .into_mealy();
-        let mm3 = NTS::builder()
+        let _mm3 = NTS::builder()
             .default_color(())
             .with_transitions([
                 (0, 'a', 1, 0),
