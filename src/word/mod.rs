@@ -1,7 +1,6 @@
 use std::hash::Hash;
 
 use crate::alphabet::Symbol;
-use impl_tools::autoimpl;
 
 mod skip;
 pub use skip::Skip;
@@ -22,7 +21,6 @@ pub use self::skip::Infix;
 
 /// A linear word is a word that can be indexed by a `usize`. This is the case for both finite and
 /// infinite words.
-#[autoimpl(for<T: trait + ?Sized> &T, &mut T)]
 pub trait LinearWord<S>: Hash + Eq {
     /// Returns the symbol at the given `position` in `self`, if it exists.
     fn nth(&self, position: usize) -> Option<S>;
@@ -73,6 +71,12 @@ pub trait LinearWord<S>: Hash + Eq {
         Self: Sized,
     {
         skip::Skip::new(self, offset)
+    }
+}
+
+impl<S: Symbol, W: LinearWord<S> + ?Sized> LinearWord<S> for &W {
+    fn nth(&self, position: usize) -> Option<S> {
+        W::nth(self, position)
     }
 }
 

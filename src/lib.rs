@@ -32,7 +32,6 @@ pub mod prelude {
         ts::{
             dag::Dag,
             dot::Dottable,
-            finite::ReachedState,
             operations::{Product, ProductIndex},
             predecessors::PredecessorIterable,
             run::{FiniteRun, OmegaRun},
@@ -53,7 +52,6 @@ pub mod prelude {
 /// Module that contains definitions for dealing with alphabets.
 pub mod alphabet;
 pub use alphabet::Alphabet;
-use impl_tools::autoimpl;
 use itertools::Itertools;
 
 /// This module defines transition systems and successor functions and such.
@@ -309,8 +307,14 @@ impl<S: Show> Show for &S {
 /// A partition is a different view on a congruence relation, by grouping elements of
 /// type `I` into their respective classes under the relation.
 #[derive(Debug, Clone)]
-#[autoimpl(Deref using self.0)]
 pub struct Partition<I: Hash + Eq>(Vec<BTreeSet<I>>);
+
+impl<I: Hash + Eq> std::ops::Deref for Partition<I> {
+    type Target = Vec<BTreeSet<I>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl<'a, I: Hash + Eq> IntoIterator for &'a Partition<I> {
     type Item = &'a BTreeSet<I>;
