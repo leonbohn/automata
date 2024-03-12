@@ -76,8 +76,9 @@ pub use congruence::{Class, RightCongruence};
 #[macro_use]
 pub mod word;
 
-/// Contains implementations for different algorithms such as minimization.
-pub mod algorithms;
+/// Contains implementations different minimization algorithms. This is feature gated behind the `minimize` feature.
+#[feature(minimize)]
+pub mod minimization;
 
 #[feature(hoa)]
 pub mod hoa;

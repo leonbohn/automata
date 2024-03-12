@@ -21,8 +21,9 @@ fastrand = { version = "2", optional = true }
 hoars = { git = "https://github.com/leonbohn/hoars", optional = true }
 
 [features]
-default = ["hoa", "graphviz", "random"]
+default = ["hoa", "graphviz", "random", "minimize"]
 random = ["fastrand"]
+minimize = []
 hoa = ["dep:hoars", "biodivine-lib-bdd"]
 graphviz = ["dep:tempfile"]
 
