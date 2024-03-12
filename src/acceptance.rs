@@ -13,54 +13,6 @@ use crate::{
     FiniteLength, InfiniteLength, Length, Word,
 };
 
-/// Abstracts the concept of an acceptance condition, which is in essence simply a predicate on some
-/// induced object. This means that objects of this type can be classified into accepting and rejecting
-/// which is represented by the boolean values true and false.
-#[autoimpl(for<T: trait + ?Sized> &T, &mut T)]
-pub trait Acceptance {
-    /// The type of induced objects that this acceptance can classify.
-    type Over: Induced;
-
-    /// Returns true if the given induced object is accepted by this acceptance condition.
-    fn is_accepting(&self, state: Self::Over) -> bool;
-}
-
-/// Implementors of this trait possess an acceptance condition.
-#[autoimpl(for<T: trait + ?Sized> &T, &mut T)]
-pub trait HasAcceptance {
-    /// The type of acceptance condition that this object possesses.
-    type Acceptance: Acceptance;
-
-    /// Returns a reference to the acceptance condition of this object.
-    fn acceptance(&self) -> &Self::Acceptance;
-}
-
-/// Abstracts the concept of a parity, which can either be even or odd.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(missing_docs)]
-pub enum Parity {
-    Even,
-    Odd,
-}
-
-impl From<Parity> for bool {
-    fn from(parity: Parity) -> Self {
-        match parity {
-            Parity::Even => false,
-            Parity::Odd => true,
-        }
-    }
-}
-
-impl From<Parity> for u8 {
-    fn from(parity: Parity) -> Self {
-        match parity {
-            Parity::Even => 0,
-            Parity::Odd => 1,
-        }
-    }
-}
-
 /// A reachability condition simply classifies objects based
 /// on whether they are included in a set or not. Most notably, this is used to
 /// define deterministic finite automata (DFA)s and can be viewed as a predicate
