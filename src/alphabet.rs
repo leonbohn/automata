@@ -35,7 +35,6 @@ pub trait Expression<S: Symbol>: Hash + Clone + Debug + Eq + Ord + Show {
 }
 
 /// An alphabet abstracts a collection of [`Symbol`]s and complex [`Expression`]s over those.
-#[impl_tools::autoimpl(for<T: trait + ?Sized> &T)]
 pub trait Alphabet: Clone {
     /// The type of symbols in this alphabet.
     type Symbol: Symbol;
@@ -84,6 +83,36 @@ pub trait Alphabet: Clone {
 
     /// Returns the number of symbols in the alphabet.
     fn size(&self) -> usize;
+}
+
+impl<A: Alphabet> Alphabet for &A {
+    type Expression = A::Expression;
+    type Symbol = A::Symbol;
+    type Universe<'this> = A::Universe<'this> where Self: 'this;
+    fn universe(&self) -> Self::Universe<'_> {
+        A::universe(self)
+    }
+    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression {
+        A::make_expression(self, symbol)
+    }
+    fn search_edge<X>(
+        map: &Map<Self::Expression, X>,
+        sym: Self::Symbol,
+    ) -> Option<(&Self::Expression, &X)> {
+        A::search_edge(map, sym)
+    }
+    fn contains(&self, symbol: Self::Symbol) -> bool {
+        A::contains(self, symbol)
+    }
+    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
+        A::matches(self, expression, symbol)
+    }
+    fn expression(symbol: Self::Symbol) -> Self::Expression {
+        A::expression(symbol)
+    }
+    fn size(&self) -> usize {
+        A::size(self)
+    }
 }
 
 /// Represents an alphabet where a [`Symbol`] is just a single `char`.

@@ -12,7 +12,6 @@ tabled = { version = "0.15.0", features = ["ansi"] }
 owo-colors = "4.0.0"
 test-log = { version = "0.2.14", features = ["trace"] }
 tempfile = { version = "3.9.0", optional = true }
-impl-tools = "0.10"
 paste = "1.0.14"
 biodivine-lib-bdd = { version = "0.5", optional = true }
 bit-set = "0.5.3"

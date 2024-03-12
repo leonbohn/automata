@@ -5,7 +5,6 @@ use std::fmt::Display;
 #[macro_use]
 pub mod transition_system;
 
-use impl_tools::autoimpl;
 pub use transition_system::{DeterministicEdgesFrom, ExpressionOf, SymbolOf, TransitionSystem};
 
 /// Defines implementations for common operations on automata/transition systems.
@@ -36,9 +35,6 @@ pub use builder::TSBuilder;
 
 mod dts;
 pub use dts::{CollectDTS, DTS};
-
-mod induces;
-pub use induces::{finite, infinite, CanInduce, Induced};
 
 /// Deals with analysing reachability in transition systems.
 pub mod reachable;
@@ -108,7 +104,6 @@ pub type StateColor<X> = <X as TransitionSystem>::StateColor;
 pub type EdgeColor<X> = <X as TransitionSystem>::EdgeColor;
 
 /// Implementors of this trait have a distinguished (initial) state.
-#[autoimpl(for<T: trait> &T, &mut T)]
 pub trait Pointed: TransitionSystem {
     /// Returns the index of the initial state.
     fn initial(&self) -> Self::StateIndex;
@@ -117,6 +112,18 @@ pub trait Pointed: TransitionSystem {
     fn initial_color(&self) -> Self::StateColor {
         self.state_color(self.initial())
             .expect("Initial state must exist and be colored!")
+    }
+}
+
+impl<P: Pointed> Pointed for &P {
+    fn initial(&self) -> Self::StateIndex {
+        P::initial(self)
+    }
+}
+
+impl<P: Pointed> Pointed for &mut P {
+    fn initial(&self) -> Self::StateIndex {
+        P::initial(self)
     }
 }
 
