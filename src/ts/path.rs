@@ -2,11 +2,11 @@ use std::fmt::Debug;
 
 use itertools::{Either, Itertools};
 
-use crate::{alphabet::Alphabet, Color, Set, Show};
+use crate::{alphabet::Alphabet, Color, Show};
 
 use super::{
     transition_system::{Indexes, IsEdge},
-    Deterministic, ExpressionOf, IndexType, SymbolOf, TransitionSystem,
+    Deterministic, IndexType, SymbolOf, TransitionSystem,
 };
 
 /// Represents a path through a transition system. Note, that the path itself is decoupled from the
@@ -177,12 +177,12 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
 
     /// Returns an iterator over all colors which appear on an edge taken by the path.
     pub fn edge_colors(&self) -> impl Iterator<Item = &C> + '_ {
-        self.transitions.iter().map(|(source, sym, c)| c)
+        self.transitions.iter().map(|(_source, _sym, c)| c)
     }
 
     /// Consumes `self` and returns an iterator over all colors which appear on an edge taken by the path. May contain duplicates.
     pub fn into_edge_colors(self) -> impl Iterator<Item = C> {
-        self.transitions.into_iter().map(|(p, a, c)| c)
+        self.transitions.into_iter().map(|(_p, _a, c)| c)
     }
 
     /// Creates a looping path by pointing the last transition to the given `position`.

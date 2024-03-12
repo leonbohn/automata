@@ -1,6 +1,4 @@
-use hoars::State;
 use itertools::Itertools;
-use owo_colors::OwoColorize;
 use std::fmt::Debug;
 
 use crate::{prelude::*, Void};
@@ -53,7 +51,7 @@ where
     where
         Self::StateColor: Clone,
     {
-        self.map_edge_colors_full(|p, a, c, q| {
+        self.map_edge_colors_full(|p, _a, _c, _q| {
             self.state_color(p)
                 .expect("We know it is reachable and it must be colored")
                 .clone()

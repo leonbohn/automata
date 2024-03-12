@@ -1,21 +1,15 @@
 use std::{
     collections::{BTreeSet, VecDeque},
     hash::Hash,
-    marker::PhantomData,
 };
 
 use itertools::Itertools;
 use tracing::{info, trace};
 
-use super::{acceptor::OmegaSemantics, Automaton};
 use crate::{
     prelude::*,
-    ts::{
-        connected_components::Scc,
-        operations::{MapEdgeColor, MapStateColor},
-        CollectDTS, Quotient, Shrinkable,
-    },
-    HasParity, Partition, Set,
+    ts::{CollectDTS, Quotient, Shrinkable},
+    Partition,
 };
 
 /// Represents a parity condition which accepts if and only if the least color that
@@ -31,7 +25,7 @@ impl<Q> OmegaSemantics<Q, usize> for MinEven {
     {
         run.infinity_edge_colors()
             .and_then(|colors| colors.min())
-            .map(|x| x.is_even())
+            .map(|x| x % 2 == 0)
             .unwrap_or(false)
     }
 }
@@ -55,7 +49,7 @@ pub type DPA<A = CharAlphabet, Sem = MinEven> =
 /// with the given semantics.
 pub type IntoDPA<T, Sem = MinEven> = Automaton<T, Sem, true>;
 
-/// Trait that should be implemented by every object that can be viewed as a [`crate::DPA`].
+/// Trait that should be implemented by every object that can be viewed as a [`super::DPA`].
 pub trait DPALike: Congruence<EdgeColor = usize> {
     /// Consumes `self` and returns a [`DPA`] from the transition system underlying `self`.
     fn into_dpa(self) -> IntoDPA<Self> {
@@ -276,8 +270,8 @@ impl<D: DPALike> IntoDPA<D> {
         &self,
         other: &IntoDPA<O>,
     ) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
-        for i in self.colors().filter(|x| x.is_even()) {
-            for j in other.colors().filter(|x| x.is_odd()) {
+        for i in self.colors().filter(|x| x % 2 == 0) {
+            for j in other.colors().filter(|x| x % 2 == 1) {
                 if let Some(cex) = self.as_ref().witness_colors(i, other, j) {
                     trace!(
                         "found counterexample {:?}, witnessing colors {i} and {j}",
@@ -314,10 +308,16 @@ impl<D: DPALike> IntoDPA<D> {
         let mut priority = 0;
         'outer: loop {
             for (source, expression) in remove_edges.drain(..) {
-                ts.remove_edge(source, &expression).is_some();
+                assert!(
+                    ts.remove_edge(source, &expression).is_some(),
+                    "We must be able to actually remove these edges"
+                );
             }
             for state in remove_states.drain(..) {
-                ts.remove_state(state).is_some();
+                assert!(
+                    ts.remove_state(state).is_some(),
+                    "We must be able to actually remove these edges"
+                );
             }
 
             if ts.size() == 0 {
@@ -365,7 +365,7 @@ impl<D: DPALike> IntoDPA<D> {
                 for (q, a, c, p) in scc
                     .interior_edges()
                     .iter()
-                    .filter(|(q, a, c, p)| c == minimal_interior_edge_color)
+                    .filter(|(_q, _a, c, _p)| c == minimal_interior_edge_color)
                 {
                     trace!(
                         "recolouring and removing {} --{}|{}--> {} with priority {}",
@@ -412,7 +412,7 @@ mod tests {
 
     #[test_log::test]
     fn normalize_dpa() {
-        let mut dpa = NTS::builder()
+        let dpa = NTS::builder()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 2, 0),
@@ -430,7 +430,7 @@ mod tests {
         for (input, expected) in [("a", 0), ("b", 0), ("ba", 0), ("bb", 1)] {
             assert_eq!(normalized.try_mealy_map(input), Some(expected))
         }
-        let n = example_dpa().normalized();
+        let _n = example_dpa().normalized();
     }
 
     fn example_dpa() -> DPA {
@@ -519,7 +519,7 @@ mod tests {
         let l = &good[0];
         let r = &bad[2];
         let prod = l.ts_product(r);
-        let sccs = prod.sccs();
+        let _sccs = prod.sccs();
         assert!(!good[0].language_equivalent(&bad[2]));
 
         for g in &good {

@@ -1,25 +1,19 @@
 #![allow(missing_docs)]
 
-use std::fmt::{Debug, Display, Write};
+use std::fmt::{Debug, Display};
 
 use itertools::Itertools;
 
 use crate::{
-    alphabet::{Directional, InvertibleChar},
-    automaton::{Initialized, IntoDPA},
-    congruence::{ColoredClass, FORC},
+    automaton::IntoDPA,
     prelude::{
-        CharAlphabet, DPALike, EdgeColor, ExpressionOf, IntoMealyMachine, IntoMooreMachine,
-        MealyLike, MooreLike, StateColor, Symbol, SymbolOf,
+        DPALike, EdgeColor, ExpressionOf, IntoMealyMachine, IntoMooreMachine, MealyLike, MooreLike,
+        StateColor, DFA,
     },
-    ts::dot,
-    Alphabet, Class, Color, Map, Pointed, RightCongruence, Show, TransitionSystem,
+    Alphabet, Color, Show, TransitionSystem,
 };
 
-use super::{
-    transition_system::{Indexes, IsEdge},
-    Deterministic, HashTs, IndexType,
-};
+use super::transition_system::IsEdge;
 
 fn sanitize_dot_ident(name: &str) -> String {
     name.chars()
@@ -94,7 +88,7 @@ pub trait Dottable: TransitionSystem {
 
     fn dot_transition_attributes<'a>(
         &'a self,
-        t: Self::EdgeRef<'a>,
+        _t: Self::EdgeRef<'a>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute>
     where
         (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
@@ -104,7 +98,7 @@ pub trait Dottable: TransitionSystem {
     fn dot_state_ident(&self, idx: Self::StateIndex) -> String;
     fn dot_state_attributes(
         &self,
-        idx: Self::StateIndex,
+        _idx: Self::StateIndex,
     ) -> impl IntoIterator<Item = DotStateAttribute>
     where
         (String, StateColor<Self>): Show,
@@ -183,7 +177,9 @@ pub trait Dottable: TransitionSystem {
                     .stdout
                     .map_or("Error in dot...".to_string(), |mut err| {
                         let mut buf = String::new();
-                        err.read_to_string(&mut buf);
+                        if let Err(e) = err.read_to_string(&mut buf) {
+                            buf = format!("Could not read from stdout: {e}");
+                        }
                         buf
                     }),
             ))
@@ -211,7 +207,7 @@ pub trait Dottable: TransitionSystem {
     }
 }
 
-impl<A: Alphabet> Dottable for crate::DFA<A> {
+impl<A: Alphabet> Dottable for DFA<A> {
     fn dot_name(&self) -> Option<String> {
         Some("DFA".into())
     }
@@ -559,16 +555,10 @@ pub fn display_dot(dot: &str) -> Result<(), std::io::Error> {
 
 #[cfg(feature = "graphviz")]
 fn render_dot_to_tempfile(dot: &str) -> Result<Vec<u8>, std::io::Error> {
-    use std::{
-        io::{Read, Write},
-        process::Stdio,
-    };
+    use std::{io::Write, process::Stdio};
 
     let mut tempfile = tempfile::NamedTempFile::new()?;
     tempfile.write_all(dot.as_bytes())?;
-    let tempfile_name = tempfile.path();
-
-    let image_tempfile = tempfile::Builder::new().suffix(".png").tempfile()?;
 
     let mut child = std::process::Command::new("dot")
         .stdin(Stdio::piped())
@@ -593,7 +583,11 @@ fn render_dot_to_tempfile(dot: &str) -> Result<Vec<u8>, std::io::Error> {
                 ))
             }
         }
-        Err(e) => todo!(),
+        Err(e) => {
+            let e = format!("Could not create dot child process\n{}", e);
+            tracing::error!("{e}");
+            Err(std::io::Error::other(e))
+        }
     }
 }
 
@@ -603,10 +597,7 @@ fn render_dot_to_tempfile(dot: &str) -> Result<Vec<u8>, std::io::Error> {
 /// of ImageMagick will be used.
 #[cfg(feature = "graphviz")]
 fn display_png(contents: Vec<u8>) -> std::io::Result<()> {
-    use std::{
-        io::{Read, Stdin, Write},
-        process::Stdio,
-    };
+    use std::{io::Write, process::Stdio};
 
     use tracing::trace;
     let mut child = if cfg!(target_os = "linux") || cfg!(target_os = "windows") {
@@ -649,7 +640,7 @@ mod tests {
         congruence::FORC,
         prelude::DPA,
         ts::{Sproutable, NTS},
-        Class, Pointed, RightCongruence, Void,
+        Pointed, RightCongruence, Void,
     };
 
     use super::Dottable;
@@ -706,7 +697,7 @@ mod tests {
         prc_a.add_edge(a3, 'a', a3, Void);
         prc_a.add_edge(a3, 'b', a3, Void);
 
-        let forc = FORC::from_iter(cong, [(0, prc_e), (1, prc_a)].iter().cloned());
+        let _forc = FORC::from_iter(cong, [(0, prc_e), (1, prc_a)].iter().cloned());
         todo!()
         // forc.render_to_file_name("/home/leon/test.png");
     }
@@ -723,8 +714,8 @@ mod tests {
         cong.add_edge(q1, 'a', q0, Void);
         cong.add_edge(q1, 'b', q1, Void);
 
-        cong.display_rendered();
-        let three_congs = vec![cong.clone(), cong.clone(), cong];
+        cong.display_rendered().unwrap();
+        let _three_congs = vec![cong.clone(), cong.clone(), cong];
         todo!()
         // three_congs.display_rendered();
     }
@@ -740,7 +731,6 @@ mod tests {
         dpa.add_edge(q0, 'b', q1, 2usize);
         dpa.add_edge(q1, 'a', q1, 0usize);
         dpa.add_edge(q1, 'b', q0, 2usize);
-        println!("{:?}", dpa);
-        dpa.display_rendered();
+        dpa.display_rendered().unwrap();
     }
 }

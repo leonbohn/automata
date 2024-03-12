@@ -1,14 +1,13 @@
 #![allow(missing_docs)]
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::VecDeque,
     fmt::{Debug, Display},
     hash::Hash,
-    marker::PhantomData,
 };
 
 use itertools::Itertools;
 
-use crate::{prelude::*, Map, Void};
+use crate::prelude::*;
 
 pub trait HasNeutral {
     fn neutral() -> Self;
@@ -159,7 +158,7 @@ impl Accumulates for Reduces<bool> {
 impl Accumulates for Reduces<()> {
     type X = ();
 
-    fn update(&mut self, other: &Self::X) {}
+    fn update(&mut self, _other: &Self::X) {}
 
     fn neutral() -> Self
     where
@@ -168,7 +167,7 @@ impl Accumulates for Reduces<()> {
         Self(())
     }
 
-    fn from_iter<'a, I: IntoIterator<Item = &'a Self::X>>(iter: I) -> Self
+    fn from_iter<'a, I: IntoIterator<Item = &'a Self::X>>(_iter: I) -> Self
     where
         Self: 'a,
     {
@@ -186,7 +185,7 @@ impl Accumulates for Reduces<()> {
 impl Accumulates for Reduces<Void> {
     type X = Void;
 
-    fn update(&mut self, other: &Self::X) {}
+    fn update(&mut self, _other: &Self::X) {}
 
     fn neutral() -> Self
     where
@@ -195,7 +194,7 @@ impl Accumulates for Reduces<Void> {
         Self(Void)
     }
 
-    fn from_iter<'a, I: IntoIterator<Item = &'a Self::X>>(iter: I) -> Self
+    fn from_iter<'a, I: IntoIterator<Item = &'a Self::X>>(_iter: I) -> Self
     where
         Self: 'a,
     {
@@ -305,7 +304,7 @@ where
         out
     }
 
-    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(iter: I) -> String
+    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(_iter: I) -> String
     where
         Self: 'a,
     {

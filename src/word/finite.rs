@@ -1,11 +1,10 @@
-use std::{collections::VecDeque, fmt::Write};
+use std::collections::VecDeque;
 
-use impl_tools::autoimpl;
 use itertools::Itertools;
 
 use crate::{prelude::Symbol, Show};
 
-use super::{omega::ReducedOmegaWord, Concat, LinearWord, PeriodicOmegaWord};
+use super::{Concat, LinearWord, PeriodicOmegaWord};
 
 /// A finite word is a [`LinearWord`] that has a finite length.
 pub trait FiniteWord<S>: LinearWord<S> {

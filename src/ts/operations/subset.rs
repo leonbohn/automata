@@ -1,4 +1,4 @@
-use std::{cell::RefCell, f32::consts::E, fmt::Debug};
+use std::{cell::RefCell, fmt::Debug};
 
 use itertools::Itertools;
 
@@ -75,7 +75,7 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
             .get(source)?
             .iter()
             .flat_map(|q| {
-                self.ts.transitions_from(*q).filter_map(|(q, a, c, p)| {
+                self.ts.transitions_from(*q).filter_map(|(_q, a, c, p)| {
                     if a == symbol {
                         Some((c, p))
                     } else {
@@ -209,8 +209,7 @@ impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        prelude::Initialized,
-        ts::{Deterministic, HashTs, NTS},
+        ts::{Deterministic, NTS},
         TransitionSystem,
     };
 

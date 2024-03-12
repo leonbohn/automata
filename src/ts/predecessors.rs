@@ -1,5 +1,3 @@
-use impl_tools::autoimpl;
-
 use crate::{automaton::Initialized, Alphabet, Color, RightCongruence, TransitionSystem, Void};
 
 use super::{

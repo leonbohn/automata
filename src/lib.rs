@@ -17,8 +17,6 @@
 //! - [`ts::Sproutable`] enables growing a TS state by state and edge/transition by edge/transition. Naturally, this is only implemented for the basic building blocks, i.e. `BTS`, `DTS` and `NTS`.
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
-#![allow(unused)]
-#![allow(clippy::pedantic)]
 
 /// The prelude is supposed to make using this package easier. Including everything, i.e.
 /// `use automata::prelude::*;` should be enough to use the package.
@@ -27,9 +25,9 @@ pub mod prelude {
         alphabet,
         alphabet::{CharAlphabet, Expression, Symbol},
         automaton::{
-            DBALike, DFALike, DPALike, Initialized, IntoDBA, IntoDFA, IntoDPA, IntoMealyMachine,
-            IntoMooreMachine, MealyLike, MealyMachine, MooreLike, MooreMachine, NoColor,
-            StateBasedDBA, StateBasedDPA, DBA, DFA, DPA,
+            Automaton, DBALike, DFALike, DPALike, FiniteSemantics, Initialized, IntoDBA, IntoDFA,
+            IntoDPA, IntoMealyMachine, IntoMooreMachine, MealyLike, MealyMachine, MooreLike,
+            MooreMachine, OmegaSemantics, DBA, DFA, DPA,
         },
         ts::{
             dag::Dag,
@@ -66,7 +64,6 @@ pub use ts::{Pointed, TransitionSystem};
 /// Defines automata and common types of combinations of transition system with acceptance condition.
 #[allow(clippy::upper_case_acronyms)]
 pub mod automaton;
-use automaton::{MealyMachine, MooreMachine, DBA, DFA, DPA};
 
 /// Defines congruence relations and congruence classes.
 pub mod congruence;
@@ -77,14 +74,14 @@ pub use congruence::{Class, RightCongruence};
 pub mod word;
 
 /// Contains implementations different minimization algorithms. This is feature gated behind the `minimize` feature.
-#[feature(minimize)]
+#[cfg(feature = "minimize")]
 pub mod minimization;
 
-#[feature(hoa)]
+#[cfg(feature = "hoa")]
 pub mod hoa;
 
 /// Implements the generation of random transition systems.
-#[feature(random)]
+#[cfg(feature = "random")]
 pub mod random;
 
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
@@ -175,13 +172,13 @@ pub trait Show {
     /// Show a collection of the thing, for a collection of states this should be {q0, q1, q2, ...}
     /// and for a collection of transitions it should be {(q0, a, q1), (q1, b, q2), ...}.
     /// By default this is unimplemented.
-    fn show_collection<'a, I>(iter: I) -> String
+    fn show_collection<'a, I>(_iter: I) -> String
     where
         Self: 'a,
         I: IntoIterator<Item = &'a Self>,
         I::IntoIter: DoubleEndedIterator,
     {
-        unimplemented!("This operation makes no sense")
+        unimplemented!("This operation makes no sense.")
     }
 }
 
@@ -262,7 +259,7 @@ impl<S: Show> Show for Vec<S> {
         S::show_collection(self.iter())
     }
 
-    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(iter: I) -> String
+    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(_iter: I) -> String
     where
         Self: 'a,
         I::IntoIter: DoubleEndedIterator,
@@ -276,12 +273,12 @@ impl<S: Show, T: Show> Show for (S, T) {
         format!("({}, {})", self.0.show(), self.1.show())
     }
 
-    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(iter: I) -> String
+    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(_iter: I) -> String
     where
         Self: 'a,
         I::IntoIter: DoubleEndedIterator,
     {
-        todo!()
+        unimplemented!()
     }
 }
 

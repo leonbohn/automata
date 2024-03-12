@@ -5,7 +5,8 @@ use crate::{
 };
 
 use super::{
-    Congruence, Deterministic, FiniteRun, FiniteWord, Indexes, OmegaRun, PredecessorIterable,
+    Congruence, Deterministic, FiniteSemantics, FiniteWord, Indexes, OmegaSemantics,
+    PredecessorIterable,
 };
 
 /// An automaton consists of a transition system and an acceptance condition.
@@ -54,20 +55,6 @@ impl<D, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
     pub fn acceptance(&self) -> &A {
         &self.acceptance
     }
-}
-
-pub trait FiniteSemantics<Q, C> {
-    type Output;
-    fn finite_semantic<R>(&self, run: R) -> Self::Output
-    where
-        R: FiniteRun<StateColor = Q, EdgeColor = C>;
-}
-
-pub trait OmegaSemantics<Q, C> {
-    type Output;
-    fn omega_semantic<R>(&self, run: R) -> Self::Output
-    where
-        R: OmegaRun<StateColor = Q, EdgeColor = C>;
 }
 
 impl<D, A> Automaton<D, A, false>

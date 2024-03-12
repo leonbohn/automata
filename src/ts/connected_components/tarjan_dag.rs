@@ -133,7 +133,7 @@ impl<'a, Ts: TransitionSystem> From<SccDecomposition<'a, Ts>> for TarjanDAG<'a, 
 }
 
 impl<'a, Ts: TransitionSystem> std::fmt::Debug for TarjanDAG<'a, Ts> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }

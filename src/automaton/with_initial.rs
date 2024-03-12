@@ -1,5 +1,3 @@
-use owo_colors::OwoColorize;
-
 use crate::prelude::*;
 use std::fmt::Debug;
 
@@ -88,7 +86,7 @@ where
 
 impl<Ts: TransitionSystem + Sproutable> Sproutable for Initialized<Ts> {
     fn new_for_alphabet(alphabet: Self::Alphabet) -> Self {
-        let mut ts = Ts::new_for_alphabet(alphabet);
+        let ts = Ts::new_for_alphabet(alphabet);
         Self(ts, <Ts::StateIndex as IndexType>::first())
     }
     fn add_edge<X, Y, CI>(
