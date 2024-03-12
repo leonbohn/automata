@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    algorithms::moore_partition_refinement,
     prelude::*,
     ts::{
         finite::ReachedColor,
@@ -67,12 +66,6 @@ pub trait DFALike: Congruence<StateColor = bool> {
     /// Returns the indices of all states that are rejecting.
     fn rejecting_states(&self) -> StatesWithColor<'_, Self> {
         StatesWithColor::new(self, false)
-    }
-
-    /// Minimizes `self` using Hopcroft's partition refinement algorithm.
-    fn minimized(self) -> IntoDFA<impl DFALike<Alphabet = Self::Alphabet>> {
-        let min = moore_partition_refinement(self);
-        min.into_dfa()
     }
 
     /// Checks whether `self` is equivalent to `other`, i.e. whether the two DFAs accept

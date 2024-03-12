@@ -36,23 +36,6 @@ pub type MooreMachine<A = CharAlphabet, Q = usize> =
 /// obtain the type of a [`DFA`] for the given ts.
 pub type IntoMooreMachine<D> = Automaton<D, MooreSemantics<StateColor<D>>, false>;
 
-impl<D: MooreLike + Deterministic> IntoMooreMachine<D>
-where
-    StateColor<D>: Color,
-{
-    /// Returns the unique minimal moore machine that is bisimilar to `self`. This means
-    /// for every finite word, the output of `self` and the output of the returned moore
-    /// machine is the same. This is done using the Hopcroft and Moore algorithms for
-    /// minimizing deterministic finite automata, implemented in the
-    /// [`crate::algorithms::moore_partition_refinement`] function.
-    pub fn minimize(&self) -> MooreMachine<D::Alphabet, D::StateColor>
-    where
-        StateColor<D>: Color,
-    {
-        crate::algorithms::moore_partition_refinement(self)
-    }
-}
-
 /// Implemented by objects that can be viewed as MooreMachines, i.e. finite transition systems
 /// that have usize annotated/outputting states.
 pub trait MooreLike: Congruence
@@ -157,7 +140,7 @@ where
         self.map_state_colors(|o| o <= color)
             .erase_edge_colors()
             .into_dfa()
-            .minimized()
+            .minimize()
             .collect_dfa()
     }
 }

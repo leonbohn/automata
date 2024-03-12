@@ -31,10 +31,6 @@ impl<Ts: Congruence> IntoMealyMachine<Ts>
 where
     EdgeColor<Ts>: Color,
 {
-    pub fn minimize(&self) -> MealyMachine<Ts::Alphabet, EdgeColor<Ts>> {
-        crate::algorithms::mealy_partition_refinement(self)
-    }
-
     pub fn restricted_inequivalence<
         O: MealyLike<Alphabet = Ts::Alphabet, EdgeColor = Ts::EdgeColor>,
     >(
