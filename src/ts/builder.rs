@@ -74,14 +74,14 @@ impl<Q, C> Default for TSBuilder<Q, C> {
 
 impl TSBuilder<bool, Void> {
     /// Tries to turn `self` into a deterministic finite automaton. Panics if `self` is not deterministic.
-    pub fn into_dfa(mut self, initial: usize) -> DFA<CharAlphabet> {
+    pub fn into_dfa(self, initial: usize) -> DFA<CharAlphabet> {
         self.deterministic().with_initial(initial).collect_dfa()
     }
 }
 
 impl TSBuilder<Void, usize> {
     /// Attempts to turn `self` into a deterministic parity automaton. Panics if `self` is not deterministic.
-    pub fn into_dpa(mut self, initial: usize) -> DPA<CharAlphabet> {
+    pub fn into_dpa(self, initial: usize) -> DPA<CharAlphabet> {
         self.default_color(Void)
             .deterministic()
             .with_initial(initial)
@@ -89,7 +89,7 @@ impl TSBuilder<Void, usize> {
     }
 
     /// Builds a Mealy machine from `self`. Panics if `self` is not deterministic.
-    pub fn into_mealy_machine(mut self, initial: usize) -> MealyMachine<CharAlphabet> {
+    pub fn into_mealy_machine(self, initial: usize) -> MealyMachine<CharAlphabet> {
         self.default_color(Void)
             .deterministic()
             .with_initial(initial)
@@ -117,20 +117,20 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     /// Adds a list of colors to `self`. The colors are assigned to the states in the order in which they are given.
     /// This means if we give the colors `[true, false]` and then add a transition from state `0` to state `1`, then state
     /// `0` will have color `true` and state `1` will have color `false`.
-    pub fn with_colors<I: IntoIterator<Item = Q>>(mut self, iter: I) -> Self {
+    pub fn with_colors<I: IntoIterator<Item = Q>>(self, iter: I) -> Self {
         iter.into_iter()
             .enumerate()
-            .fold(self, |mut acc, (i, x)| acc.color(i, x))
+            .fold(self, |acc, (i, x)| acc.color(i, x))
     }
 
     /// Build a deterministic transition system from `self`. Panics if `self` is not deterministic.
-    pub fn deterministic(mut self) -> DTS<CharAlphabet, Q, C> {
+    pub fn deterministic(self) -> DTS<CharAlphabet, Q, C> {
         self.collect().try_into().expect("Not deterministic!")
     }
 
     /// Assigns the given `color` to the state with the given index `idx`.
     pub fn color(mut self, idx: usize, color: Q) -> Self {
-        assert!(self.colors.iter().all(|(q, c)| q != &idx));
+        assert!(self.colors.iter().all(|(q, _c)| q != &idx));
         self.colors.push((idx, color));
         self
     }
@@ -204,7 +204,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     }
 
     /// Collects self into a non-deterministic transition system.
-    pub fn collect(mut self) -> NTS<CharAlphabet, Q, C> {
+    pub fn collect(self) -> NTS<CharAlphabet, Q, C> {
         let alphabet = CharAlphabet::from_iter(self.edges.iter().map(|(_, a, _, _)| *a));
         let num_states = self
             .edges

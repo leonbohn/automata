@@ -1,13 +1,8 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
 
-use impl_tools::autoimpl;
 use itertools::Itertools;
 
-use crate::{
-    prelude::Symbol,
-    ts::{Congruence, Deterministic, SymbolOf},
-    Alphabet, Map, Show,
-};
+use crate::{prelude::Symbol, ts::Congruence, Alphabet, Map, Show};
 
 use super::{FiniteWord, LinearWord, NormalizedOmegaWord};
 
@@ -268,7 +263,7 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
 }
 
 impl<S: Symbol> LinearWord<S> for PeriodicOmegaWord<S> {
-    fn nth(&self, position: usize) -> Option<S> {
+    fn nth(&self, _position: usize) -> Option<S> {
         todo!()
     }
 }
@@ -301,8 +296,8 @@ impl<S: Symbol> OmegaWord<S> for PeriodicOmegaWord<S> {
 /// of a finite spoke and finite, non-empty cycle.
 ///
 /// The reduced representation can be computed in polynomial time and it is unique.
-/// We can compute it by calling [`ReducedOmegaWord::normalized()`] and it is possible to
-/// verify whether a word is normalized through the [`ReducedOmegaWord::is_normalized()`]
+/// We can compute it by calling [`OmegaWord::reduced()`] and it is possible to
+/// verify whether an instance of `Self` is normalized through the [`ReducedOmegaWord::is_reduced()`]
 /// method.
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct ReducedOmegaWord<S> {
@@ -323,14 +318,6 @@ impl<S: Symbol> Show for ReducedOmegaWord<S> {
                 .map(|chr| chr.show())
                 .join("")
         )
-    }
-    fn show_collection<'a, I>(iter: I) -> String
-    where
-        Self: 'a,
-        I: IntoIterator<Item = &'a Self>,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        unimplemented!()
     }
 }
 
@@ -492,7 +479,7 @@ impl TryFrom<&str> for ReducedOmegaWord<char> {
 pub struct Epsilon();
 
 impl<S: Symbol> LinearWord<S> for Epsilon {
-    fn nth(&self, position: usize) -> Option<S> {
+    fn nth(&self, _position: usize) -> Option<S> {
         None
     }
 }
@@ -521,6 +508,7 @@ pub struct OmegaIteration<W>(W);
 
 impl<W> OmegaIteration<W> {
     /// Iterate the given finite word `from`, panics if the word is empty.
+    #[allow(unused)]
     pub fn new<S: Symbol>(from: W) -> Self
     where
         W: FiniteWord<S>,

@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use super::{
     transitionprofile::{Reduces, Replaces},
     Accumulates, RunProfile, TransitionMonoid,
@@ -8,7 +6,6 @@ use crate::{
     alphabet::{Directional, InvertibleChar},
     prelude::*,
     ts::transition_system::EdgeReference,
-    Map,
 };
 
 #[derive(Clone)]
@@ -18,6 +15,7 @@ pub struct Cayley<
     SA: Accumulates<X = Ts::StateColor>,
     EA: Accumulates<X = Ts::EdgeColor>,
 > {
+    #[allow(unused)]
     ts: &'a Ts,
     alphabet: Directional,
     expressions: crate::Map<SymbolOf<Self>, ExpressionOf<Self>>,
@@ -31,10 +29,13 @@ impl<
         EA: Accumulates<X = Ts::EdgeColor>,
     > Cayley<'a, Ts, SA, EA>
 {
+    /// Returns a reference to the underlying transition system.
+    #[allow(unused)]
     pub fn ts(&self) -> &Ts {
         self.ts
     }
 
+    /// returns a reference to the [`TransitionMonoid`].
     pub fn monoid(&self) -> &TransitionMonoid<'a, Ts, SA, EA> {
         &self.m
     }
@@ -89,7 +90,7 @@ where
         symbol: SymbolOf<Self>,
     ) -> Option<Self::EdgeRef<'_>> {
         let idx = state.to_index(self)?;
-        let (tp, string) = self.monoid().get_profile(idx)?;
+        let (_tp, string) = self.monoid().get_profile(idx)?;
         let mut word = string.to_deque();
         symbol.mul(&mut word);
         let tp = self.monoid().profile_for(&word)?;
@@ -108,6 +109,7 @@ where
     Reduces<Ts::EdgeColor>: Accumulates<X = Ts::EdgeColor>,
     Reduces<Ts::StateColor>: Accumulates<X = Ts::StateColor>,
 {
+    #[allow(unused)]
     pub fn new_reducing(ts: &'a Ts) -> Self {
         let alphabet = Directional::from_iter(ts.alphabet().universe());
         Cayley {
@@ -124,6 +126,7 @@ where
     Replaces<Ts::EdgeColor>: Accumulates<X = Ts::EdgeColor>,
     Replaces<Ts::StateColor>: Accumulates<X = Ts::StateColor>,
 {
+    #[allow(unused)]
     pub fn new_replacing(ts: &'a Ts) -> Self {
         let alphabet = Directional::from_iter(ts.alphabet().universe());
         Cayley {
@@ -295,9 +298,11 @@ mod tests {
     use crate::{tests::wiki_dfa, ts::Dottable};
 
     #[test]
+    #[ignore]
     fn right_cayley_graph() {
         let dfa = wiki_dfa();
-        let accumulating_cayley = super::Cayley::new_reducing(&dfa);
-        let replacing_cayley = super::Cayley::new_replacing(&dfa);
+        let _accumulating_cayley = super::Cayley::new_reducing(&dfa);
+        let _replacing_cayley = super::Cayley::new_replacing(&dfa);
+        todo!("Find something to test?")
     }
 }

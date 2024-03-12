@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::prelude::Symbol;
 
-use super::{omega::PeriodicOmegaWord, ConsumingInfixIterator, FiniteWord, LinearWord, OmegaWord};
+use super::{ConsumingInfixIterator, FiniteWord, LinearWord, OmegaWord};
 
 /// A suffix of a [`LinearWord`] which skips a fixed number of symbols. If the underlying
 /// word is infinite, the suffix is also infinite. If the underlying word is finite, the suffix
@@ -120,7 +120,7 @@ impl<'a, S: Symbol, W: OmegaWord<S>> OmegaWord<S> for Skip<'a, S, W> {
     fn spoke(&self) -> Self::Spoke<'_> {
         if self.offset < self.sequence.loop_index() {
             self.sequence
-                .infix(self.offset, (self.sequence.loop_index() - self.offset))
+                .infix(self.offset, self.sequence.loop_index() - self.offset)
         } else {
             self.sequence.infix(self.sequence.loop_index(), 0)
         }
@@ -132,9 +132,9 @@ impl<'a, S: Symbol, W: OmegaWord<S>> OmegaWord<S> for Skip<'a, S, W> {
                 .infix(self.sequence.loop_index(), self.sequence.cycle_length())
         } else {
             self.sequence.infix(
-                (self.sequence.loop_index()
+                self.sequence.loop_index()
                     + (self.offset.saturating_sub(self.sequence.loop_index())
-                        % self.sequence.cycle_length())),
+                        % self.sequence.cycle_length()),
                 self.sequence.cycle_length(),
             )
         }

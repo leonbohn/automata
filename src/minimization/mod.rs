@@ -10,8 +10,7 @@ where
     /// Returns the unique minimal moore machine that is bisimilar to `self`. This means
     /// for every finite word, the output of `self` and the output of the returned moore
     /// machine is the same. This is done using the Hopcroft and Moore algorithms for
-    /// minimizing deterministic finite automata, implemented in the
-    /// [`crate::algorithms::moore_partition_refinement`] function.
+    /// minimizing deterministic finite automata.
     pub fn minimize(&self) -> MooreMachine<D::Alphabet, D::StateColor> {
         partition_refinement::moore_partition_refinement(self)
     }

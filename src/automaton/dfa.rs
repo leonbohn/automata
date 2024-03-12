@@ -1,15 +1,8 @@
 use std::collections::BTreeSet;
 
-use crate::{
-    prelude::*,
-    ts::{
-        finite::ReachedColor,
-        operations::{MapStateColor, MatchingProduct},
-        Quotient,
-    },
-};
+use crate::prelude::*;
 
-use super::{acceptor::FiniteSemantics, Automaton, StatesWithColor};
+use super::StatesWithColor;
 
 #[derive(Clone, Copy, Default, Hash, Eq, PartialEq)]
 pub struct DFASemantics;
@@ -181,5 +174,3 @@ impl ReducesTo<bool> for BTreeSet<usize> {
         self.into_iter().min().unwrap() % 2 == 0
     }
 }
-
-type DfaProductReduced<L, R> = MapStateColor<MatchingProduct<L, R>, fn((bool, bool)) -> bool>;

@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use itertools::Itertools;
 
 use crate::{Alphabet, Partition, Pointed, RightCongruence, Set, Show, TransitionSystem};
@@ -69,9 +67,8 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
         self.partition.iter().position(|o| o.contains(&q))
     }
 
+    #[allow(unused)]
     fn sanity_check(ts: &Ts, partition: &Partition<Ts::StateIndex>) -> bool {
-        use itertools::Itertools;
-
         for p in &partition.0 {
             let all_equal = p
                 .iter()
@@ -85,7 +82,7 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
                 })
                 .all_equal();
             if !all_equal {
-                println!("SANITY CHECK FAILED:\n{:?}", partition);
+                panic!("SANITY CHECK FAILED:\n{:?}", partition);
                 return false;
             }
         }
@@ -94,7 +91,7 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
 
     /// Extracts the underlying right congruence by erasing the state and edge colors and then collecting
     /// into a [`RightCongruence`].
-    pub fn underlying_right_congruence(self, ts: &Ts) -> RightCongruence<Ts::Alphabet>
+    pub fn underlying_right_congruence(self, _ts: &Ts) -> RightCongruence<Ts::Alphabet>
     where
         Ts: Deterministic + Pointed,
     {
@@ -210,7 +207,7 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
 
     fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
         let state = state.to_index(self)?;
-        let mut it = self.class_iter_by_id(state)?;
+        let it = self.class_iter_by_id(state)?;
         it.map(|o| self.ts.state_color(o)).collect()
     }
 
@@ -272,11 +269,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        tests::wiki_dfa,
-        ts::{Deterministic, Dottable},
-        Partition, RightCongruence, TransitionSystem,
-    };
+    use crate::{tests::wiki_dfa, ts::Deterministic, Partition, TransitionSystem};
 
     #[test]
     fn quotient_test() {

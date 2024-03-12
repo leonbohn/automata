@@ -1,17 +1,9 @@
-use crate::{Alphabet, Set};
+use crate::Alphabet;
 
 use super::{
     deterministic::{FiniteRunResult, OmegaRunResult},
-    path::Lasso,
-    Congruence, EdgeColor, IndexType, Path, StateColor,
+    IndexType,
 };
-
-/// This module deals with partial runs.
-pub mod partial;
-/// Module for dealing with completed and successful runs.
-pub mod successful;
-// /// Module that defines a walker, which can perform stepwise computations on a transition system.
-// pub mod walker;
 
 /// A run is a sequence of states and edges that is consistent with the transition system.
 /// Implementors of this trait represent such a run.

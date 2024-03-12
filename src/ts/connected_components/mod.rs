@@ -1,14 +1,7 @@
-use std::{
-    collections::{BTreeSet, VecDeque},
-    fmt::Debug,
-};
-
 use itertools::Itertools;
 use tracing::trace;
 
 use crate::prelude::*;
-
-use super::IsEdge;
 
 mod scc;
 pub use scc::Scc;
@@ -86,19 +79,11 @@ impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
-
     use crate::{
-        alphabet,
-        alphabet::CharAlphabet,
-        ts::{
-            connected_components::{Scc, SccDecomposition},
-            Sproutable,
-        },
-        Pointed, RightCongruence, Set, TransitionSystem, Void,
+        prelude::*,
+        ts::connected_components::{Scc, SccDecomposition},
+        Set,
     };
-
-    use super::NTS;
 
     pub(super) fn ts() -> RightCongruence<CharAlphabet> {
         let mut cong = RightCongruence::new(alphabet!(simple 'a', 'b'));

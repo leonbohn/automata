@@ -1,14 +1,8 @@
-use std::{
-    collections::VecDeque,
-    fmt::{Debug, Display},
-    hash::Hash,
-    rc::Rc,
-};
+use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
-use hoars::{ALPHABET, MAX_APS, VARS};
 use itertools::Itertools;
 
-use crate::{word::FiniteWord, Map, Show};
+use crate::{Map, Show};
 
 /// A symbol of an alphabet, which is also the type of the symbols in a word. We consider different types
 /// of alphabets:
@@ -165,7 +159,7 @@ impl Alphabet for Empty {
         0
     }
 
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression {
+    fn make_expression(&self, _symbol: Self::Symbol) -> &Self::Expression {
         &Empty
     }
 }
@@ -175,7 +169,7 @@ impl Show for Empty {
         todo!()
     }
 
-    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(iter: I) -> String
+    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(_iter: I) -> String
     where
         Self: 'a,
     {
@@ -456,8 +450,8 @@ impl Alphabet for Directional {
     type Expression = InvertibleChar;
 
     fn search_edge<X>(
-        map: &Map<Self::Expression, X>,
-        sym: Self::Symbol,
+        _map: &Map<Self::Expression, X>,
+        _sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         todo!()
     }

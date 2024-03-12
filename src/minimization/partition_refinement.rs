@@ -5,16 +5,12 @@
 //! the output of the state, whereas for Mealy machines, we consider the output of the transition.
 //! It is necessary to have two distinct algorithms (so with different names) as there might be
 //! transition systems which have outputs on both the states and the transitions.
-use std::{
-    collections::{BTreeSet, VecDeque},
-    hash::Hash,
-    time::Instant,
-};
+use std::{collections::BTreeSet, time::Instant};
 
 use itertools::Itertools;
 use tracing::{debug, info, trace};
 
-use crate::{prelude::*, ts::transition_system::IsEdge, Alphabet, Map, Partition, Set};
+use crate::{prelude::*, ts::transition_system::IsEdge, Map, Partition};
 
 /// Computes the maximal bisimulation of the given [`MealyLike`] deterministic machine. The returned
 /// partition is a [`Partition`] of the state indices, where any states in the same class of the
@@ -44,7 +40,7 @@ where
                 }
             }
 
-            for (c, x) in splitter {
+            for (_c, x) in splitter {
                 let mut new_partition = vec![];
                 for y in &partition {
                     if x.intersection(y).next().is_none() || y.difference(&x).next().is_none() {
@@ -215,7 +211,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{alphabet::Fixed, prelude::*, tests::wiki_dfa, Partition};
+    use crate::{prelude::*, tests::wiki_dfa};
 
     use super::moore_partition_refinement;
 
