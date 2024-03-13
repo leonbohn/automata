@@ -18,7 +18,7 @@ pub trait PredecessorIterable: TransitionSystem {
     fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>>;
 
     /// Reverses the directions of all transitions in the transition system. This consumes the transition system.
-    /// See also [`Reversed`].
+    /// See also [`operations::Reversed`].
     fn reversed(self) -> operations::Reversed<Self> {
         operations::Reversed(self)
     }

@@ -2,10 +2,9 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::Bijection;
-use crate::Map;
-use crate::Set;
-use crate::TransitionSystem;
+use crate::math::Bijection;
+use crate::math::Map;
+use crate::math::Set;
 
 use crate::prelude::*;
 
@@ -176,7 +175,7 @@ pub trait Deterministic: TransitionSystem {
     /// - [`Err`] if the run is unsuccessful, meaning a symbol is encountered for which no
     /// transition exists.
     ///
-    /// It returns a [`crate::ts::path::PathIn`] in either case, which is a path in the transition system. So it is possible
+    /// It returns a [`crate::transition_system::path::PathIn`] in either case, which is a path in the transition system. So it is possible
     /// to inspect the path, e.g. to find out which state was reached or which transitions were taken.
     /// For more information, see [`crate::prelude::Path`].
     #[allow(clippy::type_complexity)]

@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::{prelude::*, Map, Partition};
+use crate::{math::Map, math::Partition, prelude::*};
 use std::{fmt::Display, hash::Hash};
 
 mod edge;
@@ -243,7 +243,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Commence a new subset construction starting from the collection of states given by `states`.
-    /// This is a convenience function that simply calls [`SubsetConstruction::new`]. It produces a
+    /// This is a convenience function that simply calls [`operations::SubsetConstruction::new`]. It produces a
     /// deterministic transition system operating on sets of states.
     fn subset_construction_from<I: IntoIterator<Item = Self::StateIndex>>(
         self,
@@ -436,7 +436,7 @@ pub trait TransitionSystem: Sized {
         self.map_state_colors(|_| true)
     }
 
-    /// Obtains the [`SccDecomposition`] of self, which is a partition of the states into strongly
+    /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly
     /// connected components. Uses Tarjan's algorithm.
     fn sccs(&self) -> connected_components::SccDecomposition<'_, Self>
     where
@@ -445,7 +445,7 @@ pub trait TransitionSystem: Sized {
         tarjan_scc_iterative(self)
     }
 
-    /// Obtains the [`SccDecomposition`] of self, which is a partition of the states into strongly
+    /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly
     /// connected components. Uses Tarjan's algorithm.
     fn sccs_recursive(&self) -> connected_components::SccDecomposition<'_, Self>
     where

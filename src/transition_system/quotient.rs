@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::{prelude::*, Partition, Set};
+use crate::{math::Partition, math::Set, prelude::*};
 
 /// A quotient takes a transition system and merges states which are in the same
 /// congruence class of some [`Partition`]. We assume that the [`Partition`] is
@@ -64,7 +64,7 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
 
     #[allow(unused)]
     fn sanity_check(ts: &Ts, partition: &Partition<Ts::StateIndex>) -> bool {
-        for p in &partition.0 {
+        for p in partition.iter() {
             let all_equal = p
                 .iter()
                 .map(|i| {
@@ -261,7 +261,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{prelude::*, tests::wiki_dfa, Partition};
+    use crate::{math::Partition, prelude::*, tests::wiki_dfa};
 
     #[test]
     fn quotient_test() {

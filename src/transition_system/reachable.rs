@@ -1,4 +1,4 @@
-use crate::{prelude::*, Set};
+use crate::{math::Set, prelude::*};
 use std::collections::VecDeque;
 
 /// Type alias for a minimal representative of a state which is its length-lexicographically minimal

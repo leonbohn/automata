@@ -1,4 +1,4 @@
-use crate::{prelude::*, transition_system::EdgeReference, Map, Set};
+use crate::{math::Map, math::Set, prelude::*, transition_system::EdgeReference};
 use std::{fmt::Debug, hash::Hash};
 
 /// A state in a transition system. This stores the color of the state and the index of the

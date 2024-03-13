@@ -2,7 +2,7 @@ use std::{cell::OnceCell, collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use itertools::Itertools;
 
-use crate::{prelude::*, Map, Set};
+use crate::{math::Map, math::Set, prelude::*};
 
 type InteriorEdgeSet<Ts> = Set<(
     <Ts as TransitionSystem>::StateIndex,

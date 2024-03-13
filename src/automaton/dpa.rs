@@ -7,9 +7,9 @@ use itertools::Itertools;
 use tracing::{info, trace};
 
 use crate::{
+    math::Partition,
     prelude::*,
     transition_system::{CollectDTS, Quotient, Shrinkable},
-    Partition,
 };
 
 /// Represents a parity condition which accepts if and only if the least color that

@@ -8,13 +8,13 @@
 //! As each combinator returns an object which again implements [`TransitionSystem`], these can easily be chained together without too much overhead. While this is convenient, the applied manipulations are computed on-demand, which may lead to considerable overhead. To circumvent this, it can be beneficial to `collect` the resulting TS into a structure, which then explicitly does all the necessary computations and avoids recomputation at a later point. There are also variants `collect_with_initial`/`collect_ts`, which either take the designated ininital state into account or collect into a specific representation of the TS.
 //!
 //! The crate defines some basic building blocks of TS which can easily be manipulated (see `Sproutable`), these are
-//! - [`ts::NTS`]/[`ts::DTS`] (the latter is just a thin wrapper around the former). These store edges in a vector, a state contains a pointer to the first edge in this collection and each edge contains pointers to the previous/next one.
-//! - [`ts::HashTs`] which stores transitions in an efficient HashMap
+//! - [`transition_system::NTS`]/[`transition_system::DTS`] (the latter is just a thin wrapper around the former). These store edges in a vector, a state contains a pointer to the first edge in this collection and each edge contains pointers to the previous/next one.
+//! - [`transition_system::HashTs`] which stores transitions in an efficient HashMap
 //!
 //! Further traits that are of importance are
 //! - [`Pointed`] which picks one designated initial state, this is important for deterministic automata
-//! - [`ts::Deterministic`], a marker trait that disambiguates between nondeterministic and deterministic TS. As [`TransitionSystem`] only provides iterators over the outgoing edges, it can be used to deal with nondeterministic TS, that have multiple overlapping edges. By implementing `Deterministic`, we guarantee, that there is always a single unique outgoing transition for each state.
-//! - [`ts::Sproutable`] enables growing a TS state by state and edge/transition by edge/transition. Naturally, this is only implemented for the basic building blocks, i.e. `BTS`, `DTS` and `NTS`.
+//! - [`transition_system::Deterministic`], a marker trait that disambiguates between nondeterministic and deterministic TS. As [`TransitionSystem`] only provides iterators over the outgoing edges, it can be used to deal with nondeterministic TS, that have multiple overlapping edges. By implementing `Deterministic`, we guarantee, that there is always a single unique outgoing transition for each state.
+//! - [`transition_system::Sproutable`] enables growing a TS state by state and edge/transition by edge/transition. Naturally, this is only implemented for the basic building blocks, i.e. `BTS`, `DTS` and `NTS`.
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
@@ -48,6 +48,10 @@ pub mod prelude {
         Alphabet, Class, Color, Pointed, RightCongruence, Show, Void,
     };
 }
+
+/// This module contains some definitions of mathematical objects which are used throughout the crate and
+/// do not really fit to the top level.
+pub mod math;
 
 /// Module that contains definitions for dealing with alphabets.
 pub mod alphabet;
@@ -86,7 +90,7 @@ pub mod random;
 /// Implements a directed acyclic graph.
 pub mod dag;
 
-use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash};
 
 /// A color is simply a type that can be used to color states or transitions.
 pub trait Color: Clone + Eq + Ord + Hash + Show {
@@ -155,15 +159,6 @@ impl Show for (&Void, &Void) {
         "-".to_string()
     }
 }
-
-/// Type alias for sets, we use this to hide which type of `HashSet` we are actually using.
-pub type Set<S> = fxhash::FxHashSet<S>;
-/// Type alias for maps, we use this to hide which type of `HashMap` we are actually using.
-pub type Map<K, V> = fxhash::FxHashMap<K, V>;
-
-/// Represents a bijective mapping between `L` and `R`, that is a mapping which associates
-/// each `L` with precisely one `R` and vice versa.
-pub type Bijection<L, R> = bimap::BiBTreeMap<L, R>;
 
 /// Helper trait which can be used to display states, transitions and such.
 pub trait Show {
@@ -308,78 +303,10 @@ impl<S: Show> Show for &S {
     }
 }
 
-/// A partition is a different view on a congruence relation, by grouping elements of
-/// type `I` into their respective classes under the relation.
-#[derive(Debug, Clone)]
-pub struct Partition<I: Hash + Eq>(Vec<BTreeSet<I>>);
-
-impl<I: Hash + Eq> std::ops::Deref for Partition<I> {
-    type Target = Vec<BTreeSet<I>>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'a, I: Hash + Eq> IntoIterator for &'a Partition<I> {
-    type Item = &'a BTreeSet<I>;
-    type IntoIter = std::slice::Iter<'a, BTreeSet<I>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl<I: Hash + Eq> PartialEq for Partition<I> {
-    fn eq(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().all(|o| other.contains(o))
-    }
-}
-impl<I: Hash + Eq> Eq for Partition<I> {}
-
-impl<I: Hash + Eq + Ord> Partition<I> {
-    /// Returns the size of the partition, i.e. the number of classes.
-    pub fn size(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Builds a new congruence relation from an iterator that yields iterators
-    /// which yield elements of type `I`.
-    pub fn new<X: IntoIterator<Item = I>, Y: IntoIterator<Item = X>>(iter: Y) -> Self {
-        Self(
-            iter.into_iter()
-                .map(|it| it.into_iter().collect::<BTreeSet<_>>())
-                .collect(),
-        )
-    }
-}
-
-impl<I: Hash + Eq + Ord> From<Vec<BTreeSet<I>>> for Partition<I> {
-    fn from(value: Vec<BTreeSet<I>>) -> Self {
-        Self(value)
-    }
-}
-
-/// Captures types that have a parity. This is used for example to determine whether a state
-/// is even or odd. We extend this notion to boolean values by assuming that `true` is even
-/// and `false` is odd.
-pub trait HasParity {
-    #[allow(missing_docs)]
-    fn is_even(&self) -> bool;
-    #[allow(missing_docs)]
-    fn is_odd(&self) -> bool {
-        !self.is_even()
-    }
-}
-impl<P: HasParity> HasParity for &P {
-    fn is_even(&self) -> bool {
-        P::is_even(self)
-    }
-}
-impl HasParity for usize {
-    fn is_even(&self) -> bool {
-        self % 2 == 0
-    }
-}
+/// Type alias for sets, we use this to hide which type of `HashSet` we are actually using.
+pub type Set<S> = fxhash::FxHashSet<S>;
+/// Type alias for maps, we use this to hide which type of `HashMap` we are actually using.
+pub type Map<K, V> = fxhash::FxHashMap<K, V>;
 
 #[cfg(test)]
 mod tests {
