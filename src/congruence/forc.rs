@@ -1,6 +1,5 @@
+use crate::{prelude::*, Map};
 use std::fmt::Debug;
-
-use crate::{ts::transition_system::Indexes, Alphabet, Map, RightCongruence, Void};
 
 /// A family of right congruences (FORC) consists of a *leading* right congruence and for each
 /// class of this congruence a *progress* right congruence.

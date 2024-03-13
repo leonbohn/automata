@@ -10,7 +10,7 @@ use std::{collections::BTreeSet, time::Instant};
 use itertools::Itertools;
 use tracing::{debug, info, trace};
 
-use crate::{prelude::*, ts::transition_system::IsEdge, Map, Partition};
+use crate::{prelude::*, Map, Partition};
 
 /// Computes the maximal bisimulation of the given [`MealyLike`] deterministic machine. The returned
 /// partition is a [`Partition`] of the state indices, where any states in the same class of the

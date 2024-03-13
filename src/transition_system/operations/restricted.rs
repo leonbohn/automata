@@ -1,10 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{
-    prelude::*,
-    ts::{predecessors::PredecessorIterable, transition_system::IsEdge, IndexType},
-    Pointed, Set, TransitionSystem,
-};
+use crate::{prelude::*, Set};
 
 /// Abstracts the filtering of a transition system's state indices. This trait is implemented by
 /// functions which take a state index and return a boolean value indicating whether the state index
@@ -58,6 +54,51 @@ where
 pub struct RestrictByStateIndex<Ts: TransitionSystem, F> {
     ts: Ts,
     filter: F,
+}
+
+impl<Ts: TransitionSystem, F> TransitionSystem for RestrictByStateIndex<Ts, F>
+where
+    F: StateIndexFilter<Ts::StateIndex>,
+{
+    type StateIndex = Ts::StateIndex;
+    type EdgeColor = Ts::EdgeColor;
+    type StateColor = Ts::StateColor;
+    type EdgeRef<'this> = Ts::EdgeRef<'this> where Self: 'this;
+    type EdgesFromIter<'this> = RestrictedEdgesFromIter<'this, Ts, F> where Self: 'this;
+    type StateIndices<'this> = Ts::StateIndices<'this> where Self: 'this;
+
+    type Alphabet = Ts::Alphabet;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        self.ts().alphabet()
+    }
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        self.ts().state_indices()
+    }
+
+    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
+        let state = state.to_index(self)?;
+        assert!((self.filter()).is_unmasked(state));
+        self.ts().state_color(state)
+    }
+
+    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
+        if !(self.filter()).is_unmasked(state.to_index(self)?) {
+            return None;
+        }
+        self.ts()
+            .edges_from(state.to_index(self)?)
+            .map(|iter| RestrictedEdgesFromIter::new(iter, self.filter()))
+    }
+
+    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
+        let initial = self.ts().maybe_initial_state()?;
+        if self.filter().is_unmasked(initial) {
+            Some(initial)
+        } else {
+            None
+        }
+    }
 }
 
 /// Iterator over the state indices of a transition system that are restricted by a filter function.

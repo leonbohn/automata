@@ -1,14 +1,7 @@
 use std::fmt::Debug;
 
+use crate::prelude::*;
 use itertools::Itertools;
-
-use crate::{
-    alphabet::{CharAlphabet, Symbol},
-    prelude::{DFALike, IsEdge, DFA},
-    ts::{transition_system::Indexes, Deterministic, EdgeColor, Sproutable, StateColor, DTS},
-    word::FiniteWord,
-    Alphabet, Pointed, Show, TransitionSystem, Void,
-};
 
 mod class;
 pub use class::{Class, ColoredClass};
@@ -29,6 +22,39 @@ mod cayley;
 #[derive(Clone, Eq, PartialEq)]
 pub struct RightCongruence<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
     ts: DTS<A, ColoredClass<A::Symbol, Q>, C>,
+}
+
+impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for RightCongruence<A, Q, C> {
+    type StateIndex = usize;
+    type EdgeColor = C;
+    type StateColor = ColoredClass<A::Symbol, Q>;
+    type EdgeRef<'this> = &'this crate::transition_system::nts::NTEdge<A::Expression, C> where Self: 'this;
+    type EdgesFromIter<'this> = crate::transition_system::nts::NTSEdgesFromIter<'this, A::Expression, C>
+    where
+        Self: 'this;
+    type StateIndices<'this> = std::ops::Range<usize> where Self: 'this;
+
+    type Alphabet = A;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        self.ts().alphabet()
+    }
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        self.ts().state_indices()
+    }
+
+    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
+        let state = state.to_index(self)?;
+        self.ts().state_color(state)
+    }
+
+    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
+        self.ts().edges_from(state.to_index(self)?)
+    }
+
+    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
+        Some(self.initial())
+    }
 }
 
 impl<S: Symbol + Show, Q: Show> Show for ColoredClass<S, Q> {
@@ -170,7 +196,10 @@ impl<A: Alphabet, Q: Clone, C: Clone> Pointed for RightCongruence<A, Q, C> {
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for RightCongruence<A, Q, C> {
-    fn add_state<X: Into<crate::ts::StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
+    fn add_state<X: Into<crate::transition_system::StateColor<Self>>>(
+        &mut self,
+        color: X,
+    ) -> Self::StateIndex {
         self.ts.add_state(color.into())
     }
 
@@ -217,7 +246,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for RightCongruence<A, Q, C> {
 
     type ExtendStateIndexIter = std::ops::Range<usize>;
 
-    fn extend_states<I: IntoIterator<Item = crate::ts::StateColor<Self>>>(
+    fn extend_states<I: IntoIterator<Item = crate::transition_system::StateColor<Self>>>(
         &mut self,
         iter: I,
     ) -> Self::ExtendStateIndexIter {

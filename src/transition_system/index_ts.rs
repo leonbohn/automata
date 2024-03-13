@@ -1,15 +1,5 @@
+use crate::{prelude::*, transition_system::EdgeReference, Map, Set};
 use std::{fmt::Debug, hash::Hash};
-
-use crate::{
-    alphabet::Alphabet,
-    ts::{transition_system::IsEdge, Deterministic},
-    Color, Map, Set,
-};
-
-use super::{
-    transition_system::Indexes, EdgeColor, ExpressionOf, IndexType, Sproutable, StateColor,
-    SymbolOf, TransitionSystem,
-};
 
 /// A state in a transition system. This stores the color of the state and the index of the
 /// first edge leaving the state.
@@ -81,6 +71,64 @@ impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> HashTsState<A, Q, C, Idx> {
     /// Obtains a reference to the color of the state.
     pub fn color(&self) -> &Q {
         &self.color
+    }
+}
+
+impl<A: Alphabet, IdxTy: IndexType, Q: Clone, C: Clone + Hash + Eq> TransitionSystem
+    for HashTs<A, Q, C, IdxTy>
+{
+    type StateColor = Q;
+    type EdgeColor = C;
+    type StateIndex = IdxTy;
+    type EdgeRef<'this> = EdgeReference<'this, A::Expression, IdxTy, C> where Self: 'this;
+    type EdgesFromIter<'this> = BTSEdgesFrom<'this, A::Expression, IdxTy, C> where Self: 'this;
+    type StateIndices<'this> = std::iter::Cloned<std::collections::hash_map::Keys<'this, IdxTy, super::index_ts::HashTsState<A, Q, C, IdxTy>>> where Self: 'this;
+
+    type Alphabet = A;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        &self.alphabet
+    }
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        self.states.keys().cloned()
+    }
+
+    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
+        let state = state.to_index(self)?;
+        self.raw_state_map().get(&state).map(|s| s.color().clone())
+    }
+
+    fn edges_from<X: Indexes<Self>>(&self, state: X) -> Option<Self::EdgesFromIter<'_>> {
+        let source = state.to_index(self)?;
+        Some(BTSEdgesFrom::new(
+            source,
+            self.raw_state_map()
+                .get(&source)
+                .map(|o| o.edge_map().iter())?,
+        ))
+    }
+}
+
+/// Specialized iterator over the edges that leave a given state in a BTS.
+pub struct BTSEdgesFrom<'ts, E, Idx, C> {
+    edges: std::collections::hash_map::Iter<'ts, E, (Idx, C)>,
+    source: Idx,
+}
+
+impl<'ts, E, Idx, C> BTSEdgesFrom<'ts, E, Idx, C> {
+    /// Creates a new instance from the given components.
+    pub fn new(source: Idx, edges: std::collections::hash_map::Iter<'ts, E, (Idx, C)>) -> Self {
+        Self { edges, source }
+    }
+}
+
+impl<'ts, E, Idx: IndexType, C> Iterator for BTSEdgesFrom<'ts, E, Idx, C> {
+    type Item = EdgeReference<'ts, E, Idx, C>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.edges
+            .next()
+            .map(|(e, (t, c))| EdgeReference::new(self.source, e, c, *t))
     }
 }
 

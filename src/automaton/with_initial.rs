@@ -5,6 +5,48 @@ use std::fmt::Debug;
 #[derive(Clone, PartialEq)]
 pub struct Initialized<Ts: TransitionSystem>(Ts, Ts::StateIndex);
 
+impl<Ts: TransitionSystem> TransitionSystem for Initialized<Ts> {
+    type Alphabet = Ts::Alphabet;
+
+    type StateIndex = Ts::StateIndex;
+
+    type StateColor = Ts::StateColor;
+
+    type EdgeColor = Ts::EdgeColor;
+
+    type EdgeRef<'this> = Ts::EdgeRef<'this>
+    where
+        Self: 'this;
+
+    type EdgesFromIter<'this> = Ts::EdgesFromIter<'this>
+    where
+        Self: 'this;
+
+    type StateIndices<'this> = Ts::StateIndices<'this>
+    where
+        Self: 'this;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        self.0.alphabet()
+    }
+
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        self.0.state_indices()
+    }
+
+    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
+        let state = state.to_index(self)?;
+        self.0.edges_from(state)
+    }
+
+    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
+        let state = state.to_index(self)?;
+        self.0.state_color(state)
+    }
+}
+
+impl<D: Deterministic> Deterministic for Initialized<D> {}
+
 impl<Ts: TransitionSystem> Initialized<Ts> {
     /// Gives a reference to the underlying transition system.
     pub fn ts(&self) -> &Ts {

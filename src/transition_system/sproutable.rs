@@ -1,12 +1,7 @@
 use bit_set::BitSet;
 use itertools::Itertools;
 
-use crate::{prelude::CharAlphabet, Alphabet, Bijection, Pointed, TransitionSystem};
-
-use super::{
-    transition_system::{Indexes, IsEdge},
-    EdgeColor, StateColor,
-};
+use crate::{prelude::*, Bijection};
 
 /// Marker trait for [`Alphabet`]s that can be indexed, i.e. where we can associate each
 /// [`Alphabet::Symbol`] and [`Alphabet::Expression`] with a unique index (a `usize`).
@@ -215,7 +210,7 @@ pub trait Sproutable: TransitionSystem {
 
 #[cfg(test)]
 mod tests {
-    use crate::ts::{Deterministic, Sproutable, NTS};
+    use crate::prelude::*;
 
     #[test]
     fn complete_ts() {
