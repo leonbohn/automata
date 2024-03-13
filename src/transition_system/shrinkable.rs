@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use crate::{prelude::*, Set};
+use crate::{math::Set, prelude::*};
 
 /// Encapsulates the ability to remove states, edges, and transitions from a transition system.
 pub trait Shrinkable: TransitionSystem {

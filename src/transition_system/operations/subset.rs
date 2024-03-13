@@ -1,6 +1,6 @@
 use std::{cell::RefCell, fmt::Debug};
 
-use crate::{prelude::*, transition_system::edge::TransitionOwnedColor, Set};
+use crate::{math::Set, prelude::*, transition_system::edge::TransitionOwnedColor};
 use itertools::Itertools;
 
 #[derive(Clone, Eq)]

@@ -3,7 +3,7 @@ use std::collections::{hash_map::Entry, BTreeSet, VecDeque};
 use itertools::Itertools;
 use tracing::trace;
 
-use crate::{prelude::*, transition_system::connected_components::Scc, Map, Set};
+use crate::{math::Map, math::Set, prelude::*, transition_system::connected_components::Scc};
 
 use super::SccDecomposition;
 

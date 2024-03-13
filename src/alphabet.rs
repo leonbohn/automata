@@ -2,7 +2,7 @@ use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
 use itertools::Itertools;
 
-use crate::{Map, Show};
+use crate::{math::Map, Show};
 
 /// A symbol of an alphabet, which is also the type of the symbols in a word. We consider different types
 /// of alphabets:
@@ -12,7 +12,7 @@ use crate::{Map, Show};
 pub trait Symbol: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show {}
 impl<S: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show> Symbol for S {}
 
-/// An expression is used to label edges of a [`crate::ts::TransitionSystem`]. For [`CharAlphabet`]
+/// An expression is used to label edges of a [`crate::transition_system::TransitionSystem`]. For [`CharAlphabet`]
 /// alphabets, an expression is simply a single symbol, whereas for a propositional alphabet, an expression
 /// is a propositional formula over the atomic propositions. See propositional for more details.
 pub trait Expression<S: Symbol>: Hash + Clone + Debug + Eq + Ord + Show {
@@ -119,7 +119,7 @@ impl<A: Alphabet> Alphabet for &A {
 ///
 /// # Example
 /// Assume we have a `CharAlphabet` over the symbols 'a' and 'b'. Then a **symbol** would be just one of these
-/// characters, e.g. 'a'. This is used to label transitions in a [`crate::ts::TransitionSystem`].
+/// characters, e.g. 'a'. This is used to label transitions in a [`crate::transition_system::TransitionSystem`].
 /// Now an **expression** would also be just a single character, e.g. 'a'. Then such an expression is
 /// matched by a symbol if the expression equals the symbol.
 #[derive(Clone, Eq, PartialEq, Hash, Debug, PartialOrd, Ord)]

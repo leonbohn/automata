@@ -136,6 +136,7 @@ mod tests {
     #[test]
     fn mealy_equivalence() {
         let mm1: MealyMachine = NTS::builder()
+            .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),
                 (0, 'b', 0, 1),
@@ -148,6 +149,7 @@ mod tests {
             .with_initial(0)
             .into_mealy();
         let mm2: MealyMachine = NTS::builder()
+            .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),
                 (0, 'b', 0, 1),
@@ -160,6 +162,7 @@ mod tests {
             .with_initial(0)
             .into_mealy();
         let _mm3: MealyMachine = NTS::builder()
+            .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),
                 (0, 'b', 0, 1),

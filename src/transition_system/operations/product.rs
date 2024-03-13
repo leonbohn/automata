@@ -403,22 +403,18 @@ impl<'a, L: PredecessorIterable, R: PredecessorIterable> ProductEdgesTo<'a, L, R
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        automaton::{MealyLike, MealyMachine},
-        transition_system::{Deterministic, NTS},
-        TransitionSystem,
-    };
-
-    use super::Product;
+    use crate::prelude::*;
 
     #[test]
     fn product_subalphabet() {
         let l: MealyMachine = NTS::builder()
+            .default_color(Void)
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
             .deterministic()
             .with_initial(0)
             .into_mealy();
         let r: MealyMachine = NTS::builder()
+            .default_color(Void)
             .with_transitions([(0, 'a', 0, 0)])
             .deterministic()
             .with_initial(0)
