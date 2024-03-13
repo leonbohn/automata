@@ -27,23 +27,23 @@ pub mod prelude {
         automaton::{
             Automaton, DBALike, DFALike, DPALike, FiniteSemantics, Initialized, IntoDBA, IntoDFA,
             IntoDPA, IntoMealyMachine, IntoMooreMachine, MealyLike, MealyMachine, MooreLike,
-            MooreMachine, OmegaSemantics, DBA, DFA, DPA,
+            MooreMachine, OmegaAcceptanceCondition, OmegaAutomaton, OmegaSemantics, DBA, DFA, DPA,
         },
-        ts::{
-            dag::Dag,
+        transition_system::operations,
+        transition_system::{
             dot::Dottable,
             operations::{Product, ProductIndex},
             predecessors::PredecessorIterable,
+            reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
-            transition_system::{EdgeReference, FullTransition, Indexes, IsEdge},
             Congruence, Deterministic, DeterministicEdgesFrom, EdgeColor, ExpressionOf, HashTs,
-            IndexType, IntoEdge, Path, Sproutable, StateColor, SymbolOf, TSBuilder,
-            TransitionSystem, DTS, NTS,
+            IndexType, Indexes, IntoEdge, IsEdge, Path, Sproutable, StateColor, SymbolOf,
+            TSBuilder, TransitionSystem, DTS, NTS,
         },
         upw,
         word::{
-            FiniteWord, LinearWord, OmegaWord, PeriodicOmegaWord, ReducedOmegaWord,
-            ReducedParseError,
+            FiniteWord, LinearWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord,
+            ReducedOmegaWord, ReducedParseError,
         },
         Alphabet, Class, Color, Pointed, RightCongruence, Show, Void,
     };
@@ -56,8 +56,9 @@ use itertools::Itertools;
 
 /// This module defines transition systems and successor functions and such.
 #[macro_use]
-pub mod ts;
-pub use ts::{Pointed, TransitionSystem};
+pub mod transition_system;
+pub use transition_system::connected_components;
+pub use transition_system::{Pointed, TransitionSystem};
 
 /// Defines automata and common types of combinations of transition system with acceptance condition.
 #[allow(clippy::upper_case_acronyms)]
@@ -81,6 +82,9 @@ pub mod hoa;
 /// Implements the generation of random transition systems.
 #[cfg(feature = "random")]
 pub mod random;
+
+/// Implements a directed acyclic graph.
+pub mod dag;
 
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 

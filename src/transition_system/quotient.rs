@@ -1,11 +1,6 @@
 use itertools::Itertools;
 
-use crate::{Alphabet, Partition, Pointed, RightCongruence, Set, Show, TransitionSystem};
-
-use super::{
-    transition_system::{Indexes, IsEdge},
-    Deterministic, ExpressionOf, SymbolOf,
-};
+use crate::{prelude::*, Partition, Set};
 
 /// A quotient takes a transition system and merges states which are in the same
 /// congruence class of some [`Partition`]. We assume that the [`Partition`] is
@@ -211,10 +206,7 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
         it.map(|o| self.ts.state_color(o)).collect()
     }
 
-    fn edges_from<Idx: super::transition_system::Indexes<Self>>(
-        &self,
-        state: Idx,
-    ) -> Option<Self::EdgesFromIter<'_>> {
+    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
         if self.partition.len() <= state.to_index(self)? {
             None
         } else {
@@ -227,7 +219,7 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
     }
 }
 impl<D: Deterministic> Deterministic for Quotient<D> {
-    fn transition<Idx: super::transition_system::Indexes<Self>>(
+    fn transition<Idx: Indexes<Self>>(
         &self,
         state: Idx,
         symbol: SymbolOf<Self>,
@@ -269,7 +261,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{tests::wiki_dfa, ts::Deterministic, Partition, TransitionSystem};
+    use crate::{prelude::*, tests::wiki_dfa, Partition};
 
     #[test]
     fn quotient_test() {

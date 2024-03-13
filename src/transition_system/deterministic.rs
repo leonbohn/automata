@@ -777,7 +777,7 @@ impl<A: Alphabet, IdType: IndexType, Q: Clone, C: Hash + Eq + Clone> Determinist
         self.raw_state_map()
             .get(&source)
             .and_then(|o| A::search_edge(o.edge_map(), symbol))
-            .map(|(e, (q, c))| EdgeReference::new(source, e, c, *q))
+            .map(|(e, (q, c))| crate::transition_system::EdgeReference::new(source, e, c, *q))
     }
 }
 
@@ -906,7 +906,7 @@ where
     D: Clone,
     F: Fn(Ts::StateIndex, &ExpressionOf<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
-    fn transition<Idx: crate::ts::transition_system::Indexes<Self>>(
+    fn transition<Idx: crate::transition_system::Indexes<Self>>(
         &self,
         state: Idx,
         symbol: crate::prelude::SymbolOf<Self>,

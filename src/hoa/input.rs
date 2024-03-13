@@ -1,14 +1,7 @@
 use std::ops::Deref;
 
+use crate::{automaton::AcceptanceMask, hoa::HoaExpression, prelude::*};
 use hoars::{HoaAutomaton, MAX_APS};
-
-use crate::{
-    automaton::{AcceptanceMask, OmegaAcceptanceCondition, OmegaAutomaton},
-    hoa::HoaExpression,
-    prelude::Initialized,
-    ts::{Sproutable, NTS},
-    TransitionSystem,
-};
 
 use super::HoaAlphabet;
 

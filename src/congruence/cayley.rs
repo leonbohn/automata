@@ -1,11 +1,10 @@
+use crate::{prelude::*, transition_system::EdgeReference};
+
+use self::alphabet::{Directional, InvertibleChar};
+
 use super::{
     transitionprofile::{Reduces, Replaces},
     Accumulates, RunProfile, TransitionMonoid,
-};
-use crate::{
-    alphabet::{Directional, InvertibleChar},
-    prelude::*,
-    ts::transition_system::EdgeReference,
 };
 
 #[derive(Clone)]
@@ -294,8 +293,7 @@ where
 
 #[cfg(test)]
 mod tests {
-
-    use crate::{tests::wiki_dfa, ts::Dottable};
+    use crate::{prelude::*, tests::wiki_dfa};
 
     #[test]
     #[ignore]

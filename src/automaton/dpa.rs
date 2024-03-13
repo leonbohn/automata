@@ -8,7 +8,7 @@ use tracing::{info, trace};
 
 use crate::{
     prelude::*,
-    ts::{CollectDTS, Quotient, Shrinkable},
+    transition_system::{CollectDTS, Quotient, Shrinkable},
     Partition,
 };
 

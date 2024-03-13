@@ -3,14 +3,7 @@ use std::collections::{hash_map::Entry, BTreeSet, VecDeque};
 use itertools::Itertools;
 use tracing::trace;
 
-use crate::{
-    prelude::Expression,
-    ts::{
-        connected_components::Scc, predecessors::PredecessorIterable, transition_system::IsEdge,
-        IndexType,
-    },
-    Map, Set, Show, TransitionSystem,
-};
+use crate::{prelude::*, transition_system::connected_components::Scc, Map, Set};
 
 use super::SccDecomposition;
 
@@ -125,7 +118,8 @@ impl<Idx: IndexType> Tarjan<Idx> {
     }
 }
 
-pub(crate) fn tarjan_scc_recursive<Ts>(ts: &Ts) -> SccDecomposition<'_, Ts>
+/// Recursive application of Tarjan's algorithm form computing the SCC decomposition.
+pub fn tarjan_scc_recursive<Ts>(ts: &Ts) -> SccDecomposition<'_, Ts>
 where
     Ts: TransitionSystem,
 {
@@ -143,7 +137,7 @@ where
 }
 
 #[allow(unused)]
-pub(crate) fn kosaraju<Ts>(ts: &Ts, start: Ts::StateIndex) -> SccDecomposition<'_, Ts>
+pub fn kosaraju<Ts>(ts: &Ts, start: Ts::StateIndex) -> SccDecomposition<'_, Ts>
 where
     Ts: TransitionSystem + PredecessorIterable,
 {
@@ -190,7 +184,8 @@ where
     SccDecomposition::new(ts, sccs)
 }
 
-pub(crate) fn tarjan_scc_iterative<Ts>(ts: &Ts) -> SccDecomposition<'_, Ts>
+/// Iterative application of Tarjan's algorithm form computing the SCC decomposition.
+pub fn tarjan_scc_iterative<Ts>(ts: &Ts) -> SccDecomposition<'_, Ts>
 where
     Ts: TransitionSystem,
 {
@@ -331,12 +326,8 @@ mod tests {
     use std::{collections::HashSet, time::Instant};
 
     use crate::{
-        ts::{
-            connected_components::{tarjan::kosaraju, tarjan_scc_recursive},
-            predecessors::PredecessorIterable,
-            NTS,
-        },
-        Pointed, TransitionSystem,
+        connected_components::{tarjan::kosaraju, tarjan_scc_recursive},
+        prelude::*,
     };
 
     use super::tarjan_scc_iterative;

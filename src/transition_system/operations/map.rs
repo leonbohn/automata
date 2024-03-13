@@ -203,7 +203,7 @@ where
         self.ts().state_color(state)
     }
 
-    fn edges_from<Idx: crate::ts::transition_system::Indexes<Self>>(
+    fn edges_from<Idx: crate::transition_system::Indexes<Self>>(
         &self,
         state: Idx,
     ) -> Option<Self::EdgesFromIter<'_>> {
@@ -266,6 +266,47 @@ impl<Ts, F> MapEdgeColor<Ts, F> {
 
     pub fn into_parts(self) -> (Ts, F) {
         (self.ts, self.f)
+    }
+}
+
+impl<D, Ts, F> TransitionSystem for MapEdgeColor<Ts, F>
+where
+    D: Clone,
+    Ts: TransitionSystem,
+    F: Fn(Ts::EdgeColor) -> D,
+{
+    type StateIndex = Ts::StateIndex;
+    type EdgeColor = D;
+    type StateColor = Ts::StateColor;
+    type EdgeRef<'this> = MappedTransition<Ts::EdgeRef<'this>, &'this F, Ts::EdgeColor> where Self: 'this;
+    type EdgesFromIter<'this> =
+        MappedEdgesFromIter<'this, Ts::EdgesFromIter<'this>, F, Ts::EdgeColor> where Self: 'this;
+
+    type StateIndices<'this> = Ts::StateIndices<'this> where Self: 'this;
+
+    type Alphabet = Ts::Alphabet;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        self.ts().alphabet()
+    }
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        self.ts().state_indices()
+    }
+
+    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
+        let state = state.to_index(self)?;
+        self.ts().state_color(state)
+    }
+
+    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
+        Some(MappedEdgesFromIter::new(
+            self.ts().edges_from(state.to_index(self)?)?,
+            self.f(),
+        ))
+    }
+
+    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
+        self.ts().maybe_initial_state()
     }
 }
 
@@ -444,6 +485,43 @@ impl<Ts, F> MapStateColor<Ts, F> {
 
     pub fn f(&self) -> &F {
         &self.f
+    }
+}
+
+impl<D, Ts, F> TransitionSystem for MapStateColor<Ts, F>
+where
+    D: Clone,
+    Ts: TransitionSystem,
+    F: Fn(Ts::StateColor) -> D,
+{
+    type StateIndex = Ts::StateIndex;
+    type EdgeColor = Ts::EdgeColor;
+    type StateColor = D;
+    type EdgeRef<'this> = Ts::EdgeRef<'this> where Self: 'this;
+    type EdgesFromIter<'this> = Ts::EdgesFromIter<'this> where Self: 'this;
+    type StateIndices<'this> = Ts::StateIndices<'this> where Self: 'this;
+
+    type Alphabet = Ts::Alphabet;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        self.ts().alphabet()
+    }
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        self.ts().state_indices()
+    }
+
+    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
+        let state = state.to_index(self)?;
+        let color = self.ts().state_color(state)?;
+        Some((self.f())(color))
+    }
+
+    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
+        self.ts().edges_from(state.to_index(self)?)
+    }
+
+    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
+        self.ts().maybe_initial_state()
     }
 }
 

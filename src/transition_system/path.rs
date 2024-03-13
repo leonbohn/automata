@@ -2,12 +2,7 @@ use std::fmt::Debug;
 
 use itertools::{Either, Itertools};
 
-use crate::{alphabet::Alphabet, Color, Show};
-
-use super::{
-    transition_system::{Indexes, IsEdge},
-    Deterministic, IndexType, SymbolOf, TransitionSystem,
-};
+use crate::prelude::*;
 
 /// Represents a path through a transition system. Note, that the path itself is decoupled from the
 /// transition system, which allows to use it for multiple transition systems. In particular, it is possible
@@ -393,8 +388,7 @@ impl<E, Idx, C> Edge<E, Idx, C> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::alphabet::CharAlphabet;
-    use crate::ts::{path::Edge, Path};
+    use crate::{prelude::*, transition_system::path::Edge};
 
     #[test]
     fn debug_display_path() {

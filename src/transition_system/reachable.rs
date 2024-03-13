@@ -1,8 +1,5 @@
+use crate::{prelude::*, Set};
 use std::collections::VecDeque;
-
-use crate::{prelude::Expression, ts::StateColor, Set, TransitionSystem};
-
-use super::{transition_system::IsEdge, SymbolOf};
 
 /// Type alias for a minimal representative of a state which is its length-lexicographically minimal
 /// access sequence and its state index.

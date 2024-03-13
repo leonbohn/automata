@@ -2,9 +2,7 @@ use std::fmt::Debug;
 
 use itertools::Itertools;
 
-use crate::{prelude::Symbol, ts::Congruence, Alphabet, Map, Show};
-
-use super::{FiniteWord, LinearWord, NormalizedOmegaWord};
+use crate::{prelude::*, Map};
 
 /// An omega word is an infinite word that can be indexed by a `usize`. We assume that all
 /// omega words can be represented as a concatenation of a finite prefix which we call spoke

@@ -7,7 +7,7 @@ mod scc;
 pub use scc::Scc;
 
 mod tarjan;
-pub(crate) use tarjan::{tarjan_scc_iterative, tarjan_scc_recursive};
+pub use tarjan::{tarjan_scc_iterative, tarjan_scc_recursive};
 
 mod tarjan_dag;
 pub use tarjan_dag::TarjanDAG;
@@ -81,7 +81,7 @@ impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
 mod tests {
     use crate::{
         prelude::*,
-        ts::connected_components::{Scc, SccDecomposition},
+        transition_system::connected_components::{Scc, SccDecomposition},
         Set,
     };
 
