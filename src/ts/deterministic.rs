@@ -662,6 +662,24 @@ pub trait Deterministic: TransitionSystem {
         Sproutable::collect_from(self)
     }
 
+    /// Compute the escape prefixes of a set of omega words on a transition system.
+    fn escape_prefixes<'a, W>(
+        &self,
+        words: impl Iterator<Item = &'a W>,
+    ) -> impl Iterator<Item = String>
+    where
+        W: OmegaWord<SymbolOf<Self>> + 'a,
+        Self: Pointed,
+    {
+        words
+            .filter_map(|w| {
+                self.omega_run(w)
+                    .err()
+                    .map(|path| w.prefix(path.len() + 1).as_string())
+            })
+            .unique()
+    }
+
     /// Collects `self` into a new transition system of type `Ts` with the same alphabet, state indices
     /// and edge colors.
     fn collect_old<
@@ -898,5 +916,26 @@ where
             state.to_index(self)?,
             self.f(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::prelude::*;
+    #[test]
+    fn escape_prefixes() {
+        // build set of words
+        let words = vec![upw!("a"), upw!("a", "b"), upw!("b"), upw!("aa", "b")];
+
+        // build transition system
+        let ts = NTS::builder()
+            .with_transitions([(0, 'a', Void, 1), (1, 'b', Void, 1)])
+            .default_color(Void)
+            .deterministic()
+            .with_initial(0);
+
+        assert!(ts
+            .escape_prefixes(words.iter())
+            .eq(vec![String::from("aa"), String::from("b")].into_iter()));
     }
 }
