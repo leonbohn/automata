@@ -223,7 +223,7 @@ impl<A: Alphabet> Dottable for DFA<A> {
     where
         (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
     {
-        [DotTransitionAttribute::Label(t.expression.show())].into_iter()
+        [DotTransitionAttribute::Label(t.expression().show())].into_iter()
     }
 
     fn dot_state_attributes(

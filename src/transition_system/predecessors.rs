@@ -140,11 +140,11 @@ impl<'a, A: Alphabet, C: Color, Idx: IndexType> BTSPredecessors<'a, A, C, Idx> {
 }
 
 impl<A: Alphabet> PredecessorIterable for RightCongruence<A> {
-    type PreEdgeRef<'this> = &'this crate::transition_system::nts::NTEdge<A::Expression, Void>
+    type PreEdgeRef<'this> = &'this crate::transition_system::impls::NTEdge<A::Expression, Void>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = crate::transition_system::nts::NTSEdgesTo<'this, A::Expression, Void>
+    type EdgesToIter<'this> = crate::transition_system::impls::NTSEdgesTo<'this, A::Expression, Void>
     where
         Self: 'this;
     fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {

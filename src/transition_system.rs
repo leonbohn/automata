@@ -4,7 +4,7 @@ use crate::{math::Map, math::Partition, prelude::*};
 use std::{fmt::Display, hash::Hash};
 
 mod edge;
-pub use edge::{EdgeReference, IsEdge};
+pub use edge::{Edge, EdgeReference, IsEdge};
 
 mod transitions_from;
 pub use transitions_from::{DeterministicEdgesFrom, TransitionsFrom};
@@ -12,8 +12,16 @@ pub use transitions_from::{DeterministicEdgesFrom, TransitionsFrom};
 /// Defines implementations for common operations on automata/transition systems.
 pub mod operations;
 
-mod index_ts;
-pub use index_ts::{HashTs, IntoHashTs};
+/// This module contains the various provided implementations of [`TransitionSystem`]. There are
+/// two variants of concern, which differ mainly in the data structure that backs them.
+/// - [`NTS`] is a (nondeterministic) transition system which is backed by an edge list. It is
+/// efficient for large systems and this implementation is used by default. There is a variant
+/// [`DTS`] which is simply a thin wrapper around [`NTS`], indicating that the wrapped transition
+/// system is deterministic, i.e. it implements [`Deterministic`].
+/// - [`HashTs`] is a (deterministic) transition system which is backed by a [`crate::Set`] of
+/// states and a [`crate::math::Map`] of edges. In other words, it uses a hash table internally.
+pub mod impls;
+pub use impls::{CollectDTS, HashTs, IntoHashTs, DTS, NTS};
 
 /// Contains implementations and definitions for dealing with paths through a transition system.
 pub mod path;
@@ -28,15 +36,8 @@ pub use shrinkable::Shrinkable;
 mod deterministic;
 pub use deterministic::Deterministic;
 
-/// Implements a type of (nondeterministic) transition system based on a vector of state information and a vector of edges.
-pub mod nts;
-pub use nts::NTS;
-
 mod builder;
 pub use builder::TSBuilder;
-
-mod dts;
-pub use dts::{CollectDTS, DTS};
 
 /// Deals with analysing reachability in transition systems.
 pub mod reachable;
@@ -348,12 +349,12 @@ pub trait TransitionSystem: Sized {
         (self, initial).into()
     }
 
-    /// Builds the [`Quotient`] of `self` with regard to some given [`Partition`].
-    fn quotient(self, partition: Partition<Self::StateIndex>) -> Quotient<Self>
+    /// Builds the [`operations::Quotient`] of `self` with regard to some given [`Partition`].
+    fn quotient(self, partition: Partition<Self::StateIndex>) -> operations::Quotient<Self>
     where
         Self: Sized,
     {
-        Quotient::new(self, partition)
+        operations::Quotient::new(self, partition)
     }
 
     /// Restricts the edges of `self` such that only transitions p --a|c--> q exist where
@@ -777,9 +778,6 @@ impl<P: Pointed> Pointed for &mut P {
 /// This module deals with transforming a transition system (or similar) into a representation in the dot (graphviz) format.
 pub mod dot;
 pub use dot::Dottable;
-
-mod quotient;
-pub use quotient::Quotient;
 
 /// A congruence is a [`TransitionSystem`], which additionally has a distinguished initial state. On top
 /// of that, a congruence does not have any coloring on either states or symbols. This
