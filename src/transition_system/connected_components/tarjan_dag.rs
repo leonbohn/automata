@@ -1,13 +1,8 @@
 use itertools::Itertools;
 use std::hash::Hash;
 
-use crate::{
-    ts::{
-        dag::{Dag, ReachableIter},
-        transition_system::{Indexes, IsEdge},
-    },
-    TransitionSystem,
-};
+use crate::dag::{Dag, ReachableIter};
+use crate::prelude::*;
 
 use super::{EdgeColor, Scc, SccDecomposition};
 
@@ -142,7 +137,7 @@ impl<'a, Ts: TransitionSystem> std::fmt::Debug for TarjanDAG<'a, Ts> {
 mod tests {
     use itertools::Itertools;
 
-    use crate::{ts::connected_components::tests::ts, TransitionSystem};
+    use crate::{transition_system::connected_components::tests::ts, TransitionSystem};
 
     #[test]
     fn tarjan_tree() {

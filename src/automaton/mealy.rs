@@ -90,7 +90,7 @@ pub trait MealyLike: Congruence {
     }
 
     /// Self::EdgeColoronsumes `self`, returning a [`MealyMachine`] that uses the underlying transition system.
-    fn into_mealy(self) -> IntoMealyMachine<Self>
+    fn into_mealy(self) -> Automaton<Self, MealySemantics<Self::EdgeColor>>
     where
         EdgeColor<Self>: Color,
     {
@@ -129,14 +129,14 @@ impl<Ts: Congruence> MealyLike for Ts where EdgeColor<Ts>: Color {}
 
 #[cfg(test)]
 mod tests {
-    use crate::{ts::NTS, TransitionSystem};
+    use crate::prelude::*;
 
     use super::MealyLike;
 
     #[test]
     fn mealy_equivalence() {
-        let mm1 = NTS::builder()
-            .default_color(())
+        let mm1: MealyMachine = NTS::builder()
+            .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),
                 (0, 'b', 0, 1),
@@ -148,8 +148,8 @@ mod tests {
             .deterministic()
             .with_initial(0)
             .into_mealy();
-        let mm2 = NTS::builder()
-            .default_color(())
+        let mm2: MealyMachine = NTS::builder()
+            .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),
                 (0, 'b', 0, 1),
@@ -161,8 +161,8 @@ mod tests {
             .deterministic()
             .with_initial(0)
             .into_mealy();
-        let _mm3 = NTS::builder()
-            .default_color(())
+        let _mm3: MealyMachine = NTS::builder()
+            .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),
                 (0, 'b', 0, 1),

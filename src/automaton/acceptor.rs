@@ -1,13 +1,4 @@
-use crate::{
-    ts::{EdgeColor, Sproutable, StateColor, SymbolOf},
-    word::OmegaWord,
-    Alphabet, Pointed, TransitionSystem,
-};
-
-use super::{
-    Congruence, Deterministic, FiniteSemantics, FiniteWord, Indexes, OmegaSemantics,
-    PredecessorIterable,
-};
+use crate::prelude::*;
 
 /// An automaton consists of a transition system and an acceptance condition.
 /// There are many different types of automata, which can be instantiated from
@@ -162,8 +153,8 @@ impl<D: Sproutable, A: Default, const OMEGA: bool> Sproutable for Automaton<D, A
         color: CI,
     ) -> Option<(Self::StateIndex, Self::EdgeColor)>
     where
-        X: super::Indexes<Self>,
-        Y: super::Indexes<Self>,
+        X: Indexes<Self>,
+        Y: Indexes<Self>,
         CI: Into<EdgeColor<Self>>,
     {
         let from = from.to_index(self)?;
@@ -171,7 +162,7 @@ impl<D: Sproutable, A: Default, const OMEGA: bool> Sproutable for Automaton<D, A
         self.ts.add_edge(from, on, to, color.into())
     }
 
-    fn remove_edges<X: super::Indexes<Self>>(
+    fn remove_edges<X: Indexes<Self>>(
         &mut self,
         from: X,
         on: <Self::Alphabet as Alphabet>::Expression,

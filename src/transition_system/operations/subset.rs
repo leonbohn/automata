@@ -1,12 +1,7 @@
 use std::{cell::RefCell, fmt::Debug};
 
+use crate::{math::Set, prelude::*, transition_system::edge::TransitionOwnedColor};
 use itertools::Itertools;
-
-use crate::{
-    prelude::*,
-    ts::{reachable::ReachableStateIndices, transition_system::TransitionOwnedColor},
-    Set,
-};
 
 #[derive(Clone, Eq)]
 pub struct StateSet<Ts: TransitionSystem>(Set<Ts::StateIndex>);
@@ -125,7 +120,7 @@ impl<Ts: TransitionSystem> TransitionSystem for SubsetConstruction<Ts> {
     where
         Self: 'this;
 
-    type StateIndices<'this> = ReachableStateIndices<&'this Self>
+    type StateIndices<'this> = crate::transition_system::reachable::ReachableStateIndices<&'this Self>
     where
         Self: 'this;
 
@@ -208,21 +203,18 @@ impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        ts::{Deterministic, NTS},
-        TransitionSystem,
-    };
+    use crate::prelude::*;
 
     #[test]
     fn subset_construction() {
         let nts = NTS::builder()
             .default_color(false)
             .with_transitions([
-                (0, 'a', (), 0),
-                (0, 'a', (), 1),
-                (0, 'b', (), 1),
-                (1, 'b', (), 1),
-                (1, 'a', (), 0),
+                (0, 'a', 0),
+                (0, 'a', 1),
+                (0, 'b', 1),
+                (1, 'b', 1),
+                (1, 'a', 0),
             ])
             .collect()
             .with_initial(0);

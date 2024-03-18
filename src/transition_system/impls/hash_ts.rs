@@ -1,96 +1,5 @@
+use crate::{math::Map, math::Set, prelude::*, transition_system::EdgeReference};
 use std::{fmt::Debug, hash::Hash};
-
-use crate::{
-    alphabet::Alphabet,
-    ts::{transition_system::IsEdge, Deterministic},
-    Color, Map, Set,
-};
-
-use super::{
-    transition_system::Indexes, EdgeColor, ExpressionOf, IndexType, Sproutable, StateColor,
-    SymbolOf, TransitionSystem,
-};
-
-/// A state in a transition system. This stores the color of the state and the index of the
-/// first edge leaving the state.
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct HashTsState<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> {
-    color: Q,
-    edges: Map<A::Expression, (Idx, C)>,
-    predecessors: Set<(Idx, A::Expression, C)>,
-}
-
-impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> HashTsState<A, Q, C, Idx> {
-    /// Creates a new state with the given color.
-    pub fn new(color: Q) -> Self {
-        Self {
-            color,
-            edges: Map::default(),
-            predecessors: Set::default(),
-        }
-    }
-
-    pub fn set_color(&mut self, color: Q) {
-        self.color = color;
-    }
-
-    pub fn predecessors(&self) -> &Set<(Idx, A::Expression, C)> {
-        &self.predecessors
-    }
-
-    pub fn add_pre_edge(&mut self, from: Idx, on: A::Expression, color: C) -> bool {
-        self.predecessors.insert((from, on, color))
-    }
-
-    pub fn remove_pre_edge(&mut self, from: Idx, on: A::Expression, color: C) -> bool {
-        self.predecessors.remove(&(from, on, color))
-    }
-
-    pub fn remove_incoming_edges_from(&mut self, target: Idx) {
-        self.predecessors.retain(|(idx, _, _)| *idx != target);
-    }
-
-    pub fn remove_outgoing_edges_to(&mut self, target: Idx) {
-        self.edges.retain(|_, (idx, _)| *idx != target);
-    }
-
-    pub fn edges(&self) -> impl Iterator<Item = (&A::Expression, &(Idx, C))> {
-        self.edges.iter()
-    }
-
-    pub fn edge_map(&self) -> &Map<A::Expression, (Idx, C)> {
-        &self.edges
-    }
-
-    pub fn add_edge(&mut self, on: A::Expression, to: Idx, color: C) -> Option<(Idx, C)> {
-        self.edges.insert(on, (to, color))
-    }
-
-    pub fn remove_edge(&mut self, on: &A::Expression) -> Option<(Idx, C)> {
-        self.edges.remove(on)
-    }
-
-    pub fn recolor<P: Color>(self, color: P) -> HashTsState<A, P, C, Idx> {
-        HashTsState {
-            color,
-            edges: self.edges,
-            predecessors: self.predecessors,
-        }
-    }
-
-    /// Obtains a reference to the color of the state.
-    pub fn color(&self) -> &Q {
-        &self.color
-    }
-}
-
-impl<A: Alphabet, Q: std::fmt::Display, C: Color, Idx: IndexType> std::fmt::Display
-    for HashTsState<A, Q, C, Idx>
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.color)
-    }
-}
 
 /// An implementation of a transition system with states of type `Q` and colors of type `C`. It stores
 /// the states and edges in a vector, which allows for fast access and iteration. The states and edges
@@ -109,25 +18,6 @@ pub type IntoHashTs<Ts> = HashTs<
     <Ts as TransitionSystem>::StateColor,
     <Ts as TransitionSystem>::EdgeColor,
 >;
-
-impl<A, C, Q, Idx> std::fmt::Debug for HashTs<A, Q, C, Idx>
-where
-    A: Alphabet,
-    C: Debug + Clone + Hash + Eq,
-    Q: Debug + Clone + Hash + Eq,
-    Idx: IndexType,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{}",
-            self.build_transition_table(
-                |idx, c| format!("{} : {:?}", idx, c),
-                |edge| format!("{:?}->{}", edge.color(), edge.target())
-            )
-        )
-    }
-}
 
 impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C, Idx> {
     /// Creates a new transition system with the given alphabet.
@@ -256,6 +146,157 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone + Hash + Eq> HashTs<A, Q, C
     /// Checks whether the state exists.
     pub fn contains_state<I: Into<Idx>>(&self, index: I) -> bool {
         self.states.contains_key(&index.into())
+    }
+}
+
+/// A state in a transition system. This stores the color of the state and the index of the
+/// first edge leaving the state.
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct HashTsState<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> {
+    color: Q,
+    edges: Map<A::Expression, (Idx, C)>,
+    predecessors: Set<(Idx, A::Expression, C)>,
+}
+
+impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> HashTsState<A, Q, C, Idx> {
+    /// Creates a new state with the given color.
+    pub fn new(color: Q) -> Self {
+        Self {
+            color,
+            edges: Map::default(),
+            predecessors: Set::default(),
+        }
+    }
+
+    pub fn set_color(&mut self, color: Q) {
+        self.color = color;
+    }
+
+    pub fn predecessors(&self) -> &Set<(Idx, A::Expression, C)> {
+        &self.predecessors
+    }
+
+    pub fn add_pre_edge(&mut self, from: Idx, on: A::Expression, color: C) -> bool {
+        self.predecessors.insert((from, on, color))
+    }
+
+    pub fn remove_pre_edge(&mut self, from: Idx, on: A::Expression, color: C) -> bool {
+        self.predecessors.remove(&(from, on, color))
+    }
+
+    pub fn remove_incoming_edges_from(&mut self, target: Idx) {
+        self.predecessors.retain(|(idx, _, _)| *idx != target);
+    }
+
+    pub fn remove_outgoing_edges_to(&mut self, target: Idx) {
+        self.edges.retain(|_, (idx, _)| *idx != target);
+    }
+
+    pub fn edges(&self) -> impl Iterator<Item = (&A::Expression, &(Idx, C))> {
+        self.edges.iter()
+    }
+
+    pub fn edge_map(&self) -> &Map<A::Expression, (Idx, C)> {
+        &self.edges
+    }
+
+    pub fn add_edge(&mut self, on: A::Expression, to: Idx, color: C) -> Option<(Idx, C)> {
+        self.edges.insert(on, (to, color))
+    }
+
+    pub fn remove_edge(&mut self, on: &A::Expression) -> Option<(Idx, C)> {
+        self.edges.remove(on)
+    }
+
+    pub fn recolor<P: Color>(self, color: P) -> HashTsState<A, P, C, Idx> {
+        HashTsState {
+            color,
+            edges: self.edges,
+            predecessors: self.predecessors,
+        }
+    }
+
+    /// Obtains a reference to the color of the state.
+    pub fn color(&self) -> &Q {
+        &self.color
+    }
+}
+
+impl<A: Alphabet, IdxTy: IndexType, Q: Clone, C: Clone + Hash + Eq> TransitionSystem
+    for HashTs<A, Q, C, IdxTy>
+{
+    type StateColor = Q;
+    type EdgeColor = C;
+    type StateIndex = IdxTy;
+    type EdgeRef<'this> = EdgeReference<'this, A::Expression, IdxTy, C> where Self: 'this;
+    type EdgesFromIter<'this> = BTSEdgesFrom<'this, A::Expression, IdxTy, C> where Self: 'this;
+    type StateIndices<'this> = std::iter::Cloned<std::collections::hash_map::Keys<'this, IdxTy, HashTsState<A, Q, C, IdxTy>>> where Self: 'this;
+
+    type Alphabet = A;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        &self.alphabet
+    }
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        self.states.keys().cloned()
+    }
+
+    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
+        let state = state.to_index(self)?;
+        self.raw_state_map().get(&state).map(|s| s.color().clone())
+    }
+
+    fn edges_from<X: Indexes<Self>>(&self, state: X) -> Option<Self::EdgesFromIter<'_>> {
+        let source = state.to_index(self)?;
+        Some(BTSEdgesFrom::new(
+            source,
+            self.raw_state_map()
+                .get(&source)
+                .map(|o| o.edge_map().iter())?,
+        ))
+    }
+}
+
+/// Specialized iterator over the edges that leave a given state in a BTS.
+// TODO: rename to HashTsEdgesFrom
+pub struct BTSEdgesFrom<'ts, E, Idx, C> {
+    edges: std::collections::hash_map::Iter<'ts, E, (Idx, C)>,
+    source: Idx,
+}
+
+impl<'ts, E, Idx, C> BTSEdgesFrom<'ts, E, Idx, C> {
+    /// Creates a new instance from the given components.
+    pub fn new(source: Idx, edges: std::collections::hash_map::Iter<'ts, E, (Idx, C)>) -> Self {
+        Self { edges, source }
+    }
+}
+
+impl<'ts, E, Idx: IndexType, C> Iterator for BTSEdgesFrom<'ts, E, Idx, C> {
+    type Item = EdgeReference<'ts, E, Idx, C>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.edges
+            .next()
+            .map(|(e, (t, c))| EdgeReference::new(self.source, e, c, *t))
+    }
+}
+
+impl<A, C, Q, Idx> std::fmt::Debug for HashTs<A, Q, C, Idx>
+where
+    A: Alphabet,
+    C: Debug + Clone + Hash + Eq,
+    Q: Debug + Clone + Hash + Eq,
+    Idx: IndexType,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{}",
+            self.build_transition_table(
+                |idx, c| format!("{} : {:?}", idx, c),
+                |edge| format!("{:?}->{}", edge.color(), edge.target())
+            )
+        )
     }
 }
 

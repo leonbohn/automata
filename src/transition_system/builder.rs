@@ -154,11 +154,11 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 0)])
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
-    pub fn with_transitions<X: FullTransition<usize, char, C>, T: IntoIterator<Item = X>>(
+    pub fn with_transitions<E: IntoEdge<usize, char, C>, T: IntoIterator<Item = E>>(
         mut self,
         iter: T,
     ) -> Self {
-        self.edges.extend(iter.into_iter().map(|t| t.clone_tuple()));
+        self.edges.extend(iter.into_iter().map(|t| t.into_edge()));
         self
     }
 

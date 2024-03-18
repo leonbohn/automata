@@ -2,10 +2,9 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::Bijection;
-use crate::Map;
-use crate::Set;
-use crate::TransitionSystem;
+use crate::math::Bijection;
+use crate::math::Map;
+use crate::math::Set;
 
 use crate::prelude::*;
 
@@ -176,7 +175,7 @@ pub trait Deterministic: TransitionSystem {
     /// - [`Err`] if the run is unsuccessful, meaning a symbol is encountered for which no
     /// transition exists.
     ///
-    /// It returns a [`crate::ts::path::PathIn`] in either case, which is a path in the transition system. So it is possible
+    /// It returns a [`crate::transition_system::path::PathIn`] in either case, which is a path in the transition system. So it is possible
     /// to inspect the path, e.g. to find out which state was reached or which transitions were taken.
     /// For more information, see [`crate::prelude::Path`].
     #[allow(clippy::type_complexity)]
@@ -777,7 +776,7 @@ impl<A: Alphabet, IdType: IndexType, Q: Clone, C: Hash + Eq + Clone> Determinist
         self.raw_state_map()
             .get(&source)
             .and_then(|o| A::search_edge(o.edge_map(), symbol))
-            .map(|(e, (q, c))| EdgeReference::new(source, e, c, *q))
+            .map(|(e, (q, c))| crate::transition_system::EdgeReference::new(source, e, c, *q))
     }
 }
 
@@ -906,7 +905,7 @@ where
     D: Clone,
     F: Fn(Ts::StateIndex, &ExpressionOf<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
-    fn transition<Idx: crate::ts::transition_system::Indexes<Self>>(
+    fn transition<Idx: crate::transition_system::Indexes<Self>>(
         &self,
         state: Idx,
         symbol: crate::prelude::SymbolOf<Self>,

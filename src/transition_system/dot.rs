@@ -13,7 +13,7 @@ use crate::{
     Alphabet, Color, Show, TransitionSystem,
 };
 
-use super::transition_system::IsEdge;
+use crate::prelude::*;
 
 fn sanitize_dot_ident(name: &str) -> String {
     name.chars()
@@ -223,7 +223,7 @@ impl<A: Alphabet> Dottable for DFA<A> {
     where
         (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
     {
-        [DotTransitionAttribute::Label(t.expression.show())].into_iter()
+        [DotTransitionAttribute::Label(t.expression().show())].into_iter()
     }
 
     fn dot_state_attributes(
@@ -635,13 +635,7 @@ fn display_png(contents: Vec<u8>) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        alphabet,
-        congruence::FORC,
-        prelude::DPA,
-        ts::{Sproutable, NTS},
-        Pointed, RightCongruence, Void,
-    };
+    use crate::{congruence::FORC, prelude::*};
 
     use super::Dottable;
 
