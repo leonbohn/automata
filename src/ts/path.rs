@@ -240,9 +240,29 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
     }
 }
 
-impl<A: Alphabet, Idx: IndexType, Q: Show, C: Show> std::fmt::Debug for Path<A, Idx, Q, C> {
+impl<A: Alphabet, Idx: IndexType, Q: std::fmt::Debug, C: std::fmt::Debug> std::fmt::Debug
+    for Path<A, Idx, Q, C>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.show())
+        write!(
+            f,
+            "{}[{:?}|{:?}]",
+            self.transitions
+                .iter()
+                .enumerate()
+                .map(|(i, (p, a, c))| format!(
+                    "[{:?}|{:?}] -{}|{:?}-> ",
+                    p,
+                    self.state_colors[i],
+                    a.show(),
+                    c
+                ))
+                .join(""),
+            self.end,
+            self.state_colors
+                .last()
+                .expect("Must have color for last state")
+        )
     }
 }
 
@@ -375,6 +395,14 @@ impl<E, Idx, C> Edge<E, Idx, C> {
 pub mod tests {
     use crate::alphabet::CharAlphabet;
     use crate::ts::{path::Edge, Path};
+
+    #[test]
+    fn debug_display_path() {
+        let path: Path<CharAlphabet, usize, usize, usize> =
+            Path::from_parts(0, vec![0, 1], vec![(7, 'b', 100)]);
+        let displayed = format!("{:?}", path);
+        assert_eq!(displayed, r#"[7|0] -b|100-> [0|1]"#)
+    }
 
     #[test]
     fn path_transitions() {
