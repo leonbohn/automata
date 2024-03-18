@@ -109,6 +109,10 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
     }
 }
 
+/// A transition in the [`Quotient`] of a [`TransitionSystem`]. We assume that
+/// a quotient can only be built from a [`crate::math::Partition`] that is
+/// a congruence (i.e. the quotient transition system is deterministic).
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct QuotientTransition<'a, Idx, E, C> {
     source: Idx,
     expression: &'a E,
@@ -135,6 +139,7 @@ impl<'a, Idx: Copy, E, C: Clone> IsEdge<'a, E, Idx, Vec<C>> for QuotientTransiti
 }
 
 impl<'a, Idx, E, C> QuotientTransition<'a, Idx, E, C> {
+    /// Build a new quotient transition from the given parts.
     pub fn new(source: Idx, expression: &'a E, colors: Vec<C>, target: Idx) -> Self {
         Self {
             source,
@@ -145,6 +150,8 @@ impl<'a, Idx, E, C> QuotientTransition<'a, Idx, E, C> {
     }
 }
 
+/// Allows iterating over the edges originating from a state in the [`Quotient`]
+/// of a [`TransitionSystem`].
 #[derive(Clone)]
 pub struct QuotientEdgesFrom<'a, Ts: TransitionSystem, I> {
     it: I,
@@ -166,6 +173,8 @@ where
 }
 
 impl<'a, Ts: TransitionSystem, I> QuotientEdgesFrom<'a, Ts, I> {
+    /// Creates a new iterator over the edges originating from a state in a
+    /// [`Quotient`] of a [`TransitionSystem`].
     pub fn new(ts: &'a Quotient<Ts>, it: I, class: usize) -> Self {
         Self {
             it,

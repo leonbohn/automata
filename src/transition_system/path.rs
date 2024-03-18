@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use itertools::{Either, Itertools};
 
 use crate::prelude::*;
@@ -346,49 +344,9 @@ impl<A: Alphabet, Idx: IndexType, Q: Color, C: Color> Show for Lasso<A, Idx, Q, 
     }
 }
 
-/// Represents an edge that is not associated to a transition system. It stores a color, an
-/// expression, as well as a source and target state index.
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct Edge<E, Idx, C> {
-    source: Idx,
-    target: Idx,
-    color: C,
-    expression: E,
-}
-
-impl<'a, E, Idx: Copy, C: Clone> IsEdge<'a, E, Idx, C> for &'a Edge<E, Idx, C> {
-    fn target(&self) -> Idx {
-        self.target
-    }
-
-    fn color(&self) -> C {
-        self.color.clone()
-    }
-
-    fn expression(&self) -> &'a E {
-        &self.expression
-    }
-
-    fn source(&self) -> Idx {
-        self.source
-    }
-}
-
-impl<E, Idx, C> Edge<E, Idx, C> {
-    /// Creates a new edge with the given source, expression, color and target.
-    pub fn new(source: Idx, expression: E, color: C, target: Idx) -> Self {
-        Self {
-            source,
-            target,
-            color,
-            expression,
-        }
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
-    use crate::{prelude::*, transition_system::path::Edge};
+    use crate::prelude::*;
 
     #[test]
     fn debug_display_path() {

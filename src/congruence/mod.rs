@@ -28,8 +28,8 @@ impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for RightCongruence<A, Q,
     type StateIndex = usize;
     type EdgeColor = C;
     type StateColor = ColoredClass<A::Symbol, Q>;
-    type EdgeRef<'this> = &'this crate::transition_system::nts::NTEdge<A::Expression, C> where Self: 'this;
-    type EdgesFromIter<'this> = crate::transition_system::nts::NTSEdgesFromIter<'this, A::Expression, C>
+    type EdgeRef<'this> = &'this crate::transition_system::impls::NTEdge<A::Expression, C> where Self: 'this;
+    type EdgesFromIter<'this> = crate::transition_system::impls::NTSEdgesFromIter<'this, A::Expression, C>
     where
         Self: 'this;
     type StateIndices<'this> = std::ops::Range<usize> where Self: 'this;

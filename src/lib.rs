@@ -29,6 +29,7 @@ pub mod prelude {
             IntoDPA, IntoMealyMachine, IntoMooreMachine, MealyLike, MealyMachine, MooreLike,
             MooreMachine, OmegaAcceptanceCondition, OmegaAutomaton, OmegaSemantics, DBA, DFA, DPA,
         },
+        math,
         transition_system::operations,
         transition_system::{
             dot::Dottable,
@@ -36,8 +37,8 @@ pub mod prelude {
             predecessors::PredecessorIterable,
             reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
-            Congruence, Deterministic, DeterministicEdgesFrom, EdgeColor, ExpressionOf, HashTs,
-            IndexType, Indexes, IntoEdge, IsEdge, Path, Sproutable, StateColor, SymbolOf,
+            Congruence, Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, ExpressionOf,
+            HashTs, IndexType, Indexes, IntoEdge, IsEdge, Path, Sproutable, StateColor, SymbolOf,
             TSBuilder, TransitionSystem, DTS, NTS,
         },
         upw,

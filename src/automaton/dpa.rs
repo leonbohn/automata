@@ -9,7 +9,7 @@ use tracing::{info, trace};
 use crate::{
     math::Partition,
     prelude::*,
-    transition_system::{CollectDTS, Quotient, Shrinkable},
+    transition_system::{CollectDTS, Shrinkable},
 };
 
 /// Represents a parity condition which accepts if and only if the least color that
@@ -162,7 +162,7 @@ impl<D: DPALike> IntoDPA<D> {
 
     /// Builds the quotient of `self` with respect to the prefix partition. This will result in the prefix
     /// congruence that underlies the language accepted by `self`.
-    pub fn prefix_congruence(&self) -> Quotient<&Self> {
+    pub fn prefix_congruence(&self) -> operations::Quotient<&Self> {
         self.quotient(self.prefix_partition())
     }
 
