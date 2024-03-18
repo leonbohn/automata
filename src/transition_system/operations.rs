@@ -13,6 +13,9 @@ pub use subset::SubsetConstruction;
 mod reverse;
 pub use reverse::Reversed;
 
+mod quotient;
+pub use quotient::{Quotient, QuotientEdgesFrom, QuotientTransition};
+
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;

@@ -63,6 +63,49 @@ impl<L: std::fmt::Display, R: std::fmt::Display> std::fmt::Display for ProductIn
 #[derive(Copy, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MatchingProduct<L, R>(pub L, pub R);
 
+impl<L, R> TransitionSystem for MatchingProduct<L, R>
+where
+    L: TransitionSystem,
+    R: TransitionSystem,
+    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = ExpressionOf<L>>,
+    L::StateColor: Clone,
+    R::StateColor: Clone,
+{
+    type StateIndex = ProductIndex<L::StateIndex, R::StateIndex>;
+    type EdgeColor = (L::EdgeColor, R::EdgeColor);
+    type StateColor = (L::StateColor, R::StateColor);
+    type EdgeRef<'this> = ProductTransition<'this, L::StateIndex, R::StateIndex, ExpressionOf<L>, L::EdgeColor, R::EdgeColor> where Self: 'this;
+    type EdgesFromIter<'this> = ProductEdgesFrom<'this, L, R> where Self: 'this;
+    type StateIndices<'this> = ProductStatesIter<'this, L, R> where Self: 'this;
+    type Alphabet = L::Alphabet;
+    fn alphabet(&self) -> &Self::Alphabet {
+        self.0.alphabet()
+    }
+
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        ProductStatesIter::new(&self.0, &self.1)
+    }
+
+    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
+        let state = state.to_index(self)?;
+        let ProductIndex(l, r) = state;
+        let left = self.0.state_color(l)?;
+        let right = self.1.state_color(r)?;
+        Some((left, right))
+    }
+
+    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
+        ProductEdgesFrom::new(&self.0, &self.1, state.to_index(self)?)
+    }
+
+    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
+        Some(ProductIndex(
+            self.0.maybe_initial_state()?,
+            self.1.maybe_initial_state()?,
+        ))
+    }
+}
+
 impl<L, R> Pointed for MatchingProduct<L, R>
 where
     L: Pointed,
@@ -360,25 +403,22 @@ impl<'a, L: PredecessorIterable, R: PredecessorIterable> ProductEdgesTo<'a, L, R
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        ts::{Deterministic, NTS},
-        TransitionSystem,
-    };
-
-    use super::Product;
+    use crate::prelude::*;
 
     #[test]
     fn product_subalphabet() {
-        let l = NTS::builder()
-            .default_color(())
+        let l: MealyMachine = NTS::builder()
+            .default_color(Void)
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
             .deterministic()
-            .with_initial(0);
-        let r = NTS::builder()
-            .default_color(())
+            .with_initial(0)
+            .into_mealy();
+        let r: MealyMachine = NTS::builder()
+            .default_color(Void)
             .with_transitions([(0, 'a', 0, 0)])
             .deterministic()
-            .with_initial(0);
+            .with_initial(0)
+            .into_mealy();
         assert!((&l).ts_product(&l).reached_state_index("b").is_some());
         let prod = l.ts_product(r);
         assert!(prod.reached_state_index("a").is_some());

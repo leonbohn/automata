@@ -1,10 +1,4 @@
-use crate::{
-    ts::{
-        predecessors::PredecessorIterable,
-        transition_system::{Indexes, IsEdge},
-    },
-    TransitionSystem,
-};
+use crate::prelude::*;
 
 /// Reverses the direction of all transitions in a given [`TransitionSystem`].
 #[derive(Clone, Debug)]
@@ -60,10 +54,7 @@ where
         self.0.state_indices()
     }
 
-    fn edges_from<Idx: crate::ts::transition_system::Indexes<Self>>(
-        &self,
-        state: Idx,
-    ) -> Option<Self::EdgesFromIter<'_>> {
+    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
         Some(self.0.predecessors(state.to_index(self)?)?.map(Reversed))
     }
 

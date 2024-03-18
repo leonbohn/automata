@@ -157,7 +157,7 @@ pub(crate) fn print_random_ts_benchmark(
 
 #[cfg(test)]
 mod tests {
-    use crate::ts::Dottable;
+    use crate::transition_system::Dottable;
 
     use super::{generate_random_dfa, print_random_ts_benchmark};
 

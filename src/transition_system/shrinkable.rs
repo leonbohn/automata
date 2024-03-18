@@ -1,8 +1,6 @@
 use std::hash::Hash;
 
-use crate::{automaton::Initialized, Alphabet, Color, Set, TransitionSystem};
-
-use super::{transition_system::Indexes, ExpressionOf, HashTs, IndexType, SymbolOf, DTS, NTS};
+use crate::{math::Set, prelude::*};
 
 /// Encapsulates the ability to remove states, edges, and transitions from a transition system.
 pub trait Shrinkable: TransitionSystem {

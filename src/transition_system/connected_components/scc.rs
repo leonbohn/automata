@@ -2,7 +2,7 @@ use std::{cell::OnceCell, collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use itertools::Itertools;
 
-use crate::{prelude::*, ts::reachable::MinimalRepresentative, Map, Set};
+use crate::{math::Map, math::Set, prelude::*};
 
 type InteriorEdgeSet<Ts> = Set<(
     <Ts as TransitionSystem>::StateIndex,
@@ -334,8 +334,7 @@ impl<'a, Ts: TransitionSystem> Debug for Scc<'a, Ts> {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::{ts::NTS, Set, TransitionSystem};
+    use crate::{prelude::*, Set};
 
     #[test]
     fn interior_transitions() {

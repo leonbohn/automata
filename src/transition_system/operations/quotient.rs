@@ -1,11 +1,6 @@
 use itertools::Itertools;
 
-use crate::{Alphabet, Partition, Pointed, RightCongruence, Set, Show, TransitionSystem};
-
-use super::{
-    transition_system::{Indexes, IsEdge},
-    Deterministic, ExpressionOf, SymbolOf,
-};
+use crate::{math::Partition, math::Set, prelude::*};
 
 /// A quotient takes a transition system and merges states which are in the same
 /// congruence class of some [`Partition`]. We assume that the [`Partition`] is
@@ -69,7 +64,7 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
 
     #[allow(unused)]
     fn sanity_check(ts: &Ts, partition: &Partition<Ts::StateIndex>) -> bool {
-        for p in &partition.0 {
+        for p in partition.iter() {
             let all_equal = p
                 .iter()
                 .map(|i| {
@@ -114,6 +109,10 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
     }
 }
 
+/// A transition in the [`Quotient`] of a [`TransitionSystem`]. We assume that
+/// a quotient can only be built from a [`crate::math::Partition`] that is
+/// a congruence (i.e. the quotient transition system is deterministic).
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct QuotientTransition<'a, Idx, E, C> {
     source: Idx,
     expression: &'a E,
@@ -140,6 +139,7 @@ impl<'a, Idx: Copy, E, C: Clone> IsEdge<'a, E, Idx, Vec<C>> for QuotientTransiti
 }
 
 impl<'a, Idx, E, C> QuotientTransition<'a, Idx, E, C> {
+    /// Build a new quotient transition from the given parts.
     pub fn new(source: Idx, expression: &'a E, colors: Vec<C>, target: Idx) -> Self {
         Self {
             source,
@@ -150,6 +150,8 @@ impl<'a, Idx, E, C> QuotientTransition<'a, Idx, E, C> {
     }
 }
 
+/// Allows iterating over the edges originating from a state in the [`Quotient`]
+/// of a [`TransitionSystem`].
 #[derive(Clone)]
 pub struct QuotientEdgesFrom<'a, Ts: TransitionSystem, I> {
     it: I,
@@ -171,6 +173,8 @@ where
 }
 
 impl<'a, Ts: TransitionSystem, I> QuotientEdgesFrom<'a, Ts, I> {
+    /// Creates a new iterator over the edges originating from a state in a
+    /// [`Quotient`] of a [`TransitionSystem`].
     pub fn new(ts: &'a Quotient<Ts>, it: I, class: usize) -> Self {
         Self {
             it,
@@ -211,10 +215,7 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
         it.map(|o| self.ts.state_color(o)).collect()
     }
 
-    fn edges_from<Idx: super::transition_system::Indexes<Self>>(
-        &self,
-        state: Idx,
-    ) -> Option<Self::EdgesFromIter<'_>> {
+    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
         if self.partition.len() <= state.to_index(self)? {
             None
         } else {
@@ -227,7 +228,7 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
     }
 }
 impl<D: Deterministic> Deterministic for Quotient<D> {
-    fn transition<Idx: super::transition_system::Indexes<Self>>(
+    fn transition<Idx: Indexes<Self>>(
         &self,
         state: Idx,
         symbol: SymbolOf<Self>,
@@ -269,7 +270,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{tests::wiki_dfa, ts::Deterministic, Partition, TransitionSystem};
+    use crate::{math::Partition, prelude::*, tests::wiki_dfa};
 
     #[test]
     fn quotient_test() {

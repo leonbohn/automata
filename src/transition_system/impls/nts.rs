@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use crate::{prelude::*, Set, Void};
+use crate::{math::Set, prelude::*, Void};
 use itertools::Itertools;
 
 /// Type alias for the constituent parts of an [`NTS`] with the same associated types as the
