@@ -789,11 +789,11 @@ pub trait Congruence: Deterministic + Pointed {
     fn build_right_congruence(
         &self,
     ) -> (
-        RightCongruence<Self::Alphabet>,
+        RightCongruenceOld<Self::Alphabet>,
         Map<Self::StateIndex, usize>,
     ) {
-        let mut cong: RightCongruence<Self::Alphabet> =
-            RightCongruence::new_for_alphabet(self.alphabet().clone());
+        let mut cong: RightCongruenceOld<Self::Alphabet> =
+            RightCongruenceOld::new_for_alphabet(self.alphabet().clone());
         let mut map = Map::default();
 
         for state in self.state_indices() {

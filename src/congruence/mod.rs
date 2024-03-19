@@ -20,11 +20,11 @@ mod cayley;
 /// represent these as a transition system, where the states are the equivalence classes and the colors
 /// on edges are `()`.
 #[derive(Clone, Eq, PartialEq)]
-pub struct RightCongruence<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
+pub struct RightCongruenceOld<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
     ts: DTS<A, ColoredClass<A::Symbol, Q>, C>,
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for RightCongruenceOld<A, Q, C> {
     type StateIndex = usize;
     type EdgeColor = C;
     type StateColor = ColoredClass<A::Symbol, Q>;
@@ -78,7 +78,7 @@ impl<S: Symbol + Show> Show for ColoredClass<S, Void> {
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Debug for RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Debug for RightCongruenceOld<A, Q, C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -91,7 +91,7 @@ impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Debug for RightCongruence<
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone> RightCongruenceOld<A, Q, C> {
     /// Assumes that `self` is det. and complete.
     pub fn congruent<W, V>(&self, word: W, other: V) -> bool
     where
@@ -188,14 +188,14 @@ impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> Pointed for RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone> Pointed for RightCongruenceOld<A, Q, C> {
     fn initial(&self) -> Self::StateIndex {
         assert!(!self.is_empty());
         0
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for RightCongruenceOld<A, Q, C> {
     fn add_state<X: Into<crate::transition_system::StateColor<Self>>>(
         &mut self,
         color: X,
@@ -254,9 +254,9 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for RightCongruence<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone + Default, C: Clone> RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Clone + Default, C: Clone> RightCongruenceOld<A, Q, C> {
     /// Creates a new [`RightCongruence`] for the given alphabet.
-    pub fn new(alphabet: A) -> RightCongruence<A, Q, C> {
+    pub fn new(alphabet: A) -> RightCongruenceOld<A, Q, C> {
         Self::new_for_alphabet(alphabet)
     }
 }

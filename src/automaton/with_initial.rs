@@ -1,7 +1,9 @@
 use crate::prelude::*;
 use std::fmt::Debug;
 
-/// Wrapper around a [`TransitionSystem`] with a designated initial state.
+/// Designates a [`TransitionSystem`] with some initial state. This is a thin wrapper
+/// around the underlying transition system and is used mainly in [`Automaton`]
+/// and its instantiations like [`DFA`] etc.
 #[derive(Clone, PartialEq)]
 pub struct Initialized<Ts: TransitionSystem>(Ts, Ts::StateIndex);
 

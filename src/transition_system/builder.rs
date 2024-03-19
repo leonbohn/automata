@@ -100,7 +100,7 @@ impl TSBuilder<Void, usize> {
 impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     /// Turns `self` into a [`RightCongruence`] with the given initial state while also erasing all state and edge
     /// colors. Panics if `self` is not deterministic.
-    pub fn into_right_congruence_bare(self, initial: usize) -> RightCongruence<CharAlphabet> {
+    pub fn into_right_congruence_bare(self, initial: usize) -> RightCongruenceOld<CharAlphabet> {
         self.deterministic()
             .with_initial(initial)
             .collect_right_congruence_bare()
@@ -197,7 +197,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     }
 
     /// Turns `self` into a [`RightCongruence`] with the given initial state. Panics if `self` is not deterministic.
-    pub fn into_right_congruence(self, initial: usize) -> RightCongruence<CharAlphabet, Q, C> {
+    pub fn into_right_congruence(self, initial: usize) -> RightCongruenceOld<CharAlphabet, Q, C> {
         self.deterministic()
             .with_initial(initial)
             .collect_right_congruence()

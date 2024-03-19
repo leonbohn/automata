@@ -551,22 +551,22 @@ pub trait Deterministic: TransitionSystem {
 
     /// Builds a new [`RightCongruence`] from `self`, which is like viewing only the right congruence underlying
     /// `self`. This procedure erases the state and edge colors.
-    fn collect_right_congruence_bare(&self) -> RightCongruence<Self::Alphabet>
+    fn collect_right_congruence_bare(&self) -> RightCongruenceOld<Self::Alphabet>
     where
         Self: Pointed,
     {
-        RightCongruence::from_ts(self.erase_state_colors().erase_edge_colors())
+        RightCongruenceOld::from_ts(self.erase_state_colors().erase_edge_colors())
     }
 
     /// Builds a new [`RightCongruence`] from `self`, which is like viewing only the right congruence underlying
     /// `self`. This procedure keeps the state and edge colors.
     fn collect_right_congruence(
         &self,
-    ) -> RightCongruence<Self::Alphabet, Self::StateColor, Self::EdgeColor>
+    ) -> RightCongruenceOld<Self::Alphabet, Self::StateColor, Self::EdgeColor>
     where
         Self: Pointed,
     {
-        RightCongruence::from_ts(self)
+        RightCongruenceOld::from_ts(self)
     }
 
     /// Collects `self` into a new [`DTS`] over the same alphabet. This is used, for example, after a chain of
@@ -737,7 +737,7 @@ impl<D: Deterministic> Deterministic for &mut D {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> Deterministic for RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone> Deterministic for RightCongruenceOld<A, Q, C> {
     fn transition<Idx: Indexes<Self>>(
         &self,
         state: Idx,

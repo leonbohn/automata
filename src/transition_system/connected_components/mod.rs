@@ -85,8 +85,8 @@ mod tests {
         Set,
     };
 
-    pub(super) fn ts() -> RightCongruence<CharAlphabet> {
-        let mut cong = RightCongruence::new(alphabet!(simple 'a', 'b'));
+    pub(super) fn ts() -> RightCongruenceOld<CharAlphabet> {
+        let mut cong = RightCongruenceOld::new(alphabet!(simple 'a', 'b'));
         let q0 = cong.add_state(vec![]);
         let q1 = cong.add_state(vec!['a']);
         let q2 = cong.add_state(vec!['b']);

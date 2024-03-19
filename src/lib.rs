@@ -46,7 +46,7 @@ pub mod prelude {
             FiniteWord, LinearWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord,
             ReducedOmegaWord, ReducedParseError,
         },
-        Alphabet, Class, Color, Pointed, RightCongruence, Show, Void,
+        Alphabet, Class, Color, Pointed, RightCongruenceOld, Show, Void,
     };
 }
 
@@ -71,7 +71,7 @@ pub mod automaton;
 
 /// Defines congruence relations and congruence classes.
 pub mod congruence;
-pub use congruence::{Class, RightCongruence};
+pub use congruence::{Class, RightCongruenceOld};
 
 /// Module that contains definitions for dealing with words.
 #[macro_use]

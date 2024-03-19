@@ -244,7 +244,7 @@ impl<A: Alphabet> Dottable for DFA<A> {
         ]
     }
 }
-impl<A: Alphabet, Q: Clone, C: Clone> Dottable for crate::RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone> Dottable for crate::RightCongruenceOld<A, Q, C> {
     fn dot_name(&self) -> Option<String> {
         Some("Congruence".into())
     }
@@ -658,7 +658,7 @@ mod tests {
     #[ignore]
     fn display_forc() {
         let alphabet = alphabet!(simple 'a', 'b');
-        let mut cong = RightCongruence::new(alphabet.clone());
+        let mut cong = RightCongruenceOld::new(alphabet.clone());
         let q0 = cong.initial();
         let q1 = cong.add_state(vec!['a']);
         cong.add_edge(q0, 'a', q1, Void);
@@ -666,7 +666,7 @@ mod tests {
         cong.add_edge(q1, 'a', q0, Void);
         cong.add_edge(q1, 'b', q1, Void);
 
-        let mut prc_e: RightCongruence<_, _, Void> = RightCongruence::new(alphabet.clone());
+        let mut prc_e: RightCongruenceOld<_, _, Void> = RightCongruenceOld::new(alphabet.clone());
         let e0 = prc_e.initial();
         let e1 = prc_e.add_state(vec!['a']);
         let e2 = prc_e.add_state(vec!['b']);
@@ -677,7 +677,7 @@ mod tests {
         prc_e.add_edge(e2, 'a', e2, Void);
         prc_e.add_edge(e2, 'b', e2, Void);
 
-        let mut prc_a = RightCongruence::new(alphabet);
+        let mut prc_a = RightCongruenceOld::new(alphabet);
         let a0 = prc_a.initial();
         let a1 = prc_a.add_state(vec!['a']);
         let a2 = prc_a.add_state(vec!['b']);
@@ -700,7 +700,7 @@ mod tests {
     #[ignore]
     fn dot_render_and_display() {
         let alphabet = alphabet!(simple 'a', 'b');
-        let mut cong: RightCongruence<_, _, Void> = RightCongruence::new(alphabet);
+        let mut cong: RightCongruenceOld<_, _, Void> = RightCongruenceOld::new(alphabet);
         let q0 = cong.initial();
         let q1 = cong.add_state(vec!['a']);
         cong.add_edge(q0, 'a', q1, Void);
