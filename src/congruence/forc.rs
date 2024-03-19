@@ -5,28 +5,28 @@ use std::fmt::Debug;
 /// class of this congruence a *progress* right congruence.
 #[derive(Clone, PartialEq, Eq)]
 pub struct FORC<A: Alphabet, Q = Void, C = Void> {
-    pub(crate) leading: RightCongruence<A>,
-    pub(crate) progress: Map<usize, RightCongruence<A, Q, C>>,
+    pub(crate) leading: RightCongruenceOld<A>,
+    pub(crate) progress: Map<usize, RightCongruenceOld<A, Q, C>>,
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone> FORC<A, Q, C> {
     /// Creates a new FORC with the given leading congruence and progress congruences.
     pub fn new(
-        leading: RightCongruence<A>,
-        progress: Map<usize, RightCongruence<A, Q, C>>,
+        leading: RightCongruenceOld<A>,
+        progress: Map<usize, RightCongruenceOld<A, Q, C>>,
     ) -> Self {
         Self { leading, progress }
     }
 
     /// Returns a reference to the leading right congruence.
-    pub fn leading(&self) -> &RightCongruence<A> {
+    pub fn leading(&self) -> &RightCongruenceOld<A> {
         &self.leading
     }
 
     /// Insert a new progress congruence for the given class.
-    pub fn insert<X>(&mut self, class: X, congruence: RightCongruence<A, Q, C>)
+    pub fn insert<X>(&mut self, class: X, congruence: RightCongruenceOld<A, Q, C>)
     where
-        X: Indexes<RightCongruence<A>>,
+        X: Indexes<RightCongruenceOld<A>>,
     {
         let idx = class
             .to_index(self.leading())
@@ -35,22 +35,24 @@ impl<A: Alphabet, Q: Clone, C: Clone> FORC<A, Q, C> {
     }
 
     /// Tries to obtain a reference to the progress right congruence for the given `class`.
-    pub fn prc<X>(&self, class: X) -> Option<&RightCongruence<A, Q, C>>
+    pub fn prc<X>(&self, class: X) -> Option<&RightCongruenceOld<A, Q, C>>
     where
-        X: Indexes<RightCongruence<A>>,
+        X: Indexes<RightCongruenceOld<A>>,
     {
         let idx = class.to_index(self.leading())?;
         self.progress.get(&idx)
     }
 
     /// Returns an iterator over the progress congruences.
-    pub fn prc_iter(&self) -> impl Iterator<Item = (&'_ usize, &'_ RightCongruence<A, Q, C>)> + '_ {
+    pub fn prc_iter(
+        &self,
+    ) -> impl Iterator<Item = (&'_ usize, &'_ RightCongruenceOld<A, Q, C>)> + '_ {
         self.progress.iter()
     }
 
     /// Creates a new FORC from the given leading congruence and progress congruences.
-    pub fn from_iter<I: IntoIterator<Item = (usize, RightCongruence<A, Q, C>)>>(
-        leading: RightCongruence<A>,
+    pub fn from_iter<I: IntoIterator<Item = (usize, RightCongruenceOld<A, Q, C>)>>(
+        leading: RightCongruenceOld<A>,
         progress: I,
     ) -> Self {
         Self {

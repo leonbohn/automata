@@ -13,23 +13,23 @@ impl<S: Show> Show for Class<S> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruence<A, Q, C>> for Class<A::Symbol> {
+impl<A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruenceOld<A, Q, C>> for Class<A::Symbol> {
     #[inline(always)]
     fn to_index(
         &self,
-        ts: &RightCongruence<A, Q, C>,
-    ) -> Option<<RightCongruence<A, Q, C> as TransitionSystem>::StateIndex> {
+        ts: &RightCongruenceOld<A, Q, C>,
+    ) -> Option<<RightCongruenceOld<A, Q, C> as TransitionSystem>::StateIndex> {
         ts.class_to_index(self).or(ts.reached_state_index(self))
     }
 }
-impl<'a, A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruence<A, Q, C>>
+impl<'a, A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruenceOld<A, Q, C>>
     for &'a Class<A::Symbol>
 {
     #[inline(always)]
     fn to_index(
         &self,
-        ts: &RightCongruence<A, Q, C>,
-    ) -> Option<<RightCongruence<A, Q, C> as TransitionSystem>::StateIndex> {
+        ts: &RightCongruenceOld<A, Q, C>,
+    ) -> Option<<RightCongruenceOld<A, Q, C> as TransitionSystem>::StateIndex> {
         Class::to_index(self, ts)
     }
 }
@@ -161,25 +161,25 @@ pub struct ColoredClass<S: Symbol, Q = Void> {
     pub(crate) color: Q,
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruence<A, Q, C>>
+impl<A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruenceOld<A, Q, C>>
     for ColoredClass<A::Symbol, Q>
 {
     #[inline(always)]
     fn to_index(
         &self,
-        ts: &RightCongruence<A, Q, C>,
-    ) -> Option<<RightCongruence<A, Q, C> as TransitionSystem>::StateIndex> {
+        ts: &RightCongruenceOld<A, Q, C>,
+    ) -> Option<<RightCongruenceOld<A, Q, C> as TransitionSystem>::StateIndex> {
         self.class.to_index(ts)
     }
 }
-impl<'a, A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruence<A, Q, C>>
+impl<'a, A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruenceOld<A, Q, C>>
     for &'a ColoredClass<A::Symbol, Q>
 {
     #[inline(always)]
     fn to_index(
         &self,
-        ts: &RightCongruence<A, Q, C>,
-    ) -> Option<<RightCongruence<A, Q, C> as TransitionSystem>::StateIndex> {
+        ts: &RightCongruenceOld<A, Q, C>,
+    ) -> Option<<RightCongruenceOld<A, Q, C> as TransitionSystem>::StateIndex> {
         self.class.to_index(ts)
     }
 }

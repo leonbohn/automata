@@ -139,7 +139,7 @@ impl<'a, A: Alphabet, C: Color, Idx: IndexType> BTSPredecessors<'a, A, C, Idx> {
     }
 }
 
-impl<A: Alphabet> PredecessorIterable for RightCongruence<A> {
+impl<A: Alphabet> PredecessorIterable for RightCongruenceOld<A> {
     type PreEdgeRef<'this> = &'this crate::transition_system::impls::NTEdge<A::Expression, Void>
     where
         Self: 'this;
