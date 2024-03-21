@@ -125,28 +125,26 @@ mod tests {
 
     #[test]
     fn reachable_states() {
-        let mut dfa = DFA::new_for_alphabet(CharAlphabet::from_iter("ab".chars()));
-        let q0 = dfa.add_state(false);
-        let q1 = dfa.add_state(false);
-        let q2 = dfa.add_state(true);
-        dfa.add_edge(q0, 'a', q1, Void);
-        dfa.add_edge(q0, 'b', q0, Void);
-        dfa.add_edge(q1, 'a', q2, Void);
-        dfa.add_edge(q1, 'b', q0, Void);
-        dfa.add_edge(q2, 'a', q2, Void);
-        dfa.add_edge(q2, 'b', q2, Void);
+        let dfa = DFA::builder()
+            .with_state_colors([false, false, true])
+            .with_edges([
+                (0, 'a', 1),
+                (0, 'b', 0),
+                (1, 'a', 2),
+                (1, 'b', 0),
+                (2, 'a', 2),
+                (2, 'b', 2),
+            ])
+            .into_dfa(0);
 
         assert_eq!(
-            dfa.minimal_representatives_from(q0).collect::<Vec<_>>(),
-            vec![(vec![], q0), (vec!['a'], q1), (vec!['a', 'a'], q2)]
+            dfa.minimal_representatives_from(0).collect::<Vec<_>>(),
+            vec![(vec![], 0), (vec!['a'], 1), (vec!['a', 'a'], 2)]
         );
-        assert_eq!(
-            dfa.reachable_state_indices().collect_vec(),
-            vec![q0, q1, q2]
-        );
+        assert_eq!(dfa.reachable_state_indices().collect_vec(), vec![0, 1, 2]);
         assert_eq!(
             dfa.reachable_states().collect_vec(),
-            vec![(q0, false), (q1, false), (q2, true)]
+            vec![(0, false), (1, false), (2, true)]
         );
     }
 }

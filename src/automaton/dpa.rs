@@ -6,11 +6,7 @@ use std::{
 use itertools::Itertools;
 use tracing::{info, trace};
 
-use crate::{
-    math::Partition,
-    prelude::*,
-    transition_system::{CollectDTS, Shrinkable},
-};
+use crate::{math::Partition, prelude::*, transition_system::Shrinkable};
 
 /// Represents a parity condition which accepts if and only if the least color that
 /// is seen infinitely often is even.
@@ -49,28 +45,27 @@ pub type DPA<A = CharAlphabet, Sem = MinEven> =
 /// with the given semantics.
 pub type IntoDPA<T, Sem = MinEven> = Automaton<T, Sem, true>;
 
-/// Trait that should be implemented by every object that can be viewed as a [`super::DPA`].
-pub trait DPALike: Congruence<EdgeColor = usize> {
-    /// Consumes `self` and returns a [`DPA`] from the transition system underlying `self`.
-    fn into_dpa(self) -> IntoDPA<Self> {
-        Automaton::from_parts(self, MinEven)
+impl<D> IntoDPA<D>
+where
+    D: Deterministic<EdgeColor = usize>,
+{
+    /// Attempts to transform the given [`FiniteWord`] into a [`EdgeColor`]. This means that the
+    /// word is run through the automaton and the last transition color is returned.
+    pub fn try_last_edge_color<W: FiniteWord<SymbolOf<Self>>>(
+        &self,
+        input: W,
+    ) -> Option<EdgeColor<Self>> {
+        self.finite_run(input)
+            .ok()
+            .and_then(|r| r.last_transition_color().cloned())
     }
 
-    /// Uses a reference to `self` for creating a [`DPA`] from the underlying transition system.
-    fn borrow_dpa(&self) -> IntoDPA<&Self> {
-        self.into_dpa()
+    /// Transforms the given [`FiniteWord`] into a [`EdgeColor`]. This simply calls [`Self::try_last_edge_color`]
+    /// and subsequently unwraps the result.
+    pub fn last_edge_color<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> EdgeColor<Self> {
+        self.try_last_edge_color(input).expect("failed to map")
     }
 
-    /// Consumes `self` and returns a [`DPA`] from the transition system underlying `self`. Note
-    /// that this restricts to reachable states.
-    fn collect_dpa(self) -> IntoDPA<Initialized<CollectDTS<Self>>> {
-        self.trim_collect().into_dpa()
-    }
-}
-
-impl<Ts> DPALike for Ts where Ts: Congruence<EdgeColor = usize> {}
-
-impl<D: DPALike> IntoDPA<D> {
     /// Gives a witness for the fact that the language accepted by `self` is not empty. This is
     /// done by finding an accepting cycle in the underlying transition system.
     pub fn give_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
@@ -80,8 +75,10 @@ impl<D: DPALike> IntoDPA<D> {
     /// Builds the complement of `self`, i.e. the DPA that accepts the complement of the language
     /// accepted by `self`. This is a cheap operation as it only requires to increment all edge
     /// colors by one.
-    pub fn complement(self) -> IntoDPA<impl DPALike<Alphabet = D::Alphabet>> {
-        self.map_edge_colors(|c| c + 1).collect_dpa()
+    pub fn complement(
+        self,
+    ) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>> {
+        self.map_edge_colors(|c| c + 1).into_dpa()
     }
 
     /// Gives a witness for the fact that `left` and `right` are not language-equivalent. This is
@@ -169,7 +166,7 @@ impl<D: DPALike> IntoDPA<D> {
     /// Attempts to find an omega-word that witnesses the given `color`, meaning the least color that
     /// appears infinitely often during the run of the returned word is equal to `color`. If no such
     /// word exists, `None` is returned.
-    pub fn witness_color(&self, color: D::EdgeColor) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
+    pub fn witness_color(&self, color: usize) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         let restrict = self.edge_color_restricted(color, usize::MAX);
         let sccs = restrict.sccs();
         for scc in sccs.iter() {
@@ -194,7 +191,7 @@ impl<D: DPALike> IntoDPA<D> {
     /// during the run of `self` on `w` is equal to `k` and the least color seen infinitely often
     /// during the run of `other` on `w` is equal to `l`. If no such word exists, `None` is returned.
     /// Main use of this is to witness the fact that `self` and `other` are not language-equivalent.
-    pub fn witness_colors<O: DPALike<Alphabet = D::Alphabet>>(
+    pub fn witness_colors<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
         &self,
         k: usize,
         other: &IntoDPA<O>,
@@ -228,14 +225,16 @@ impl<D: DPALike> IntoDPA<D> {
     }
 
     /// Returns an iterator over all colors that appear on edges of `self`.
-    pub fn colors(&self) -> impl Iterator<Item = D::EdgeColor> + '_ {
-        MealyLike::color_range(self)
+    pub fn colors(&self) -> impl Iterator<Item = usize> + '_ {
+        self.state_indices()
+            .flat_map(|q| self.edges_from(q).unwrap().map(|e| e.color()))
+            .unique()
     }
 
     /// Attempts to find an omega-word that witnesses the fact that `self` and `other` are not
     /// language-equivalent. If no such word exists, `None` is returned. Internally, this uses
     /// [`Self::witness_not_subset_of`] in both directions.
-    pub fn witness_inequivalence<O: DPALike<Alphabet = D::Alphabet>>(
+    pub fn witness_inequivalence<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
         &self,
         other: &IntoDPA<O>,
     ) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
@@ -245,7 +244,7 @@ impl<D: DPALike> IntoDPA<D> {
 
     /// Returns true if `self` is language-equivalent to `other`, i.e. if and only if the Two
     /// DPAs accept the same language.
-    pub fn language_equivalent<O: DPALike<Alphabet = D::Alphabet>>(
+    pub fn language_equivalent<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
         &self,
         other: &IntoDPA<O>,
     ) -> bool {
@@ -254,19 +253,25 @@ impl<D: DPALike> IntoDPA<D> {
 
     /// Returns true if and only if `self` is included in `other`, i.e. if and only if the language
     /// accepted by `self` is a subset of the language accepted by `other`.
-    pub fn included_in<O: DPALike<Alphabet = D::Alphabet>>(&self, other: &IntoDPA<O>) -> bool {
+    pub fn included_in<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
+        &self,
+        other: &IntoDPA<O>,
+    ) -> bool {
         self.witness_not_subset_of(other).is_none()
     }
 
     /// Returns true if and only if `self` includes `other`, i.e. if and only if the language
     /// accepted by `self` is a superset of the language accepted by `other`.
-    pub fn includes<O: DPALike<Alphabet = D::Alphabet>>(&self, other: &IntoDPA<O>) -> bool {
+    pub fn includes<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
+        &self,
+        other: &IntoDPA<O>,
+    ) -> bool {
         other.witness_not_subset_of(self).is_none()
     }
 
     /// Attempts to find an omega-word that witnesses the fact that `self` is not included in `other`.
     /// If no such word exists, `None` is returned.
-    pub fn witness_not_subset_of<O: DPALike<Alphabet = D::Alphabet>>(
+    pub fn witness_not_subset_of<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
         &self,
         other: &IntoDPA<O>,
     ) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
@@ -291,14 +296,16 @@ impl<D: DPALike> IntoDPA<D> {
     /// "Computing the rabin index of a finite automaton". The procedure that this implementation actually uses
     /// is outlined by Schewe and Ehlers in [Natural Colors of Infinite Words](https://arxiv.org/pdf/2207.11000.pdf)
     /// in Section 4.1, Definition 2.
-    pub fn normalized(&self) -> IntoDPA<impl DPALike<Alphabet = D::Alphabet>>
+    pub fn normalized(
+        &self,
+    ) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
         StateColor<Self>: Eq + Hash + Clone + Ord,
     {
         let start = std::time::Instant::now();
 
-        let mut ts: Initialized<HashTs<_, D::StateColor, D::EdgeColor>> = self.collect_pointed().0;
+        let mut ts: Initialized<HashTs<_, D::StateColor, usize>> = self.collect_pointed().0;
         let out = ts.clone();
 
         let mut recoloring = Vec::new();
@@ -428,7 +435,7 @@ mod tests {
         assert!(normalized.language_equivalent(&dpa));
 
         for (input, expected) in [("a", 0), ("b", 0), ("ba", 0), ("bb", 1)] {
-            assert_eq!(normalized.try_mealy_map(input), Some(expected))
+            assert_eq!(normalized.last_edge_color(input), expected)
         }
         let _n = example_dpa().normalized();
     }

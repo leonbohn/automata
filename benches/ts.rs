@@ -5,7 +5,7 @@ use itertools::Itertools;
 
 fn bench_dts() -> Initialized<DTS<CharAlphabet, usize, usize>> {
     TSBuilder::default()
-        .with_colors([1, 13, 72, 891, 3, 5])
+        .with_state_colors([1, 13, 72, 891, 3, 5])
         .with_transitions([
             (0, 'a', 2, 0),
             (0, 'b', 65, 1),

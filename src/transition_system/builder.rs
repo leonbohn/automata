@@ -19,7 +19,7 @@ use super::IntoEdge;
 /// use automata::prelude::*;
 ///
 /// let ts = TSBuilder::default()
-///     .with_colors([true, false]) // colors given in the order of the states
+///     .with_state_colors([true, false]) // colors given in the order of the states
 ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 0)])
 ///     .into_dfa(0); // 0 is the initial state
 /// ```
@@ -79,6 +79,16 @@ impl TSBuilder<bool, Void> {
     }
 }
 
+impl TSBuilder<Void, bool> {
+    /// Attempts to turn `self` into a deterministic Büchi automaton. Panics if `self` is not deterministic.
+    pub fn into_dba(self, initial: usize) -> DBA<CharAlphabet> {
+        self.default_color(Void)
+            .deterministic()
+            .with_initial(initial)
+            .collect_dba()
+    }
+}
+
 impl TSBuilder<Void, usize> {
     /// Attempts to turn `self` into a deterministic parity automaton. Panics if `self` is not deterministic.
     pub fn into_dpa(self, initial: usize) -> DPA<CharAlphabet> {
@@ -89,7 +99,7 @@ impl TSBuilder<Void, usize> {
     }
 
     /// Builds a Mealy machine from `self`. Panics if `self` is not deterministic.
-    pub fn into_mealy_machine(self, initial: usize) -> MealyMachine<CharAlphabet> {
+    pub fn into_mealy(self, initial: usize) -> MealyMachine<CharAlphabet> {
         self.default_color(Void)
             .deterministic()
             .with_initial(initial)
@@ -97,8 +107,15 @@ impl TSBuilder<Void, usize> {
     }
 }
 
+impl TSBuilder<usize, Void> {
+    /// Builds a Moore machine from `self`. Panics if `self` is not deterministic.
+    pub fn into_moore(self, initial: usize) -> MooreMachine<CharAlphabet> {
+        self.deterministic().with_initial(initial).into_moore()
+    }
+}
+
 impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
-    /// Turns `self` into a [`RightCongruence`] with the given initial state while also erasing all state and edge
+    /// Turns `self` into a [`RightCongruenceOld`] with the given initial state while also erasing all state and edge
     /// colors. Panics if `self` is not deterministic.
     pub fn into_right_congruence_bare(self, initial: usize) -> RightCongruenceOld<CharAlphabet> {
         self.deterministic()
@@ -117,7 +134,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     /// Adds a list of colors to `self`. The colors are assigned to the states in the order in which they are given.
     /// This means if we give the colors `[true, false]` and then add a transition from state `0` to state `1`, then state
     /// `0` will have color `true` and state `1` will have color `false`.
-    pub fn with_colors<I: IntoIterator<Item = Q>>(self, iter: I) -> Self {
+    pub fn with_state_colors<I: IntoIterator<Item = Q>>(self, iter: I) -> Self {
         iter.into_iter()
             .enumerate()
             .fold(self, |acc, (i, x)| acc.color(i, x))
@@ -150,7 +167,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     /// use automata::prelude::*;
     ///
     /// let ts = TSBuilder::default()
-    ///     .with_colors([true, false]) // colors given in the order of the states
+    ///     .with_state_colors([true, false]) // colors given in the order of the states
     ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 0)])
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
@@ -183,7 +200,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     /// use automata::prelude::*;
     ///
     /// let ts = TSBuilder::default()
-    ///     .with_colors([true, false]) // colors given in the order of the states
+    ///     .with_state_colors([true, false]) // colors given in the order of the states
     ///     .with_edges([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1)])
     ///     .with_edges([(1, 'b', 0)]) // We can also skip the `Void` entry at position 3
     ///     .into_dfa(0); // 0 is the initial state
@@ -196,7 +213,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
         self
     }
 
-    /// Turns `self` into a [`RightCongruence`] with the given initial state. Panics if `self` is not deterministic.
+    /// Turns `self` into a [`RightCongruenceOld`] with the given initial state. Panics if `self` is not deterministic.
     pub fn into_right_congruence(self, initial: usize) -> RightCongruenceOld<CharAlphabet, Q, C> {
         self.deterministic()
             .with_initial(initial)

@@ -12,7 +12,7 @@ pub trait ToHoa: TransitionSystem + Pointed {
     fn to_hoa_automaton(&self) -> HoaAutomaton;
 }
 
-impl<D: DPALike<Alphabet = HoaAlphabet>> ToHoa for IntoDPA<D> {
+impl<D: TransitionSystem<Alphabet = HoaAlphabet>> ToHoa for IntoDPA<D> {
     fn to_hoa_automaton(&self) -> HoaAutomaton {
         let mut aut = HoaAutomaton::default();
         aut.add_header_item(hoa_alphabet_to_header_item(self.alphabet()));
