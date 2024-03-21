@@ -667,7 +667,7 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 }
 
 /// Trait that helps with accessing states in more elaborate [`TransitionSystem`]s. For
-/// example in a [`crate::RightCongruence`], we have more information than the [`crate::Color`]
+/// example in a [`RightCongruenceOld`], we have more information than the [`crate::Color`]
 /// on a state, we have its [`crate::Class`] as well. Since we would like to be able to
 /// access a state of a congruence not only by its index, but also by its classname
 /// or any other [word](`crate::prelude::LinearWord`) of finite length, this trait is necessary.
@@ -783,7 +783,87 @@ pub use dot::Dottable;
 /// of that, a congruence does not have any coloring on either states or symbols. This
 /// functionality is abstracted in [`Pointed`]. This trait is automatically implemented.
 pub trait Congruence: Deterministic + Pointed {
-    /// Creates a new instance of a [`RightCongruence`] from the transition structure of `self`. Returns
+    /// Takes ownership of `self` and builds a new [`DFA`] from it.
+    fn into_dfa(self) -> IntoDFA<Self>
+    where
+        Self: Congruence<StateColor = bool>,
+    {
+        self.into()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`DFA`].
+    fn collect_dfa(&self) -> DFA<Self::Alphabet>
+    where
+        Self: Congruence<StateColor = bool>,
+    {
+        self.erase_edge_colors().collect_pointed().0.into_dfa()
+    }
+
+    /// Takes ownership of `self` and builds a new [`DPA`] from it.
+    fn into_dpa(self) -> IntoDPA<Self>
+    where
+        Self: Congruence<EdgeColor = usize>,
+    {
+        self.into()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`DPA`].
+    fn collect_dpa(&self) -> DPA<Self::Alphabet>
+    where
+        Self: Congruence<EdgeColor = usize>,
+    {
+        self.erase_state_colors().collect_pointed().0.into_dpa()
+    }
+
+    /// Takes ownership of `self` and builds a new [`DBA`] from it.
+    fn into_dba(self) -> IntoDBA<Self>
+    where
+        Self: Congruence<EdgeColor = bool>,
+    {
+        self.into()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`DBA`].
+    fn collect_dba(&self) -> DBA<Self::Alphabet>
+    where
+        Self: Congruence<EdgeColor = bool>,
+    {
+        self.erase_state_colors().collect_pointed().0.into_dba()
+    }
+
+    /// Takes ownership of `self` and builds a new [`MooreMachine`] from it.
+    fn into_moore(self) -> IntoMooreMachine<Self>
+    where
+        StateColor<Self>: Color,
+    {
+        self.into()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`MooreMachine`].
+    fn collect_moore(&self) -> MooreMachine<Self::Alphabet, StateColor<Self>>
+    where
+        StateColor<Self>: Color,
+    {
+        self.erase_edge_colors().collect_pointed().0.into_moore()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`MealyMachine`].
+    fn into_mealy(self) -> IntoMealyMachine<Self>
+    where
+        EdgeColor<Self>: Color,
+    {
+        self.into()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`MealyMachine`].
+    fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, EdgeColor<Self>>
+    where
+        EdgeColor<Self>: Color,
+    {
+        self.erase_state_colors().collect_pointed().0.into_mealy()
+    }
+
+    /// Creates a new instance of a [`RightCongruenceOld`] from the transition structure of `self`. Returns
     /// the created congruence together with a [`Map`] from old/original state indices to indices of the
     /// created congruence.
     fn build_right_congruence(

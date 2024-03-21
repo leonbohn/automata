@@ -255,7 +255,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for RightCongruenceOld<A, Q, C>
 }
 
 impl<A: Alphabet, Q: Clone + Default, C: Clone> RightCongruenceOld<A, Q, C> {
-    /// Creates a new [`RightCongruence`] for the given alphabet.
+    /// Creates a new [`RightCongruenceOld`] for the given alphabet.
     pub fn new(alphabet: A) -> RightCongruenceOld<A, Q, C> {
         Self::new_for_alphabet(alphabet)
     }

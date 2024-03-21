@@ -5,20 +5,20 @@ pub use acceptance_type::OmegaAcceptanceType;
 
 #[macro_use]
 mod moore;
-pub use moore::{IntoMooreMachine, MooreLike, MooreMachine};
+pub use moore::{IntoMooreMachine, MooreMachine};
 
 #[macro_use]
 mod mealy;
-pub use mealy::{IntoMealyMachine, MealyLike, MealyMachine};
+pub use mealy::{IntoMealyMachine, MealyMachine};
 
 mod dfa;
-pub use dfa::{DFALike, IntoDFA, DFA};
+pub use dfa::{IntoDFA, DFA};
 
 mod dpa;
-pub use dpa::{DPALike, IntoDPA, MinEven, DPA};
+pub use dpa::{IntoDPA, MinEven, DPA};
 
 mod dba;
-pub use dba::{DBALike, IntoDBA, DBA};
+pub use dba::{IntoDBA, DBA};
 
 #[allow(missing_docs)]
 mod omega;
@@ -45,15 +45,30 @@ pub use with_initial::Initialized;
 /// the value of `OMEGA` (in the former case `OMEGA` should be false, and in the
 /// latter case `OMEGA` should be true).
 #[derive(Clone, Eq, PartialEq, Copy)]
-pub struct Automaton<D, A, const OMEGA: bool = false> {
+pub struct Automaton<D: TransitionSystem, A, const OMEGA: bool = false> {
     ts: D,
+    initial: D::StateIndex,
     acceptance: A,
 }
 
-impl<D, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
+impl<D, A, const OMEGA: bool> Automaton<D, A, OMEGA>
+where
+    D: TransitionSystem<Alphabet = CharAlphabet>,
+{
+    /// Instantiates a new [`TSBuilder`] for the edge and state color of `self`.
+    pub fn builder() -> TSBuilder<D::StateColor, D::EdgeColor> {
+        TSBuilder::default()
+    }
+}
+
+impl<D: TransitionSystem, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
     /// Creates a new automaton from the given transition system and acceptance condition.
-    pub fn from_parts(ts: D, acceptance: A) -> Self {
-        Self { ts, acceptance }
+    pub fn from_parts(ts: D, initial: impl Indexes<D>, acceptance: A) -> Self {
+        Self {
+            initial: initial.to_index(&ts).unwrap(),
+            ts,
+            acceptance,
+        }
     }
 
     /// Decomposes the automaton into its parts: the transition system and the acceptance condition.
@@ -117,7 +132,9 @@ where
     }
 }
 
-impl<D, A, const OMEGA: bool> AsRef<Automaton<D, A, OMEGA>> for Automaton<D, A, OMEGA> {
+impl<D: TransitionSystem, A, const OMEGA: bool> AsRef<Automaton<D, A, OMEGA>>
+    for Automaton<D, A, OMEGA>
+{
     fn as_ref(&self) -> &Automaton<D, A, OMEGA> {
         self
     }
@@ -139,15 +156,20 @@ impl<D: PredecessorIterable, A, const OMEGA: bool> PredecessorIterable for Autom
     }
 }
 
-impl<D: Pointed, A, const OMEGA: bool> Pointed for Automaton<D, A, OMEGA> {
+impl<D: TransitionSystem, A, const OMEGA: bool> Pointed for Automaton<D, A, OMEGA> {
     fn initial(&self) -> Self::StateIndex {
-        self.ts.initial()
+        self.initial
     }
 }
 
-impl<D: Sproutable, A: Default, const OMEGA: bool> Sproutable for Automaton<D, A, OMEGA> {
+impl<D: Sproutable, A: Default, const OMEGA: bool> Sproutable for Automaton<D, A, OMEGA>
+where
+    D::StateColor: Default,
+{
     fn new_for_alphabet(alphabet: Self::Alphabet) -> Self {
-        Automaton::from_parts(D::new_for_alphabet(alphabet), Default::default())
+        let mut ts = D::new_for_alphabet(alphabet);
+        let initial = ts.add_state::<StateColor<D>>(Default::default());
+        Automaton::from_parts(ts, initial, Default::default())
     }
 
     fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
@@ -241,7 +263,7 @@ impl<D: TransitionSystem, A, const OMEGA: bool> TransitionSystem for Automaton<D
     }
 }
 
-impl<T, A, const OMEGA: bool> std::fmt::Debug for Automaton<T, A, OMEGA>
+impl<T: TransitionSystem, A, const OMEGA: bool> std::fmt::Debug for Automaton<T, A, OMEGA>
 where
     T: std::fmt::Debug,
     A: std::fmt::Debug,
@@ -317,26 +339,36 @@ impl<'a, Ts: TransitionSystem<StateColor = bool>> Iterator for StatesWithColor<'
     }
 }
 
+impl<D, A, const OMEGA: bool> From<D> for Automaton<D, A, OMEGA>
+where
+    D: Congruence,
+    A: Default,
+{
+    fn from(value: D) -> Self {
+        let initial = value.initial();
+        Self::from_parts(value, initial, A::default())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
 
     #[test]
     fn mealy_color_or_below() {
-        let mut mm: MooreMachine<CharAlphabet, usize> =
-            MooreMachine::new_for_alphabet(alphabet!(simple 'a', 'b'));
-        let a = mm.add_state(0usize);
-        let b = mm.add_state(1usize);
-        let c = mm.add_state(1usize);
-        let d = mm.add_state(0usize);
-        mm.add_edge(a, 'a', b, Void);
-        mm.add_edge(a, 'b', c, ());
-        mm.add_edge(b, 'a', c, ());
-        mm.add_edge(b, 'b', c, ());
-        mm.add_edge(c, 'a', d, ());
-        mm.add_edge(c, 'b', c, ());
-        mm.add_edge(d, 'a', d, ());
-        mm.add_edge(d, 'b', d, ());
+        let mm = MooreMachine::builder()
+            .with_state_colors([0, 1, 1, 0])
+            .with_edges([
+                (0, 'a', 1),
+                (0, 'b', 2),
+                (1, 'a', 2),
+                (1, 'b', 2),
+                (2, 'a', 3),
+                (2, 'b', 3),
+                (3, 'a', 3),
+                (3, 'b', 3),
+            ])
+            .into_moore(0);
 
         let dfas = mm.decompose_dfa();
         let dfa1 = &dfas[1];
@@ -351,34 +383,31 @@ mod tests {
 
     #[test]
     fn dbas() {
-        let mut dba = super::DBA::new_for_alphabet(CharAlphabet::from_iter(['a', 'b']));
-        let q0 = dba.add_state(());
-        let q1 = dba.add_state(Void);
-
-        let _e0 = dba.add_edge(q0, 'a', q1, true);
-        let _e1 = dba.add_edge(q0, 'b', q0, false);
-        let _e2 = dba.add_edge(q1, 'a', q1, true);
-        let _e3 = dba.add_edge(q1, 'b', q0, false);
+        let dba = DBA::builder()
+            .with_edges([
+                (0, 'a', true, 1),
+                (0, 'b', false, 0),
+                (1, 'a', true, 1),
+                (1, 'b', false, 0),
+            ])
+            .into_dba(0);
         assert!(dba.accepts(ReducedOmegaWord::periodic("abb")));
         assert!(!dba.accepts(ReducedOmegaWord::periodic("b")));
         assert!(dba.accepts(upw!("a")));
         assert!(!dba.accepts(upw!("b")));
 
-        assert!(!dba.dba_is_empty());
-        println!("{:?}", dba.dba_give_word());
+        assert!(!dba.is_empty());
+        println!("{:?}", dba.give_word());
 
         println!("{:?}", &dba);
     }
 
     #[test]
     fn dfas_and_boolean_operations() {
-        let mut dfa = super::DFA::new_for_alphabet(CharAlphabet::new(['a', 'b']));
-        let s0 = dfa.add_state(true);
-        let s1 = dfa.add_state(false);
-        let _e0 = dfa.add_edge(s0, 'a', s1, Void);
-        let _e1 = dfa.add_edge(s0, 'b', s0, Void);
-        let _e2 = dfa.add_edge(s1, 'a', s1, Void);
-        let _e3 = dfa.add_edge(s1, 'b', s0, Void);
+        let dfa = DFA::builder()
+            .with_state_colors([true, false])
+            .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 1), (1, 'b', 0)])
+            .into_dfa(0);
 
         assert!(!dfa.is_empty_language());
         assert_eq!(dfa.give_word(), Some(vec![]));

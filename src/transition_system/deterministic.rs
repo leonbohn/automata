@@ -549,7 +549,7 @@ pub trait Deterministic: TransitionSystem {
         self.finite_run_from(word, origin).ok().map(|p| p.reached())
     }
 
-    /// Builds a new [`RightCongruence`] from `self`, which is like viewing only the right congruence underlying
+    /// Builds a new [`RightCongruenceOld`] from `self`, which is like viewing only the right congruence underlying
     /// `self`. This procedure erases the state and edge colors.
     fn collect_right_congruence_bare(&self) -> RightCongruenceOld<Self::Alphabet>
     where
@@ -558,7 +558,7 @@ pub trait Deterministic: TransitionSystem {
         RightCongruenceOld::from_ts(self.erase_state_colors().erase_edge_colors())
     }
 
-    /// Builds a new [`RightCongruence`] from `self`, which is like viewing only the right congruence underlying
+    /// Builds a new [`RightCongruenceOld`] from `self`, which is like viewing only the right congruence underlying
     /// `self`. This procedure keeps the state and edge colors.
     fn collect_right_congruence(
         &self,

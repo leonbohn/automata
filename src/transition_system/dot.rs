@@ -4,16 +4,7 @@ use std::fmt::{Debug, Display};
 
 use itertools::Itertools;
 
-use crate::{
-    automaton::IntoDPA,
-    prelude::{
-        DPALike, EdgeColor, ExpressionOf, IntoMealyMachine, IntoMooreMachine, MealyLike, MooreLike,
-        StateColor, DFA,
-    },
-    Alphabet, Color, Show, TransitionSystem,
-};
-
-use crate::prelude::*;
+use crate::{automaton::IntoDPA, prelude::*, Alphabet, Color, Show, TransitionSystem};
 
 fn sanitize_dot_ident(name: &str) -> String {
     name.chars()
@@ -281,7 +272,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Dottable for crate::RightCongruenceOld<A, 
 
 impl<M> Dottable for IntoMooreMachine<M>
 where
-    M: MooreLike,
+    M: Deterministic,
     StateColor<M>: Color,
 {
     fn dot_name(&self) -> Option<String> {
@@ -322,7 +313,7 @@ where
 
 impl<M> Dottable for IntoMealyMachine<M>
 where
-    M: MealyLike,
+    M: Deterministic,
     EdgeColor<M>: Show,
 {
     fn dot_name(&self) -> Option<String> {
@@ -355,8 +346,9 @@ where
     }
 }
 
-impl<D: DPALike> Dottable for IntoDPA<D>
+impl<D> Dottable for IntoDPA<D>
 where
+    D: Deterministic,
     EdgeColor<D>: Show,
 {
     fn dot_name(&self) -> Option<String> {
@@ -649,7 +641,7 @@ mod tests {
                 (1, 'a', Void, 1),
                 (1, 'b', Void, 0),
             ])
-            .with_colors([false, true])
+            .with_state_colors([false, true])
             .into_dfa(0);
         dfa.display_rendered().unwrap();
     }
