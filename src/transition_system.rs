@@ -421,6 +421,27 @@ pub trait TransitionSystem: Sized {
         operations::MapEdgeColor::new(self, f)
     }
 
+    /// Consumes and recolors `self` with the colors as given by `provider`.
+    /// See more possible ways of assigning colors in [`operations::ProvidesStateColor`].
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let ts = TSBuilder::without_colors()
+    ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
+    ///     .into_deterministic_initialized(0);
+    /// let colored = ts.with_state_color(false);
+    /// assert_eq!(colored.reached_state_color("a"), Some(false));
+    /// assert_eq!(colored.reached_state_color("aaa"), Some(false));
+    /// ```
+    fn with_state_color<P: ProvidesStateColor<Self::StateIndex>>(
+        self,
+        provider: P,
+    ) -> WithStateColor<Self, P> {
+        WithStateColor::new(self, provider)
+    }
+
     /// Map the state colors of `self` with the given function.
     fn map_state_colors<D: Clone, F: Fn(Self::StateColor) -> D>(
         self,
@@ -781,6 +802,8 @@ impl<P: Pointed> Pointed for &mut P {
 /// This module deals with transforming a transition system (or similar) into a representation in the dot (graphviz) format.
 pub mod dot;
 pub use dot::Dottable;
+
+use self::operations::{ProvidesStateColor, WithStateColor};
 
 /// A congruence is a [`TransitionSystem`], which additionally has a distinguished initial state. On top
 /// of that, a congruence does not have any coloring on either states or symbols. This

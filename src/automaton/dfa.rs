@@ -2,6 +2,8 @@ use std::collections::BTreeSet;
 
 use crate::prelude::*;
 
+use self::operations::DefaultIfMissing;
+
 use super::StatesWithColor;
 
 #[derive(Clone, Copy, Default, Hash, Eq, PartialEq)]
@@ -34,6 +36,41 @@ impl<D> IntoDFA<D>
 where
     D: Deterministic<StateColor = bool>,
 {
+    /// Creates a new [`DFA`] from the given transition system and iterator over accepting
+    /// states.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let ts = TSBuilder::without_colors()
+    ///     .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
+    ///     .into_deterministic_initialized(0);
+    /// assert!(DFA::from_ts(ts, [0]).accepts(""));
+    /// assert!(DFA::from_ts(ts, [1]).accepts("a"));
+    /// assert!(!DFA::from_ts(ts, []).accepts("a"));
+    /// ```
+    pub fn from_ts<C>(
+        ts: C,
+        accepting_states: impl IntoIterator<Item = impl Indexes<C>>,
+    ) -> IntoDFA<operations::WithStateColor<C, operations::DefaultIfMissing<C::StateIndex, bool>>>
+    where
+        C: Congruence,
+    {
+        let accepting: math::Map<_, bool> = accepting_states
+            .into_iter()
+            .map(|idx| {
+                (
+                    idx.to_index(&ts)
+                        .expect("supposed accepting state does not exist!"),
+                    true,
+                )
+            })
+            .collect();
+        ts.with_state_color(DefaultIfMissing::new(accepting, false))
+            .into_dfa()
+    }
+
     /// Returns the indices of all states that are accepting.
     pub fn accepting_states(&self) -> StatesWithColor<'_, Self> {
         StatesWithColor::new(self, true)

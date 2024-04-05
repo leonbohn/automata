@@ -221,6 +221,14 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
         RightCongruence::from_ts(self.deterministic().with_initial(initial))
     }
 
+    /// Consumes `self` and returns an [`Initialized`] wrapping a [`DTS`].
+    pub fn into_deterministic_initialized(
+        self,
+        initial: usize,
+    ) -> Initialized<DTS<CharAlphabet, Q, C>> {
+        self.deterministic().with_initial(initial)
+    }
+
     /// Collects self into a non-deterministic transition system.
     pub fn collect(self) -> NTS<CharAlphabet, Q, C> {
         let alphabet = CharAlphabet::from_iter(self.edges.iter().map(|(_, a, _, _)| *a));

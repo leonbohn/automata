@@ -16,6 +16,9 @@ pub use reverse::Reversed;
 mod quotient;
 pub use quotient::{Quotient, QuotientEdgesFrom, QuotientTransition};
 
+mod with_state_color;
+pub use with_state_color::{DefaultIfMissing, ProvidesStateColor, WithStateColor};
+
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
