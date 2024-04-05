@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::{prelude::*, Void};
+use crate::{congruence::RightCongruence, prelude::*, Void};
 
 use super::IntoEdge;
 
@@ -115,12 +115,15 @@ impl TSBuilder<usize, Void> {
 }
 
 impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
-    /// Turns `self` into a [`RightCongruenceOld`] with the given initial state while also erasing all state and edge
+    /// Turns `self` into a [`RightCongruence`] with the given initial state while also erasing all state and edge
     /// colors. Panics if `self` is not deterministic.
-    pub fn into_right_congruence_bare(self, initial: usize) -> RightCongruenceOld<CharAlphabet> {
-        self.deterministic()
-            .with_initial(initial)
-            .collect_right_congruence_bare()
+    pub fn into_right_congruence_bare(self, initial: usize) -> RightCongruence<CharAlphabet> {
+        RightCongruence::from_ts(
+            self.deterministic()
+                .with_initial(initial)
+                .erase_state_colors()
+                .erase_edge_colors(),
+        )
     }
 }
 
@@ -213,11 +216,9 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
         self
     }
 
-    /// Turns `self` into a [`RightCongruenceOld`] with the given initial state. Panics if `self` is not deterministic.
-    pub fn into_right_congruence(self, initial: usize) -> RightCongruenceOld<CharAlphabet, Q, C> {
-        self.deterministic()
-            .with_initial(initial)
-            .collect_right_congruence()
+    /// Turns `self` into a [`RightCongruence`] with the given initial state. Panics if `self` is not deterministic.
+    pub fn into_right_congruence(self, initial: usize) -> RightCongruence<CharAlphabet, Q, C> {
+        RightCongruence::from_ts(self.deterministic().with_initial(initial))
     }
 
     /// Collects self into a non-deterministic transition system.

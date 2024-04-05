@@ -85,21 +85,19 @@ mod tests {
         Set,
     };
 
-    pub(super) fn ts() -> RightCongruenceOld<CharAlphabet> {
-        let mut cong = RightCongruenceOld::new(alphabet!(simple 'a', 'b'));
-        let q0 = cong.add_state(vec![]);
-        let q1 = cong.add_state(vec!['a']);
-        let q2 = cong.add_state(vec!['b']);
-        let q3 = cong.add_state(vec!['b', 'b']);
-        cong.add_edge(q0, 'a', q1, Void);
-        cong.add_edge(q0, 'b', q2, Void);
-        cong.add_edge(q1, 'a', q1, Void);
-        cong.add_edge(q1, 'b', q1, Void);
-        cong.add_edge(q2, 'a', q3, Void);
-        cong.add_edge(q2, 'b', q2, Void);
-        cong.add_edge(q3, 'a', q3, Void);
-        cong.add_edge(q3, 'b', q2, Void);
-        cong
+    pub(super) fn ts() -> RightCongruence<CharAlphabet> {
+        TSBuilder::without_colors()
+            .with_edges([
+                (0, 'a', 1),
+                (0, 'b', 2),
+                (1, 'a', 1),
+                (1, 'b', 1),
+                (2, 'a', 3),
+                (2, 'b', 2),
+                (3, 'a', 3),
+                (3, 'b', 2),
+            ])
+            .into_right_congruence(0)
     }
 
     #[test]
