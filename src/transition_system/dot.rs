@@ -235,7 +235,7 @@ impl<A: Alphabet> Dottable for DFA<A> {
         ]
     }
 }
-impl<A: Alphabet, Q: Clone, C: Clone> Dottable for crate::RightCongruenceOld<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone> Dottable for crate::RightCongruence<A, Q, C> {
     fn dot_name(&self) -> Option<String> {
         Some("Congruence".into())
     }
@@ -649,39 +649,33 @@ mod tests {
     #[test]
     #[ignore]
     fn display_forc() {
-        let alphabet = alphabet!(simple 'a', 'b');
-        let mut cong = RightCongruenceOld::new(alphabet.clone());
-        let q0 = cong.initial();
-        let q1 = cong.add_state(vec!['a']);
-        cong.add_edge(q0, 'a', q1, Void);
-        cong.add_edge(q0, 'b', q0, Void);
-        cong.add_edge(q1, 'a', q0, Void);
-        cong.add_edge(q1, 'b', q1, Void);
+        let cong = TSBuilder::without_colors()
+            .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
+            .into_right_congruence(0);
 
-        let mut prc_e: RightCongruenceOld<_, _, Void> = RightCongruenceOld::new(alphabet.clone());
-        let e0 = prc_e.initial();
-        let e1 = prc_e.add_state(vec!['a']);
-        let e2 = prc_e.add_state(vec!['b']);
-        prc_e.add_edge(e0, 'a', e1, Void);
-        prc_e.add_edge(e0, 'b', e2, Void);
-        prc_e.add_edge(e1, 'a', e1, Void);
-        prc_e.add_edge(e1, 'b', e2, Void);
-        prc_e.add_edge(e2, 'a', e2, Void);
-        prc_e.add_edge(e2, 'b', e2, Void);
+        let prc_e = TSBuilder::without_colors()
+            .with_edges([
+                (0, 'a', 1),
+                (0, 'b', 2),
+                (1, 'a', 1),
+                (1, 'b', 2),
+                (2, 'a', 2),
+                (2, 'b', 2),
+            ])
+            .into_right_congruence(0);
 
-        let mut prc_a = RightCongruenceOld::new(alphabet);
-        let a0 = prc_a.initial();
-        let a1 = prc_a.add_state(vec!['a']);
-        let a2 = prc_a.add_state(vec!['b']);
-        let a3 = prc_a.add_state(vec!['a', 'a']);
-        prc_a.add_edge(a0, 'a', a1, Void);
-        prc_a.add_edge(a0, 'b', a2, Void);
-        prc_a.add_edge(a1, 'a', a3, Void);
-        prc_a.add_edge(a1, 'b', a2, Void);
-        prc_a.add_edge(a2, 'a', a1, Void);
-        prc_a.add_edge(a2, 'b', a2, Void);
-        prc_a.add_edge(a3, 'a', a3, Void);
-        prc_a.add_edge(a3, 'b', a3, Void);
+        let prc_a = TSBuilder::without_colors()
+            .with_edges([
+                (0, 'a', 1),
+                (0, 'b', 2),
+                (1, 'a', 3),
+                (1, 'b', 2),
+                (2, 'a', 1),
+                (2, 'b', 2),
+                (3, 'a', 3),
+                (3, 'b', 3),
+            ])
+            .into_right_congruence(0);
 
         let _forc = FORC::from_iter(cong, [(0, prc_e), (1, prc_a)].iter().cloned());
         todo!()
@@ -691,14 +685,9 @@ mod tests {
     #[test]
     #[ignore]
     fn dot_render_and_display() {
-        let alphabet = alphabet!(simple 'a', 'b');
-        let mut cong: RightCongruenceOld<_, _, Void> = RightCongruenceOld::new(alphabet);
-        let q0 = cong.initial();
-        let q1 = cong.add_state(vec!['a']);
-        cong.add_edge(q0, 'a', q1, Void);
-        cong.add_edge(q0, 'b', q0, Void);
-        cong.add_edge(q1, 'a', q0, Void);
-        cong.add_edge(q1, 'b', q1, Void);
+        let cong = TSBuilder::without_colors()
+            .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
+            .into_right_congruence(0);
 
         cong.display_rendered().unwrap();
         let _three_congs = vec![cong.clone(), cong.clone(), cong];

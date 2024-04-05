@@ -584,7 +584,7 @@ mod tests {
         let a = (&dpa).with_initial(1).into_dpa();
         assert!(!dpa.language_equivalent(&a));
 
-        let cong = dpa.prefix_congruence().collect_right_congruence_bare();
+        let cong = RightCongruence::from_ts(dpa.prefix_congruence());
         assert_eq!(cong.size(), 2);
         assert_eq!(cong.initial(), cong.reached_state_index("aa").unwrap());
         assert!(cong.congruent("", "aa"));

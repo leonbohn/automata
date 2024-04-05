@@ -29,6 +29,7 @@ pub mod prelude {
             IntoMooreMachine, MealyMachine, MooreMachine, OmegaAcceptanceCondition, OmegaAutomaton,
             OmegaSemantics, DBA, DFA, DPA,
         },
+        congruence::RightCongruence,
         math,
         transition_system::operations,
         transition_system::{
@@ -46,7 +47,7 @@ pub mod prelude {
             FiniteWord, LinearWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord,
             ReducedOmegaWord, ReducedParseError,
         },
-        Alphabet, Class, Color, Pointed, RightCongruenceOld, Show, Void,
+        Alphabet, Class, Color, Pointed, Show, Void,
     };
 }
 
@@ -71,7 +72,7 @@ pub mod automaton;
 
 /// Defines congruence relations and congruence classes.
 pub mod congruence;
-pub use congruence::{Class, RightCongruenceOld};
+pub use congruence::{Class, RightCongruence};
 
 /// Module that contains definitions for dealing with words.
 #[macro_use]

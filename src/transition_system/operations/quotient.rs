@@ -85,14 +85,12 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
     }
 
     /// Extracts the underlying right congruence by erasing the state and edge colors and then collecting
-    /// into a [`RightCongruenceOld`].
-    pub fn underlying_right_congruence(self, _ts: &Ts) -> RightCongruenceOld<Ts::Alphabet>
+    /// into a [`RightCongruence`].
+    pub fn underlying_right_congruence(self, _ts: &Ts) -> RightCongruence<Ts::Alphabet>
     where
         Ts: Deterministic + Pointed,
     {
-        self.erase_edge_colors()
-            .erase_state_colors()
-            .collect_right_congruence_bare()
+        RightCongruence::from_ts(self.erase_edge_colors().erase_state_colors())
     }
 
     /// Creates a new quotient of the given transition system by the give [`Partition`].

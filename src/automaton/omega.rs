@@ -106,7 +106,7 @@ impl<A: Alphabet> OmegaAutomaton<A> {
         self.try_into().ok()
     }
 
-    pub fn prefix_congruence(&self) -> RightCongruenceOld<A> {
+    pub fn prefix_congruence(&self) -> RightCongruence<A> {
         todo!()
     }
 

@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::{prelude::*, Void};
+use crate::prelude::*;
 
 /// Represents a congruence class, which is in essence simply a non-empty sequence of symbols
 /// for the underlying alphabet.
@@ -13,23 +13,23 @@ impl<S: Show> Show for Class<S> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruenceOld<A, Q, C>> for Class<A::Symbol> {
+impl<A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruence<A, Q, C>> for Class<A::Symbol> {
     #[inline(always)]
     fn to_index(
         &self,
-        ts: &RightCongruenceOld<A, Q, C>,
-    ) -> Option<<RightCongruenceOld<A, Q, C> as TransitionSystem>::StateIndex> {
+        ts: &RightCongruence<A, Q, C>,
+    ) -> Option<<RightCongruence<A, Q, C> as TransitionSystem>::StateIndex> {
         ts.class_to_index(self).or(ts.reached_state_index(self))
     }
 }
-impl<'a, A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruenceOld<A, Q, C>>
+impl<'a, A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruence<A, Q, C>>
     for &'a Class<A::Symbol>
 {
     #[inline(always)]
     fn to_index(
         &self,
-        ts: &RightCongruenceOld<A, Q, C>,
-    ) -> Option<<RightCongruenceOld<A, Q, C> as TransitionSystem>::StateIndex> {
+        ts: &RightCongruence<A, Q, C>,
+    ) -> Option<<RightCongruence<A, Q, C> as TransitionSystem>::StateIndex> {
         Class::to_index(self, ts)
     }
 }
@@ -151,95 +151,5 @@ impl<S: Ord> Ord for Class<S> {
 impl<S: Ord> PartialOrd for Class<S> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
-    }
-}
-
-/// A colored class is a [`Class`] which additionally has an associated color.
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct ColoredClass<S: Symbol, Q = Void> {
-    pub(crate) class: Class<S>,
-    pub(crate) color: Q,
-}
-
-impl<A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruenceOld<A, Q, C>>
-    for ColoredClass<A::Symbol, Q>
-{
-    #[inline(always)]
-    fn to_index(
-        &self,
-        ts: &RightCongruenceOld<A, Q, C>,
-    ) -> Option<<RightCongruenceOld<A, Q, C> as TransitionSystem>::StateIndex> {
-        self.class.to_index(ts)
-    }
-}
-impl<'a, A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruenceOld<A, Q, C>>
-    for &'a ColoredClass<A::Symbol, Q>
-{
-    #[inline(always)]
-    fn to_index(
-        &self,
-        ts: &RightCongruenceOld<A, Q, C>,
-    ) -> Option<<RightCongruenceOld<A, Q, C> as TransitionSystem>::StateIndex> {
-        self.class.to_index(ts)
-    }
-}
-
-impl<S: Symbol, Q: std::fmt::Debug> std::fmt::Display for ColoredClass<S, Q> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{} | {:?}]", self.class, self.color)
-    }
-}
-
-impl<S: Symbol, J: Into<Class<S>>> From<J> for ColoredClass<S, Void> {
-    fn from(value: J) -> Self {
-        Self {
-            class: value.into(),
-            color: Void,
-        }
-    }
-}
-
-impl<S: Symbol, W: FiniteWord<S>, Q: Clone> From<(W, Q)> for ColoredClass<S, Q> {
-    fn from(value: (W, Q)) -> Self {
-        Self {
-            class: value.0.to_vec().into(),
-            color: value.1,
-        }
-    }
-}
-
-impl<S: Symbol, Q: Clone> ColoredClass<S, Q> {
-    /// Creates a new colored class from the given class and color.
-    pub fn new<X: Into<Class<S>>>(class: X, color: Q) -> Self {
-        Self {
-            class: class.into(),
-            color,
-        }
-    }
-
-    /// Returns a reference to the underlying class.
-    pub fn class(&self) -> &Class<S> {
-        &self.class
-    }
-
-    /// Consumes `self` and returns a [`ColoredClass`] with the same color but the given `class`.
-    pub fn reclass<X: Into<Class<S>>>(self, class: X) -> ColoredClass<S, Q> {
-        ColoredClass {
-            class: class.into(),
-            color: self.color,
-        }
-    }
-
-    /// Consumes `self` and returns a [`ColoredClass`] with the same class but the given `color`.
-    pub fn recolor<D: Clone>(self, color: D) -> ColoredClass<S, D> {
-        ColoredClass {
-            class: self.class,
-            color,
-        }
-    }
-
-    /// Returns a reference to the stored color.
-    pub fn color(&self) -> &Q {
-        &self.color
     }
 }

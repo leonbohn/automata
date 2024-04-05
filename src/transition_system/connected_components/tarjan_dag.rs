@@ -144,6 +144,7 @@ mod tests {
         let cong = ts();
         let sccs = cong.sccs();
         let tree = super::TarjanDAG::from(sccs);
+        assert_eq!(tree.size(), 3);
         assert_eq!(
             tree.reachable_from(0).sorted().collect::<Vec<_>>(),
             vec![0, 1, 2]

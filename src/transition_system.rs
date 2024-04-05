@@ -1,7 +1,10 @@
 use itertools::Itertools;
 
 use crate::{math::Map, math::Partition, prelude::*};
-use std::{fmt::Display, hash::Hash};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 mod edge;
 pub use edge::{Edge, EdgeReference, IsEdge};
@@ -674,7 +677,7 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 ///
 /// Implementors should be able to _uniquely_ identify a single state in a transition
 /// system of type `Ts`.
-pub trait Indexes<Ts: TransitionSystem> {
+pub trait Indexes<Ts: TransitionSystem>: Debug {
     /// _Uniquely_ identifies a state in `ts` and return its index. If the state does
     /// not exist, `None` is returned.
     fn to_index(&self, ts: &Ts) -> Option<Ts::StateIndex>;
@@ -869,36 +872,10 @@ pub trait Congruence: Deterministic + Pointed {
     fn build_right_congruence(
         &self,
     ) -> (
-        RightCongruenceOld<Self::Alphabet>,
+        RightCongruence<Self::Alphabet>,
         Map<Self::StateIndex, usize>,
     ) {
-        let mut cong: RightCongruenceOld<Self::Alphabet> =
-            RightCongruenceOld::new_for_alphabet(self.alphabet().clone());
-        let mut map = Map::default();
-
-        for state in self.state_indices() {
-            map.insert(state, cong.add_state(Class::epsilon()));
-        }
-
-        for state in self.state_indices() {
-            if let Some(it) = self.edges_from(state) {
-                for edge in it {
-                    let target = edge.target();
-                    let target_class = map.get(&target).unwrap();
-                    let _color = edge.color().clone();
-                    let _target_class = cong.add_edge(
-                        *map.get(&state).unwrap(),
-                        edge.expression().clone(),
-                        *target_class,
-                        Void,
-                    );
-                }
-            }
-        }
-
-        cong.recompute_labels();
-
-        (cong, map)
+        todo!()
     }
 }
 impl<Sim: Deterministic + Pointed> Congruence for Sim {}

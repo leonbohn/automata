@@ -139,19 +139,6 @@ impl<'a, A: Alphabet, C: Color, Idx: IndexType> BTSPredecessors<'a, A, C, Idx> {
     }
 }
 
-impl<A: Alphabet> PredecessorIterable for RightCongruenceOld<A> {
-    type PreEdgeRef<'this> = &'this crate::transition_system::impls::NTEdge<A::Expression, Void>
-    where
-        Self: 'this;
-
-    type EdgesToIter<'this> = crate::transition_system::impls::NTSEdgesTo<'this, A::Expression, Void>
-    where
-        Self: 'this;
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        self.ts().predecessors(state.to_index(self)?)
-    }
-}
-
 impl<Ts: PredecessorIterable> PredecessorIterable for Initialized<Ts> {
     type PreEdgeRef<'this> = Ts::PreEdgeRef<'this> where Self: 'this;
     type EdgesToIter<'this> = Ts::EdgesToIter<'this> where Self: 'this;
