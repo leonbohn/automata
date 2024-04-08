@@ -46,16 +46,16 @@ where
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
     ///     .into_deterministic_initialized(0);
-    /// assert!(DFA::from_ts(ts, [0]).accepts(""));
-    /// assert!(DFA::from_ts(ts, [1]).accepts("a"));
+    /// assert!(DFA::from_ts(&ts, [0]).accepts(""));
+    /// assert!(!DFA::from_ts(&ts, [1]).accepts("a"));
     /// assert!(!DFA::from_ts(ts, []).accepts("a"));
     /// ```
     pub fn from_ts<C>(
         ts: C,
-        accepting_states: impl IntoIterator<Item = impl Indexes<C>>,
+        accepting_states: impl IntoIterator<Item = C::StateIndex>,
     ) -> IntoDFA<operations::WithStateColor<C, operations::DefaultIfMissing<C::StateIndex, bool>>>
     where
-        C: Congruence,
+        C: Congruence<Alphabet = D::Alphabet>,
     {
         let accepting: math::Map<_, bool> = accepting_states
             .into_iter()
