@@ -34,6 +34,6 @@ jobs:
       - name: Verify that documentation contains no invalid links
         run: cargo doc --no-deps
       - name: Compile
-        run: cargo build --locked
+        run: cargo build
       - name: Run all tests and see that there are no regressions
         run: cargo test --all
