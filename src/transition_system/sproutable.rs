@@ -111,10 +111,47 @@ pub trait Sproutable: TransitionSystem {
     ///
     /// The sink state will be colored with `sink_color` and each newly introduced edge will
     /// be colored with `edge_color`.
+    ///
+    /// # Example
+    /// We should be able to take a TS that is not yet complete and use this method to build
+    /// one which is complete. For an incomplete transition system, this should result in
+    /// a new state being created.
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let mut ts = TSBuilder::without_colors()
+    ///     .with_edges([(0, 'a', 0)])
+    ///     .with_alphabet_symbols(['a', 'b'])
+    ///     .deterministic();
+    /// assert!(!ts.is_complete());
+    /// ts.complete_with_colors(Void, Void);
+    /// assert_eq!(ts.size(), 2);
+    /// assert!(ts.is_complete());
+    /// ```
+    ///
+    /// However if we call the method on a TS that is already complete, i.e. it has a transition
+    /// for every alphabet symbol going out from every state, then the method should return the
+    /// original TS unchanged.
+    /// ```
+    /// use automata::prelude::*;
+    /// let mut ts = TSBuilder::without_colors()
+    ///     .with_edges([(0, 'a', 0), (0, 'b', 0)])
+    ///     .with_alphabet_symbols(['a', 'b'])
+    ///     .deterministic();
+    /// assert!(ts.is_complete());
+    /// ts.complete_with_colors(Void, Void);
+    /// assert_eq!(ts.size(), 1);
+    /// assert!(ts.is_complete());
+    /// ```
     fn complete_with_colors(&mut self, sink_color: Self::StateColor, edge_color: Self::EdgeColor)
     where
         Self::Alphabet: IndexedAlphabet,
     {
+        // in case we are already a complete TS, we can return without changes
+        if self.is_complete() {
+            return;
+        }
+
         let sink = self.add_state(sink_color);
         for sym in self.alphabet().universe().collect_vec() {
             self.add_edge(
@@ -224,6 +261,8 @@ mod tests {
             ])
             .deterministic();
         assert_eq!(partial.reached_state_index_from("aaacb", 0), None);
+        assert!(!partial.is_complete());
+
         partial.complete_with_colors((), 2);
         for w in ["abbaccababcab", "bbcca", "cc", "aababbabbabbccbabba"] {
             if partial.reached_state_index_from(w, 0).unwrap() < 1 {

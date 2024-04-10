@@ -399,20 +399,6 @@ pub trait Deterministic: TransitionSystem {
         self.last_edge_color_from(word, self.initial())
     }
 
-    /// Checks whether `self` is complete, meaning every state has a transition for every symbol
-    /// of the alphabet.
-    fn is_complete(&self) -> bool {
-        for q in self.state_indices() {
-            if !self
-                .alphabet()
-                .universe()
-                .all(|sym| self.transition(q, sym).is_some())
-            {
-                return false;
-            }
-        }
-        true
-    }
     /// Runs the given `word` on the transition system, starting in the initial state.
     #[allow(clippy::type_complexity)]
     fn omega_run<W>(
