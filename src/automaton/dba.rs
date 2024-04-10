@@ -22,22 +22,13 @@ pub type DBA<A = CharAlphabet> = Automaton<Initialized<DTS<A, Void, bool>>, DBAS
 /// Helper trait for creating a [`DBA`] from a given transition system.
 pub type IntoDBA<T> = Automaton<T, DBASemantics, true>;
 
-/// Similar to [`DFALike`], this trait is supposed to be (automatically) implemented by everything that can be viewed
-/// as a [`super::DBA`].
-pub trait DBALike: Congruence<EdgeColor = bool> {
-    /// Uses a reference to `self` for creating a [`DBA`].
-    fn borrow_dba(&self) -> IntoDBA<&Self> {
-        self.into_dba()
-    }
-
-    /// Consumes `self` and returns a [`DBA`].
-    fn into_dba(self) -> IntoDBA<Self> {
-        Automaton::from_parts(self, DBASemantics)
-    }
-
+impl<C> IntoDBA<C>
+where
+    C: Deterministic<EdgeColor = bool>,
+{
     /// Tries to identify a word which is accepted by `self`. If such a word exists, it returns it and otherwise
     /// the function gives back `None`.
-    fn dba_give_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
+    pub fn give_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         for good_scc in self
             .sccs()
             .iter()
@@ -68,9 +59,7 @@ pub trait DBALike: Congruence<EdgeColor = bool> {
     }
 
     /// Returns `true` if and only if `self` accepts a non-empty language.
-    fn dba_is_empty(&self) -> bool {
-        self.dba_give_word().is_none()
+    pub fn is_empty(&self) -> bool {
+        self.give_word().is_none()
     }
 }
-
-impl<Ts> DBALike for Ts where Ts: Deterministic<EdgeColor = bool> + Pointed {}

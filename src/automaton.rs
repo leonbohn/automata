@@ -1,5 +1,34 @@
 use crate::prelude::*;
 
+mod acceptance_type;
+pub use acceptance_type::OmegaAcceptanceType;
+
+#[macro_use]
+mod moore;
+pub use moore::{IntoMooreMachine, MooreMachine};
+
+#[macro_use]
+mod mealy;
+pub use mealy::{IntoMealyMachine, MealyMachine};
+
+mod dfa;
+pub use dfa::{IntoDFA, DFA};
+
+mod dpa;
+pub use dpa::{IntoDPA, MinEven, DPA};
+
+mod dba;
+pub use dba::{IntoDBA, DBA};
+
+#[allow(missing_docs)]
+mod omega;
+pub use omega::{
+    AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
+};
+
+mod with_initial;
+pub use with_initial::Initialized;
+
 /// An automaton consists of a transition system and an acceptance condition.
 /// There are many different types of automata, which can be instantiated from
 /// this struct by setting the type parameters accordingly.
@@ -16,15 +45,30 @@ use crate::prelude::*;
 /// the value of `OMEGA` (in the former case `OMEGA` should be false, and in the
 /// latter case `OMEGA` should be true).
 #[derive(Clone, Eq, PartialEq, Copy)]
-pub struct Automaton<D, A, const OMEGA: bool = false> {
+pub struct Automaton<D: TransitionSystem, A, const OMEGA: bool = false> {
     ts: D,
+    initial: D::StateIndex,
     acceptance: A,
 }
 
-impl<D, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
+impl<D, A, const OMEGA: bool> Automaton<D, A, OMEGA>
+where
+    D: TransitionSystem<Alphabet = CharAlphabet>,
+{
+    /// Instantiates a new [`TSBuilder`] for the edge and state color of `self`.
+    pub fn builder() -> TSBuilder<D::StateColor, D::EdgeColor> {
+        TSBuilder::default()
+    }
+}
+
+impl<D: TransitionSystem, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
     /// Creates a new automaton from the given transition system and acceptance condition.
-    pub fn from_parts(ts: D, acceptance: A) -> Self {
-        Self { ts, acceptance }
+    pub fn from_parts(ts: D, initial: impl Indexes<D>, acceptance: A) -> Self {
+        Self {
+            initial: initial.to_index(&ts).unwrap(),
+            ts,
+            acceptance,
+        }
     }
 
     /// Decomposes the automaton into its parts: the transition system and the acceptance condition.
@@ -88,7 +132,9 @@ where
     }
 }
 
-impl<D, A, const OMEGA: bool> AsRef<Automaton<D, A, OMEGA>> for Automaton<D, A, OMEGA> {
+impl<D: TransitionSystem, A, const OMEGA: bool> AsRef<Automaton<D, A, OMEGA>>
+    for Automaton<D, A, OMEGA>
+{
     fn as_ref(&self) -> &Automaton<D, A, OMEGA> {
         self
     }
@@ -110,15 +156,20 @@ impl<D: PredecessorIterable, A, const OMEGA: bool> PredecessorIterable for Autom
     }
 }
 
-impl<D: Pointed, A, const OMEGA: bool> Pointed for Automaton<D, A, OMEGA> {
+impl<D: TransitionSystem, A, const OMEGA: bool> Pointed for Automaton<D, A, OMEGA> {
     fn initial(&self) -> Self::StateIndex {
-        self.ts.initial()
+        self.initial
     }
 }
 
-impl<D: Sproutable, A: Default, const OMEGA: bool> Sproutable for Automaton<D, A, OMEGA> {
+impl<D: Sproutable, A: Default, const OMEGA: bool> Sproutable for Automaton<D, A, OMEGA>
+where
+    D::StateColor: Default,
+{
     fn new_for_alphabet(alphabet: Self::Alphabet) -> Self {
-        Automaton::from_parts(D::new_for_alphabet(alphabet), Default::default())
+        let mut ts = D::new_for_alphabet(alphabet);
+        let initial = ts.add_state::<StateColor<D>>(Default::default());
+        Automaton::from_parts(ts, initial, Default::default())
     }
 
     fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
@@ -203,7 +254,7 @@ impl<D: TransitionSystem, A, const OMEGA: bool> TransitionSystem for Automaton<D
         self.ts.state_indices()
     }
 
-    fn edges_from<Idx: super::Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
+    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
         self.ts.edges_from(state.to_index(self)?)
     }
 
@@ -212,7 +263,7 @@ impl<D: TransitionSystem, A, const OMEGA: bool> TransitionSystem for Automaton<D
     }
 }
 
-impl<T, A, const OMEGA: bool> std::fmt::Debug for Automaton<T, A, OMEGA>
+impl<T: TransitionSystem, A, const OMEGA: bool> std::fmt::Debug for Automaton<T, A, OMEGA>
 where
     T: std::fmt::Debug,
     A: std::fmt::Debug,
@@ -228,5 +279,154 @@ where
             self.acceptance,
             self.ts
         )
+    }
+}
+
+/// This trait is implemented by acceptance conditions for finite words.
+pub trait FiniteSemantics<Q, C> {
+    /// The type of output that this semantic produces.
+    type Output;
+    /// Compute the output for the given finite run.
+    fn finite_semantic<R>(&self, run: R) -> Self::Output
+    where
+        R: FiniteRun<StateColor = Q, EdgeColor = C>;
+}
+
+/// This trait is implemented by acceptance conditions for omega words.
+pub trait OmegaSemantics<Q, C> {
+    /// The type of output that this semantic produces.
+    type Output;
+    /// Compute the output for the given omega run.
+    fn omega_semantic<R>(&self, run: R) -> Self::Output
+    where
+        R: OmegaRun<StateColor = Q, EdgeColor = C>;
+}
+
+/// Iterator over the accepting states of a [`TransitionSystem`] that have a certain coloring.
+pub struct StatesWithColor<'a, Ts: TransitionSystem> {
+    ts: &'a Ts,
+    iter: Ts::StateIndices<'a>,
+    color: Ts::StateColor,
+}
+
+impl<'a, Ts: TransitionSystem> StatesWithColor<'a, Ts> {
+    /// Creates a new instance for the given transition system and color.
+    pub fn new(ts: &'a Ts, color: Ts::StateColor) -> Self {
+        Self {
+            iter: ts.state_indices(),
+            ts,
+            color,
+        }
+    }
+}
+
+impl<'a, Ts: TransitionSystem> Clone for StatesWithColor<'a, Ts> {
+    fn clone(&self) -> Self {
+        Self {
+            ts: self.ts,
+            iter: self.ts.state_indices(),
+            color: self.color.clone(),
+        }
+    }
+}
+
+impl<'a, Ts: TransitionSystem<StateColor = bool>> Iterator for StatesWithColor<'a, Ts> {
+    type Item = Ts::StateIndex;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter
+            .find(|&index| self.ts.state_color(index).unwrap() == self.color)
+    }
+}
+
+impl<D, A, const OMEGA: bool> From<D> for Automaton<D, A, OMEGA>
+where
+    D: Congruence,
+    A: Default,
+{
+    fn from(value: D) -> Self {
+        let initial = value.initial();
+        Self::from_parts(value, initial, A::default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::prelude::*;
+
+    #[test]
+    fn mealy_color_or_below() {
+        let mm = MooreMachine::builder()
+            .with_state_colors([0, 1, 1, 0])
+            .with_edges([
+                (0, 'a', 1),
+                (0, 'b', 2),
+                (1, 'a', 2),
+                (1, 'b', 2),
+                (2, 'a', 3),
+                (2, 'b', 3),
+                (3, 'a', 3),
+                (3, 'b', 3),
+            ])
+            .into_moore(0);
+
+        let dfas = mm.decompose_dfa();
+        let dfa1 = &dfas[1];
+        let dfa0 = &dfas[0];
+
+        println!("{:?}", dfa0);
+        assert!(dfa1.accepts(""));
+        assert!(dfa1.accepts("b"));
+        assert!(!dfa0.accepts("b"));
+        assert!(dfa0.accepts("ba"));
+    }
+
+    #[test]
+    fn dbas() {
+        let dba = DBA::builder()
+            .with_edges([
+                (0, 'a', true, 1),
+                (0, 'b', false, 0),
+                (1, 'a', true, 1),
+                (1, 'b', false, 0),
+            ])
+            .into_dba(0);
+        assert!(dba.accepts(ReducedOmegaWord::periodic("abb")));
+        assert!(!dba.accepts(ReducedOmegaWord::periodic("b")));
+        assert!(dba.accepts(upw!("a")));
+        assert!(!dba.accepts(upw!("b")));
+
+        assert!(!dba.is_empty());
+        println!("{:?}", dba.give_word());
+
+        println!("{:?}", &dba);
+    }
+
+    #[test]
+    fn dfas_and_boolean_operations() {
+        let dfa = DFA::builder()
+            .with_state_colors([true, false])
+            .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 1), (1, 'b', 0)])
+            .into_dfa(0);
+
+        assert!(!dfa.is_empty_language());
+        assert_eq!(dfa.give_word(), Some(vec![]));
+
+        let _dfb = dfa.clone();
+
+        assert!(dfa.accepts("ababab"));
+        assert!(!dfa.accepts("a"));
+
+        let notdfa = dfa.as_ref().negation().into_dfa();
+        assert!(!notdfa.accepts("ababab"));
+        assert!(notdfa.accepts("a"));
+
+        let intersection = dfa.as_ref().intersection(&notdfa).into_dfa();
+        assert!(!intersection.accepts("ababab"));
+        assert!(!intersection.accepts("a"));
+
+        let union = dfa.as_ref().union(&notdfa).into_dfa();
+        assert!(union.accepts("ababab"));
+        assert!(union.accepts("a"));
     }
 }

@@ -68,7 +68,7 @@ pub trait Sproutable: TransitionSystem {
     ///
     /// let source: DTS<CharAlphabet, usize, usize> = TSBuilder::default()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
-    ///     .with_colors([0])
+    ///     .with_state_colors([0])
     ///     .deterministic();
     ///
     /// let (without_edge_colors, _): (DTS<CharAlphabet, usize, Void>, _) = DTS::collect_from(&source);

@@ -25,10 +25,11 @@ pub mod prelude {
         alphabet,
         alphabet::{CharAlphabet, Expression, Symbol},
         automaton::{
-            Automaton, DBALike, DFALike, DPALike, FiniteSemantics, Initialized, IntoDBA, IntoDFA,
-            IntoDPA, IntoMealyMachine, IntoMooreMachine, MealyLike, MealyMachine, MooreLike,
-            MooreMachine, OmegaAcceptanceCondition, OmegaAutomaton, OmegaSemantics, DBA, DFA, DPA,
+            Automaton, FiniteSemantics, Initialized, IntoDBA, IntoDFA, IntoDPA, IntoMealyMachine,
+            IntoMooreMachine, MealyMachine, MooreMachine, OmegaAcceptanceCondition, OmegaAutomaton,
+            OmegaSemantics, DBA, DFA, DPA,
         },
+        congruence::RightCongruence,
         math,
         transition_system::operations,
         transition_system::{
@@ -46,7 +47,7 @@ pub mod prelude {
             FiniteWord, LinearWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord,
             ReducedOmegaWord, ReducedParseError,
         },
-        Alphabet, Class, Color, Pointed, RightCongruence, Show, Void,
+        Alphabet, Class, Color, Pointed, Show, Void,
     };
 }
 
@@ -311,30 +312,25 @@ pub type Map<K, V> = fxhash::FxHashMap<K, V>;
 
 #[cfg(test)]
 mod tests {
-    use crate::{alphabet, prelude::*, Void};
+    use crate::prelude::*;
 
     pub fn wiki_dfa() -> DFA<CharAlphabet> {
-        let mut dfa = DFA::new_for_alphabet(alphabet!(simple 'a', 'b'));
-        let a = dfa.add_state(false);
-        let b = dfa.add_state(false);
-        let c = dfa.add_state(true);
-        let d = dfa.add_state(true);
-        let e = dfa.add_state(true);
-        let f = dfa.add_state(false);
-
-        dfa.add_edge(a, 'a', b, Void);
-        dfa.add_edge(a, 'b', c, Void);
-        dfa.add_edge(b, 'a', a, Void);
-        dfa.add_edge(b, 'b', d, Void);
-        dfa.add_edge(c, 'a', e, Void);
-        dfa.add_edge(c, 'b', f, Void);
-        dfa.add_edge(d, 'a', e, Void);
-        dfa.add_edge(d, 'b', f, Void);
-        dfa.add_edge(e, 'a', e, Void);
-        dfa.add_edge(e, 'b', f, Void);
-        dfa.add_edge(f, 'a', f, Void);
-        dfa.add_edge(f, 'b', f, Void);
-
-        dfa
+        TSBuilder::without_edge_colors()
+            .with_state_colors([false, false, true, true, true, false])
+            .with_edges([
+                (0, 'a', 1),
+                (0, 'b', 2),
+                (1, 'a', 0),
+                (1, 'b', 3),
+                (2, 'a', 4),
+                (2, 'b', 5),
+                (3, 'a', 4),
+                (3, 'b', 5),
+                (4, 'a', 4),
+                (4, 'b', 5),
+                (5, 'a', 5),
+                (5, 'b', 5),
+            ])
+            .into_dfa(0)
     }
 }

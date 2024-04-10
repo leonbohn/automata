@@ -1,7 +1,10 @@
 use itertools::Itertools;
 
 use crate::{math::Map, math::Partition, prelude::*};
-use std::{fmt::Display, hash::Hash};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 mod edge;
 pub use edge::{Edge, EdgeReference, IsEdge};
@@ -418,6 +421,27 @@ pub trait TransitionSystem: Sized {
         operations::MapEdgeColor::new(self, f)
     }
 
+    /// Consumes and recolors `self` with the colors as given by `provider`.
+    /// See more possible ways of assigning colors in [`operations::ProvidesStateColor`].
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let ts = TSBuilder::without_colors()
+    ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
+    ///     .into_deterministic_initialized(0);
+    /// let colored = ts.with_state_color(false);
+    /// assert_eq!(colored.reached_state_color("a"), Some(false));
+    /// assert_eq!(colored.reached_state_color("aaa"), Some(false));
+    /// ```
+    fn with_state_color<P: ProvidesStateColor<Self::StateIndex>>(
+        self,
+        provider: P,
+    ) -> WithStateColor<Self, P> {
+        WithStateColor::new(self, provider)
+    }
+
     /// Map the state colors of `self` with the given function.
     fn map_state_colors<D: Clone, F: Fn(Self::StateColor) -> D>(
         self,
@@ -667,14 +691,14 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 }
 
 /// Trait that helps with accessing states in more elaborate [`TransitionSystem`]s. For
-/// example in a [`crate::RightCongruence`], we have more information than the [`crate::Color`]
+/// example in a [`RightCongruence`], we have more information than the [`crate::Color`]
 /// on a state, we have its [`crate::Class`] as well. Since we would like to be able to
 /// access a state of a congruence not only by its index, but also by its classname
 /// or any other [word](`crate::prelude::LinearWord`) of finite length, this trait is necessary.
 ///
 /// Implementors should be able to _uniquely_ identify a single state in a transition
 /// system of type `Ts`.
-pub trait Indexes<Ts: TransitionSystem> {
+pub trait Indexes<Ts: TransitionSystem>: Debug {
     /// _Uniquely_ identifies a state in `ts` and return its index. If the state does
     /// not exist, `None` is returned.
     fn to_index(&self, ts: &Ts) -> Option<Ts::StateIndex>;
@@ -779,10 +803,92 @@ impl<P: Pointed> Pointed for &mut P {
 pub mod dot;
 pub use dot::Dottable;
 
+use self::operations::{ProvidesStateColor, WithStateColor};
+
 /// A congruence is a [`TransitionSystem`], which additionally has a distinguished initial state. On top
 /// of that, a congruence does not have any coloring on either states or symbols. This
 /// functionality is abstracted in [`Pointed`]. This trait is automatically implemented.
 pub trait Congruence: Deterministic + Pointed {
+    /// Takes ownership of `self` and builds a new [`DFA`] from it.
+    fn into_dfa(self) -> IntoDFA<Self>
+    where
+        Self: Congruence<StateColor = bool>,
+    {
+        self.into()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`DFA`].
+    fn collect_dfa(&self) -> DFA<Self::Alphabet>
+    where
+        Self: Congruence<StateColor = bool>,
+    {
+        self.erase_edge_colors().collect_pointed().0.into_dfa()
+    }
+
+    /// Takes ownership of `self` and builds a new [`DPA`] from it.
+    fn into_dpa(self) -> IntoDPA<Self>
+    where
+        Self: Congruence<EdgeColor = usize>,
+    {
+        self.into()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`DPA`].
+    fn collect_dpa(&self) -> DPA<Self::Alphabet>
+    where
+        Self: Congruence<EdgeColor = usize>,
+    {
+        self.erase_state_colors().collect_pointed().0.into_dpa()
+    }
+
+    /// Takes ownership of `self` and builds a new [`DBA`] from it.
+    fn into_dba(self) -> IntoDBA<Self>
+    where
+        Self: Congruence<EdgeColor = bool>,
+    {
+        self.into()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`DBA`].
+    fn collect_dba(&self) -> DBA<Self::Alphabet>
+    where
+        Self: Congruence<EdgeColor = bool>,
+    {
+        self.erase_state_colors().collect_pointed().0.into_dba()
+    }
+
+    /// Takes ownership of `self` and builds a new [`MooreMachine`] from it.
+    fn into_moore(self) -> IntoMooreMachine<Self>
+    where
+        StateColor<Self>: Color,
+    {
+        self.into()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`MooreMachine`].
+    fn collect_moore(&self) -> MooreMachine<Self::Alphabet, StateColor<Self>>
+    where
+        StateColor<Self>: Color,
+    {
+        self.erase_edge_colors().collect_pointed().0.into_moore()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`MealyMachine`].
+    fn into_mealy(self) -> IntoMealyMachine<Self>
+    where
+        EdgeColor<Self>: Color,
+    {
+        self.into()
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`MealyMachine`].
+    fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, EdgeColor<Self>>
+    where
+        EdgeColor<Self>: Color,
+    {
+        self.erase_state_colors().collect_pointed().0.into_mealy()
+    }
+
     /// Creates a new instance of a [`RightCongruence`] from the transition structure of `self`. Returns
     /// the created congruence together with a [`Map`] from old/original state indices to indices of the
     /// created congruence.
@@ -792,33 +898,7 @@ pub trait Congruence: Deterministic + Pointed {
         RightCongruence<Self::Alphabet>,
         Map<Self::StateIndex, usize>,
     ) {
-        let mut cong: RightCongruence<Self::Alphabet> =
-            RightCongruence::new_for_alphabet(self.alphabet().clone());
-        let mut map = Map::default();
-
-        for state in self.state_indices() {
-            map.insert(state, cong.add_state(Class::epsilon()));
-        }
-
-        for state in self.state_indices() {
-            if let Some(it) = self.edges_from(state) {
-                for edge in it {
-                    let target = edge.target();
-                    let target_class = map.get(&target).unwrap();
-                    let _color = edge.color().clone();
-                    let _target_class = cong.add_edge(
-                        *map.get(&state).unwrap(),
-                        edge.expression().clone(),
-                        *target_class,
-                        Void,
-                    );
-                }
-            }
-        }
-
-        cong.recompute_labels();
-
-        (cong, map)
+        todo!()
     }
 }
 impl<Sim: Deterministic + Pointed> Congruence for Sim {}
