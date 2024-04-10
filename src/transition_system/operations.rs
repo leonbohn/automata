@@ -16,27 +16,24 @@ pub use reverse::Reversed;
 mod quotient;
 pub use quotient::{Quotient, QuotientEdgesFrom, QuotientTransition};
 
+mod with_state_color;
+pub use with_state_color::{DefaultIfMissing, ProvidesStateColor, WithStateColor};
+
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
 
     #[test]
     fn product() {
-        let mut dfa = DFA::new_for_alphabet(CharAlphabet::new(['a', 'b']));
-        let s0 = dfa.add_state(true);
-        let s1 = dfa.add_state(false);
-        let _e0 = dfa.add_edge(s0, 'a', s1, Void);
-        let _e1 = dfa.add_edge(s0, 'b', s0, Void);
-        let _e2 = dfa.add_edge(s1, 'a', s1, Void);
-        let _e3 = dfa.add_edge(s1, 'b', s0, Void);
+        let dfa = DFA::builder()
+            .with_state_colors([true, false])
+            .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 1), (1, 'b', 0)])
+            .into_dfa(0);
 
-        let mut dfb = DFA::new_for_alphabet(CharAlphabet::new(['a', 'b']));
-        let s0 = dfb.add_state(true);
-        let s1 = dfb.add_state(true);
-        let _e0 = dfb.add_edge(s0, 'a', s1, Void);
-        let _e1 = dfb.add_edge(s0, 'b', s0, Void);
-        let _e2 = dfb.add_edge(s1, 'a', s1, Void);
-        let _e3 = dfb.add_edge(s1, 'b', s0, Void);
+        let dfb = DFA::builder()
+            .with_state_colors([true, true])
+            .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 1), (1, 'b', 0)])
+            .into_dfa(0);
 
         let xxx = dfa.ts_product(dfb);
         assert_eq!(xxx.reached_state_index("abb"), Some(ProductIndex(0, 0)));

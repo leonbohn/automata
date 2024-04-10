@@ -201,12 +201,13 @@ where
         })
         // TODO: Should we not get rid of the edge colors entirely?
         .erase_edge_colors()
-        .collect_moore();
+        .collect_pointed()
+        .0;
     debug!(
         "Collecting into Moore machine took {} microseconds",
         start.elapsed().as_micros()
     );
-    out
+    out.into()
 }
 
 #[cfg(test)]
@@ -221,7 +222,7 @@ mod tests {
 
         let p = moore_partition_refinement(&dfa);
         assert_eq!(p.size(), 3);
-        assert!(p.moore_bisimilar(dfa));
+        assert!(p.bisimilar(dfa));
     }
 
     #[test_log::test]

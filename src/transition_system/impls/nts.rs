@@ -217,7 +217,7 @@ impl<Q, C> NTS<CharAlphabet, Q, C> {
     /// use automata::prelude::*;
     ///
     /// let ts = TSBuilder::default()
-    ///     .with_colors([true, false]) // colors given in the order of the states
+    ///     .with_state_colors([true, false]) // colors given in the order of the states
     ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 0)])
     ///     .into_dfa(0); // 0 is the initial state
     /// ```

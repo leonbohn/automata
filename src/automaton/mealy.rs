@@ -7,7 +7,7 @@ use crate::prelude::*;
 /// Represents the semantics of a Mealy machine. Concretely, this type returns for
 /// a finite run, the last transition color that is taken. It panics if the run has
 /// no transitions at all.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct MealySemantics<C>(PhantomData<C>);
 
 /// A Mealy machine is a transition system where each transition has an output. Thus, the output
@@ -25,16 +25,42 @@ pub type MealyMachine<A = CharAlphabet, C = usize> =
 /// [`MealyMachine`].
 pub type IntoMealyMachine<D> = Automaton<D, MealySemantics<EdgeColor<D>>, false>;
 
-impl<Ts: Congruence> IntoMealyMachine<Ts>
+impl<C: Congruence> IntoMealyMachine<C>
 where
-    EdgeColor<Ts>: Color,
+    EdgeColor<C>: Color,
 {
+    pub fn bisimilar<M>(&self, _other: M) -> bool
+    where
+        M: Congruence,
+        EdgeColor<M>: Color,
+    {
+        todo!()
+    }
+
+    /// Attempts to run the given finite word in `self`, returning the color of the last transition that
+    /// is taken wrapped in `Some`. If no successful run on `input` is possible, the function returns `None`.
+    pub fn map<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> Option<EdgeColor<C>> {
+        self.finite_run(input)
+            .ok()
+            .and_then(|r| r.last_transition_color().cloned())
+    }
+
+    /// Returns a vector over all colors that can be emitted.
+    pub fn color_range(&self) -> impl Iterator<Item = C::EdgeColor> + '_
+    where
+        EdgeColor<Self>: Clone + Hash + Eq,
+    {
+        self.reachable_state_indices()
+            .flat_map(|o| self.edges_from(o).unwrap().map(|e| IsEdge::color(&e)))
+            .unique()
+    }
+
     pub fn restricted_inequivalence<
-        O: MealyLike<Alphabet = Ts::Alphabet, EdgeColor = Ts::EdgeColor>,
+        O: Congruence<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
     >(
         &self,
         other: &IntoMealyMachine<O>,
-    ) -> Option<Vec<SymbolOf<Ts>>> {
+    ) -> Option<Vec<SymbolOf<C>>> {
         let prod = self.ts_product(other);
         for (mut rep, ProductIndex(l, r)) in prod.minimal_representatives() {
             'edges: for edge in self.edges_from(l).unwrap() {
@@ -60,78 +86,25 @@ where
     }
 
     pub fn witness_inequivalence<
-        O: MealyLike<Alphabet = Ts::Alphabet, EdgeColor = Ts::EdgeColor>,
+        O: Congruence<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
     >(
         &self,
         other: &IntoMealyMachine<O>,
-    ) -> Option<Vec<SymbolOf<Ts>>> {
+    ) -> Option<Vec<SymbolOf<C>>> {
         self.restricted_inequivalence(other)
             .or(other.restricted_inequivalence(self))
     }
 }
 
-/// Implemented by objects which can be viewed as a MealyMachine, i.e. a finite transition system
-/// which has outputs of type usize on its edges.
-pub trait MealyLike: Congruence {
-    fn mealy_bisimilar<M>(&self, _other: M) -> bool
-    where
-        M: Congruence,
-        EdgeColor<M>: Color,
-    {
-        todo!()
-    }
-
-    /// Uses a reference to `self` for obtaining a [`MealyMachine`].
-    fn as_mealy(&self) -> IntoMealyMachine<&Self>
-    where
-        EdgeColor<Self>: Color,
-    {
-        Automaton::from_parts(self, MealySemantics(PhantomData))
-    }
-
-    /// Self::EdgeColoronsumes `self`, returning a [`MealyMachine`] that uses the underlying transition system.
-    fn into_mealy(self) -> Automaton<Self, MealySemantics<Self::EdgeColor>>
-    where
-        EdgeColor<Self>: Color,
-    {
-        Automaton::from_parts(self, MealySemantics(PhantomData))
-    }
-
-    fn collect_mealy(self) -> MealyMachine<Self::Alphabet, Self::EdgeColor>
-    where
-        EdgeColor<Self>: Color,
-    {
-        self.erase_state_colors().collect_pointed().0.into_mealy()
-    }
-
-    /// Attempts to run the given finite word in `self`, returning the color of the last transition that
-    /// is taken wrapped in `Some`. If no successful run on `input` is possible, the function returns `None`.
-    fn try_mealy_map<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> Option<Self::EdgeColor>
-    where
-        Self: Deterministic,
-    {
-        self.finite_run(input)
-            .ok()
-            .and_then(|r| r.last_transition_color().cloned())
-    }
-
-    /// Returns a vector over all colors that can be emitted.
-    fn color_range(&self) -> impl Iterator<Item = Self::EdgeColor>
-    where
-        EdgeColor<Self>: Clone + Hash + Eq,
-    {
-        self.reachable_state_indices()
-            .flat_map(|o| self.edges_from(o).unwrap().map(|e| IsEdge::color(&e)))
-            .unique()
+impl<Q> Default for MealySemantics<Q> {
+    fn default() -> Self {
+        Self(std::marker::PhantomData)
     }
 }
-impl<Ts: Congruence> MealyLike for Ts where EdgeColor<Ts>: Color {}
 
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
-
-    use super::MealyLike;
 
     #[test]
     fn mealy_equivalence() {

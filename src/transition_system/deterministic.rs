@@ -549,26 +549,6 @@ pub trait Deterministic: TransitionSystem {
         self.finite_run_from(word, origin).ok().map(|p| p.reached())
     }
 
-    /// Builds a new [`RightCongruence`] from `self`, which is like viewing only the right congruence underlying
-    /// `self`. This procedure erases the state and edge colors.
-    fn collect_right_congruence_bare(&self) -> RightCongruence<Self::Alphabet>
-    where
-        Self: Pointed,
-    {
-        RightCongruence::from_ts(self.erase_state_colors().erase_edge_colors())
-    }
-
-    /// Builds a new [`RightCongruence`] from `self`, which is like viewing only the right congruence underlying
-    /// `self`. This procedure keeps the state and edge colors.
-    fn collect_right_congruence(
-        &self,
-    ) -> RightCongruence<Self::Alphabet, Self::StateColor, Self::EdgeColor>
-    where
-        Self: Pointed,
-    {
-        RightCongruence::from_ts(self)
-    }
-
     /// Collects `self` into a new [`DTS`] over the same alphabet. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     ///
@@ -577,6 +557,33 @@ pub trait Deterministic: TransitionSystem {
     fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
         let (ts, _map) = DTS::collect_from(self);
         ts
+    }
+
+    /// Collects `self` into a new [`DTS`] over the same alphabet, while also returning the
+    /// index of the state corresponding to the old initial state.
+    /// This is used, for example, after a chain of  manipulations on a transition system,
+    /// to obtain a condensed version that is then faster to work with.
+    ///
+    /// By default, the implementation is naive and slow, it simply inserts all states one
+    /// after the other and subsequently inserts all transitions, see
+    /// [`Sproutable::collect_from`] for details.
+    #[allow(clippy::type_complexity)]
+    fn collect_dts_pointed(
+        self,
+    ) -> (
+        DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
+        usize,
+    )
+    where
+        Self: Pointed,
+    {
+        let old_initial = self.initial();
+        let (ts, map) = DTS::collect_from(self);
+        (
+            ts,
+            *map.get_by_left(&old_initial)
+                .expect("Initial state did not get collected"),
+        )
     }
 
     /// Collects `self` into a new [`HashTs`] over the same alphabet. This is used, for example, after a chain of
@@ -734,23 +741,6 @@ impl<D: Deterministic> Deterministic for &mut D {
         symbol: SymbolOf<Self>,
     ) -> Option<Self::EdgeRef<'_>> {
         D::transition(self, state.to_index(self)?, symbol)
-    }
-}
-
-impl<A: Alphabet, Q: Clone, C: Clone> Deterministic for RightCongruence<A, Q, C> {
-    fn transition<Idx: Indexes<Self>>(
-        &self,
-        state: Idx,
-        symbol: SymbolOf<Self>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        self.ts().transition(state.to_index(self)?, symbol)
-    }
-    fn edge_color<Idx: Indexes<Self>>(
-        &self,
-        state: Idx,
-        expression: &ExpressionOf<Self>,
-    ) -> Option<EdgeColor<Self>> {
-        self.ts().edge_color(state.to_index(self)?, expression)
     }
 }
 
@@ -924,7 +914,7 @@ mod tests {
     #[test]
     fn escape_prefixes() {
         // build set of words
-        let words = vec![upw!("a"), upw!("a", "b"), upw!("b"), upw!("aa", "b")];
+        let words = [upw!("a"), upw!("a", "b"), upw!("b"), upw!("aa", "b")];
 
         // build transition system
         let ts = NTS::builder()

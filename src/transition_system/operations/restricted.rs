@@ -286,7 +286,11 @@ impl<D: PredecessorIterable<EdgeColor = usize>> PredecessorIterable for ColorRes
     }
 }
 
-impl<D: DPALike> Deterministic for ColorRestricted<D> {
+impl<D> Deterministic for ColorRestricted<D>
+where
+    D: Deterministic,
+    EdgeColor<D>: Ord,
+{
     fn transition<Idx: Indexes<Self>>(
         &self,
         state: Idx,
@@ -364,20 +368,21 @@ mod tests {
 
     #[test]
     fn restrict_ts_by_state_index() {
-        let mut dfa = DFA::new_for_alphabet(alphabet! {simple 'a', 'b'});
-        let q0 = dfa.add_state(false);
-        let q1 = dfa.add_state(false);
-        let q2 = dfa.add_state(true);
+        let dfa = TSBuilder::without_edge_colors()
+            .with_state_colors([false, false, true])
+            .with_edges([
+                (0, 'a', 1),
+                (0, 'b', 0),
+                (1, 'a', 2),
+                (1, 'b', 1),
+                (2, 'a', 0),
+                (2, 'b', 2),
+            ])
+            .into_dfa(0);
 
-        dfa.add_edge(q0, 'a', q1, Void);
-        dfa.add_edge(q0, 'b', q0, Void);
-        dfa.add_edge(q1, 'a', q2, Void);
-        dfa.add_edge(q1, 'b', q1, Void);
-        dfa.add_edge(q2, 'a', q0, Void);
-        dfa.add_edge(q2, 'b', q2, Void);
         assert!(dfa.accepts("aa"));
 
-        let restricted = dfa.restrict_state_indices(|idx| idx != q2);
+        let restricted = dfa.restrict_state_indices(|idx| idx != 2);
         assert!(!restricted.into_dfa().accepts("aa"));
     }
 }

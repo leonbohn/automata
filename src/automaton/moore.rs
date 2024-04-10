@@ -8,7 +8,7 @@ use super::Automaton;
 /// Represents the semantics of a Moore machine, it produces the color of the
 /// state that is reached during a run on a word. If the input is empty, it
 /// produces the color of the initial state.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct MooreSemantics<Q>(std::marker::PhantomData<Q>);
 
 /// A Moore machine is a transition system where each state has an output. Thus, the output
@@ -34,22 +34,41 @@ pub type MooreMachine<A = CharAlphabet, Q = usize> =
 /// obtain the type of a [`DFA`] for the given ts.
 pub type IntoMooreMachine<D> = Automaton<D, MooreSemantics<StateColor<D>>, false>;
 
-/// Implemented by objects that can be viewed as MooreMachines, i.e. finite transition systems
-/// that have usize annotated/outputting states.
-pub trait MooreLike: Congruence
+impl<C> IntoMooreMachine<C>
 where
-    StateColor<Self>: Color,
+    C: Deterministic,
+    StateColor<C>: Color,
 {
-    /// Consumes and thereby turns `self` into a [`MooreMachine`].
-    fn into_moore(self) -> IntoMooreMachine<Self> {
-        Automaton::from_parts(self, MooreSemantics(std::marker::PhantomData))
+    /// Decomposes `self` into a sequence of DFAs, where the i-th DFA accepts all words which
+    /// produce a color less than or equal to i.
+    pub fn decompose_dfa(&self) -> Vec<DFA<C::Alphabet>>
+    where
+        StateColor<Self>: Color,
+    {
+        self.color_range()
+            .into_iter()
+            .sorted()
+            .map(|i| self.color_or_below_dfa(i))
+            .collect()
+    }
+
+    /// Builds a DFA that accepts all words which emit a color less than or equal to `color`.
+    pub fn color_or_below_dfa(&self, color: C::StateColor) -> DFA<C::Alphabet>
+    where
+        StateColor<Self>: Color,
+    {
+        self.map_state_colors(|o| o <= color)
+            .erase_edge_colors()
+            .into_dfa()
+            .minimize()
+            .collect_dfa()
     }
 
     /// Pushes the state colors onto the outgoing edges of `self` and collects the resulting
     /// transition system into a new [`MealyMachine`].
-    fn push_colors_to_outgoing_edges(&self) -> MealyMachine<Self::Alphabet, Self::StateColor>
+    pub fn push_colors_to_outgoing_edges(&self) -> MealyMachine<C::Alphabet, C::StateColor>
     where
-        Self::StateColor: Clone,
+        C::StateColor: Clone,
     {
         self.map_edge_colors_full(|p, _a, _c, _q| {
             self.state_color(p)
@@ -61,12 +80,12 @@ where
 
     /// Runs the given `input` word in self. If the run is successful, the color of the state that it reaches
     /// is emitted (wrapped in a `Some`). For unsuccessful runs, `None` is returned.
-    fn try_moore_map<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> Option<Self::StateColor> {
+    pub fn map<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> Option<C::StateColor> {
         self.reached_state_color(input)
     }
 
     /// Obtains a vec containing the possible colors emitted by `self` (without duplicates).
-    fn color_range(&self) -> Vec<Self::StateColor>
+    pub fn color_range(&self) -> Vec<C::StateColor>
     where
         StateColor<Self>: Color,
     {
@@ -79,32 +98,23 @@ where
             .collect()
     }
 
-    /// Builds a moore machine from a reference to `self`. Note that this allocates a new
-    /// transition system, which is a copy of the underlying one.
-    fn collect_moore(&self) -> MooreMachine<Self::Alphabet, Self::StateColor>
-    where
-        Self::StateColor: Color,
-    {
-        self.erase_edge_colors().collect_pointed().0.into_moore()
-    }
-
     /// Returns true if `self` is bisimilar to `other`, i.e. if the two moore machines
     /// produce the same output for each finite word. This is done by checking whether
-    /// [`Self::moore_witness_non_bisimilarity`] returns `None`.
-    fn moore_bisimilar<M>(&self, other: M) -> bool
+    /// [`Self::witness_non_bisimilarity`] returns `None`.
+    pub fn bisimilar<M>(&self, other: M) -> bool
     where
-        M: MooreLike<Alphabet = Self::Alphabet, StateColor = Self::StateColor>,
+        M: Congruence<Alphabet = C::Alphabet, StateColor = C::StateColor>,
         StateColor<Self>: Color,
     {
-        self.moore_witness_non_bisimilarity(other).is_none()
+        self.witness_non_bisimilarity(other).is_none()
     }
 
     /// Returns a witness for the non-bisimilarity of `self` and `other`, i.e. a finite word
     /// that produces different outputs in the two moore machines. If the two machines are
     /// bisimilar, `None` is returned.
-    fn moore_witness_non_bisimilarity<M>(&self, other: M) -> Option<Vec<SymbolOf<Self>>>
+    pub fn witness_non_bisimilarity<M>(&self, other: M) -> Option<Vec<SymbolOf<Self>>>
     where
-        M: MooreLike<Alphabet = Self::Alphabet, StateColor = Self::StateColor>,
+        M: Congruence<Alphabet = C::Alphabet, StateColor = C::StateColor>,
         StateColor<Self>: Color,
     {
         let prod = self.ts_product(other);
@@ -116,30 +126,10 @@ where
         }
         None
     }
+}
 
-    /// Decomposes `self` into a sequence of DFAs, where the i-th DFA accepts all words which
-    /// produce a color less than or equal to i.
-    fn decompose_dfa(&self) -> Vec<DFA<Self::Alphabet>>
-    where
-        StateColor<Self>: Color,
-    {
-        self.color_range()
-            .into_iter()
-            .sorted()
-            .map(|i| self.color_or_below_dfa(i))
-            .collect()
-    }
-
-    /// Builds a DFA that accepts all words which emit a color less than or equal to `color`.
-    fn color_or_below_dfa(&self, color: Self::StateColor) -> DFA<Self::Alphabet>
-    where
-        StateColor<Self>: Color,
-    {
-        self.map_state_colors(|o| o <= color)
-            .erase_edge_colors()
-            .into_dfa()
-            .minimize()
-            .collect_dfa()
+impl<Q> Default for MooreSemantics<Q> {
+    fn default() -> Self {
+        Self(std::marker::PhantomData)
     }
 }
-impl<Ts: Congruence> MooreLike for Ts where StateColor<Ts>: Color {}
