@@ -2,6 +2,7 @@ use itertools::Itertools;
 
 use crate::{math::Map, math::Partition, prelude::*};
 use std::{
+    collections::BTreeSet,
     fmt::{Debug, Display},
     hash::Hash,
 };
@@ -211,6 +212,28 @@ pub trait TransitionSystem: Sized {
                 None
             }
         }))
+    }
+
+    /// Checks whether `self` is complete, meaning every state has a transition for every symbol
+    /// of the alphabet.
+    fn is_complete(&self) -> bool {
+        let universe = self.alphabet().universe().collect::<BTreeSet<_>>();
+
+        for q in self.state_indices() {
+            let syms = self
+                .transitions_from(q)
+                .map(|(_q, a, _c, _p)| a)
+                .collect::<BTreeSet<_>>();
+
+            assert!(
+                syms.is_subset(&universe),
+                "Makes no sense to have more symbols on transitions than in the alphabet"
+            );
+            if !universe.is_subset(&syms) {
+                return false;
+            }
+        }
+        true
     }
 
     /// Returns true if and only if there exists a transition from the given `source` state to the
