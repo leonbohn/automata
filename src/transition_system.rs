@@ -691,7 +691,7 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 }
 
 /// Trait that helps with accessing states in more elaborate [`TransitionSystem`]s. For
-/// example in a [`RightCongruenceOld`], we have more information than the [`crate::Color`]
+/// example in a [`RightCongruence`], we have more information than the [`crate::Color`]
 /// on a state, we have its [`crate::Class`] as well. Since we would like to be able to
 /// access a state of a congruence not only by its index, but also by its classname
 /// or any other [word](`crate::prelude::LinearWord`) of finite length, this trait is necessary.
@@ -889,7 +889,7 @@ pub trait Congruence: Deterministic + Pointed {
         self.erase_state_colors().collect_pointed().0.into_mealy()
     }
 
-    /// Creates a new instance of a [`RightCongruenceOld`] from the transition structure of `self`. Returns
+    /// Creates a new instance of a [`RightCongruence`] from the transition structure of `self`. Returns
     /// the created congruence together with a [`Map`] from old/original state indices to indices of the
     /// created congruence.
     fn build_right_congruence(

@@ -567,6 +567,7 @@ pub trait Deterministic: TransitionSystem {
     /// By default, the implementation is naive and slow, it simply inserts all states one
     /// after the other and subsequently inserts all transitions, see
     /// [`Sproutable::collect_from`] for details.
+    #[allow(clippy::type_complexity)]
     fn collect_dts_pointed(
         self,
     ) -> (
@@ -913,7 +914,7 @@ mod tests {
     #[test]
     fn escape_prefixes() {
         // build set of words
-        let words = vec![upw!("a"), upw!("a", "b"), upw!("b"), upw!("aa", "b")];
+        let words = [upw!("a"), upw!("a", "b"), upw!("b"), upw!("aa", "b")];
 
         // build transition system
         let ts = NTS::builder()
