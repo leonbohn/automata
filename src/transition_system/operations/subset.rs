@@ -216,7 +216,7 @@ mod tests {
                 (1, 'b', 1),
                 (1, 'a', 0),
             ])
-            .collect()
+            .nondeterministic()
             .with_initial(0);
 
         let dts = nts.subset_construction();

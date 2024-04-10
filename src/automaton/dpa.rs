@@ -427,7 +427,7 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 1),
             ])
-            .collect()
+            .nondeterministic()
             .into_deterministic()
             .with_initial(0)
             .collect_dpa();
