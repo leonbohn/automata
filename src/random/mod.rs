@@ -131,7 +131,7 @@ pub(crate) fn print_random_ts_benchmark(
     // );
 
     for symbol_count in symbols {
-        let mut row = vec![symbol_count.to_string()];
+        let mut row = [symbol_count.to_string()];
 
         for reciprocal in reciprocals {
             let mut averages = BenchmarkAverages::new(experiment_count);
