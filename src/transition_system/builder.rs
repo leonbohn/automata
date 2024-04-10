@@ -2,6 +2,8 @@ use itertools::Itertools;
 
 use crate::{congruence::RightCongruence, prelude::*, Void};
 
+use self::math::Set;
+
 use super::IntoEdge;
 
 /// Helper struct for the construction of non-deterministic transition systems. It stores a list of edges, a list of colors and a default color.
@@ -24,6 +26,7 @@ use super::IntoEdge;
 ///     .into_dfa(0); // 0 is the initial state
 /// ```
 pub struct TSBuilder<Q = Void, C = Void> {
+    symbols: Set<char>,
     edges: Vec<(usize, char, C, usize)>,
     default: Option<Q>,
     colors: Vec<(usize, Q)>,
@@ -33,6 +36,7 @@ impl<C> TSBuilder<Void, C> {
     /// Creates an empty instance of `Self`, where states are uncolored (have color [`Void`])
     pub fn without_state_colors() -> Self {
         TSBuilder {
+            symbols: Set::default(),
             edges: vec![],
             default: Some(Void),
             colors: vec![],
@@ -43,6 +47,7 @@ impl<Q> TSBuilder<Q, Void> {
     /// Creates an empty instance of `Self`, where edges are uncolored (have color [`Void`])
     pub fn without_edge_colors() -> Self {
         TSBuilder {
+            symbols: Set::default(),
             edges: vec![],
             default: None,
             colors: vec![],
@@ -55,6 +60,7 @@ impl TSBuilder<Void, Void> {
     /// are colored [`Void`]).
     pub fn without_colors() -> Self {
         Self {
+            symbols: Set::default(),
             edges: vec![],
             default: Some(Void),
             colors: vec![],
@@ -65,6 +71,7 @@ impl TSBuilder<Void, Void> {
 impl<Q, C> Default for TSBuilder<Q, C> {
     fn default() -> Self {
         Self {
+            symbols: Set::default(),
             edges: vec![],
             default: None,
             colors: vec![],
@@ -134,6 +141,18 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
         self
     }
 
+    /// By default, the only alphabet symbols in the transition system that is built
+    /// upon calling [`Self::nondeterministic()`] or [`Self::deterministic()`] are the ones that
+    /// appear on at least one transition/edge. This method can be used to force
+    /// additional alphabet symbols to appear.
+    pub fn with_alphabet_symbols<I>(mut self, symbols: I) -> Self
+    where
+        I: IntoIterator<Item = char>,
+    {
+        self.symbols.extend(symbols);
+        self
+    }
+
     /// Adds a list of colors to `self`. The colors are assigned to the states in the order in which they are given.
     /// This means if we give the colors `[true, false]` and then add a transition from state `0` to state `1`, then state
     /// `0` will have color `true` and state `1` will have color `false`.
@@ -145,7 +164,9 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
 
     /// Build a deterministic transition system from `self`. Panics if `self` is not deterministic.
     pub fn deterministic(self) -> DTS<CharAlphabet, Q, C> {
-        self.collect().try_into().expect("Not deterministic!")
+        self.nondeterministic()
+            .try_into()
+            .expect("Not deterministic!")
     }
 
     /// Assigns the given `color` to the state with the given index `idx`.
@@ -230,8 +251,9 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     }
 
     /// Collects self into a non-deterministic transition system.
-    pub fn collect(self) -> NTS<CharAlphabet, Q, C> {
-        let alphabet = CharAlphabet::from_iter(self.edges.iter().map(|(_, a, _, _)| *a));
+    pub fn nondeterministic(self) -> NTS<CharAlphabet, Q, C> {
+        let alphabet =
+            CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
         let num_states = self
             .edges
             .iter()
