@@ -6,14 +6,11 @@ on:
       - '*'
         
 jobs:
-  check:
-    name: Run checks and lints
+  check_build:
+    name: Verify correct building
     strategy:
       matrix:
         platform:
-          - os_name: Linux-x86_64
-            os: ubuntu-20.04
-            target: x86_64-unknown-linux-gnu
           - os_name: Windows-x86_64
             os: windows-latest
             target: x86_64-pc-windows-msvc
@@ -22,6 +19,17 @@ jobs:
             target: x86_64-apple-darwin
 
     runs-on: ${{ matrix.platform.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+      - name: Setup Rust toolchain with caching
+        uses: brndnmtthws/rust-action@v1
+      - name: Compile
+        run: cargo build
+
+  checks:
+    name: Run tests, verify documentation and formatting
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@main

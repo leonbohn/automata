@@ -5,20 +5,23 @@ pub use acceptance_type::OmegaAcceptanceType;
 
 #[macro_use]
 mod moore;
-pub use moore::{IntoMooreMachine, MooreMachine};
+pub use moore::{IntoMooreMachine, MooreMachine, MooreSemantics};
 
 #[macro_use]
 mod mealy;
-pub use mealy::{IntoMealyMachine, MealyMachine};
+pub use mealy::{IntoMealyMachine, MealyMachine, MealySemantics};
 
 mod dfa;
-pub use dfa::{IntoDFA, DFA};
+pub use dfa::{DFASemantics, IntoDFA, DFA};
 
 mod dpa;
-pub use dpa::{IntoDPA, MinEven, DPA};
+pub use dpa::{
+    IntoDPA, MaxEvenParitySemantics, MaxOddParitySemantics, MinEvenParitySemantics,
+    MinOddParitySemantics, DPA,
+};
 
 mod dba;
-pub use dba::{IntoDBA, DBA};
+pub use dba::{DBASemantics, IntoDBA, DBA};
 
 #[allow(missing_docs)]
 mod omega;
@@ -28,6 +31,9 @@ pub use omega::{
 
 mod with_initial;
 pub use with_initial::Initialized;
+
+mod semantics;
+pub use semantics::{FiniteSemantics, OmegaSemantics, Semantics};
 
 /// An automaton consists of a transition system and an acceptance condition.
 /// There are many different types of automata, which can be instantiated from
@@ -41,7 +47,7 @@ pub use with_initial::Initialized;
 /// type of the acceptance condition.
 ///
 /// In order for the automaton to be able to accept words, the acceptance condition
-/// must implement the `FiniteSemantics` or `OmegaSemantics` trait, depending on
+/// must implement the [`FiniteSemantics`] or [`OmegaSemantics`] trait, depending on
 /// the value of `OMEGA` (in the former case `OMEGA` should be false, and in the
 /// latter case `OMEGA` should be true).
 #[derive(Clone, Eq, PartialEq, Copy)]
@@ -108,7 +114,7 @@ where
     /// Transforms the given finite word using the automaton, that means it returns
     /// the output of the acceptance condition on the run of the word.
     pub fn transform<W: FiniteWord<SymbolOf<D>>>(&self, word: W) -> A::Output {
-        self.acceptance.finite_semantic(self.ts.finite_run(word))
+        self.acceptance.evaluate(self.ts.finite_run(word))
     }
 }
 
@@ -122,13 +128,13 @@ where
     where
         A: OmegaSemantics<StateColor<D>, EdgeColor<D>, Output = bool>,
     {
-        self.acceptance.omega_semantic(self.ts.omega_run(word))
+        self.acceptance.evaluate(self.ts.omega_run(word))
     }
 
     /// Transforms the given omega word using the automaton, that means it returns
     /// the output of the acceptance condition on the run of the word.
     pub fn transform<W: OmegaWord<SymbolOf<D>>>(&self, word: W) -> A::Output {
-        self.acceptance.omega_semantic(self.ts.omega_run(word))
+        self.acceptance.evaluate(self.ts.omega_run(word))
     }
 }
 
@@ -280,26 +286,6 @@ where
             self.ts
         )
     }
-}
-
-/// This trait is implemented by acceptance conditions for finite words.
-pub trait FiniteSemantics<Q, C> {
-    /// The type of output that this semantic produces.
-    type Output;
-    /// Compute the output for the given finite run.
-    fn finite_semantic<R>(&self, run: R) -> Self::Output
-    where
-        R: FiniteRun<StateColor = Q, EdgeColor = C>;
-}
-
-/// This trait is implemented by acceptance conditions for omega words.
-pub trait OmegaSemantics<Q, C> {
-    /// The type of output that this semantic produces.
-    type Output;
-    /// Compute the output for the given omega run.
-    fn omega_semantic<R>(&self, run: R) -> Self::Output
-    where
-        R: OmegaRun<StateColor = Q, EdgeColor = C>;
 }
 
 /// Iterator over the accepting states of a [`TransitionSystem`] that have a certain coloring.
