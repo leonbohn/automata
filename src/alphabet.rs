@@ -118,11 +118,11 @@ impl<A: Alphabet> Alphabet for &A {
 /// Represents an alphabet where a [`Symbol`] is just a single `char`.
 ///
 /// # Example
-/// Assume we have a `CharAlphabet` over the symbols 'a' and 'b'. Then a **symbol** would be just one of these
+/// Assume we have a [`CharAlphabet`] over the symbols 'a' and 'b'. Then a **symbol** would be just one of these
 /// characters, e.g. 'a'. This is used to label transitions in a [`crate::transition_system::TransitionSystem`].
 /// Now an **expression** would also be just a single character, e.g. 'a'. Then such an expression is
 /// matched by a symbol if the expression equals the symbol.
-#[derive(Clone, Eq, PartialEq, Hash, Debug, PartialOrd, Ord)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct CharAlphabet(pub(crate) Vec<char>);
 
 impl CharAlphabet {
@@ -241,7 +241,7 @@ impl From<Vec<char>> for CharAlphabet {
 
 impl FromIterator<char> for CharAlphabet {
     fn from_iter<T: IntoIterator<Item = char>>(iter: T) -> Self {
-        Self(iter.into_iter().unique().collect())
+        Self(iter.into_iter().unique().sorted().collect())
     }
 }
 

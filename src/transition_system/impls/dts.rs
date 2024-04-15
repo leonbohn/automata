@@ -1,12 +1,12 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 
 use crate::{prelude::*, Void};
 
-use super::nts::{NTEdge, NTSEdgesFromIter, NTSEdgesTo, NTSPartsFor, NTState};
+use super::nts::{NTEdge, NTSEdgesFromIter, NTSEdgesToIter, NTSPartsFor, NTState};
 
 /// A deterministic transition system. This is a thin wrapper around [`NTS`] and is only used to
 /// enforce that the underlying NTS is deterministic.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct DTS<A: Alphabet = CharAlphabet, Q = Void, C = Void>(pub(crate) NTS<A, Q, C>);
 
 /// Type alias to create a deterministic transition with the same alphabet, state and edge color
@@ -61,7 +61,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> PredecessorIterable for DTS<A, Q, C> {
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = NTSEdgesTo<'this, A::Expression, C>
+    type EdgesToIter<'this> = NTSEdgesToIter<'this, A::Expression, C>
     where
         Self: 'this;
 
@@ -198,6 +198,14 @@ impl<A: Alphabet, Q: Clone, C: Clone> From<DTS<A, Q, C>> for NTS<A, Q, C> {
         value.0
     }
 }
+
+impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> PartialEq for DTS<A, Q, C> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> Eq for DTS<A, Q, C> {}
 
 impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> std::fmt::Debug for DTS<A, Q, C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
