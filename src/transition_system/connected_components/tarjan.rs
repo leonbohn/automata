@@ -334,22 +334,23 @@ mod tests {
 
     #[test]
     fn tarjan_iterative() {
-        let ts = NTS::builder()
+        let ts = TSBuilder::without_colors()
             .with_transitions([
-                (0, 'a', 0, 0),
-                (0, 'b', 1, 1),
-                (0, 'c', 2, 2),
-                (1, 'a', 0, 1),
-                (2, 'a', 3, 3),
-                (2, 'b', 2, 2),
-                (3, 'a', 2, 2),
+                (0, 'a', Void, 0),
+                (0, 'b', Void, 1),
+                (0, 'c', Void, 2),
+                (1, 'a', Void, 1),
+                (2, 'a', Void, 3),
+                (2, 'b', Void, 2),
+                (3, 'a', Void, 2),
             ])
-            .into_dpa(0);
+            .into_right_congruence(0);
 
         let rev = (&ts).reversed();
         let reachable = rev
             .reachable_state_indices_from(3usize)
             .collect::<HashSet<_>>();
+        println!("{:?}", reachable);
         assert!(reachable.contains(&3));
         assert!(reachable.contains(&2));
 

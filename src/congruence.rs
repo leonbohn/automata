@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 
 use crate::prelude::*;
 use itertools::Itertools;
@@ -18,7 +18,7 @@ mod cayley;
 
 /// Represents a right congruence relation, which is in essence a trim, deterministic
 /// transition system with a designated initial state.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct RightCongruence<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
     ts: DTS<A, Q, C>,
     initial: usize,
@@ -144,7 +144,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> PredecessorIterable for RightCongruence<A,
 where
     Self: 'this;
 
-    type EdgesToIter<'this> = crate::transition_system::impls::NTSEdgesTo<'this, A::Expression, C>
+    type EdgesToIter<'this> = crate::transition_system::impls::NTSEdgesToIter<'this, A::Expression, C>
 where
     Self: 'this;
 
@@ -153,6 +153,14 @@ where
         self.ts.predecessors(state)
     }
 }
+
+impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> PartialEq for RightCongruence<A, Q, C> {
+    fn eq(&self, other: &Self) -> bool {
+        self.initial == other.initial && self.ts.eq(&other.ts)
+    }
+}
+
+impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> Eq for RightCongruence<A, Q, C> {}
 
 impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Debug for RightCongruence<A, Q, C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
