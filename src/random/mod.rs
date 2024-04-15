@@ -14,7 +14,7 @@ use crate::prelude::*;
 /// 4. Repeat until all states and symbols have been treated.
 pub fn generate_random_ts(symbols: usize, probability: f64) -> Initialized<DTS> {
     let alphabet = CharAlphabet::alphabetic(symbols);
-    let mut dts = DTS::new_for_alphabet(alphabet.clone());
+    let mut dts = DTS::for_alphabet(alphabet.clone());
 
     let mut current = dts.add_state(());
     let mut symbol_position = 0;

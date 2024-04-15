@@ -82,7 +82,7 @@ impl<Q, C> Default for TSBuilder<Q, C> {
 impl TSBuilder<bool, Void> {
     /// Tries to turn `self` into a deterministic finite automaton. Panics if `self` is not deterministic.
     pub fn into_dfa(self, initial: usize) -> DFA<CharAlphabet> {
-        self.deterministic().with_initial(initial).collect_dfa()
+        self.into_dts().with_initial(initial).collect_dfa()
     }
 }
 
@@ -90,7 +90,7 @@ impl TSBuilder<Void, bool> {
     /// Attempts to turn `self` into a deterministic Büchi automaton. Panics if `self` is not deterministic.
     pub fn into_dba(self, initial: usize) -> DBA<CharAlphabet> {
         self.default_color(Void)
-            .deterministic()
+            .into_dts()
             .with_initial(initial)
             .collect_dba()
     }
@@ -100,7 +100,7 @@ impl TSBuilder<Void, usize> {
     /// Attempts to turn `self` into a deterministic parity automaton. Panics if `self` is not deterministic.
     pub fn into_dpa(self, initial: usize) -> DPA<CharAlphabet> {
         self.default_color(Void)
-            .deterministic()
+            .into_dts()
             .with_initial(initial)
             .collect_dpa()
     }
@@ -108,7 +108,7 @@ impl TSBuilder<Void, usize> {
     /// Builds a Mealy machine from `self`. Panics if `self` is not deterministic.
     pub fn into_mealy(self, initial: usize) -> MealyMachine<CharAlphabet> {
         self.default_color(Void)
-            .deterministic()
+            .into_dts()
             .with_initial(initial)
             .into_mealy()
     }
@@ -117,7 +117,7 @@ impl TSBuilder<Void, usize> {
 impl TSBuilder<usize, Void> {
     /// Builds a Moore machine from `self`. Panics if `self` is not deterministic.
     pub fn into_moore(self, initial: usize) -> MooreMachine<CharAlphabet> {
-        self.deterministic().with_initial(initial).into_moore()
+        self.into_dts().with_initial(initial).into_moore()
     }
 }
 
@@ -126,7 +126,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     /// colors. Panics if `self` is not deterministic.
     pub fn into_right_congruence_bare(self, initial: usize) -> RightCongruence<CharAlphabet> {
         RightCongruence::from_ts(
-            self.deterministic()
+            self.into_dts()
                 .with_initial(initial)
                 .erase_state_colors()
                 .erase_edge_colors(),
@@ -142,7 +142,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     }
 
     /// By default, the only alphabet symbols in the transition system that is built
-    /// upon calling [`Self::nondeterministic()`] or [`Self::deterministic()`] are the ones that
+    /// upon calling [`Self::into_nts()`] or [`Self::into_dts()`] are the ones that
     /// appear on at least one transition/edge. This method can be used to force
     /// additional alphabet symbols to appear.
     pub fn with_alphabet_symbols<I>(mut self, symbols: I) -> Self
@@ -163,10 +163,8 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     }
 
     /// Build a deterministic transition system from `self`. Panics if `self` is not deterministic.
-    pub fn deterministic(self) -> DTS<CharAlphabet, Q, C> {
-        self.nondeterministic()
-            .try_into()
-            .expect("Not deterministic!")
+    pub fn into_dts(self) -> DTS<CharAlphabet, Q, C> {
+        self.into_nts().try_into().expect("Not deterministic!")
     }
 
     /// Assigns the given `color` to the state with the given index `idx`.
@@ -239,7 +237,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
 
     /// Turns `self` into a [`RightCongruence`] with the given initial state. Panics if `self` is not deterministic.
     pub fn into_right_congruence(self, initial: usize) -> RightCongruence<CharAlphabet, Q, C> {
-        RightCongruence::from_ts(self.deterministic().with_initial(initial))
+        RightCongruence::from_ts(self.into_dts().with_initial(initial))
     }
 
     /// Consumes `self` and returns an [`Initialized`] wrapping a [`DTS`].
@@ -247,11 +245,11 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
         self,
         initial: usize,
     ) -> Initialized<DTS<CharAlphabet, Q, C>> {
-        self.deterministic().with_initial(initial)
+        self.into_dts().with_initial(initial)
     }
 
     /// Collects self into a non-deterministic transition system.
-    pub fn nondeterministic(self) -> NTS<CharAlphabet, Q, C> {
+    pub fn into_nts(self) -> NTS<CharAlphabet, Q, C> {
         let alphabet =
             CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
         let num_states = self
@@ -260,7 +258,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
             .flat_map(|(q, _, _, p)| [*p, *q])
             .unique()
             .count();
-        let mut ts = NTS::new_for_alphabet(alphabet);
+        let mut ts = NTS::for_alphabet(alphabet);
         let colors_it = (0..num_states).map(|x| {
             if let Some(color) =
                 self.colors

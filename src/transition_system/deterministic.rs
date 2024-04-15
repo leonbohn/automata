@@ -539,9 +539,9 @@ pub trait Deterministic: TransitionSystem {
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Sproutable::collect_from`] for details.
+    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
     fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
-        let (ts, _map) = DTS::collect_from(self);
+        let (ts, _map) = DTS::collect_with_index_mapping(self);
         ts
     }
 
@@ -552,7 +552,7 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one
     /// after the other and subsequently inserts all transitions, see
-    /// [`Sproutable::collect_from`] for details.
+    /// [`Deterministic::collect_dts`] for details.
     #[allow(clippy::type_complexity)]
     fn collect_dts_pointed(
         self,
@@ -564,7 +564,28 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
     {
         let old_initial = self.initial();
-        let (ts, map) = DTS::collect_from(self);
+        let (ts, map) = DTS::collect_with_index_mapping(self);
+        (
+            ts,
+            *map.get_by_left(&old_initial)
+                .expect("Initial state did not get collected"),
+        )
+    }
+
+    /// Collects `self` into a new [`HashTs`] over the same alphabet. This is used, for example, after a chain of
+    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
+    /// This method additionally also returns the initial state of the collected TS.
+    ///
+    /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
+    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
+    fn collect_hash_ts_pointed(self) -> (IntoHashTs<Self>, usize)
+    where
+        EdgeColor<Self>: Hash + Eq,
+        StateColor<Self>: Hash + Eq,
+        Self: Pointed,
+    {
+        let old_initial = self.initial();
+        let (ts, map) = HashTs::collect_with_index_mapping(self);
         (
             ts,
             *map.get_by_left(&old_initial)
@@ -576,20 +597,31 @@ pub trait Deterministic: TransitionSystem {
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Sproutable::collect_from`] for details.
+    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
     fn collect_hash_ts(self) -> IntoHashTs<Self>
     where
         EdgeColor<Self>: Hash + Eq,
         StateColor<Self>: Hash + Eq,
     {
-        let (ts, _map) = HashTs::collect_from(self);
+        let (ts, _map) = HashTs::collect_with_index_mapping(self);
         ts
     }
 
     /// Collects `self` into a new transition system. This procedure also completes the collected transition
     /// system with a sink (a state that cannot be left) and for each state of the ts that does not have an
     /// outgoing transition on some symbol, a new transition into the sink is added.
-    fn collect_complete_with_initial(
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let ts = TSBuilder::without_colors().with_edges([(0, 'a', 1), (1, 'b', 0)]).into_dts();
+    /// let collected = ts.with_initial(0).collect_complete_pointed(Void, Void);
+    /// assert_eq!(collected.size(), 3);
+    ///
+    /// assert_eq!(collected.reached_state_index("b"), collected.reached_state_index("aa"));
+    /// ```
+    fn collect_complete_pointed(
         &self,
         sink_color: Self::StateColor,
         edge_color: Self::EdgeColor,
@@ -607,7 +639,7 @@ pub trait Deterministic: TransitionSystem {
     fn collect_pointed<Ts>(&self) -> (Initialized<Ts>, Bijection<Self::StateIndex, Ts::StateIndex>)
     where
         Self: Pointed,
-        Ts: Sproutable<Alphabet = Self::Alphabet>,
+        Ts: ForAlphabet<Self::Alphabet> + Sproutable,
         EdgeColor<Self>: Into<EdgeColor<Ts>>,
         StateColor<Self>: Into<StateColor<Ts>>,
     {
@@ -647,11 +679,11 @@ pub trait Deterministic: TransitionSystem {
     /// and edge colors. **This does not consider the initial state.**
     fn collect<Ts>(&self) -> (Ts, Bijection<Self::StateIndex, Ts::StateIndex>)
     where
-        Ts: Sproutable<Alphabet = Self::Alphabet>,
+        Ts: ForAlphabet<Self::Alphabet> + Sproutable,
         EdgeColor<Self>: Into<EdgeColor<Ts>>,
         StateColor<Self>: Into<StateColor<Ts>>,
     {
-        Sproutable::collect_from(self)
+        Sproutable::collect_with_index_mapping(self)
     }
 
     /// Compute the escape prefixes of a set of omega words on a transition system.
@@ -670,43 +702,6 @@ pub trait Deterministic: TransitionSystem {
                     .map(|path| w.prefix(path.len() + 1).as_string())
             })
             .unique()
-    }
-
-    /// Collects `self` into a new transition system of type `Ts` with the same alphabet, state indices
-    /// and edge colors.
-    fn collect_old<
-        Ts: TransitionSystem<
-                StateColor = Self::StateColor,
-                EdgeColor = Self::EdgeColor,
-                Alphabet = Self::Alphabet,
-            > + super::Sproutable,
-    >(
-        &self,
-    ) -> Ts {
-        let mut ts = Ts::new_for_alphabet(self.alphabet().clone());
-        let mut map = std::collections::HashMap::new();
-        for index in self.state_indices() {
-            map.insert(
-                index,
-                ts.add_state(
-                    self.state_color(index)
-                        .expect("Every state should be colored!"),
-                ),
-            );
-        }
-        for index in self.state_indices() {
-            for sym in self.alphabet().universe() {
-                if let Some(edge) = self.transition(index, sym) {
-                    ts.add_edge(
-                        *map.get(&index).unwrap(),
-                        <Self::Alphabet as Alphabet>::expression(sym),
-                        *map.get(&edge.target()).unwrap(),
-                        edge.color().clone(),
-                    );
-                }
-            }
-        }
-        ts
     }
 }
 
@@ -906,7 +901,7 @@ mod tests {
         let ts = NTS::builder()
             .with_transitions([(0, 'a', Void, 1), (1, 'b', Void, 1)])
             .default_color(Void)
-            .deterministic()
+            .into_dts()
             .with_initial(0);
 
         assert!(ts

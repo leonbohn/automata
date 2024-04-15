@@ -172,12 +172,6 @@ impl<D: Sproutable, A: Default, const OMEGA: bool> Sproutable for Automaton<D, A
 where
     D::StateColor: Default,
 {
-    fn new_for_alphabet(alphabet: Self::Alphabet) -> Self {
-        let mut ts = D::new_for_alphabet(alphabet);
-        let initial = ts.add_state::<StateColor<D>>(Default::default());
-        Automaton::from_parts(ts, initial, Default::default())
-    }
-
     fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
         self.ts.add_state(color)
     }
