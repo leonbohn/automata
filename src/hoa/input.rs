@@ -45,7 +45,7 @@ pub fn hoa_automaton_to_nts(
 ) -> Initialized<NTS<HoaAlphabet, usize, AcceptanceMask>> {
     let aps = aut.num_aps();
     assert!(aps < MAX_APS);
-    let mut ts = NTS::new_for_alphabet(HoaAlphabet::from_hoa_automaton(&aut));
+    let mut ts = NTS::for_alphabet(HoaAlphabet::from_hoa_automaton(&aut));
     for (id, state) in aut.body().iter().enumerate() {
         assert_eq!(id, state.id() as usize);
         assert_eq!(id, ts.add_state(state.id() as usize));

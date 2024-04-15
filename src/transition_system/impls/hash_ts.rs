@@ -293,8 +293,8 @@ where
             f,
             "{}",
             self.build_transition_table(
-                |idx, c| format!("{} : {:?}", idx, c),
-                |edge| format!("{:?}->{}", edge.color(), edge.target())
+                |idx, c| format!("{} : {:?}", idx.show(), c),
+                |edge| format!("{:?}->{}", edge.color(), edge.target().show())
             )
         )
     }
@@ -370,13 +370,6 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for HashTs<A, Q, C,
             .set_color(color.into());
     }
 
-    fn new_for_alphabet(alphabet: Self::Alphabet) -> Self {
-        Self {
-            alphabet,
-            states: Map::default(),
-        }
-    }
-
     fn remove_edges<X: Indexes<Self>>(
         &mut self,
         from: X,
@@ -396,6 +389,15 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for HashTs<A, Q, C,
             true
         } else {
             false
+        }
+    }
+}
+
+impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq> ForAlphabet<A> for HashTs<A, Q, C> {
+    fn for_alphabet(from: A) -> Self {
+        Self {
+            alphabet: from,
+            states: Map::default(),
         }
     }
 }

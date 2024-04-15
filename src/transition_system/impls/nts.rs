@@ -26,15 +26,17 @@ pub struct NTS<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
     edges: Vec<NTEdge<A::Expression, C>>,
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
-    fn new_for_alphabet(alphabet: Self::Alphabet) -> Self {
+impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet<A> for NTS<A, Q, C> {
+    fn for_alphabet(alphabet: Self::Alphabet) -> Self {
         Self {
             alphabet,
             states: vec![],
             edges: vec![],
         }
     }
+}
 
+impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
     fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
         let id = self.states.len();
         let state = NTState::new(color.into());
@@ -396,7 +398,7 @@ mod tests {
                 (1, 'a', 200, 0),
                 (1, 'b', 2000, 1),
             ])
-            .deterministic();
+            .into_dts();
         let second = TSBuilder::default()
             .with_state_colors([0, 1])
             .with_edges([
@@ -405,7 +407,7 @@ mod tests {
                 (0, 'a', 100u32, 0),
                 (1, 'a', 200, 0),
             ])
-            .deterministic();
+            .into_dts();
         assert!(first == second, "equality should disregard order of edges");
     }
 }

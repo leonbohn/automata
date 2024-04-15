@@ -3,6 +3,18 @@ use itertools::Itertools;
 
 use crate::{math::Bijection, prelude::*};
 
+/// Implemented by [`TransitionSystem`]s (TS) that can be created for a given [`Alphabet`],
+/// which is may be used in conjunction with [`Sproutable`] to successively grow a
+/// TS.
+///
+/// Usually, this will *not* be implemented by TS that have a [designated initial state](`Pointed`).
+/// For those, a dedicated method should be used.
+pub trait ForAlphabet<A: Alphabet>: TransitionSystem<Alphabet = A> {
+    /// Creates an instance of `Self` for the given [`Alphabet`]. The resulting
+    /// TS should be empty.
+    fn for_alphabet(from: A) -> Self;
+}
+
 /// Marker trait for [`Alphabet`]s that can be indexed, i.e. where we can associate each
 /// [`Alphabet::Symbol`] and [`Alphabet::Expression`] with a unique index (a `usize`).
 pub trait IndexedAlphabet: Alphabet {
@@ -48,9 +60,6 @@ impl IndexedAlphabet for CharAlphabet {
 
 /// Trait for transition systems that allow insertion of states and transitions.
 pub trait Sproutable: TransitionSystem {
-    /// Creates a new instance of `Self` for the given alphabet.
-    fn new_for_alphabet(alphabet: Self::Alphabet) -> Self;
-
     /// Creates a new transition system, by collecting all states and transitions present in `ts`.
     /// This is done by using a naive approach, which simply iterates through all states and adds
     /// them one by one. At the same time, a [bijective mapping](`Bijection`) between old and
@@ -69,18 +78,20 @@ pub trait Sproutable: TransitionSystem {
     /// let source: DTS<CharAlphabet, usize, usize> = TSBuilder::default()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
     ///     .with_state_colors([0])
-    ///     .deterministic();
+    ///     .into_dts();
     ///
-    /// let (without_edge_colors, _): (DTS<CharAlphabet, usize, Void>, _) = DTS::collect_from(&source);
-    /// let (without_state_colors, _): (DTS<CharAlphabet, Void, usize>, _) = DTS::collect_from(&source);
+    /// let (without_edge_colors, map1): (DTS<CharAlphabet, usize, Void>, _) = DTS::collect_with_index_mapping(&source);
+    /// let (without_state_colors, map2): (DTS<CharAlphabet, Void, usize>, _) = DTS::collect_with_index_mapping(&source);
+    /// assert_eq!(map1.get_by_left(&0).unwrap(), map2.get_by_left(&0).unwrap());
     /// ```
-    fn collect_from<Ts>(ts: Ts) -> (Self, Bijection<Ts::StateIndex, Self::StateIndex>)
+    fn collect_with_index_mapping<Ts>(ts: Ts) -> (Self, Bijection<Ts::StateIndex, Self::StateIndex>)
     where
-        Ts: TransitionSystem<Alphabet = Self::Alphabet>,
+        Self: ForAlphabet<Ts::Alphabet> + Sproutable,
+        Ts: TransitionSystem,
         StateColor<Ts>: Into<StateColor<Self>>,
         EdgeColor<Ts>: Into<EdgeColor<Self>>,
     {
-        let mut out = Self::new_for_alphabet(ts.alphabet().clone());
+        let mut out = Self::for_alphabet(ts.alphabet().clone());
         let mut map = Bijection::new();
         for index in ts.state_indices() {
             map.insert(
@@ -122,7 +133,7 @@ pub trait Sproutable: TransitionSystem {
     /// let mut ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
-    ///     .deterministic();
+    ///     .into_dts();
     /// assert!(!ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
     /// assert_eq!(ts.size(), 2);
@@ -137,7 +148,7 @@ pub trait Sproutable: TransitionSystem {
     /// let mut ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
-    ///     .deterministic();
+    ///     .into_dts();
     /// assert!(ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
     /// assert_eq!(ts.size(), 1);
@@ -259,7 +270,7 @@ mod tests {
                 (0, 'c', 0, 1),
                 (1, 'a', 0, 0),
             ])
-            .deterministic();
+            .into_dts();
         assert_eq!(partial.reached_state_index_from("aaacb", 0), None);
         assert!(!partial.is_complete());
 

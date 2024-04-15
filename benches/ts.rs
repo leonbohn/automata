@@ -32,7 +32,7 @@ fn bench_dts() -> Initialized<DTS<CharAlphabet, usize, usize>> {
             (5, 'c', 19, 3),
             (5, 'd', 18, 5),
         ])
-        .deterministic()
+        .into_dts()
         .with_initial(0)
 }
 

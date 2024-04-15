@@ -298,7 +298,7 @@ where
                 "{i} -{:?}|{:?}-> {}",
                 rs.sc(),
                 rs.ec(),
-                rs.state()
+                rs.state().show()
             ))
         }
         out
@@ -538,7 +538,7 @@ where
             row.extend(profile.iter().map(|tp| {
                 format!(
                     "{}|{}",
-                    tp.state().blue(),
+                    tp.state().show().blue(),
                     (tp.sc(), tp.ec()).show().purple(),
                 )
             }));

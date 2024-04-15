@@ -40,8 +40,8 @@ pub mod prelude {
             reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
             Congruence, Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, ExpressionOf,
-            HashTs, IndexType, Indexes, IntoEdge, IsEdge, Path, Sproutable, StateColor, SymbolOf,
-            TSBuilder, TransitionSystem, DTS, NTS,
+            ForAlphabet, HashTs, IndexType, Indexes, IntoEdge, IsEdge, Path, Sproutable,
+            StateColor, SymbolOf, TSBuilder, TransitionSystem, DTS, NTS,
         },
         upw,
         word::{
