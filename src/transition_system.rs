@@ -1,11 +1,7 @@
 use itertools::Itertools;
 
-use crate::{math::Map, math::Partition, prelude::*};
-use std::{
-    collections::BTreeSet,
-    fmt::{Debug, Display},
-    hash::Hash,
-};
+use crate::{math::Partition, prelude::*};
+use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
 mod edge;
 pub use edge::{Edge, EdgeReference, IsEdge};
@@ -32,7 +28,7 @@ pub mod path;
 pub use path::Path;
 
 mod sproutable;
-pub use sproutable::{IndexedAlphabet, Sproutable};
+pub use sproutable::{ForAlphabet, IndexedAlphabet, Sproutable};
 
 mod shrinkable;
 pub use shrinkable::Shrinkable;
@@ -734,23 +730,9 @@ impl<Ts: TransitionSystem> Indexes<Ts> for Ts::StateIndex {
     }
 }
 /// Encapsulates what is necessary for a type to be usable as a state index in a [`TransitionSystem`].
-pub trait IndexType: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Display + Show {
-    /// Gives the first possible index. For an integer type, this should be `0`. For a product type,
-    /// this should be the product of the first indices of the components.
-    fn first() -> Self;
-}
+pub trait IndexType: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show {}
 
-impl IndexType for usize {
-    fn first() -> Self {
-        0
-    }
-}
-
-impl<I: IndexType, J: IndexType> IndexType for ProductIndex<I, J> {
-    fn first() -> Self {
-        ProductIndex(I::first(), J::first())
-    }
-}
+impl<TY: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show> IndexType for TY {}
 
 /// Implementors of this trait can be transformed into a owned tuple representation of
 /// an edge in a [`TransitionSystem`].
@@ -912,16 +894,13 @@ pub trait Congruence: Deterministic + Pointed {
         self.erase_state_colors().collect_pointed().0.into_mealy()
     }
 
-    /// Creates a new instance of a [`RightCongruence`] from the transition structure of `self`. Returns
-    /// the created congruence together with a [`Map`] from old/original state indices to indices of the
-    /// created congruence.
-    fn build_right_congruence(
-        &self,
-    ) -> (
-        RightCongruence<Self::Alphabet>,
-        Map<Self::StateIndex, usize>,
-    ) {
-        todo!()
+    /// Creates a new instance of a [`RightCongruence`] from the transition structure of `self`.
+    /// Note, that this method might not preserve state indices!
+    fn right_congruence(self) -> RightCongruence<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
+    where
+        Self: Pointed,
+    {
+        RightCongruence::from_ts(self)
     }
 }
 impl<Sim: Deterministic + Pointed> Congruence for Sim {}

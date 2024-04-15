@@ -260,7 +260,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
                     "{{{}}}",
                     states.iter().map(|idx| idx.to_string()).join(", ")
                 );
-                panic!("From {origin}|{} on symbol {}, we reach {} while precisely one state should be reached!", self.class_iter_by_id(origin).unwrap().map(|c| c.to_string()).join(", "), symbol.show(), string)
+                panic!("From {origin}|{} on symbol {}, we reach {} while precisely one state should be reached!", self.class_iter_by_id(origin).unwrap().map(|c| c.show()).join(", "), symbol.show(), string)
             }
         }
     }

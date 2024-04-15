@@ -442,7 +442,7 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 1),
             ])
-            .nondeterministic()
+            .into_nts()
             .into_deterministic()
             .with_initial(0)
             .collect_dpa();
@@ -495,7 +495,7 @@ mod tests {
                     (1, 'a', 1, 1),
                     (1, 'b', 0, 0),
                 ])
-                .deterministic()
+                .into_dts()
                 .with_initial(0)
                 .collect_dpa(),
             NTS::builder()
@@ -508,7 +508,7 @@ mod tests {
                     (2, 'a', 3, 0),
                     (2, 'b', 5, 2),
                 ])
-                .deterministic()
+                .into_dts()
                 .with_initial(0)
                 .collect_dpa(),
         ];
@@ -516,13 +516,13 @@ mod tests {
             NTS::builder()
                 .default_color(())
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 0, 0)])
-                .deterministic()
+                .into_dts()
                 .with_initial(0)
                 .collect_dpa(),
             NTS::builder()
                 .default_color(())
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 2, 0)])
-                .deterministic()
+                .into_dts()
                 .with_initial(0)
                 .collect_dpa(),
             NTS::builder()
@@ -533,7 +533,7 @@ mod tests {
                     (1, 'a', 5, 0),
                     (1, 'b', 3, 1),
                 ])
-                .deterministic()
+                .into_dts()
                 .with_initial(0)
                 .collect_dpa(),
         ];
@@ -573,13 +573,13 @@ mod tests {
         let univ = NTS::builder()
             .default_color(())
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 2, 0)])
-            .deterministic()
+            .into_dts()
             .with_initial(0)
             .collect_dpa();
         let aomega = NTS::builder()
             .default_color(())
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
-            .deterministic()
+            .into_dts()
             .with_initial(0)
             .collect_dpa();
         assert!(univ.includes(&aomega));

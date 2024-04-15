@@ -698,14 +698,14 @@ mod tests {
     #[test]
     #[ignore]
     fn dot_render_dpa() {
-        let alphabet = alphabet!(simple 'a', 'b');
-        let mut dpa: DPA<alphabet::CharAlphabet> = DPA::new_for_alphabet(alphabet);
-        let q0 = dpa.initial();
-        let q1 = dpa.add_state(Void);
-        dpa.add_edge(q0, 'a', q0, 1usize);
-        dpa.add_edge(q0, 'b', q1, 2usize);
-        dpa.add_edge(q1, 'a', q1, 0usize);
-        dpa.add_edge(q1, 'b', q0, 2usize);
+        let dpa = TSBuilder::without_state_colors()
+            .with_edges([
+                (0, 'a', 1, 0),
+                (0, 'b', 2, 1),
+                (1, 'a', 0, 1),
+                (1, 'b', 2, 0),
+            ])
+            .into_dpa(0);
         dpa.display_rendered().unwrap();
     }
 }

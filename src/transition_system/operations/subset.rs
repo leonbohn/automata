@@ -171,7 +171,7 @@ where
                         .get(idx)
                         .unwrap()
                         .iter()
-                        .map(|q| q.to_string())
+                        .map(|q| q.show())
                         .join(", ")
                 ),
                 |edge| edge.target().to_string()
@@ -216,7 +216,7 @@ mod tests {
                 (1, 'b', 1),
                 (1, 'a', 0),
             ])
-            .nondeterministic()
+            .into_nts()
             .with_initial(0);
 
         let dts = nts.subset_construction();
