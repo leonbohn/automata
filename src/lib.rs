@@ -257,27 +257,11 @@ impl<S: Show> Show for Vec<S> {
     fn show(&self) -> String {
         S::show_collection(self.iter())
     }
-
-    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(_iter: I) -> String
-    where
-        Self: 'a,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        unimplemented!()
-    }
 }
 
 impl<S: Show, T: Show> Show for (S, T) {
     fn show(&self) -> String {
         format!("({}, {})", self.0.show(), self.1.show())
-    }
-
-    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(_iter: I) -> String
-    where
-        Self: 'a,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        unimplemented!()
     }
 }
 

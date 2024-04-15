@@ -38,15 +38,6 @@ impl Show for AcceptanceMask {
     fn show(&self) -> String {
         self.iter().map(|i| format!("{{{i}}}")).join(", ")
     }
-
-    fn show_collection<'a, I>(_iter: I) -> String
-    where
-        Self: 'a,
-        I: IntoIterator<Item = &'a Self>,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        unimplemented!()
-    }
 }
 
 impl From<&hoars::AcceptanceSignature> for AcceptanceMask {
