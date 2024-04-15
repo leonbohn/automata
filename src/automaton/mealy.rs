@@ -118,7 +118,7 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 0, 0),
             ])
-            .deterministic()
+            .into_dts()
             .with_initial(0)
             .into_mealy();
         let mm2: MealyMachine = NTS::builder()
@@ -131,7 +131,7 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 1, 0),
             ])
-            .deterministic()
+            .into_dts()
             .with_initial(0)
             .into_mealy();
         let _mm3: MealyMachine = NTS::builder()
@@ -144,7 +144,7 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 0, 2),
             ])
-            .deterministic()
+            .into_dts()
             .with_initial(0)
             .into_mealy();
 

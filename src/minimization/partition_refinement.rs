@@ -87,7 +87,7 @@ where
         "Building quotient with partition {{{}}}",
         partition
             .iter()
-            .map(|set| format!("{{{}}}", set.iter().map(|c| c.to_string()).join(", ")))
+            .map(|set| format!("{{{}}}", set.iter().map(|c| c.show()).join(", ")))
             .join(", ")
     );
 
@@ -187,7 +187,7 @@ where
         "Building quotient with partition {{{}}}",
         partition
             .iter()
-            .map(|set| format!("{{{}}}", set.iter().map(|c| c.to_string()).join(", ")))
+            .map(|set| format!("{{{}}}", set.iter().map(|c| c.show()).join(", ")))
             .join(", ")
     );
 

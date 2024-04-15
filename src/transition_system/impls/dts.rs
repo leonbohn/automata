@@ -56,6 +56,12 @@ impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for DTS<A, Q, C> {
     }
 }
 
+impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet<A> for DTS<A, Q, C> {
+    fn for_alphabet(from: A) -> Self {
+        Self(NTS::for_alphabet(from))
+    }
+}
+
 impl<A: Alphabet, Q: Clone, C: Clone> PredecessorIterable for DTS<A, Q, C> {
     type PreEdgeRef<'this> = &'this NTEdge<A::Expression, C>
     where
@@ -71,10 +77,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> PredecessorIterable for DTS<A, Q, C> {
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for DTS<A, Q, C> {
-    fn new_for_alphabet(alphabet: Self::Alphabet) -> Self {
-        Self(NTS::new_for_alphabet(alphabet))
-    }
-
     fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
         self.0.add_state(color)
     }

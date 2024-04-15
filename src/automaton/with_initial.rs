@@ -83,7 +83,7 @@ where
         writeln!(
             f,
             "Initialized to state {} with table\n{:?}",
-            self.initial(),
+            self.initial().show(),
             self.ts()
         )
     }
@@ -104,7 +104,7 @@ where
     /// Takes an alphabet and a color and constructs an [`Initialized`] instance with the given alphabet, no
     /// transitions and a single initial state with the given color.
     pub fn with_initial_color(alphabet: A, color: Q) -> Self {
-        let mut ts = DTS::new_for_alphabet(alphabet);
+        let mut ts = DTS::for_alphabet(alphabet);
         let initial = ts.add_state(color);
         Self(ts, initial)
     }
@@ -129,10 +129,6 @@ where
 }
 
 impl<Ts: TransitionSystem + Sproutable> Sproutable for Initialized<Ts> {
-    fn new_for_alphabet(alphabet: Self::Alphabet) -> Self {
-        let ts = Ts::new_for_alphabet(alphabet);
-        Self(ts, <Ts::StateIndex as IndexType>::first())
-    }
     fn add_edge<X, Y, CI>(
         &mut self,
         from: X,

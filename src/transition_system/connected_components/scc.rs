@@ -349,7 +349,7 @@ mod tests {
         let ts = NTS::builder()
             .default_color(())
             .with_transitions(&transitions)
-            .deterministic()
+            .into_dts()
             .with_initial(0);
         let sccs = ts.sccs();
         let first = sccs.first();
