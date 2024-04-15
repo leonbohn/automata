@@ -146,5 +146,7 @@ mod tests {
             dfa.reachable_states().collect_vec(),
             vec![(0, false), (1, false), (2, true)]
         );
+
+        assert_eq!(dfa.reachable_state_indices_from(2).collect_vec(), vec![2]);
     }
 }
