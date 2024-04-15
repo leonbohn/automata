@@ -241,7 +241,7 @@ impl From<Vec<char>> for CharAlphabet {
 
 impl FromIterator<char> for CharAlphabet {
     fn from_iter<T: IntoIterator<Item = char>>(iter: T) -> Self {
-        Self(iter.into_iter().unique().collect())
+        Self(iter.into_iter().unique().sorted().collect())
     }
 }
 
