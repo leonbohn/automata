@@ -32,6 +32,7 @@ jobs:
 
   checks:
     name: Run tests, verify documentation and formatting
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@main
