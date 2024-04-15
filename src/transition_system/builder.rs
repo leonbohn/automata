@@ -252,13 +252,8 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
 
     /// Collects self into a non-deterministic transition system.
     pub fn nondeterministic(self) -> NTS<CharAlphabet, Q, C> {
-        let alphabet = CharAlphabet::from_iter(
-            self.edges
-                .iter()
-                .map(|(_, c, _, _)| *c)
-                .chain(self.symbols)
-                .sorted(),
-        );
+        let alphabet =
+            CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
         let num_states = self
             .edges
             .iter()
