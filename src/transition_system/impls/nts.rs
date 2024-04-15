@@ -1,7 +1,13 @@
-use std::hash::Hash;
+use std::{collections::BTreeSet, hash::Hash};
 
 use crate::{math::Set, prelude::*, Void};
 use itertools::Itertools;
+
+mod ntstate;
+pub use ntstate::{NTSEdgesFromIter, NTSEdgesToIter, NTState};
+
+mod ntedge;
+pub use ntedge::NTEdge;
 
 /// Type alias for the constituent parts of an [`NTS`] with the same associated types as the
 /// transition sytem `D`.
@@ -11,95 +17,9 @@ pub type NTSPartsFor<D> = (
     Vec<NTEdge<ExpressionOf<D>, EdgeColor<D>>>,
 );
 
-/// Stores information characterizing a state in a non-deterministic transition system, see [`NTS`].
-/// It stores a color and a pointer to the index of the first edge leaving the state.
-#[derive(Clone, Eq, PartialEq)]
-pub struct NTState<Q> {
-    pub(super) color: Q,
-    pub(super) first_edge: Option<usize>,
-}
-
-impl<Q> NTState<Q> {
-    /// Create a new state with the given color.
-    pub fn new(color: Q) -> Self {
-        Self {
-            color,
-            first_edge: None,
-        }
-    }
-
-    /// Applies the given recoloring function to produce a new [`NTState`] with color `C`.
-    /// This method consumes `self`.
-    pub fn recolor<C, F: Fn(Q) -> C>(self, f: F) -> NTState<C> {
-        NTState {
-            color: f(self.color),
-            first_edge: self.first_edge,
-        }
-    }
-}
-
-/// Represents an edge in a non-deterministic transition system, see [`NTS`]. It stores a color, an
-/// expression, as well as a source and target state index. Moreover, it stores the indices of the
-/// next and previous edge in the list of edges leaving the source state.
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct NTEdge<E, C> {
-    pub(super) prev: Option<usize>,
-    pub(super) source: usize,
-    pub(super) target: usize,
-    pub(super) color: C,
-    pub(super) expression: E,
-    pub(super) next: Option<usize>,
-}
-
-impl<'a, E, C: Clone> IsEdge<'a, E, usize, C> for &'a NTEdge<E, C> {
-    fn target(&self) -> usize {
-        self.target
-    }
-
-    fn color(&self) -> C {
-        self.color.clone()
-    }
-
-    fn expression(&self) -> &'a E {
-        &self.expression
-    }
-
-    fn source(&self) -> usize {
-        self.source
-    }
-}
-
-impl<E, C> NTEdge<E, C> {
-    /// Creates a new edge with the given source, expression, color and target. The pointers
-    /// to the next and previous edge are set to `None`.
-    pub fn new(source: usize, expression: E, color: C, target: usize) -> Self {
-        Self {
-            prev: None,
-            source,
-            target,
-            color,
-            expression,
-            next: None,
-        }
-    }
-
-    /// Consumes `self` and applies the given function `f` to obtain a new color which is then
-    /// combined with the remaining fields to form a recolored edge.
-    pub fn recolor<D, F: Fn(C) -> D>(self, f: F) -> NTEdge<E, D> {
-        NTEdge {
-            prev: self.prev,
-            source: self.source,
-            target: self.target,
-            color: f(self.color),
-            expression: self.expression,
-            next: self.next,
-        }
-    }
-}
-
 /// Represents a non-deterministic transition system. It stores an [`Alphabet`], a list of [`NTState`]s and a list of [`NTEdge`]s.
 /// Each state
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct NTS<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
     alphabet: A,
     states: Vec<NTState<Q>>,
@@ -373,30 +293,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
     }
 }
 
-/// Iterator over the edges leaving a state in a non-deterministic transition system.
-pub struct NTSEdgesFromIter<'a, E, C> {
-    edges: &'a [NTEdge<E, C>],
-    current: Option<usize>,
-}
-
-impl<'a, E, C> Iterator for NTSEdgesFromIter<'a, E, C> {
-    type Item = &'a NTEdge<E, C>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let idx = self.current?;
-        assert!(idx < self.edges.len());
-        let e = &self.edges[idx];
-        self.current = e.next;
-        Some(e)
-    }
-}
-
-impl<'a, E, C> NTSEdgesFromIter<'a, E, C> {
-    /// Creates a new iterator over the edges leaving a state.
-    pub fn new(edges: &'a [NTEdge<E, C>], current: Option<usize>) -> Self {
-        Self { edges, current }
-    }
-}
-
 impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for NTS<A, Q, C> {
     type StateIndex = usize;
 
@@ -446,47 +342,70 @@ impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for NTS<A, Q, C> {
     }
 }
 
-/// Iterator over the edges in a [`NTS`] that reach a certain state.
-pub struct NTSEdgesTo<'a, E, C> {
-    edges: std::slice::Iter<'a, NTEdge<E, C>>,
-    target: usize,
-}
-
-impl<'a, E, C> Iterator for NTSEdgesTo<'a, E, C> {
-    type Item = &'a NTEdge<E, C>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.edges.find(|e| e.target == self.target)
-    }
-}
-
-impl<'a, E, C> NTSEdgesTo<'a, E, C> {
-    /// Creates a new iterator over the edges reaching a state.
-    pub fn new<A: Alphabet<Expression = E>, Q: Clone>(
-        nts: &'a NTS<A, Q, C>,
-        target: usize,
-    ) -> Self {
-        Self {
-            edges: nts.edges.iter(),
-            target,
-        }
-    }
-}
-
 impl<A: Alphabet, Q: Clone, C: Clone> PredecessorIterable for NTS<A, Q, C> {
     type PreEdgeRef<'this> = &'this NTEdge<A::Expression, C>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = NTSEdgesTo<'this, A::Expression, C>
+    type EdgesToIter<'this> = NTSEdgesToIter<'this, A::Expression, C>
     where
         Self: 'this;
 
     fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
         let state = state.to_index(self)?;
-        if state < self.states.len() {
-            Some(NTSEdgesTo::new(self, state))
-        } else {
-            None
+        assert!(state < self.states.len());
+
+        Some(NTSEdgesToIter::new(self, state))
+    }
+}
+
+impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> PartialEq for NTS<A, Q, C> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.alphabet != other.alphabet || self.states.len() != other.states.len() {
+            return false;
         }
+
+        self.states.iter().zip(other.states.iter()).all(|(x, y)| {
+            if x.color != y.color {
+                return false;
+            }
+            let edges = x
+                .edges_from_iter(&self.edges)
+                .map(|e| (&e.expression, &e.color, e.target))
+                .collect::<Set<_>>();
+
+            y.edges_from_iter(&other.edges)
+                .all(|e| edges.contains(&(&e.expression, &e.color, e.target)))
+        })
+    }
+}
+
+impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> Eq for NTS<A, Q, C> {}
+
+#[cfg(test)]
+mod tests {
+    use crate::prelude::TSBuilder;
+
+    #[test]
+    fn nts_equality() {
+        let first = TSBuilder::default()
+            .with_state_colors([0, 1])
+            .with_edges([
+                (0, 'a', 100u32, 0),
+                (0, 'b', 1000, 1),
+                (1, 'a', 200, 0),
+                (1, 'b', 2000, 1),
+            ])
+            .deterministic();
+        let second = TSBuilder::default()
+            .with_state_colors([0, 1])
+            .with_edges([
+                (0, 'b', 1000, 1),
+                (1, 'b', 2000, 1),
+                (0, 'a', 100u32, 0),
+                (1, 'a', 200, 0),
+            ])
+            .deterministic();
+        assert!(first == second, "equality should disregard order of edges");
     }
 }
