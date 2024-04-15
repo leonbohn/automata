@@ -303,13 +303,6 @@ where
         }
         out
     }
-
-    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(_iter: I) -> String
-    where
-        Self: 'a,
-    {
-        todo!()
-    }
 }
 
 impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
