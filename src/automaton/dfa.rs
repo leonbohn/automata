@@ -6,6 +6,9 @@ use self::operations::DefaultIfMissing;
 
 use super::StatesWithColor;
 
+/// Defines the [`FiniteSemantics`] that are used by a deterministic finite automaton
+/// [`DFA`]. This leads to a [`FiniteWord`] being accepted if the state that it reaches
+/// is colored with `true`, and the word being rejected otherwise.
 #[derive(Clone, Copy, Default, Hash, Eq, PartialEq)]
 pub struct DFASemantics;
 
@@ -15,9 +18,12 @@ impl std::fmt::Debug for DFASemantics {
     }
 }
 
-impl<C> FiniteSemantics<bool, C> for DFASemantics {
+impl<C> Semantics<bool, C> for DFASemantics {
     type Output = bool;
-    fn finite_semantic<R>(&self, run: R) -> Self::Output
+}
+
+impl<C> FiniteSemantics<bool, C> for DFASemantics {
+    fn evaluate<R>(&self, run: R) -> Self::Output
     where
         R: FiniteRun<StateColor = bool, EdgeColor = C>,
     {

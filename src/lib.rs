@@ -25,9 +25,10 @@ pub mod prelude {
         alphabet,
         alphabet::{CharAlphabet, Expression, Symbol},
         automaton::{
-            Automaton, FiniteSemantics, Initialized, IntoDBA, IntoDFA, IntoDPA, IntoMealyMachine,
-            IntoMooreMachine, MealyMachine, MooreMachine, OmegaAcceptanceCondition, OmegaAutomaton,
-            OmegaSemantics, DBA, DFA, DPA,
+            Automaton, DBASemantics, DFASemantics, FiniteSemantics, Initialized, IntoDBA, IntoDFA,
+            IntoDPA, IntoMealyMachine, IntoMooreMachine, MealyMachine, MealySemantics,
+            MinEvenParitySemantics, MooreMachine, MooreSemantics, OmegaAcceptanceCondition,
+            OmegaAutomaton, OmegaSemantics, Semantics, DBA, DFA, DPA,
         },
         congruence::RightCongruence,
         math,
