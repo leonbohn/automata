@@ -7,7 +7,7 @@ use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddValuation, BddVariable}
 use hoars::{HoaAutomaton, ALPHABET, MAX_APS, VARS};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct HoaStream(pub(crate) String);
+pub struct HoaString(pub(crate) String);
 
 /// A propositional alphabet, where a symbol is a valuation of all propositional variables.
 ///
@@ -28,6 +28,19 @@ pub struct HoaAlphabet {
 }
 
 impl HoaAlphabet {
+    pub fn size(&self) -> usize {
+        2u32.saturating_pow(self.apnames.len() as u32)
+            .try_into()
+            .expect("Cannot fit value into usize")
+    }
+
+    pub fn apnames(&self) -> &[String] {
+        &self.apnames
+    }
+    pub fn apnames_len(&self) -> usize {
+        self.apnames.len()
+    }
+
     pub fn from_hoa_automaton(aut: &HoaAutomaton) -> Self {
         let apnames = aut.aps().clone();
         assert!(apnames.len() < MAX_APS);

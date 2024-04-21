@@ -50,7 +50,7 @@ impl From<&hoars::AcceptanceSignature> for AcceptanceMask {
 
 #[derive(Debug, Clone, Eq, Copy, PartialEq, Ord, PartialOrd)]
 pub enum OmegaAcceptanceCondition {
-    Parity,
+    Parity(usize, usize),
     Buchi,
     Rabin,
     Streett,
@@ -63,7 +63,7 @@ pub enum OmegaAcceptanceCondition {
 impl OmegaAcceptanceCondition {
     pub fn satisfied(&self, infset: &Set<AcceptanceMask>) -> bool {
         match self {
-            OmegaAcceptanceCondition::Parity => infset
+            OmegaAcceptanceCondition::Parity(_low, _high) => infset
                 .iter()
                 .map(|x| x.as_priority())
                 .min()
