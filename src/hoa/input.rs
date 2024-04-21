@@ -3,7 +3,15 @@ use std::ops::Deref;
 use crate::{automaton::AcceptanceMask, hoa::HoaExpression, prelude::*};
 use hoars::{HoaAutomaton, MAX_APS};
 
-use super::HoaAlphabet;
+use super::{HoaAlphabet, HoaStream};
+
+/// Tries to `pop` the foremost valid HOA automaton from the given [`HoaStream`].
+/// If no valid automaton is found before the end of the stream is reached, the
+/// function returns `None`.
+pub fn pop_omega_automaton(
+    hoa_stream: HoaStream,
+) -> Option<(OmegaAutomaton<HoaAlphabet>, HoaStream)> {
+}
 
 /// Considers the given HOA string as a single automaton and tries to parse it into an
 /// [`OmegaAutomaton`].
@@ -72,4 +80,30 @@ pub fn hoa_automaton_to_nts(
         .expect("Initial state must be a singleton") as usize;
 
     ts.with_initial(initial)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn hoa_tdba() {
+        let aut_hoa = r#"
+        HOA: v1
+        States: 3
+        Start: 0
+        acc-name: Buchi
+        Acceptance: 1 Inf(0)
+        AP: 1 "a"
+        --BODY--
+        State: 0
+        [0] 1
+        [!0]  2
+        State: 1  /* former state 0 */
+        [0] 1 {0}
+        [!0] 2 {0}
+        State: 2  /* former state 1 */
+        [0] 1
+        [!0] 2
+        --END--
+        "#;
+    }
 }
