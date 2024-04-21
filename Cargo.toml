@@ -17,7 +17,7 @@ biodivine-lib-bdd = { version = "0.5", optional = true }
 bit-set = "0.5"
 bimap = "0.6"
 fastrand = { version = "2", optional = true }
-hoars = { git = "https://github.com/leonbohn/hoars", optional = true }
+hoars = { path = "hoars", optional = true }
 
 [features]
 default = ["hoa", "graphviz", "random", "minimize"]
