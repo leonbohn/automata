@@ -6,6 +6,9 @@ use crate::{prelude::*, Map};
 use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddValuation, BddVariable};
 use hoars::{HoaAutomaton, ALPHABET, MAX_APS, VARS};
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct HoaStream(pub(crate) String);
+
 /// A propositional alphabet, where a symbol is a valuation of all propositional variables.
 ///
 /// # Example
