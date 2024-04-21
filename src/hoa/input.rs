@@ -1,16 +1,91 @@
 use std::ops::Deref;
 
-use crate::{automaton::AcceptanceMask, hoa::HoaExpression, prelude::*};
+use crate::{
+    automaton::{AcceptanceMask, DeterministicOmegaAutomaton},
+    hoa::HoaExpression,
+    prelude::*,
+};
 use hoars::{HoaAutomaton, MAX_APS};
+use tracing::trace;
 
-use super::{HoaAlphabet, HoaStream};
+use super::{HoaAlphabet, HoaString};
+
+fn parse_omega_automaton_range(
+    hoa: &str,
+    start: usize,
+    end: usize,
+) -> Option<OmegaAutomaton<HoaAlphabet>> {
+    match HoaAutomaton::try_from(&hoa[start..end]) {
+        Ok(aut) => match OmegaAutomaton::try_from(aut) {
+            Ok(aut) => Some(aut),
+            Err(e) => {
+                tracing::warn!("Encountered processing error {}", e);
+                None
+            }
+        },
+        Err(e) => {
+            tracing::warn!("Encountered parsing error {}", e);
+            None
+        }
+    }
+}
+
+pub fn pop_deterministic_omega_automaton(
+    hoa: HoaString,
+) -> Option<(DeterministicOmegaAutomaton<HoaAlphabet>, HoaString)> {
+    let mut hoa = hoa;
+    while let Some((aut, rest)) = pop_omega_automaton(hoa) {
+        if let Some(det) = aut.to_deterministic() {
+            return Some((det, rest));
+        }
+        trace!("Automaton was not deterministic, skipping");
+        hoa = rest;
+    }
+    None
+}
 
 /// Tries to `pop` the foremost valid HOA automaton from the given [`HoaStream`].
 /// If no valid automaton is found before the end of the stream is reached, the
 /// function returns `None`.
-pub fn pop_omega_automaton(
-    hoa_stream: HoaStream,
-) -> Option<(OmegaAutomaton<HoaAlphabet>, HoaStream)> {
+pub fn pop_omega_automaton(hoa: HoaString) -> Option<(OmegaAutomaton<HoaAlphabet>, HoaString)> {
+    const END_LEN: usize = "--END--".len();
+    const ABORT_LEN: usize = "--ABORT--".len();
+
+    match (hoa.0.find("--ABORT--"), hoa.0.find("--END--")) {
+        (None, Some(pos)) => {
+            trace!("Returnting first automaton, going up to position {pos}");
+            let aut = parse_omega_automaton_range(&hoa.0, 0, pos + END_LEN)?;
+            Some((
+                aut,
+                HoaString(hoa.0[pos + END_LEN..].trim_start().to_string()),
+            ))
+        }
+        (Some(abort), None) => {
+            trace!("Found only one automaton --ABORT--ed at {abort}, but no subsequent --END-- of automaton to parse.");
+            None
+        }
+        (Some(abort), Some(end)) => {
+            if abort < end {
+                trace!("Found --ABORT-- before --END--, returning first automaton from {abort} to {end}");
+                let aut = parse_omega_automaton_range(&hoa.0, abort + ABORT_LEN, end + END_LEN)?;
+                Some((
+                    aut,
+                    HoaString(hoa.0[end + END_LEN..].trim_start().to_string()),
+                ))
+            } else {
+                trace!("Found --END--, returning first automaton up to {end}");
+                let aut = parse_omega_automaton_range(&hoa.0, 0, end + END_LEN)?;
+                Some((
+                    aut,
+                    HoaString(hoa.0[end + END_LEN..].trim_start().to_string()),
+                ))
+            }
+        }
+        (None, None) => {
+            trace!("No end of automaton found, there is no automaton to parse.");
+            None
+        }
+    }
 }
 
 /// Considers the given HOA string as a single automaton and tries to parse it into an
@@ -30,10 +105,19 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
     type Error = String;
 
     fn try_from(value: &hoars::Header) -> Result<Self, Self::Error> {
-        if !value.acceptance_name().is_parity() {
-            return Err("Unhandled acceptance type".to_string());
+        let acceptance_sets = value.iter().find_map(|it| match it {
+            hoars::HeaderItem::Acceptance(acceptance, _cond) => Some(*acceptance),
+            _ => None,
+        });
+
+        match value.acceptance_name() {
+            hoars::AcceptanceName::Buchi => Ok(OmegaAcceptanceCondition::Buchi),
+            hoars::AcceptanceName::Parity => Ok(OmegaAcceptanceCondition::Parity(
+                0,
+                acceptance_sets.unwrap() as usize,
+            )),
+            _ => Err("Unsupported acceptance condition".to_string()),
         }
-        Ok(OmegaAcceptanceCondition::Parity)
     }
 }
 
@@ -84,9 +168,32 @@ pub fn hoa_automaton_to_nts(
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn hoa_tdba() {
-        let aut_hoa = r#"
+    use tracing::debug;
+
+    use crate::{hoa::HoaString, TransitionSystem};
+
+    #[test_log::test]
+    fn hoa_tdpa() {
+        let raw_hoa = r#"
+        HOA: v1
+        States: 2
+        Start: 0
+        acc-name: Rabin 1
+        Acceptance: 2 (Fin(0) & Inf(1))
+        AP: 2 "a" "b"
+        --BODY--
+        State: 0 "a U b"   /* An example of named state */
+        [0 & !1] 0 {0}
+        [1] 1 {0}
+        State: 1
+        [t] 1 {1}
+        --END--
+        "
+    }
+
+    #[test_log::test]
+    fn hoa_tdba_with_abort_and_nondeterministic() {
+        let raw_hoa = r#"
         HOA: v1
         States: 3
         Start: 0
@@ -96,14 +203,41 @@ mod tests {
         --BODY--
         State: 0
         [0] 1
-        [!0]  2
-        State: 1  /* former state 0 */
-        [0] 1 {0}
-        [!0] 2 {0}
-        State: 2  /* former state 1 */
+        --ABORT--
+        HOA: v1
+        States: 2
+        Start: 0
+        acc-name: Buchi
+        Acceptance: 1 Inf(0)
+        AP: 1 "a"
+        --BODY--
+        State: 0
+        [0] 0 {0}
+        [!0] 0
+        State: 1
+        [0] 0 {0}
         [0] 1
-        [!0] 2
+        [!0] 0
+        --END--
+        HOA: v1
+        States: 1
+        Start: 0
+        acc-name: Buchi
+        Acceptance: 1 Inf(0)
+        AP: 1 "a"
+        --BODY--
+        State: 0
+        [0] 0 {0}
+        [!0] 0
         --END--
         "#;
+        let hoa = HoaString(raw_hoa.to_string());
+        debug!("SADF");
+
+        let first = super::pop_deterministic_omega_automaton(hoa);
+        assert!(first.is_some());
+        let (first, hoa) = first.unwrap();
+        assert_eq!(first.size(), 1);
+        assert!(hoa.0.is_empty());
     }
 }
