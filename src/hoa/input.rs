@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{io::BufRead, ops::Deref};
 
 use crate::{
     automaton::{AcceptanceMask, DeterministicOmegaAutomaton},
@@ -9,6 +9,58 @@ use hoars::{HoaAutomaton, MAX_APS};
 use tracing::trace;
 
 use super::{HoaAlphabet, HoaString};
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct HoaAutomatonStream<R> {
+    read: R,
+    buf: String,
+    pos: usize,
+}
+
+impl<R: BufRead> Iterator for HoaAutomatonStream<R> {
+    type Item = OmegaAutomaton<HoaAlphabet>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.read.read_line(&mut self.buf) {
+                Ok(0) => return None,
+                Ok(read_bytes) => {
+                    trace!(
+                        "Read HOA line with {read_bytes} bytes from stream: {}",
+                        &self.buf[self.pos..]
+                    );
+
+                    if self.buf[self.pos..].contains("--ABORT--") {
+                        self.buf.clear();
+                        self.pos = 0;
+                        continue;
+                    }
+
+                    if self.buf[self.pos..].contains("--END--") {
+                        let end = self.pos + "--END--".len();
+                        let aut = parse_omega_automaton_range(&self.buf, 0, end);
+                        self.buf.clear();
+                        self.pos = 0;
+                        return aut;
+                    }
+
+                    self.pos += read_bytes;
+                }
+                Err(_e) => return None,
+            }
+        }
+    }
+}
+
+impl<R> HoaAutomatonStream<R> {
+    pub fn new(read: R) -> Self {
+        Self {
+            read,
+            pos: 0,
+            buf: String::new(),
+        }
+    }
+}
 
 fn parse_omega_automaton_range(
     hoa: &str,
