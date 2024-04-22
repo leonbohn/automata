@@ -22,15 +22,19 @@ impl AcceptanceMask {
         self.iter().min()
     }
 
-    pub fn as_priority(&self) -> usize {
+    pub fn try_as_priority(&self) -> Option<usize> {
         let mut it = self.iter();
         let Some(priority) = it.next() else {
-            panic!("No priority set");
+            return None;
         };
         if it.next().is_some() {
             warn!("more than one priority is set! {:?}", self.0);
         }
-        priority
+        Some(priority)
+    }
+
+    pub fn as_priority(&self) -> usize {
+        self.try_as_priority().unwrap()
     }
 }
 
@@ -112,6 +116,24 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
         acc: OmegaAcceptanceCondition,
     ) -> Self {
         Self { ts, acc }
+    }
+
+    pub fn into_dpa(self) -> DPA<A> {
+        assert!(
+            matches!(self.acc, OmegaAcceptanceCondition::Parity(_, _)),
+            "Can only turn DPA into DPA for now"
+        );
+
+        let neutral = self
+            .ts
+            .edge_colors_unique()
+            .filter_map(|mask| mask.try_as_priority())
+            .max()
+            .expect("Need at least one neutral color (the maximal one)");
+
+        self.ts
+            .map_edge_colors(|mask| mask.try_as_priority().unwrap_or(neutral))
+            .collect_dpa()
     }
 }
 

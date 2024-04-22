@@ -3,8 +3,11 @@ pub mod input;
 pub mod output;
 
 use crate::{prelude::*, Map};
-use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddValuation, BddVariable};
+use biodivine_lib_bdd::{
+    Bdd, BddPartialValuation, BddSatisfyingValuations, BddValuation, BddVariable,
+};
 use hoars::{HoaAutomaton, ALPHABET, MAX_APS, VARS};
+use itertools::Itertools;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HoaString(pub(crate) String);
@@ -111,16 +114,15 @@ impl Ord for HoaSymbol {
 }
 impl Show for HoaSymbol {
     fn show(&self) -> String {
-        todo!()
-    }
-
-    fn show_collection<'a, I>(_iter: I) -> String
-    where
-        Self: 'a,
-        I: IntoIterator<Item = &'a Self>,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        todo!()
+        (0..self.aps)
+            .map(|i| {
+                if ((1 << i) & self.repr) > 0 {
+                    i.to_string()
+                } else {
+                    format!("!{i}")
+                }
+            })
+            .join(" & ")
     }
 }
 
@@ -194,16 +196,36 @@ impl Ord for HoaExpression {
 }
 impl Show for HoaExpression {
     fn show(&self) -> String {
-        todo!()
-    }
+        let convert_clause = |clause: BddPartialValuation| {
+            if clause.is_empty() {
+                return "t".to_string();
+            }
+            clause
+                .to_values()
+                .into_iter()
+                .map(|(var, b)| {
+                    if b {
+                        var.to_index().to_string()
+                    } else {
+                        format!("!{}", var.to_index())
+                    }
+                })
+                .join(" & ")
+        };
 
-    fn show_collection<'a, I>(_iter: I) -> String
-    where
-        Self: 'a,
-        I: IntoIterator<Item = &'a Self>,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        todo!()
+        let dnf = self.bdd.to_dnf();
+
+        if dnf.is_empty() {
+            panic!("Decide on how to deal with this!");
+        }
+
+        if dnf.len() == 1 {
+            return convert_clause(dnf.into_iter().next().expect("length is 1"));
+        }
+
+        dnf.into_iter()
+            .map(|clause| format!("({})", convert_clause(clause)))
+            .join(" | ")
     }
 }
 
@@ -310,8 +332,8 @@ impl Alphabet for HoaAlphabet {
         true
     }
 
-    fn matches(&self, _expression: &Self::Expression, _symbol: Self::Symbol) -> bool {
-        todo!()
+    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
+        expression.matches(symbol)
     }
 
     fn expression(_symbol: Self::Symbol) -> Self::Expression {
