@@ -2,7 +2,9 @@
 pub mod input;
 pub mod output;
 
-use crate::{prelude::*, Map};
+use std::cell::RefCell;
+
+use crate::{prelude::*, Set};
 use biodivine_lib_bdd::{
     Bdd, BddPartialValuation, BddSatisfyingValuations, BddValuation, BddVariable,
 };
@@ -25,9 +27,10 @@ pub struct HoaString(pub(crate) String);
 /// a symbol if the symbol satisfies the expression, i.e. if the expression evaluates to `true` under the given
 /// valuation. The expression from above, for example, would be matched by the symbol given above (`a & !b & c`),
 /// but not by the symbols `a & b & !c` or `!a & !b & c`.
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HoaAlphabet {
     apnames: Vec<String>,
+    expressions: RefCell<Set<HoaExpression>>,
 }
 
 impl HoaAlphabet {
@@ -49,7 +52,10 @@ impl HoaAlphabet {
         assert!(apnames.len() < MAX_APS);
         assert!(!apnames.is_empty());
 
-        Self { apnames }
+        Self {
+            apnames,
+            expressions: RefCell::new(Set::default()),
+        }
     }
     pub fn top(&self) -> Bdd {
         ALPHABET.mk_true()
@@ -85,6 +91,14 @@ pub(crate) fn bdd_valuation_to_hoa_symbol(valuation: &BddValuation) -> HoaSymbol
     HoaSymbol { repr, aps }
 }
 
+pub(crate) fn hoa_symbol_to_hoa_expression(symbol: &HoaSymbol) -> HoaExpression {
+    let bdd: Bdd = symbol.as_bdd_valuation().into();
+    HoaExpression {
+        bdd,
+        aps: symbol.aps,
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Copy)]
 pub struct HoaSymbol {
     repr: u8,
@@ -99,6 +113,21 @@ impl HoaSymbol {
             valuation.set_value(VARS[i], val);
         }
         valuation
+    }
+    pub fn to_char(&self) -> char {
+        assert!(self.aps <= MAX_APS, "Too many APs");
+        (('a' as u8) + (self.repr & 0b1111)) as char
+    }
+    pub fn from_char(value: char, aps: usize) -> Self {
+        assert!(aps <= MAX_APS);
+        let val = value as u8;
+        assert!(('a' as u8) < val);
+        assert!(val <= ('p' as u8));
+
+        Self {
+            repr: (val - ('a' as u8)) & 0b1111,
+            aps,
+        }
     }
 }
 
@@ -300,13 +329,6 @@ impl Alphabet for HoaAlphabet {
 
     type Expression = HoaExpression;
 
-    fn search_edge<X>(
-        _map: &Map<Self::Expression, X>,
-        _sym: Self::Symbol,
-    ) -> Option<(&Self::Expression, &X)> {
-        todo!()
-    }
-
     fn size(&self) -> usize {
         2u32.saturating_pow(self.apnames.len() as u32)
             .try_into()
@@ -336,12 +358,8 @@ impl Alphabet for HoaAlphabet {
         expression.matches(symbol)
     }
 
-    fn expression(_symbol: Self::Symbol) -> Self::Expression {
-        todo!()
-    }
-
-    fn make_expression(&self, _symbol: Self::Symbol) -> &Self::Expression {
-        todo!()
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
+        hoa_symbol_to_hoa_expression(&symbol)
     }
 }
 

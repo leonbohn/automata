@@ -31,7 +31,7 @@ impl<R: BufRead> Iterator for FilterDeterministicHoaAutomatonStream<R> {
             match self.base.next() {
                 None => return None,
                 Some(aut) => {
-                    if let Some(det) = aut.to_deterministic() {
+                    if let Some(det) = aut.into_deterministic() {
                         return Some(det);
                     } else {
                         warn!("Encountered automaton that is not deterministic, skipping...")
@@ -119,7 +119,7 @@ pub fn pop_deterministic_omega_automaton(
 ) -> Option<(DeterministicOmegaAutomaton<HoaAlphabet>, HoaString)> {
     let mut hoa = hoa;
     while let Some((aut, rest)) = pop_omega_automaton(hoa) {
-        if let Some(det) = aut.to_deterministic() {
+        if let Some(det) = aut.into_deterministic() {
             return Some((det, rest));
         }
         trace!("Automaton was not deterministic, skipping");

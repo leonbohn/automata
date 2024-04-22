@@ -1,6 +1,9 @@
-use automata::hoa::input::FilterDeterministicHoaAutomatonStream;
 use automata::hoa::output::WriteHoa;
+use automata::hoa::HoaAlphabet;
 use automata::prelude::*;
+use automata::{
+    automaton::DeterministicOmegaAutomaton, hoa::input::FilterDeterministicHoaAutomatonStream,
+};
 
 use tracing::{debug, info, trace};
 use tracing_subscriber::{filter, prelude::*};
@@ -27,11 +30,11 @@ fn cli() -> clap::Command {
 }
 
 fn setup_logging(matches: &ArgMatches) {
-    let Ok(verbosity) = matches.try_get_one::<String>("verbosity") else {
+    let Ok(Some(verbosity)) = matches.try_get_one::<String>("verbosity") else {
         return;
     };
 
-    let level = match verbosity.unwrap().as_str() {
+    let level = match verbosity.as_str() {
         "trace" => filter::LevelFilter::TRACE,
         "debug" => filter::LevelFilter::DEBUG,
         "info" => filter::LevelFilter::INFO,
@@ -63,7 +66,12 @@ pub fn main() {
 
             while let Some(aut) = stream.next() {
                 info!("read deterministic automaton with {} states", aut.size());
-                print!("{}", aut.into_dpa().to_hoa());
+
+                let converted: DeterministicOmegaAutomaton<CharAlphabet> = aut.into();
+                let reconverted: DeterministicOmegaAutomaton<HoaAlphabet> =
+                    converted.try_into().unwrap();
+
+                print!("{}", reconverted.into_dpa().to_hoa());
             }
         }
         _ => unreachable!(),

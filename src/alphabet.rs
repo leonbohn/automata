@@ -42,12 +42,12 @@ pub trait Alphabet: Clone {
     type Expression: Expression<Self::Symbol>;
 
     /// Creates an expression from a single symbol.
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression;
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression;
 
     /// Returns a map from each symbol in the alphabet to the corresponding expression.
     fn expression_map(&self) -> crate::Map<Self::Symbol, Self::Expression> {
         self.universe()
-            .map(|sym| (sym, Self::expression(sym)))
+            .map(|sym| (sym, self.make_expression(sym)))
             .collect()
     }
 
@@ -58,7 +58,10 @@ pub trait Alphabet: Clone {
     fn search_edge<X>(
         map: &Map<Self::Expression, X>,
         sym: Self::Symbol,
-    ) -> Option<(&Self::Expression, &X)>;
+    ) -> Option<(&Self::Expression, &X)> {
+        map.iter()
+            .find_map(|(e, x)| if e.matches(sym) { Some((e, x)) } else { None })
+    }
 
     /// Type for an iterator over all possible symbols in the alphabet. For propositional alphabets,
     /// this may return quite a few symbols (exponential in the number of atomic propositions).
@@ -78,9 +81,6 @@ pub trait Alphabet: Clone {
     /// the expression is satisfied by the given symbol, an example of this is illustrated in propositional.
     fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool;
 
-    /// Creates an expression from a single symbol.
-    fn expression(symbol: Self::Symbol) -> Self::Expression;
-
     /// Returns the number of symbols in the alphabet.
     fn size(&self) -> usize;
 }
@@ -92,7 +92,7 @@ impl<A: Alphabet> Alphabet for &A {
     fn universe(&self) -> Self::Universe<'_> {
         A::universe(self)
     }
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression {
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
         A::make_expression(self, symbol)
     }
     fn search_edge<X>(
@@ -106,9 +106,6 @@ impl<A: Alphabet> Alphabet for &A {
     }
     fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
         A::matches(self, expression, symbol)
-    }
-    fn expression(symbol: Self::Symbol) -> Self::Expression {
-        A::expression(symbol)
     }
     fn size(&self) -> usize {
         A::size(self)
@@ -180,16 +177,12 @@ impl Alphabet for Empty {
         true
     }
 
-    fn expression(_symbol: Self::Symbol) -> Self::Expression {
-        Empty
-    }
-
     fn size(&self) -> usize {
         0
     }
 
-    fn make_expression(&self, _symbol: Self::Symbol) -> &Self::Expression {
-        &Empty
+    fn make_expression(&self, _symbol: Self::Symbol) -> Self::Expression {
+        Empty
     }
 }
 
@@ -302,10 +295,6 @@ impl Alphabet for CharAlphabet {
         expression == &symbol
     }
 
-    fn expression(symbol: Self::Symbol) -> Self::Expression {
-        symbol
-    }
-
     fn universe(&self) -> Self::Universe<'_> {
         self.0.iter().cloned()
     }
@@ -322,8 +311,9 @@ impl Alphabet for CharAlphabet {
         map.get_key_value(&sym)
     }
 
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression {
-        self.0
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
+        *self
+            .0
             .iter()
             .find(|c| c == &&symbol)
             .expect("symbol does not exist")
@@ -387,12 +377,9 @@ impl<S: Symbol + Expression<S>, const N: usize> Alphabet for Fixed<S, N> {
         expression == &symbol
     }
 
-    fn expression(symbol: Self::Symbol) -> Self::Expression {
-        symbol
-    }
-
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression {
-        self.0
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
+        *self
+            .0
             .iter()
             .find(|c| c == &&symbol)
             .expect("symbol does not exist")
@@ -505,12 +492,9 @@ impl Alphabet for Directional {
         *expression == symbol
     }
 
-    fn expression(symbol: Self::Symbol) -> Self::Expression {
-        symbol
-    }
-
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression {
-        self.0
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
+        *self
+            .0
             .iter()
             .find(|c| c == &&symbol)
             .expect("symbol does not exist")

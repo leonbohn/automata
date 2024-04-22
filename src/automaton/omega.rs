@@ -2,7 +2,7 @@ use bit_set::BitSet;
 use itertools::Itertools;
 use tracing::warn;
 
-use crate::{congruence::FORC, prelude::*, Set};
+use crate::{hoa::HoaAlphabet, prelude::*, Set};
 
 use super::Initialized;
 
@@ -97,16 +97,8 @@ impl<A: Alphabet> OmegaAutomaton<A> {
         Self { ts, acc }
     }
 
-    pub fn to_deterministic(&self) -> Option<DeterministicOmegaAutomaton<A>> {
+    pub fn into_deterministic(self) -> Option<DeterministicOmegaAutomaton<A>> {
         self.try_into().ok()
-    }
-
-    pub fn prefix_congruence(&self) -> RightCongruence<A> {
-        todo!()
-    }
-
-    pub fn underlying_forc(&self) -> FORC<A, bool> {
-        todo!()
     }
 }
 
@@ -134,6 +126,41 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
         self.ts
             .map_edge_colors(|mask| mask.try_as_priority().unwrap_or(neutral))
             .collect_dpa()
+    }
+}
+
+impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
+    fn from(value: DeterministicOmegaAutomaton<HoaAlphabet>) -> Self {
+        let ts = TSBuilder::default()
+            .with_state_colors((0..value.size()).map(|i| value.state_color(i).unwrap()))
+            .with_transitions(value.state_indices().flat_map(|q| {
+                value.edges_from(q).unwrap().flat_map(|edge| {
+                    edge.expression()
+                        .symbols()
+                        .map(move |sym| (edge.source(), sym.to_char(), edge.color(), edge.target()))
+                })
+            }))
+            .into_deterministic_initialized(value.initial());
+        DeterministicOmegaAutomaton::new(ts, value.acc)
+    }
+}
+
+impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
+    for DeterministicOmegaAutomaton<HoaAlphabet>
+{
+    /// For now, we allow this to error out in exactly one case: if the number of alphabet symbols
+    /// is not a power of 2 and cannot be mapped immediately into AP combinations.
+    type Error = ();
+    fn try_from(value: DeterministicOmegaAutomaton<CharAlphabet>) -> Result<Self, Self::Error> {
+        let alphabet_size = value.alphabet().size();
+        if alphabet_size != alphabet_size.next_power_of_two() || alphabet_size == 0 {
+            return Err(());
+        }
+
+        let aps = alphabet_size.ilog2() as usize;
+        assert!(aps > 0, "We do not want this edge case");
+
+        todo!()
     }
 }
 
