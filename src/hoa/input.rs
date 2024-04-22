@@ -6,9 +6,41 @@ use crate::{
     prelude::*,
 };
 use hoars::{HoaAutomaton, MAX_APS};
-use tracing::trace;
+use tracing::{trace, warn};
 
 use super::{HoaAlphabet, HoaString};
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct FilterDeterministicHoaAutomatonStream<R> {
+    base: HoaAutomatonStream<R>,
+}
+
+impl<R> FilterDeterministicHoaAutomatonStream<R> {
+    pub fn new(read: R) -> Self {
+        Self {
+            base: HoaAutomatonStream::new(read),
+        }
+    }
+}
+
+impl<R: BufRead> Iterator for FilterDeterministicHoaAutomatonStream<R> {
+    type Item = DeterministicOmegaAutomaton<HoaAlphabet>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.base.next() {
+                None => return None,
+                Some(aut) => {
+                    if let Some(det) = aut.to_deterministic() {
+                        return Some(det);
+                    } else {
+                        warn!("Encountered automaton that is not deterministic, skipping...")
+                    }
+                }
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HoaAutomatonStream<R> {
@@ -25,12 +57,8 @@ impl<R: BufRead> Iterator for HoaAutomatonStream<R> {
             match self.read.read_line(&mut self.buf) {
                 Ok(0) => return None,
                 Ok(read_bytes) => {
-                    trace!(
-                        "Read HOA line with {read_bytes} bytes from stream: {}",
-                        &self.buf[self.pos..]
-                    );
-
                     if self.buf[self.pos..].contains("--ABORT--") {
+                        trace!("encountered --ABORT-- in stream, resetting");
                         self.buf.clear();
                         self.pos = 0;
                         continue;
@@ -38,6 +66,10 @@ impl<R: BufRead> Iterator for HoaAutomatonStream<R> {
 
                     if self.buf[self.pos..].contains("--END--") {
                         let end = self.pos + "--END--".len();
+                        trace!(
+                            "encountered --END-- in stream, attempting to parse automaton \n{}",
+                            &self.buf[..end]
+                        );
                         let aut = parse_omega_automaton_range(&self.buf, 0, end);
                         self.buf.clear();
                         self.pos = 0;

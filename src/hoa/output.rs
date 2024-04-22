@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use tracing::trace;
 
 use crate::prelude::*;
 
@@ -61,6 +62,7 @@ pub trait WriteHoa: TransitionSystem + Pointed {
     fn to_hoa(&self) -> String {
         let mut w = String::new();
         self.write_hoa(&mut w).unwrap();
+        trace!("produced HOA string from automaton\n{}", w);
         w
     }
 }
@@ -72,8 +74,9 @@ impl OmegaAcceptanceCondition {
                 let zero_based_range = high - low + (low % 2);
                 write!(
                     w,
-                    "acc-name: parity min even {}\nAcceptance: {}\n",
-                    zero_based_range,
+                    "acc-name: parity min even {}\nAcceptance: {} {}\n",
+                    zero_based_range + 1,
+                    zero_based_range + 1,
                     build_parity_condition_hoa(*low, *high)
                 )
             }
@@ -148,7 +151,7 @@ impl HoaSuitableAlphabet for HoaAlphabet {
         write!(
             w,
             "AP: {} {}\n",
-            self.size(),
+            self.apnames_len(),
             self.apnames()
                 .iter()
                 .map(|name| format!("\"{}\"", name))

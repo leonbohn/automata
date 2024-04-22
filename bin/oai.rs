@@ -1,20 +1,71 @@
-use automata::hoa::input::HoaAutomatonStream;
+use automata::hoa::input::FilterDeterministicHoaAutomatonStream;
+use automata::hoa::output::WriteHoa;
 use automata::prelude::*;
 
-use tracing::info;
+use tracing::{debug, info, trace};
 use tracing_subscriber::{filter, prelude::*};
 
-pub fn main() {
-    let stdout_log = tracing_subscriber::fmt::layer().pretty();
+use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
+
+fn cli() -> clap::Command {
+    Command::new("oai")
+    .about("Omega automata interaction")
+    .subcommand_required(true)
+    .arg(
+        Arg::new("verbosity")
+        .short('v')
+        .long("verbosity")
+        .num_args(0..=1)
+        .require_equals(true)
+        .value_parser(["info", "debug", "trace"])
+        .default_missing_value("info")
+    )
+    .subcommand(
+        Command::new("todpa")
+        .about("reads HOA automaton from stdin and tries to convert it into a deterministic parity automaton")
+    )
+}
+
+fn setup_logging(matches: &ArgMatches) {
+    let Ok(verbosity) = matches.try_get_one::<String>("verbosity") else {
+        return;
+    };
+
+    let level = match verbosity.unwrap().as_str() {
+        "trace" => filter::LevelFilter::TRACE,
+        "debug" => filter::LevelFilter::DEBUG,
+        "info" => filter::LevelFilter::INFO,
+        _ => unreachable!(),
+    };
+
+    let stdout_log = tracing_subscriber::fmt::layer()
+        .pretty()
+        .with_writer(std::io::stderr);
 
     tracing_subscriber::registry()
-        .with(stdout_log.with_filter(filter::LevelFilter::TRACE))
+        .with(stdout_log.with_filter(level))
         .init();
 
-    info!("Reading from stdin");
-    let mut stream = HoaAutomatonStream::new(std::io::stdin().lock());
+    trace!("setup {level} logging");
+}
 
-    while let Some(aut) = stream.next() {
-        info!("Read automaton with {} states", aut.size());
+pub fn main() {
+    let matches = cli().get_matches();
+
+    setup_logging(&matches);
+
+    info!("reading automata from stdin");
+    let mut stream = FilterDeterministicHoaAutomatonStream::new(std::io::stdin().lock());
+
+    match matches.subcommand() {
+        Some(("todpa", sub_matches)) => {
+            info!("converting input automata into DPAs");
+
+            while let Some(aut) = stream.next() {
+                info!("read deterministic automaton with {} states", aut.size());
+                print!("{}", aut.into_dpa().to_hoa());
+            }
+        }
+        _ => unreachable!(),
     }
 }
