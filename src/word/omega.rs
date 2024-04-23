@@ -506,7 +506,6 @@ pub struct OmegaIteration<W>(W);
 
 impl<W> OmegaIteration<W> {
     /// Iterate the given finite word `from`, panics if the word is empty.
-    #[allow(unused)]
     pub fn new<S: Symbol>(from: W) -> Self
     where
         W: FiniteWord<S>,

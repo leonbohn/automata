@@ -11,8 +11,6 @@ pub type MinimalRepresentative<Ts> = (Vec<SymbolOf<Ts>>, <Ts as TransitionSystem
 #[derive(Debug, Clone)]
 pub struct MinimalRepresentatives<Ts: TransitionSystem> {
     ts: Ts,
-    #[allow(unused)]
-    origin: Ts::StateIndex,
     seen: Set<Ts::StateIndex>,
     queue: VecDeque<MinimalRepresentative<Ts>>,
 }
@@ -25,12 +23,7 @@ where
     pub fn new(ts: Ts, origin: Ts::StateIndex) -> Self {
         let seen = Set::from_iter([origin]);
         let queue = [(vec![], origin)].into_iter().collect();
-        Self {
-            ts,
-            origin,
-            seen,
-            queue,
-        }
+        Self { ts, seen, queue }
     }
 }
 

@@ -167,6 +167,8 @@ fn explicit_edge() -> impl Parser<Token, ExplicitEdge, Error = Simple<Token>> {
         })
 }
 
+// For now, we allow only explicit edges, but this might change in the future. In any case, we already have the necessary
+// infrastructure to support implicit edges.
 #[allow(unused)]
 fn implicit_edge() -> impl Parser<Token, ImplicitEdge, Error = Simple<Token>> {
     value::state_conjunction()

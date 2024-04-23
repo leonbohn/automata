@@ -67,13 +67,11 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
     }
 
     /// Creates a `HASHTS` from the given alphabet and states.
-    #[allow(unused)]
     pub(crate) fn from_parts(alphabet: A, states: Map<Idx, HashTsState<A, Q, C, Idx>>) -> Self {
         Self { alphabet, states }
     }
 
     /// Decomposes the `HASHTS` into its constituent parts.
-    #[allow(unused)]
     #[allow(clippy::type_complexity)]
     pub(crate) fn into_parts(self) -> (A, Map<Idx, HashTsState<A, Q, C, Idx>>) {
         (self.alphabet, self.states)
@@ -135,7 +133,6 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
 
 impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone + Hash + Eq> HashTs<A, Q, C, Idx> {
     /// Returns an iterator over the [`EdgeIndex`]es of the edges leaving the given state.
-    #[allow(unused)]
     pub(crate) fn index_ts_edges_from(
         &self,
         source: Idx,

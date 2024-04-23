@@ -62,28 +62,6 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
         self.partition.iter().position(|o| o.contains(&q))
     }
 
-    #[allow(unused)]
-    fn sanity_check(ts: &Ts, partition: &Partition<Ts::StateIndex>) -> bool {
-        for p in partition.iter() {
-            let all_equal = p
-                .iter()
-                .map(|i| {
-                    ts.edges_from(*i)
-                        .map(|it| {
-                            it.map(|tt| (tt.expression().clone(), tt.target()))
-                                .collect::<Set<_>>()
-                        })
-                        .unwrap_or_default()
-                })
-                .all_equal();
-            if !all_equal {
-                panic!("SANITY CHECK FAILED:\n{:?}", partition);
-                return false;
-            }
-        }
-        true
-    }
-
     /// Extracts the underlying right congruence by erasing the state and edge colors and then collecting
     /// into a [`RightCongruence`].
     pub fn underlying_right_congruence(self, _ts: &Ts) -> RightCongruence<Ts::Alphabet>
