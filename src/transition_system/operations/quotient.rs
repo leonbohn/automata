@@ -99,7 +99,7 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
             expressions: ts
                 .alphabet()
                 .universe()
-                .map(|sym| (sym, <Ts::Alphabet as Alphabet>::expression(sym)))
+                .map(|sym| (sym, ts.alphabet().make_expression(sym).clone()))
                 .collect(),
             ts,
             partition,

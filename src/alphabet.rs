@@ -42,14 +42,22 @@ pub trait Alphabet: Clone {
     type Expression: Expression<Self::Symbol>;
 
     /// Creates an expression from a single symbol.
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression;
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression;
 
     /// Returns a map from each symbol in the alphabet to the corresponding expression.
     fn expression_map(&self) -> crate::Map<Self::Symbol, Self::Expression> {
         self.universe()
-            .map(|sym| (sym, Self::expression(sym)))
+            .map(|sym| (sym, self.make_expression(sym)))
             .collect()
     }
+
+    /// Returns true if the two expressions are disjoint, meaning they share no common valuations.
+    fn disjoint(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
+        !self.overlapping(left, right)
+    }
+
+    /// Returns true if there exists a valuation/symbol matched by both expressions.
+    fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool;
 
     /// This method is used for an optimization: If we have a [`CharAlphabet`] alphabet, then an edge list essentially
     /// boils down to a map from `Self::Symbol` to an edge. For more complicated alphabets, this may not always
@@ -58,7 +66,10 @@ pub trait Alphabet: Clone {
     fn search_edge<X>(
         map: &Map<Self::Expression, X>,
         sym: Self::Symbol,
-    ) -> Option<(&Self::Expression, &X)>;
+    ) -> Option<(&Self::Expression, &X)> {
+        map.iter()
+            .find_map(|(e, x)| if e.matches(sym) { Some((e, x)) } else { None })
+    }
 
     /// Type for an iterator over all possible symbols in the alphabet. For propositional alphabets,
     /// this may return quite a few symbols (exponential in the number of atomic propositions).
@@ -78,9 +89,6 @@ pub trait Alphabet: Clone {
     /// the expression is satisfied by the given symbol, an example of this is illustrated in propositional.
     fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool;
 
-    /// Creates an expression from a single symbol.
-    fn expression(symbol: Self::Symbol) -> Self::Expression;
-
     /// Returns the number of symbols in the alphabet.
     fn size(&self) -> usize;
 }
@@ -92,7 +100,7 @@ impl<A: Alphabet> Alphabet for &A {
     fn universe(&self) -> Self::Universe<'_> {
         A::universe(self)
     }
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression {
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
         A::make_expression(self, symbol)
     }
     fn search_edge<X>(
@@ -101,14 +109,14 @@ impl<A: Alphabet> Alphabet for &A {
     ) -> Option<(&Self::Expression, &X)> {
         A::search_edge(map, sym)
     }
+    fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
+        A::overlapping(self, left, right)
+    }
     fn contains(&self, symbol: Self::Symbol) -> bool {
         A::contains(self, symbol)
     }
     fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
         A::matches(self, expression, symbol)
-    }
-    fn expression(symbol: Self::Symbol) -> Self::Expression {
-        A::expression(symbol)
     }
     fn size(&self) -> usize {
         A::size(self)
@@ -164,6 +172,10 @@ impl Alphabet for Empty {
         todo!()
     }
 
+    fn overlapping(&self, _left: &Self::Expression, _right: &Self::Expression) -> bool {
+        false
+    }
+
     type Universe<'this> = std::iter::Empty<Empty>
     where
         Self: 'this;
@@ -180,16 +192,12 @@ impl Alphabet for Empty {
         true
     }
 
-    fn expression(_symbol: Self::Symbol) -> Self::Expression {
-        Empty
-    }
-
     fn size(&self) -> usize {
         0
     }
 
-    fn make_expression(&self, _symbol: Self::Symbol) -> &Self::Expression {
-        &Empty
+    fn make_expression(&self, _symbol: Self::Symbol) -> Self::Expression {
+        Empty
     }
 }
 
@@ -298,12 +306,12 @@ impl Alphabet for CharAlphabet {
         self.0.len()
     }
 
-    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
-        expression == &symbol
+    fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
+        left == right
     }
 
-    fn expression(symbol: Self::Symbol) -> Self::Expression {
-        symbol
+    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
+        expression == &symbol
     }
 
     fn universe(&self) -> Self::Universe<'_> {
@@ -322,8 +330,9 @@ impl Alphabet for CharAlphabet {
         map.get_key_value(&sym)
     }
 
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression {
-        self.0
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
+        *self
+            .0
             .iter()
             .find(|c| c == &&symbol)
             .expect("symbol does not exist")
@@ -367,6 +376,10 @@ impl<S: Symbol + Expression<S>, const N: usize> Alphabet for Fixed<S, N> {
         map.get_key_value(&sym)
     }
 
+    fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
+        left == right
+    }
+
     fn size(&self) -> usize {
         N
     }
@@ -387,12 +400,9 @@ impl<S: Symbol + Expression<S>, const N: usize> Alphabet for Fixed<S, N> {
         expression == &symbol
     }
 
-    fn expression(symbol: Self::Symbol) -> Self::Expression {
-        symbol
-    }
-
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression {
-        self.0
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
+        *self
+            .0
             .iter()
             .find(|c| c == &&symbol)
             .expect("symbol does not exist")
@@ -489,6 +499,10 @@ impl Alphabet for Directional {
         self.0.len()
     }
 
+    fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
+        left == right
+    }
+
     type Universe<'this> = std::iter::Cloned<std::slice::Iter<'this, InvertibleChar>>
     where
         Self: 'this;
@@ -505,12 +519,9 @@ impl Alphabet for Directional {
         *expression == symbol
     }
 
-    fn expression(symbol: Self::Symbol) -> Self::Expression {
-        symbol
-    }
-
-    fn make_expression(&self, symbol: Self::Symbol) -> &Self::Expression {
-        self.0
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
+        *self
+            .0
             .iter()
             .find(|c| c == &&symbol)
             .expect("symbol does not exist")

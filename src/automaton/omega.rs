@@ -1,8 +1,8 @@
 use bit_set::BitSet;
 use itertools::Itertools;
-use tracing::warn;
+use tracing::error;
 
-use crate::{congruence::FORC, prelude::*, Set};
+use crate::{hoa::HoaAlphabet, prelude::*, Set};
 
 use super::Initialized;
 
@@ -25,10 +25,17 @@ impl AcceptanceMask {
     pub fn as_priority(&self) -> usize {
         let mut it = self.iter();
         let Some(priority) = it.next() else {
-            panic!("No priority set");
+            error!(
+                "no priority is set on the edge, we require each edge to have precisely one color"
+            );
+            panic!("could not extract priority from acceptance mask");
         };
         if it.next().is_some() {
-            warn!("more than one priority is set! {:?}", self.0);
+            error!(
+                "more than one priority is set on the edge: {:?}, but we require edges to have precisely one color",
+                self.0
+            );
+            panic!("could not extract priority from acceptance mask");
         }
         priority
     }
@@ -50,7 +57,7 @@ impl From<&hoars::AcceptanceSignature> for AcceptanceMask {
 
 #[derive(Debug, Clone, Eq, Copy, PartialEq, Ord, PartialOrd)]
 pub enum OmegaAcceptanceCondition {
-    Parity,
+    Parity(usize, usize),
     Buchi,
     Rabin,
     Streett,
@@ -63,7 +70,7 @@ pub enum OmegaAcceptanceCondition {
 impl OmegaAcceptanceCondition {
     pub fn satisfied(&self, infset: &Set<AcceptanceMask>) -> bool {
         match self {
-            OmegaAcceptanceCondition::Parity => infset
+            OmegaAcceptanceCondition::Parity(_low, _high) => infset
                 .iter()
                 .map(|x| x.as_priority())
                 .min()
@@ -93,16 +100,8 @@ impl<A: Alphabet> OmegaAutomaton<A> {
         Self { ts, acc }
     }
 
-    pub fn to_deterministic(&self) -> Option<DeterministicOmegaAutomaton<A>> {
+    pub fn into_deterministic(self) -> Option<DeterministicOmegaAutomaton<A>> {
         self.try_into().ok()
-    }
-
-    pub fn prefix_congruence(&self) -> RightCongruence<A> {
-        todo!()
-    }
-
-    pub fn underlying_forc(&self) -> FORC<A, bool> {
-        todo!()
     }
 }
 
@@ -112,6 +111,74 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
         acc: OmegaAcceptanceCondition,
     ) -> Self {
         Self { ts, acc }
+    }
+
+    pub fn into_dpa(self) -> DPA<A> {
+        assert!(
+            matches!(self.acc, OmegaAcceptanceCondition::Parity(_, _)),
+            "Can only turn DPA into DPA for now"
+        );
+
+        self.ts
+            .map_edge_colors(|mask| mask.as_priority())
+            .collect_dpa()
+    }
+}
+
+impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
+    fn from(value: DeterministicOmegaAutomaton<HoaAlphabet>) -> Self {
+        let size = value.size();
+        let ts = TSBuilder::default()
+            .with_state_colors((0..size).map(|i| value.state_color(i).unwrap()))
+            .with_transitions(value.state_indices().flat_map(|q| {
+                assert!(q < size);
+                value.edges_from(q).unwrap().flat_map(|edge| {
+                    edge.expression()
+                        .chars_iter()
+                        .map(move |sym| (edge.source(), sym, edge.color(), edge.target()))
+                })
+            }))
+            .into_deterministic_initialized(value.initial());
+        DeterministicOmegaAutomaton::new(ts, value.acc)
+    }
+}
+
+impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
+    for DeterministicOmegaAutomaton<HoaAlphabet>
+{
+    /// For now, we allow this to error out in exactly one case: if the number of alphabet symbols
+    /// is not a power of 2 and cannot be mapped immediately into AP combinations.
+    type Error = String;
+    fn try_from(value: DeterministicOmegaAutomaton<CharAlphabet>) -> Result<Self, Self::Error> {
+        let size = value.size();
+        let mut ts = DTS::for_alphabet(HoaAlphabet::try_from_char_alphabet(value.alphabet())?);
+
+        for q in value.state_indices() {
+            assert!(q < size, "The state indices must be contiguous for this!");
+            ts.add_state(value.state_color(q).unwrap());
+        }
+
+        for q in value.state_indices() {
+            for edge in value.edges_from(q).unwrap() {
+                assert!(
+                    ts.add_edge(
+                        edge.source(),
+                        ts.alphabet()
+                            .make_expression(ts.alphabet().char_to_hoa_symbol(*edge.expression())),
+                        edge.target(),
+                        edge.color(),
+                    )
+                    .is_none(),
+                    "Expected a deterministic automaton"
+                );
+            }
+        }
+
+        assert!(value.initial() < size);
+        Ok(DeterministicOmegaAutomaton::new(
+            ts.with_initial(value.initial()),
+            value.acc,
+        ))
     }
 }
 
