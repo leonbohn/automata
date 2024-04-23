@@ -1,6 +1,6 @@
 use bit_set::BitSet;
 use itertools::Itertools;
-use tracing::{trace, warn};
+use tracing::error;
 
 use crate::{hoa::HoaAlphabet, prelude::*, Set};
 
@@ -22,17 +22,22 @@ impl AcceptanceMask {
         self.iter().min()
     }
 
-    pub fn try_as_priority(&self) -> Option<usize> {
-        let mut it = self.iter();
-        let priority = it.next()?;
-        if it.next().is_some() {
-            warn!("more than one priority is set! {:?}", self.0);
-        }
-        Some(priority)
-    }
-
     pub fn as_priority(&self) -> usize {
-        self.try_as_priority().unwrap()
+        let mut it = self.iter();
+        let Some(priority) = it.next() else {
+            error!(
+                "no priority is set on the edge, we require each edge to have precisely one color"
+            );
+            panic!("could not extract priority from acceptance mask");
+        };
+        if it.next().is_some() {
+            error!(
+                "more than one priority is set on the edge: {:?}, but we require edges to have precisely one color",
+                self.0
+            );
+            panic!("could not extract priority from acceptance mask");
+        }
+        priority
     }
 }
 
@@ -114,27 +119,20 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
             "Can only turn DPA into DPA for now"
         );
 
-        let neutral = self
-            .ts
-            .edge_colors_unique()
-            .filter_map(|mask| mask.try_as_priority())
-            .max()
-            .expect("Need at least one neutral color (the maximal one)");
-
         self.ts
-            .map_edge_colors(|mask| mask.try_as_priority().unwrap_or(neutral))
+            .map_edge_colors(|mask| mask.as_priority())
             .collect_dpa()
     }
 }
 
 impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
     fn from(value: DeterministicOmegaAutomaton<HoaAlphabet>) -> Self {
-        trace!("in From<DOA>");
+        let size = value.size();
         let ts = TSBuilder::default()
-            .with_state_colors((0..value.size()).map(|i| value.state_color(i).unwrap()))
+            .with_state_colors((0..size).map(|i| value.state_color(i).unwrap()))
             .with_transitions(value.state_indices().flat_map(|q| {
+                assert!(q < size);
                 value.edges_from(q).unwrap().flat_map(|edge| {
-                    trace!("edge has expression with {} aps", edge.expression().aps());
                     edge.expression()
                         .chars_iter()
                         .map(move |sym| (edge.source(), sym, edge.color(), edge.target()))
@@ -150,17 +148,37 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
 {
     /// For now, we allow this to error out in exactly one case: if the number of alphabet symbols
     /// is not a power of 2 and cannot be mapped immediately into AP combinations.
-    type Error = ();
+    type Error = String;
     fn try_from(value: DeterministicOmegaAutomaton<CharAlphabet>) -> Result<Self, Self::Error> {
-        let alphabet_size = value.alphabet().size();
-        if alphabet_size != alphabet_size.next_power_of_two() || alphabet_size == 0 {
-            return Err(());
+        let size = value.size();
+        let mut ts = DTS::for_alphabet(HoaAlphabet::try_from_char_alphabet(value.alphabet())?);
+
+        for q in value.state_indices() {
+            assert!(q < size, "The state indices must be contiguous for this!");
+            ts.add_state(value.state_color(q).unwrap());
         }
 
-        let aps = alphabet_size.ilog2() as usize;
-        assert!(aps > 0, "We do not want this edge case");
+        for q in value.state_indices() {
+            for edge in value.edges_from(q).unwrap() {
+                assert!(
+                    ts.add_edge(
+                        edge.source(),
+                        ts.alphabet()
+                            .make_expression(ts.alphabet().char_to_hoa_symbol(*edge.expression())),
+                        edge.target(),
+                        edge.color(),
+                    )
+                    .is_none(),
+                    "Expected a deterministic automaton"
+                );
+            }
+        }
 
-        todo!()
+        assert!(value.initial() < size);
+        Ok(DeterministicOmegaAutomaton::new(
+            ts.with_initial(value.initial()),
+            value.acc,
+        ))
     }
 }
 
