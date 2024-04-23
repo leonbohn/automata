@@ -121,8 +121,7 @@ pub struct ProductStatesIter<'a, L: TransitionSystem, R: TransitionSystem> {
     left: L::StateIndices<'a>,
     right: R::StateIndices<'a>,
     left_state: Option<L::StateIndex>,
-    #[allow(unused)]
-    lts: &'a L,
+    _lts: &'a L,
     rts: &'a R,
 }
 
@@ -154,7 +153,7 @@ impl<'a, L: TransitionSystem, R: TransitionSystem> ProductStatesIter<'a, L, R> {
             left: lit,
             right: rts.state_indices(),
             rts,
-            lts,
+            _lts: lts,
         }
     }
 }

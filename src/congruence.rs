@@ -9,12 +9,13 @@ pub use class::Class;
 mod forc;
 pub use forc::FORC;
 
-#[allow(unused)]
 mod transitionprofile;
-pub use transitionprofile::{Accumulates, RunProfile, RunSignature, TransitionMonoid};
+pub use transitionprofile::{
+    Accumulates, ReducingMonoid, ReplacingMonoid, RunProfile, RunSignature, TransitionMonoid,
+};
 
-#[allow(unused)]
 mod cayley;
+pub use cayley::{Cayley, RightCayley};
 
 /// Represents a right congruence relation, which is in essence a trim, deterministic
 /// transition system with a designated initial state.

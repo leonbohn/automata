@@ -322,15 +322,12 @@ impl Show for HoaExpression {
 
 pub struct HoaExpressionIter<'a> {
     iter: BddSatisfyingValuations<'a>,
-    #[allow(unused)]
-    aps: usize,
 }
 
 impl<'a> HoaExpressionIter<'a> {
     pub fn new(expr: &'a HoaExpression) -> Self {
         Self {
             iter: expr.bdd.sat_valuations(),
-            aps: expr.aps,
         }
     }
 }
