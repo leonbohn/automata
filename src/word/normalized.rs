@@ -1,4 +1,7 @@
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    hash::{Hash, Hasher},
+};
 
 use itertools::Itertools;
 
@@ -18,11 +21,13 @@ use super::LinearWord;
 /// back and forth between the two states. Consider a word `w = ba^ω`, meaning `u = b` and `x = a`. Clearly `w` is not normalized wrt `T`
 /// since `u` leads to `0` while `x` leads to `1`. The normalization of `w` wrt `T` would be `b(aa)^ω` since `aa` loops on the state `0`
 /// that is reached after reading `b` from the initial state `0`.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct NormalizedOmegaWord<S: Symbol> {
     upw: ReducedOmegaWord<S>,
     pre_loop_count: usize,
     loop_size: usize,
+    base: std::cell::OnceCell<Vec<S>>,
+    rec: std::cell::OnceCell<Vec<S>>,
 }
 
 impl<S: Symbol> NormalizedOmegaWord<S> {
@@ -45,6 +50,8 @@ impl<S: Symbol> NormalizedOmegaWord<S> {
             upw,
             pre_loop_count,
             loop_size,
+            base: std::cell::OnceCell::new(),
+            rec: std::cell::OnceCell::new(),
         }
     }
 
@@ -74,20 +81,20 @@ impl<S: Symbol> LinearWord<S> for NormalizedOmegaWord<S> {
 }
 
 impl<S: Symbol> OmegaWord<S> for NormalizedOmegaWord<S> {
-    type Spoke<'this> = Vec<S>
+    type Spoke<'this> = &'this [S]
     where
         Self: 'this;
 
-    type Cycle<'this> = Vec<S>
+    type Cycle<'this> = &'this [S]
     where
         Self: 'this;
 
     fn spoke(&self) -> Self::Spoke<'_> {
-        self.base_iter().collect()
+        self.base.get_or_init(|| self.base_iter().collect())
     }
 
     fn cycle(&self) -> Self::Cycle<'_> {
-        self.rec_iter().collect()
+        self.rec.get_or_init(|| self.rec_iter().collect())
     }
 }
 
@@ -96,6 +103,14 @@ impl<S: Symbol> Debug for NormalizedOmegaWord<S> {
         let base = self.base_iter().map(|s| s.show()).join("");
         let rec = self.rec_iter().map(|s| s.show()).join("");
         write!(f, "{base}·{rec}~{base}")
+    }
+}
+
+impl<S: Symbol> Hash for NormalizedOmegaWord<S> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.upw.hash(state);
+        self.pre_loop_count.hash(state);
+        self.loop_size.hash(state);
     }
 }
 
