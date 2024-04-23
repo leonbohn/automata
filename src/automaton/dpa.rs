@@ -90,8 +90,49 @@ where
 
     /// Gives a witness for the fact that the language accepted by `self` is not empty. This is
     /// done by finding an accepting cycle in the underlying transition system.
-    pub fn give_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
-        todo!()
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let dpa = TSBuilder::without_state_colors()
+    ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
+    ///     .into_dpa(0);
+    /// assert!(dpa.give_accepted_word().is_some())
+    /// ```
+    pub fn give_accepted_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
+        self.colors().find_map(|i| {
+            if i % 2 == 1 {
+                None
+            } else {
+                self.witness_color(i)
+            }
+        })
+    }
+    /// Gives a witness for the fact that the language accepted by `self` is not universal. This is
+    /// done by finding a rejecting cycle in the underlying transition system.
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let dpa = TSBuilder::without_state_colors()
+    ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
+    ///     .into_dpa(0);
+    /// assert!(dpa.give_rejected_word().is_some());
+    ///
+    /// let univ = TSBuilder::without_state_colors()
+    ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 2, 0)])
+    ///     .into_dpa(0);
+    /// assert!(univ.give_rejected_word().is_none())
+    /// ```
+    pub fn give_rejected_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
+        self.colors().find_map(|i| {
+            if i % 2 == 0 {
+                None
+            } else {
+                self.witness_color(i)
+            }
+        })
     }
 
     /// Builds the complement of `self`, i.e. the DPA that accepts the complement of the language

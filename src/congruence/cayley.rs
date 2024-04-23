@@ -2,10 +2,7 @@ use crate::{prelude::*, transition_system::EdgeReference};
 
 use self::alphabet::{Directional, InvertibleChar};
 
-use super::{
-    transitionprofile::{Reduces, Replaces},
-    Accumulates, RunProfile, TransitionMonoid,
-};
+use super::{Accumulates, RunProfile, TransitionMonoid};
 
 /// Represents the two-sided Cayley graph of a deterministic transition system.
 /// In essence, it is a graph using transition profiles of the ts as nodes. It uses
@@ -20,53 +17,48 @@ use super::{
 /// store which state is reached. However the encountered edge and state colours need to be taken
 /// into account as well. The [`Accumulates`] trait provides a way to combine these colours.
 ///
-/// There are two main ways to combine the colours:
-/// - `Reduces`: This struct takes the minimum of the currently stored/known and any encountered value.
-/// - `Replaces`: This struct stores any encountered value and replaces the currently stored value.
-/// - `Collect` (not yet implemented): This struct collects all encountered values.
+/// Since the Cayley graph is merely a way of visualising the transition profiles/transition monoid
+/// of a transition system, we defer for an example to [`TransitionMonoid`].
 #[derive(Clone)]
-pub struct Cayley<
-    Ts: Deterministic<Alphabet = CharAlphabet> + Pointed,
-    SA: Accumulates<X = Ts::StateColor>,
-    EA: Accumulates<X = Ts::EdgeColor>,
-> {
+pub struct Cayley<Ts: Deterministic<Alphabet = CharAlphabet> + Pointed>
+where
+    Ts::EdgeColor: Accumulates,
+    Ts::StateColor: Accumulates,
+{
     alphabet: Directional,
     expressions: crate::Map<SymbolOf<Self>, ExpressionOf<Self>>,
-    m: TransitionMonoid<Ts, SA, EA>,
+    m: TransitionMonoid<Ts>,
 }
 
 /// The right Cayley graph of a deterministic transition system is a graph that uses
 /// the transition profiles of the ts as nodes. See [`Cayley`] for more details.
 #[derive(Clone)]
-pub struct RightCayley<
-    Ts: TransitionSystem + Pointed,
-    SA: Accumulates<X = Ts::StateColor>,
-    EA: Accumulates<X = Ts::EdgeColor>,
-> {
+pub struct RightCayley<Ts: TransitionSystem + Pointed> {
     expressions: crate::Map<SymbolOf<Ts>, ExpressionOf<Ts>>,
-    m: TransitionMonoid<Ts, SA, EA>,
+    m: TransitionMonoid<Ts>,
 }
 
-impl<
-        Ts: Deterministic<Alphabet = CharAlphabet> + Pointed,
-        SA: Accumulates<X = Ts::StateColor>,
-        EA: Accumulates<X = Ts::EdgeColor>,
-    > Cayley<Ts, SA, EA>
+impl<Ts> Cayley<Ts>
+where
+    Ts: Deterministic<Alphabet = CharAlphabet> + Pointed,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
 {
     /// Returns a reference to the [`TransitionMonoid`].
-    pub fn monoid(&self) -> &TransitionMonoid<Ts, SA, EA> {
+    pub fn monoid(&self) -> &TransitionMonoid<Ts> {
         &self.m
     }
 }
 
-impl<Ts, SA: Accumulates<X = Ts::StateColor>, EA: Accumulates<X = Ts::EdgeColor>> TransitionSystem
-    for Cayley<Ts, SA, EA>
+impl<Ts> TransitionSystem for Cayley<Ts>
 where
     Ts: Deterministic<Alphabet = CharAlphabet> + Pointed,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
 {
     type StateIndex = usize;
 
-    type StateColor = RunProfile<Ts::StateIndex, SA, EA>;
+    type StateColor = RunProfile<Ts::StateIndex, StateColor<Ts>, EdgeColor<Ts>>;
 
     type EdgeColor = ();
 
@@ -97,10 +89,11 @@ where
     }
 }
 
-impl<Ts, SA: Accumulates<X = Ts::StateColor>, EA: Accumulates<X = Ts::EdgeColor>> Deterministic
-    for Cayley<Ts, SA, EA>
+impl<Ts> Deterministic for Cayley<Ts>
 where
     Ts: Deterministic<Alphabet = CharAlphabet> + Pointed,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
 {
     fn transition<Idx: Indexes<Self>>(
         &self,
@@ -121,50 +114,31 @@ where
     }
 }
 
-impl<Ts> Cayley<Ts, Reduces<Ts::StateColor>, Reduces<Ts::EdgeColor>>
+impl<Ts> Cayley<Ts>
 where
     Ts: Deterministic<Alphabet = CharAlphabet> + Pointed,
-    Reduces<Ts::EdgeColor>: Accumulates<X = Ts::EdgeColor>,
-    Reduces<Ts::StateColor>: Accumulates<X = Ts::StateColor>,
+    Ts::EdgeColor: Accumulates,
+    Ts::StateColor: Accumulates,
 {
-    /// Instantiates a new Cayley graph that reduces the state and edge colors. Specifically,
-    /// this means that the state and edge colors are accumulated by taking the minimum of the
-    /// currently stored/known and any encountered value.
-    pub fn new_reducing(ts: Ts) -> Self {
+    /// Build a new Cayley graph from the given transition system.
+    pub fn new(ts: Ts) -> Self {
         let alphabet = Directional::from_iter(ts.alphabet().universe());
         Cayley {
             expressions: alphabet.expression_map(),
-            m: TransitionMonoid::new_reducing(ts),
+            m: TransitionMonoid::new(ts),
             alphabet,
-        }
-    }
-}
-impl<Ts> Cayley<Ts, Replaces<Ts::StateColor>, Replaces<Ts::EdgeColor>>
-where
-    Ts: Deterministic<Alphabet = CharAlphabet> + Pointed,
-    Replaces<Ts::EdgeColor>: Accumulates<X = Ts::EdgeColor>,
-    Replaces<Ts::StateColor>: Accumulates<X = Ts::StateColor>,
-{
-    /// Instantiates a new Cayley graph that replaces the state and edge colors. This means
-    /// any encountered value is stored and replaces the currently stored value.
-    pub fn new_replacing(ts: Ts) -> Self {
-        let alphabet = Directional::from_iter(ts.alphabet().universe());
-        Cayley {
-            expressions: alphabet.expression_map(),
-            alphabet,
-            m: TransitionMonoid::new_replacing(ts),
         }
     }
 }
 
-impl<Ts, SA: Accumulates<X = Ts::StateColor>, EA: Accumulates<X = Ts::EdgeColor>> Cayley<Ts, SA, EA>
+impl<Ts> Cayley<Ts>
 where
     Ts: Deterministic<Alphabet = CharAlphabet> + Pointed,
     Ts::StateColor: Accumulates,
     Ts::EdgeColor: Accumulates,
 {
     /// Builds a new Cayley graph from the given transition system and transition monoid.
-    pub fn from(ts: Ts, m: TransitionMonoid<Ts, SA, EA>) -> Self {
+    pub fn from(ts: Ts, m: TransitionMonoid<Ts>) -> Self {
         let alphabet = Directional::from_iter(ts.alphabet().universe());
         Self {
             expressions: alphabet.expression_map(),
@@ -174,11 +148,11 @@ where
     }
 }
 
-impl<
-        Ts: TransitionSystem + Pointed,
-        SA: Accumulates<X = Ts::StateColor>,
-        EA: Accumulates<X = Ts::EdgeColor>,
-    > RightCayley<Ts, SA, EA>
+impl<Ts> RightCayley<Ts>
+where
+    Ts: TransitionSystem + Pointed,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
 {
     /// Returns a reference to the underlying ts.
     pub fn ts(&self) -> &Ts {
@@ -186,19 +160,20 @@ impl<
     }
 
     /// Returns a reference to the [`TransitionMonoid`].
-    pub fn monoid(&self) -> &TransitionMonoid<Ts, SA, EA> {
+    pub fn monoid(&self) -> &TransitionMonoid<Ts> {
         &self.m
     }
 }
 
-impl<Ts, SA: Accumulates<X = Ts::StateColor>, EA: Accumulates<X = Ts::EdgeColor>> TransitionSystem
-    for RightCayley<Ts, SA, EA>
+impl<Ts> TransitionSystem for RightCayley<Ts>
 where
     Ts: Deterministic + Pointed,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
 {
     type StateIndex = usize;
 
-    type StateColor = RunProfile<Ts::StateIndex, SA, EA>;
+    type StateColor = RunProfile<Ts::StateIndex, StateColor<Ts>, EdgeColor<Ts>>;
 
     type EdgeColor = ();
 
@@ -228,10 +203,11 @@ where
     }
 }
 
-impl<Ts, SA: Accumulates<X = Ts::StateColor>, EA: Accumulates<X = Ts::EdgeColor>> Deterministic
-    for RightCayley<Ts, SA, EA>
+impl<Ts> Deterministic for RightCayley<Ts>
 where
     Ts: Deterministic + Pointed,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
 {
     fn transition<Idx: Indexes<Self>>(
         &self,
@@ -251,65 +227,17 @@ where
         ))
     }
 }
-
-impl<Ts> RightCayley<Ts, Reduces<Ts::StateColor>, Reduces<Ts::EdgeColor>>
-where
-    Ts: Deterministic + Pointed,
-    Reduces<Ts::EdgeColor>: Accumulates<X = Ts::EdgeColor>,
-    Reduces<Ts::StateColor>: Accumulates<X = Ts::StateColor>,
-{
-    /// Instantiates a new right Cayley graph that reduces the state and edge colors. Specifically,
-    /// this means that the state and edge colors are accumulated by taking the minimum of the currently
-    /// stored/known and any encountered value.
-    pub fn new_reducing(ts: Ts) -> Self {
-        RightCayley {
-            expressions: ts.alphabet().expression_map(),
-            m: TransitionMonoid::new_reducing(ts),
-        }
-    }
-}
-impl<Ts> RightCayley<Ts, Replaces<Ts::StateColor>, Replaces<Ts::EdgeColor>>
-where
-    Ts: Deterministic + Pointed,
-    Replaces<Ts::EdgeColor>: Accumulates<X = Ts::EdgeColor>,
-    Replaces<Ts::StateColor>: Accumulates<X = Ts::StateColor>,
-{
-    /// Instantiates a new right Cayley graph that replaces the state and edge colors. This means
-    /// any encountered value is stored and replaces the currently stored value.
-    pub fn new_replacing(ts: Ts) -> Self {
-        RightCayley {
-            expressions: ts.alphabet().expression_map(),
-            m: TransitionMonoid::new_replacing(ts),
-        }
-    }
-}
-
-impl<Ts, SA: Accumulates<X = Ts::StateColor>, EA: Accumulates<X = Ts::EdgeColor>>
-    RightCayley<Ts, SA, EA>
+impl<Ts> RightCayley<Ts>
 where
     Ts: TransitionSystem + Pointed,
-    Ts::StateColor: Accumulates,
-    Ts::EdgeColor: Accumulates,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
 {
     /// Builds a new right Cayley graph from the given transition system and transition monoid.
-    pub fn from(ts: Ts, m: TransitionMonoid<Ts, SA, EA>) -> Self {
+    pub fn from(ts: Ts, m: TransitionMonoid<Ts>) -> Self {
         Self {
             expressions: ts.alphabet().expression_map(),
             m,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::tests::wiki_dfa;
-
-    #[test]
-    #[ignore]
-    fn right_cayley_graph() {
-        let dfa = wiki_dfa();
-        let _accumulating_cayley = super::Cayley::new_reducing(&dfa);
-        let _replacing_cayley = super::Cayley::new_replacing(&dfa);
-        todo!("Find something to test?")
     }
 }
