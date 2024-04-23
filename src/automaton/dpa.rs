@@ -103,7 +103,7 @@ where
     pub fn give_accepted_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         self.colors().find_map(|i| {
             if i % 2 == 1 {
-                return None;
+                None
             } else {
                 self.witness_color(i)
             }
@@ -128,7 +128,7 @@ where
     pub fn give_rejected_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         self.colors().find_map(|i| {
             if i % 2 == 0 {
-                return None;
+                None
             } else {
                 self.witness_color(i)
             }
