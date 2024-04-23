@@ -684,19 +684,6 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn dot_render_and_display() {
-        let cong = TSBuilder::without_colors()
-            .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
-            .into_right_congruence(0);
-
-        cong.display_rendered().unwrap();
-        let _three_congs = vec![cong.clone(), cong.clone(), cong];
-        todo!()
-        // three_congs.display_rendered();
-    }
-
-    #[test]
-    #[ignore]
     fn dot_render_dpa() {
         let dpa = TSBuilder::without_state_colors()
             .with_edges([

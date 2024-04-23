@@ -244,16 +244,6 @@ pub trait Sproutable: TransitionSystem {
         from: X,
         on: <Self::Alphabet as Alphabet>::Expression,
     ) -> bool;
-
-    /// Turns the automaton into a complete one, by adding a sink state and adding transitions
-    /// to it from all states that do not have a transition for a given symbol.
-    fn complete_with_sink(&mut self, sink_color: Self::StateColor) -> Self::StateIndex {
-        let _sink = self.add_state(sink_color.clone());
-
-        let _universe = self.alphabet().universe().collect_vec();
-
-        todo!()
-    }
 }
 
 #[cfg(test)]

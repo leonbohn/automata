@@ -1,35 +1,36 @@
 #![allow(missing_docs)]
-use std::{
-    collections::VecDeque,
-    fmt::{Debug, Display},
-    hash::Hash,
-};
+use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
 use itertools::Itertools;
 
 use crate::prelude::*;
 
-pub trait HasNeutral {
-    fn neutral() -> Self;
-}
-
-impl HasNeutral for usize {
-    fn neutral() -> Self {
-        usize::MAX
-    }
-}
-impl HasNeutral for bool {
-    fn neutral() -> Self {
-        false
-    }
-}
-impl HasNeutral for () {
-    fn neutral() -> Self {}
-}
-impl HasNeutral for Void {
-    fn neutral() -> Self {
-        Void
-    }
+/// Represents the monoid of transition profiles of a transition system.
+///
+/// # Examples
+/// ```
+/// use automata::prelude::*;
+/// use automata::congruence::{TransitionMonoid, RunProfile};
+///
+/// let dfa = TSBuilder::without_edge_colors()
+///     .with_transitions([(0, 'a', 0), (0, 'b', 1), (1, 'a', 1), (1, 'b', 0)])
+///     .with_state_colors([false, true])
+///     .into_dfa(0);
+///
+/// let m = TransitionMonoid::new(dfa);
+///
+/// let bb = m.profile(&"bb");
+/// assert_eq!(bb, &RunProfile::new([(0, true, Void), (1, true, Void)]));
+/// ```
+#[derive(Clone)]
+pub struct TransitionMonoid<Ts: TransitionSystem> {
+    ts: Ts,
+    strings: Vec<(Vec<SymbolOf<Ts>>, ProfileEntry)>,
+    #[allow(clippy::type_complexity)]
+    tps: Vec<(
+        RunProfile<Ts::StateIndex, Ts::StateColor, Ts::EdgeColor>,
+        usize,
+    )>,
 }
 
 /// Encapsulates the behavour of colors along run segments. This is what we are mainly
@@ -38,175 +39,95 @@ impl HasNeutral for Void {
 /// then we mainly want to know what the combined behaviour of the visited edges is.
 /// As we use min-parity, this means we take the minimal value along all edges.
 pub trait Accumulates: Sized + Clone + Eq + Hash + Ord {
-    type X: Clone + Sized;
     /// Updates self with the received value.
-    fn update(&mut self, other: &Self::X);
+    fn update(&mut self, other: &Self);
     /// The neutral element with regard to accumulation, which is `false` for booleans and the maximal
     /// `usize::MAX` for integers.
     fn neutral() -> Self;
     /// Accumulate an iterator into a single value.
-    fn from_iter<'a, I: IntoIterator<Item = &'a Self::X>>(iter: I) -> Self
+    fn from_iter<'a, I: IntoIterator<Item = &'a Self>>(iter: I) -> Self
     where
         Self: 'a;
-    fn from(x: Self::X) -> Self;
-    fn from_or_neutral(x: Option<Self::X>) -> Self {
+    fn from(x: Self) -> Self;
+    fn from_or_neutral(x: Option<Self>) -> Self {
         match x {
             Some(x) => Self::from(x),
             None => Self::neutral(),
         }
     }
-    fn result(&self) -> &Self::X;
+    fn result(&self) -> &Self;
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Replaces<X>(X);
-
-impl<X: Clone + HasNeutral + Eq + Ord + Hash> Accumulates for Replaces<X> {
-    type X = X;
-    fn from(x: Self::X) -> Self {
-        Self(x)
+impl Accumulates for bool {
+    fn update(&mut self, other: &Self) {
+        *self |= *other;
     }
 
-    fn from_iter<'a, I: IntoIterator<Item = &'a Self::X>>(iter: I) -> Self
+    fn neutral() -> Self {
+        false
+    }
+
+    fn from_iter<'a, I: IntoIterator<Item = &'a Self>>(iter: I) -> Self
     where
         Self: 'a,
     {
-        Self(
-            iter.into_iter()
-                .last()
-                .expect("We assume the iterator to be non-empty")
-                .clone(),
-        )
-    }
-    fn update(&mut self, other: &Self::X) {
-        self.0 = other.clone()
+        iter.into_iter().any(|x| *x)
     }
 
-    fn result(&self) -> &Self::X {
-        &self.0
+    fn from(x: Self) -> Self {
+        x
     }
 
-    fn neutral() -> Self
-    where
-        Self::X: HasNeutral,
-    {
-        Self(X::neutral())
+    fn result(&self) -> &Self {
+        self
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Reduces<X>(X);
+impl Accumulates for Void {
+    fn update(&mut self, _other: &Self) {}
 
-impl Accumulates for Reduces<usize> {
-    type X = usize;
-
-    fn update(&mut self, other: &Self::X) {
-        self.0 = std::cmp::min(self.0, *other)
+    fn neutral() -> Self {
+        Void
     }
 
-    fn neutral() -> Self
-    where
-        Self::X: HasNeutral,
-    {
-        Self(Self::X::neutral())
-    }
-
-    fn from_iter<'a, I: IntoIterator<Item = &'a Self::X>>(iter: I) -> Self
+    fn from_iter<'a, I: IntoIterator<Item = &'a Self>>(_iter: I) -> Self
     where
         Self: 'a,
     {
-        Self(*iter.into_iter().min().unwrap())
+        Void
     }
 
-    fn result(&self) -> &Self::X {
-        &self.0
+    fn from(x: Self) -> Self {
+        x
     }
 
-    fn from(x: Self::X) -> Self {
-        Self(x)
+    fn result(&self) -> &Self {
+        self
     }
 }
-impl Accumulates for Reduces<bool> {
-    type X = bool;
 
-    fn update(&mut self, other: &Self::X) {
-        self.0 |= *other
+impl Accumulates for usize {
+    fn update(&mut self, other: &Self) {
+        *self = std::cmp::min(*self, *other);
     }
 
-    fn neutral() -> Self
-    where
-        Self::X: HasNeutral,
-    {
-        Self(Self::X::neutral())
+    fn neutral() -> Self {
+        usize::MAX
     }
 
-    fn from_iter<'a, I: IntoIterator<Item = &'a Self::X>>(iter: I) -> Self
+    fn from_iter<'a, I: IntoIterator<Item = &'a Self>>(iter: I) -> Self
     where
         Self: 'a,
     {
-        Self(*iter.into_iter().min().unwrap())
+        iter.into_iter().cloned().min().unwrap_or(usize::MAX)
     }
 
-    fn result(&self) -> &Self::X {
-        &self.0
+    fn from(x: Self) -> Self {
+        x
     }
 
-    fn from(x: Self::X) -> Self {
-        Self(x)
-    }
-}
-impl Accumulates for Reduces<()> {
-    type X = ();
-
-    fn update(&mut self, _other: &Self::X) {}
-
-    fn neutral() -> Self
-    where
-        Self::X: HasNeutral,
-    {
-        Self(())
-    }
-
-    fn from_iter<'a, I: IntoIterator<Item = &'a Self::X>>(_iter: I) -> Self
-    where
-        Self: 'a,
-    {
-        Self(())
-    }
-
-    fn result(&self) -> &Self::X {
-        &()
-    }
-
-    fn from(x: Self::X) -> Self {
-        Self(x)
-    }
-}
-impl Accumulates for Reduces<Void> {
-    type X = Void;
-
-    fn update(&mut self, _other: &Self::X) {}
-
-    fn neutral() -> Self
-    where
-        Self::X: HasNeutral,
-    {
-        Self(Void)
-    }
-
-    fn from_iter<'a, I: IntoIterator<Item = &'a Self::X>>(_iter: I) -> Self
-    where
-        Self: 'a,
-    {
-        Self(Void)
-    }
-
-    fn result(&self) -> &Self::X {
-        &Void
-    }
-
-    fn from(x: Self::X) -> Self {
-        Self(x)
+    fn result(&self) -> &Self {
+        self
     }
 }
 
@@ -219,11 +140,11 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
         self.0
     }
 
-    pub fn sc(&self) -> &Q::X {
+    pub fn sc(&self) -> &Q {
         self.1.result()
     }
 
-    pub fn ec(&self) -> &C::X {
+    pub fn ec(&self) -> &C {
         self.2.result()
     }
 }
@@ -235,7 +156,7 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
 
     pub fn extend_in<Ts>(&self, ts: &Ts, symbol: SymbolOf<Ts>) -> Option<Self>
     where
-        Ts: Deterministic<StateIndex = Idx, StateColor = Q::X, EdgeColor = C::X>,
+        Ts: Deterministic<StateIndex = Idx, StateColor = Q, EdgeColor = C>,
     {
         match ts.transition(self.0, symbol) {
             Some(tt) => {
@@ -252,7 +173,7 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
     }
     pub fn all_extensions<
         'a,
-        Ts: Deterministic<StateIndex = Idx, StateColor = Q::X, EdgeColor = C::X>,
+        Ts: Deterministic<StateIndex = Idx, StateColor = Q, EdgeColor = C>,
     >(
         &'a self,
         ts: &'a Ts,
@@ -274,16 +195,16 @@ impl<Idx, Q, C> RunProfile<Idx, Q, C> {
 
 impl<Idx: IndexType, Q: Accumulates, C: Accumulates> Show for RunProfile<Idx, Q, C>
 where
-    Q::X: Debug,
-    C::X: Debug,
+    Q: Show,
+    C: Show,
 {
     fn show(&self) -> String {
         let mut out = String::new();
         for (i, rs) in self.0.iter().enumerate() {
             out.push_str(&format!(
-                "{i} -{:?}|{:?}-> {}",
-                rs.sc(),
-                rs.ec(),
+                "{i} -{}|{}-> {}",
+                rs.sc().show(),
+                rs.ec().show(),
                 rs.state().show()
             ))
         }
@@ -292,7 +213,15 @@ where
 }
 
 impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
-    pub fn empty<Ts: TransitionSystem<StateIndex = Idx, StateColor = Q::X, EdgeColor = C::X>>(
+    pub fn new<I: IntoIterator<Item = (Idx, Q, C)>>(iter: I) -> Self {
+        Self(
+            iter.into_iter()
+                .map(|(i, q, c)| RunSignature(i, q, c))
+                .collect(),
+        )
+    }
+
+    pub fn empty<Ts: TransitionSystem<StateIndex = Idx, StateColor = Q, EdgeColor = C>>(
         ts: Ts,
     ) -> Self {
         Self::empty_for_states(ts.state_indices().collect())
@@ -310,7 +239,7 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
 
     pub fn extend_in<Ts>(&self, ts: &Ts, sym: SymbolOf<Ts>) -> Self
     where
-        Ts: Deterministic<StateIndex = Idx, StateColor = Q::X, EdgeColor = C::X>,
+        Ts: Deterministic<StateIndex = Idx, StateColor = Q, EdgeColor = C>,
     {
         Self(
             self.0
@@ -325,7 +254,7 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
 
     pub fn all_extensions<
         'a,
-        Ts: Deterministic<StateIndex = Idx, StateColor = Q::X, EdgeColor = C::X>,
+        Ts: Deterministic<StateIndex = Idx, StateColor = Q, EdgeColor = C>,
     >(
         &'a self,
         ts: &'a Ts,
@@ -359,74 +288,46 @@ impl From<&ProfileEntry> for usize {
     }
 }
 
-#[derive(Clone)]
-pub struct TransitionMonoid<
+impl<Ts> TransitionMonoid<Ts>
+where
     Ts: TransitionSystem,
-    SA: Accumulates<X = Ts::StateColor>,
-    EA: Accumulates<X = Ts::EdgeColor>,
-> {
-    ts: Ts,
-    strings: Vec<(Vec<SymbolOf<Ts>>, ProfileEntry)>,
-    #[allow(clippy::type_complexity)]
-    tps: Vec<(RunProfile<Ts::StateIndex, SA, EA>, usize)>,
-}
-
-impl<
-        Ts: TransitionSystem,
-        SA: Accumulates<X = Ts::StateColor>,
-        EA: Accumulates<X = Ts::EdgeColor>,
-    > TransitionMonoid<Ts, SA, EA>
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
 {
     pub fn ts(&self) -> &Ts {
         &self.ts
     }
+
+    pub fn elements(&self) -> usize {
+        self.tps.len()
+    }
 }
 
-impl<Ts> TransitionMonoid<Ts, Reduces<Ts::StateColor>, Reduces<Ts::EdgeColor>>
+impl<Ts> TransitionMonoid<Ts>
 where
     Ts: Deterministic + Pointed,
-    Reduces<Ts::EdgeColor>: Accumulates<X = Ts::EdgeColor>,
-    Reduces<Ts::StateColor>: Accumulates<X = Ts::StateColor>,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
 {
-    pub fn new_reducing(ts: Ts) -> Self {
+    pub fn new(ts: Ts) -> Self {
         Self::build(ts)
     }
-
-    pub fn new_reducing_for_states<I: IntoIterator<Item = Ts::StateIndex>>(
-        ts: Ts,
-        iter: I,
-    ) -> Self {
-        Self::build_for_states(ts, iter.into_iter().collect())
-    }
-}
-impl<Ts> TransitionMonoid<Ts, Replaces<Ts::StateColor>, Replaces<Ts::EdgeColor>>
-where
-    Ts: Deterministic + Pointed,
-    Replaces<Ts::EdgeColor>: Accumulates<X = Ts::EdgeColor>,
-    Replaces<Ts::StateColor>: Accumulates<X = Ts::StateColor>,
-{
-    pub fn new_replacing(ts: Ts) -> Self {
-        Self::build(ts)
-    }
-
-    pub fn new_replacing_for_states<I: IntoIterator<Item = Ts::StateIndex>>(
-        ts: Ts,
-        iter: I,
-    ) -> Self {
-        Self::build_for_states(ts, iter.into_iter().collect())
-    }
 }
 
-impl<Ts, SA: Accumulates<X = Ts::StateColor>, EA: Accumulates<X = Ts::EdgeColor>>
-    TransitionMonoid<Ts, SA, EA>
+impl<Ts> TransitionMonoid<Ts>
 where
     Ts: Deterministic + Pointed,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
 {
     #[allow(clippy::type_complexity)]
     pub fn get_profile(
         &self,
         idx: usize,
-    ) -> Option<(&RunProfile<Ts::StateIndex, SA, EA>, &[SymbolOf<Ts>])> {
+    ) -> Option<(
+        &RunProfile<Ts::StateIndex, StateColor<Ts>, EdgeColor<Ts>>,
+        &[SymbolOf<Ts>],
+    )> {
         let (tp, string_idx) = self.tps.get(idx)?;
         let (word, _) = self.strings.get(*string_idx)?;
         Some((tp, word))
@@ -446,16 +347,24 @@ where
         }
     }
 
+    pub fn profile<W: FiniteWord<SymbolOf<Ts>>>(
+        &self,
+        word: W,
+    ) -> &RunProfile<Ts::StateIndex, StateColor<Ts>, EdgeColor<Ts>> {
+        let idx = self.profile_for(word).expect("Must exist!");
+        &self.tps[idx].0
+    }
+
     pub fn profile_indices(&self) -> std::ops::Range<usize> {
         0..self.tps.len()
     }
 
-    fn build(ts: Ts) -> TransitionMonoid<Ts, SA, EA> {
+    fn build(ts: Ts) -> TransitionMonoid<Ts> {
         let indices = ts.state_indices().collect();
         Self::build_for_states(ts, indices)
     }
 
-    fn build_for_states(ts: Ts, states: Vec<Ts::StateIndex>) -> TransitionMonoid<Ts, SA, EA> {
+    fn build_for_states(ts: Ts, states: Vec<Ts::StateIndex>) -> TransitionMonoid<Ts> {
         let eps_profile = RunProfile::empty_for_states(states);
         let mut tps = vec![(eps_profile.clone(), 0)];
         let mut strings = vec![(vec![], ProfileEntry::Profile(0))];
@@ -464,9 +373,12 @@ where
         while let Some((word, profile)) = queue.pop_front() {
             for (profile_extension, sym) in profile.all_extensions(&ts) {
                 assert!(
-                    word.len() < 10,
+                    word.len() < ts.size() * 2,
                     "This looks dangerously like an infinite loop..."
                 );
+                assert!(profile_extension
+                    .iter()
+                    .all(|tp| ts.contains_state_index(tp.state())));
                 let mut word_extension = word.clone();
                 word_extension.push(sym);
                 if let Some(existing_idx) = tps.iter().position(|(tp, _)| *tp == profile_extension)
@@ -488,36 +400,28 @@ where
     }
 }
 
-pub type ReplacingMonoid<Ts> = TransitionMonoid<
-    Ts,
-    Replaces<<Ts as TransitionSystem>::StateColor>,
-    Replaces<<Ts as TransitionSystem>::EdgeColor>,
->;
-
-pub type ReducingMonoid<Ts> = TransitionMonoid<
-    Ts,
-    Reduces<<Ts as TransitionSystem>::StateColor>,
-    Reduces<<Ts as TransitionSystem>::EdgeColor>,
->;
-
-impl<Ts, SA, EA> Display for TransitionMonoid<Ts, SA, EA>
+impl<Ts> Show for TransitionMonoid<Ts>
 where
     Ts: TransitionSystem,
-    Ts::StateIndex: Show,
-    for<'b> (&'b StateColor<Ts>, &'b EdgeColor<Ts>): Show,
-    SA: Accumulates<X = Ts::StateColor>,
-    EA: Accumulates<X = Ts::EdgeColor>,
-    SymbolOf<Ts>: Display,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
+    for<'b> (&'b Ts::StateColor, &'b Ts::EdgeColor): Show,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn show(&self) -> String {
         use owo_colors::OwoColorize;
         let mut b = tabled::builder::Builder::default();
 
         for (word, entry) in &self.strings {
-            let mut row = vec![word.show()];
+            let mut row = vec![];
             let profile_idx = match entry {
-                ProfileEntry::Profile(profile) => profile,
-                ProfileEntry::Redirect(redirect) => redirect,
+                ProfileEntry::Profile(profile) => {
+                    row.push(word.show().bold().to_string());
+                    profile
+                }
+                ProfileEntry::Redirect(redirect) => {
+                    row.push(word.show().dimmed().to_string());
+                    redirect
+                }
             };
 
             let (profile, _) = self.tps.get(*profile_idx).expect("Must exist!");
@@ -531,25 +435,28 @@ where
             b.push_record(row);
         }
 
-        write!(f, "{}", b.build().with(tabled::settings::Style::ascii()))
+        b.build().with(tabled::settings::Style::ascii()).to_string()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{congruence::transitionprofile::ReducingMonoid, tests::wiki_dfa, TransitionSystem};
+    use crate::congruence::TransitionMonoid;
 
     #[test]
-    fn tp_from_ts() {
-        let dfa = wiki_dfa();
+    fn tp_from_ts_time() {
+        let dfa = crate::prelude::TSBuilder::without_edge_colors()
+            .with_transitions([(0, 'a', 0), (0, 'b', 1), (1, 'a', 1), (1, 'b', 0)])
+            .with_state_colors([false, true])
+            .into_dfa(0);
 
-        let tps = ReducingMonoid::build(&dfa);
-        println!("{}", tps);
-
-        let reduced_tps = ReducingMonoid::build_for_states(
-            &dfa,
-            dfa.state_indices().filter(|i| i % 2 == 0).collect(),
+        let start = std::time::Instant::now();
+        let tps = TransitionMonoid::build(&dfa);
+        println!(
+            "building transition monoid took {} microseconds",
+            start.elapsed().as_micros()
         );
-        print!("{}", reduced_tps);
+        assert_eq!(tps.elements(), 5);
+        println!("{}", crate::Show::show(&tps));
     }
 }

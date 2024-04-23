@@ -10,9 +10,7 @@ mod forc;
 pub use forc::FORC;
 
 mod transitionprofile;
-pub use transitionprofile::{
-    Accumulates, ReducingMonoid, ReplacingMonoid, RunProfile, RunSignature, TransitionMonoid,
-};
+pub use transitionprofile::{Accumulates, RunProfile, RunSignature, TransitionMonoid};
 
 mod cayley;
 pub use cayley::{Cayley, RightCayley};
@@ -34,6 +32,13 @@ impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
         V: FiniteWord<A::Symbol>,
     {
         self.reached_state_index(word).unwrap() == self.reached_state_index(other).unwrap()
+    }
+
+    /// Computes a DFA that accepts precisely those finite words which loop on the given `class`. Formally,
+    /// if `u` represents the given class, then the DFA accepts precisely those words `w` such that `uw`
+    /// is congruent to `u`.
+    pub fn looping_words(&self, _class: &Class<A::Symbol>) -> DFA<A> {
+        todo!()
     }
 
     /// Verifies whether an element of `self` is  idempotent, i.e. if the mr of the indexed
@@ -66,13 +71,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
             .iter()
             .enumerate()
             .find_map(|(idx, c)| if c == class { Some(idx) } else { None })
-    }
-
-    /// Computes a DFA that accepts precisely those finite words which loop on the given `class`. Formally,
-    /// if `u` represents the given class, then the DFA accepts precisely those words `w` such that `uw`
-    /// is congruent to `u`.
-    pub fn looping_words(&self, _class: &Class<A::Symbol>) -> DFA<A> {
-        todo!()
     }
 
     /// Returns an iterator which yields pairs `(c, idx)` consisting of a reference `c` to the class name together
