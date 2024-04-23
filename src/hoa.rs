@@ -191,8 +191,8 @@ impl PartialOrd for HoaSymbol {
     }
 }
 impl Ord for HoaSymbol {
-    fn cmp(&self, _other: &Self) -> std::cmp::Ordering {
-        todo!()
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.aps.cmp(&other.aps).then(self.repr.cmp(&other.repr))
     }
 }
 impl Show for HoaSymbol {
@@ -281,8 +281,10 @@ impl PartialOrd for HoaExpression {
     }
 }
 impl Ord for HoaExpression {
-    fn cmp(&self, _other: &Self) -> std::cmp::Ordering {
-        todo!()
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.aps
+            .cmp(&other.aps)
+            .then(self.bdd.sat_witness().cmp(&other.bdd.sat_witness()))
     }
 }
 impl Show for HoaExpression {

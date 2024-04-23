@@ -1,6 +1,6 @@
 use std::{fmt::Debug, hash::Hash};
 
-use crate::prelude::*;
+use crate::{congruence::operations::DefaultIfMissing, prelude::*};
 use itertools::Itertools;
 
 mod class;
@@ -10,9 +10,7 @@ mod forc;
 pub use forc::FORC;
 
 mod transitionprofile;
-pub use transitionprofile::{
-    Accumulates, ReducingMonoid, ReplacingMonoid, RunProfile, RunSignature, TransitionMonoid,
-};
+pub use transitionprofile::{Accumulates, RunProfile, RunSignature, TransitionMonoid};
 
 mod cayley;
 pub use cayley::{Cayley, RightCayley};
@@ -27,6 +25,11 @@ pub struct RightCongruence<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
+    /// Returns a reference to the underlying transition system.
+    pub fn ts(&self) -> &DTS<A, Q, C> {
+        &self.ts
+    }
+
     /// Returns true if and only if
     pub fn congruent<W, V>(&self, word: W, other: V) -> bool
     where
@@ -34,6 +37,36 @@ impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
         V: FiniteWord<A::Symbol>,
     {
         self.reached_state_index(word).unwrap() == self.reached_state_index(other).unwrap()
+    }
+
+    /// Computes a DFA that accepts precisely those finite words which loop on the given `class`. Formally,
+    /// if `u` represents the given class, then the DFA accepts precisely those words `w` such that `uw`
+    /// is congruent to `u`.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let ts = TSBuilder::without_colors()
+    ///     .with_transitions([(0, 'a', 1), (1, 'a', 0), (0, 'b', 0), (1, 'b', 1)])
+    ///     .into_right_congruence_bare(0);
+    ///
+    /// let dfa = ts.looping_words(1);
+    /// assert!(dfa.accepts("aa"));
+    /// assert!(!dfa.accepts("a"));
+    /// assert!(dfa.accepts("b"));
+    ///
+    /// assert!(dfa.equivalent(ts.looping_words(0)));
+    /// ```
+    pub fn looping_words<Idx: Indexes<Self>>(&self, class: Idx) -> DFA<A> {
+        let idx = class.to_index(self).unwrap();
+        self.ts()
+            .with_initial(idx)
+            .with_state_color(DefaultIfMissing::new(
+                [(idx, true)].into_iter().collect(),
+                false,
+            ))
+            .collect_dfa()
     }
 
     /// Verifies whether an element of `self` is  idempotent, i.e. if the mr of the indexed
@@ -66,13 +99,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
             .iter()
             .enumerate()
             .find_map(|(idx, c)| if c == class { Some(idx) } else { None })
-    }
-
-    /// Computes a DFA that accepts precisely those finite words which loop on the given `class`. Formally,
-    /// if `u` represents the given class, then the DFA accepts precisely those words `w` such that `uw`
-    /// is congruent to `u`.
-    pub fn looping_words(&self, _class: &Class<A::Symbol>) -> DFA<A> {
-        todo!()
     }
 
     /// Returns an iterator which yields pairs `(c, idx)` consisting of a reference `c` to the class name together

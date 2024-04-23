@@ -261,8 +261,10 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
 }
 
 impl<S: Symbol> LinearWord<S> for PeriodicOmegaWord<S> {
-    fn nth(&self, _position: usize) -> Option<S> {
-        todo!()
+    fn nth(&self, position: usize) -> Option<S> {
+        self.representation
+            .get(position % self.representation.len())
+            .copied()
     }
 }
 impl<S: Symbol> OmegaWord<S> for PeriodicOmegaWord<S> {

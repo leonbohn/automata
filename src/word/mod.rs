@@ -94,8 +94,8 @@ pub struct ConsumingInfixIterator<'a, S: Symbol, W: LinearWord<S>> {
 }
 
 impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for ConsumingInfixIterator<'a, S, W> {
-    fn nth(&self, _position: usize) -> Option<S> {
-        todo!()
+    fn nth(&self, position: usize) -> Option<S> {
+        self.word.nth(self.start + position)
     }
 }
 
