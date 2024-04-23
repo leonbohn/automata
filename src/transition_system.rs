@@ -123,9 +123,9 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Helper function which creates an expression from the given symbol.
-    /// This is a convenience function that simply calls [`Alphabet::expression`].
+    /// This is a convenience function that simply calls [`Alphabet::make_expression`].
     fn make_expression(&self, sym: SymbolOf<Self>) -> ExpressionOf<Self> {
-        <Self::Alphabet as Alphabet>::expression(sym)
+        self.alphabet().make_expression(sym)
     }
 
     /// Gives an iterator over all transitions of `self`.

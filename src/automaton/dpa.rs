@@ -75,6 +75,13 @@ where
             .and_then(|r| r.last_transition_color().cloned())
     }
 
+    /// Computes the least and greatest edge color that appears on any edge of the automaton.
+    /// If there are no edges, `(usize::MAX, 0)` is returned.
+    pub fn low_and_high_priority(&self) -> (usize, usize) {
+        self.edge_colors_unique()
+            .fold((usize::MAX, 0), |(low, high), c| (low.min(c), high.max(c)))
+    }
+
     /// Transforms the given [`FiniteWord`] into a [`EdgeColor`]. This simply calls [`Self::try_last_edge_color`]
     /// and subsequently unwraps the result.
     pub fn last_edge_color<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> EdgeColor<Self> {

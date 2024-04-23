@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::prelude::*;
 
 /// This trait is implemented for references to transitions, so that they can be used in
