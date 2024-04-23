@@ -1,5 +1,18 @@
 [package]
 name = "automata"
+license = "MIT"
+description = "A library concerned with transition systems and automata for both finite and infinite words."
+homepage = "https://github.com/leonbohn/automata"
+repository = "https://github.com/leonbohn/automata"
+keywords = [
+    "omega-automata",
+    "transition-system",
+    "language",
+    "hoa",
+    "automata",
+]
+categories = ["mathematics", "science"]
+readme = "README.md"
 version = "0.2.0"
 edition = "2021"
 
@@ -17,7 +30,7 @@ biodivine-lib-bdd = { version = "0.5", optional = true }
 bit-set = "0.5"
 bimap = "0.6"
 fastrand = { version = "2", optional = true }
-hoars = { path = "hoars", optional = true }
+hoars = { version = "0.2", path = "hoars", optional = true }
 clap = { version = "4.5", optional = true }
 
 [features]
