@@ -678,8 +678,7 @@ mod tests {
             .into_right_congruence(0);
 
         let _forc = FORC::from_iter(cong, [(0, prc_e), (1, prc_a)].iter().cloned());
-        todo!()
-        // forc.render_to_file_name("/home/leon/test.png");
+        todo!("Learn how to render FORC!")
     }
 
     #[test]
