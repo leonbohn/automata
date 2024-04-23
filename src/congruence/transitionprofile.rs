@@ -232,21 +232,7 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
     pub fn empty_from(q: Idx) -> Self {
         Self(q, Q::neutral(), C::neutral())
     }
-    fn dup(&self) -> Self {
-        Self(self.0, self.1.clone(), self.2.clone())
-    }
 
-    fn with_q(self, q: Idx) -> Self {
-        Self(q, self.1, self.2)
-    }
-
-    fn with_sc(self, sc: Q::X) -> Self {
-        Self(self.0, Q::from(sc), self.2)
-    }
-
-    fn with_ec(self, ec: C::X) -> Self {
-        Self(self.0, self.1, C::from(ec))
-    }
     pub fn extend_in<Ts>(&self, ts: &Ts, symbol: SymbolOf<Ts>) -> Option<Self>
     where
         Ts: Deterministic<StateIndex = Idx, StateColor = Q::X, EdgeColor = C::X>,
@@ -309,15 +295,10 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
     pub fn empty<Ts: TransitionSystem<StateIndex = Idx, StateColor = Q::X, EdgeColor = C::X>>(
         ts: Ts,
     ) -> Self {
-        Self::empty_for_states(ts.state_indices().collect(), ts)
+        Self::empty_for_states(ts.state_indices().collect())
     }
 
-    pub fn empty_for_states<
-        Ts: TransitionSystem<StateIndex = Idx, StateColor = Q::X, EdgeColor = C::X>,
-    >(
-        states: Vec<Idx>,
-        ts: Ts,
-    ) -> Self {
+    pub fn empty_for_states(states: Vec<Idx>) -> Self {
         Self(
             states
                 .into_iter()
@@ -380,54 +361,64 @@ impl From<&ProfileEntry> for usize {
 
 #[derive(Clone)]
 pub struct TransitionMonoid<
-    'a,
     Ts: TransitionSystem,
     SA: Accumulates<X = Ts::StateColor>,
     EA: Accumulates<X = Ts::EdgeColor>,
 > {
-    ts: &'a Ts,
+    ts: Ts,
     strings: Vec<(Vec<SymbolOf<Ts>>, ProfileEntry)>,
     #[allow(clippy::type_complexity)]
     tps: Vec<(RunProfile<Ts::StateIndex, SA, EA>, usize)>,
 }
 
-impl<'a, Ts> TransitionMonoid<'a, Ts, Reduces<Ts::StateColor>, Reduces<Ts::EdgeColor>>
+impl<
+        Ts: TransitionSystem,
+        SA: Accumulates<X = Ts::StateColor>,
+        EA: Accumulates<X = Ts::EdgeColor>,
+    > TransitionMonoid<Ts, SA, EA>
+{
+    pub fn ts(&self) -> &Ts {
+        &self.ts
+    }
+}
+
+impl<Ts> TransitionMonoid<Ts, Reduces<Ts::StateColor>, Reduces<Ts::EdgeColor>>
 where
     Ts: Deterministic + Pointed,
     Reduces<Ts::EdgeColor>: Accumulates<X = Ts::EdgeColor>,
     Reduces<Ts::StateColor>: Accumulates<X = Ts::StateColor>,
 {
-    pub fn new_reducing(ts: &'a Ts) -> Self {
+    pub fn new_reducing(ts: Ts) -> Self {
         Self::build(ts)
     }
 
     pub fn new_reducing_for_states<I: IntoIterator<Item = Ts::StateIndex>>(
-        ts: &'a Ts,
+        ts: Ts,
         iter: I,
     ) -> Self {
-        Self::build_for_states(ts, iter)
+        Self::build_for_states(ts, iter.into_iter().collect())
     }
 }
-impl<'a, Ts> TransitionMonoid<'a, Ts, Replaces<Ts::StateColor>, Replaces<Ts::EdgeColor>>
+impl<Ts> TransitionMonoid<Ts, Replaces<Ts::StateColor>, Replaces<Ts::EdgeColor>>
 where
     Ts: Deterministic + Pointed,
     Replaces<Ts::EdgeColor>: Accumulates<X = Ts::EdgeColor>,
     Replaces<Ts::StateColor>: Accumulates<X = Ts::StateColor>,
 {
-    pub fn new_replacing(ts: &'a Ts) -> Self {
+    pub fn new_replacing(ts: Ts) -> Self {
         Self::build(ts)
     }
 
     pub fn new_replacing_for_states<I: IntoIterator<Item = Ts::StateIndex>>(
-        ts: &'a Ts,
+        ts: Ts,
         iter: I,
     ) -> Self {
-        Self::build_for_states(ts, iter)
+        Self::build_for_states(ts, iter.into_iter().collect())
     }
 }
 
-impl<'a, Ts, SA: Accumulates<X = Ts::StateColor>, EA: Accumulates<X = Ts::EdgeColor>>
-    TransitionMonoid<'a, Ts, SA, EA>
+impl<Ts, SA: Accumulates<X = Ts::StateColor>, EA: Accumulates<X = Ts::EdgeColor>>
+    TransitionMonoid<Ts, SA, EA>
 where
     Ts: Deterministic + Pointed,
 {
@@ -448,7 +439,7 @@ where
     }
 
     pub fn profile_for<W: FiniteWord<SymbolOf<Ts>>>(&self, word: W) -> Option<usize> {
-        let (tp, pe) = self.strings.iter().find(|(p, e)| p.equals(&word))?;
+        let (_tp, pe) = self.strings.iter().find(|(p, _e)| p.equals(&word))?;
         match pe {
             ProfileEntry::Profile(p) => Some(*p),
             ProfileEntry::Redirect(r) => Some(*r),
@@ -459,22 +450,19 @@ where
         0..self.tps.len()
     }
 
-    fn build(ts: &'a Ts) -> TransitionMonoid<'a, Ts, SA, EA> {
-        Self::build_for_states(ts, ts.state_indices())
+    fn build(ts: Ts) -> TransitionMonoid<Ts, SA, EA> {
+        let indices = ts.state_indices().collect();
+        Self::build_for_states(ts, indices)
     }
 
-    fn build_for_states<I: IntoIterator<Item = Ts::StateIndex>>(
-        ts: &'a Ts,
-        iter: I,
-    ) -> TransitionMonoid<'a, Ts, SA, EA> {
-        let states = iter.into_iter().collect();
-        let eps_profile = RunProfile::empty_for_states(states, ts);
+    fn build_for_states(ts: Ts, states: Vec<Ts::StateIndex>) -> TransitionMonoid<Ts, SA, EA> {
+        let eps_profile = RunProfile::empty_for_states(states);
         let mut tps = vec![(eps_profile.clone(), 0)];
         let mut strings = vec![(vec![], ProfileEntry::Profile(0))];
         let mut queue = VecDeque::from_iter([(vec![], eps_profile)]);
 
         while let Some((word, profile)) = queue.pop_front() {
-            for (profile_extension, sym) in profile.all_extensions(ts) {
+            for (profile_extension, sym) in profile.all_extensions(&ts) {
                 assert!(
                     word.len() < 10,
                     "This looks dangerously like an infinite loop..."
@@ -500,21 +488,19 @@ where
     }
 }
 
-pub type ReplacingMonoid<'a, Ts> = TransitionMonoid<
-    'a,
+pub type ReplacingMonoid<Ts> = TransitionMonoid<
     Ts,
     Replaces<<Ts as TransitionSystem>::StateColor>,
     Replaces<<Ts as TransitionSystem>::EdgeColor>,
 >;
 
-pub type ReducingMonoid<'a, Ts> = TransitionMonoid<
-    'a,
+pub type ReducingMonoid<Ts> = TransitionMonoid<
     Ts,
     Reduces<<Ts as TransitionSystem>::StateColor>,
     Reduces<<Ts as TransitionSystem>::EdgeColor>,
 >;
 
-impl<'a, Ts, SA, EA> Display for TransitionMonoid<'a, Ts, SA, EA>
+impl<Ts, SA, EA> Display for TransitionMonoid<Ts, SA, EA>
 where
     Ts: TransitionSystem,
     Ts::StateIndex: Show,
@@ -551,11 +537,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Debug;
-
     use crate::{congruence::transitionprofile::ReducingMonoid, tests::wiki_dfa, TransitionSystem};
-
-    use super::TransitionMonoid;
 
     #[test]
     fn tp_from_ts() {
@@ -564,8 +546,10 @@ mod tests {
         let tps = ReducingMonoid::build(&dfa);
         println!("{}", tps);
 
-        let reduced_tps =
-            ReducingMonoid::build_for_states(&dfa, dfa.state_indices().filter(|i| i % 2 == 0));
+        let reduced_tps = ReducingMonoid::build_for_states(
+            &dfa,
+            dfa.state_indices().filter(|i| i % 2 == 0).collect(),
+        );
         print!("{}", reduced_tps);
     }
 }

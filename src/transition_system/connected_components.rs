@@ -7,7 +7,7 @@ mod scc;
 pub use scc::Scc;
 
 mod tarjan;
-pub use tarjan::{tarjan_scc_iterative, tarjan_scc_recursive};
+pub use tarjan::{kosaraju, tarjan_scc_iterative, tarjan_scc_recursive};
 
 mod tarjan_dag;
 pub use tarjan_dag::TarjanDAG;

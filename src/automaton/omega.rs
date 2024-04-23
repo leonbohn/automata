@@ -88,7 +88,6 @@ pub struct OmegaAutomaton<A: Alphabet> {
 
 pub struct DeterministicOmegaAutomaton<A: Alphabet> {
     pub(super) ts: Initialized<DTS<A, usize, AcceptanceMask>>,
-    #[allow(unused)]
     pub(super) acc: OmegaAcceptanceCondition,
 }
 
