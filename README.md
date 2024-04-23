@@ -27,11 +27,11 @@ The code gives us a DFA
 - state $0$ lies on an $a$-cycle of length $3$ and each state along this cycle has a self-loop on $b$.
 
 We can now perform operations, for example we can test whether a word is accepted by calling the `accepts` method:
-```rust
+```rust ignore
 assert!(zero_mod_three_times_a.accepts("abbabbababbbbabbbababbababbabbbbabbbbabbabbbbabbab")); // made you count
 ```
 Or if we had a second DFA, `one_mod_three_times_a`, which is entirely the same, apart from swapping the colors for state $0$ and state $1$, then we could combine the two and perform operations on the result:
-```rust
+```rust ignore
 let what_is_still_missing = zero_mod_three_times_a.union(one_mod_three_times_a.negation());
 assert!(what_is_still_missing.accepts(""));
 assert!(!what_is_still_missing.accepts("a"));
@@ -47,24 +47,26 @@ This is indicated by a type if it implements the `Deterministic` trait and sice 
 This allows us to perform additional operations
 
 ```rust
+use automata::prelude::*;
+
 let aut = TSBuilder::without_edge_colors()
     .with_state_colors([true, false, true, false])
     .with_transitions([(0, 'a', 2), (0, 'b', 1), (0, 'c', 3),
                        (1, 'a', 0), (1, 'b', 2), (1, 'c', 3),
                        (2, 'a', 2), (2, 'b', 1), (2, 'c', 3),
                        (3, 'a', 3), (3, 'b', 3), (3, 'c', 3) ])
-    .into_dfa();
+    .into_dfa(0);
 
 // reachable states in lenght-lexicographic order
-assert_eq!(aut.reachable_state_indices().collect::<Vec<_>>(), vec![0, 2, 1]);
+assert_eq!(aut.reachable_state_indices().collect::<Vec<_>>(), vec![0, 2, 1, 3]);
 // but we can also just pick a different starting state
-assert_eq!(aut.reachable_state_indices_from(1).collect::<Vec<_>>(), vec![1, 0, 2]);
+assert_eq!(aut.reachable_state_indices_from(1).collect::<Vec<_>>(), vec![1, 0, 2, 3]);
 ```
 
 Operations can be chained together efficiently and are evaluated as needed.
 They are lazily evaluated and computations only happen if the result is actually needed.
 
-```rust
+```rust ignore
 // give each edge q-->p a color of the tuple (p, q)
 let mapped_restricted = aut.map_edge_colors_full(|(q, _e, _c, p)| (p, q))
     // restrict ourselves to state indices strictly smaller than 3
@@ -78,7 +80,7 @@ let (ts, map )
 
 Operations may be computed in full by collecting into a fresh transition system.
 In any case, collection is possbile like so
-```rust
+```rust ignore
 let collected = mapped_restricted.collect_dts();
 // if we had a transition with an initial state, there would also be a pointed variant
 let (_ts, _init) = collected.with_initial(0).collect_dts_pointed();
@@ -92,7 +94,7 @@ assert_eq!(mm.map("babc"), None);
 ```
 
 For more fine-grained control, it is also possible to straight up chop the transition system up into its [SCCs](https://en.wikipedia.org/wiki/Strongly_connected_component), for which a few different algorithms are available such as a recursive and an iterative implementation of Tarjan's algorithm and an implementation of Kosarajus algorithm. By no means have I done the implementation here alone, there was heavy inspiration especially in the beginning by the code of `petgraph`, thank you so much for your amazing work <3.
-```rust
+```rust ignore
 // get direct access to a decomposition into SCCs
 let sccs = aut.sccs();//or sccs_kosaraju() or sccs_recursive();
 assert_eq!(sccs.first(), &Scc::new(&aut, [0, 1, 2]));
@@ -107,7 +109,7 @@ assert_eq!(transient_edges.len(), 3);
 ```
 
 These decompositions are then also what powers some language theoretic operations on automata, for example:
-```rust
+```rust ignore
 assert!(aut.accepts(aut.give_word().unwrap()));
 assert!(aut.intersection(aut.negation()).is_empty_language());
 ```
@@ -126,7 +128,9 @@ A DPA, for example, accepts a word if the least edge color that is seen infinite
 Since DPA have nice algorithmic properties and [are able to capture](https://en.wikipedia.org/wiki/%CE%A9-automaton#Expressive_power_of_%CF%89-automata) the full class of $\omega$-regular languages, this library gears mostly towards them.
 
 ```rust
-let dpa = NTS::without_state_colors()
+use automata::prelude::*;
+
+let dpa = TSBuilder::without_state_colors()
     .with_transitions([
         (0, 'a', 1, 1),
         (0, 'b', 0, 0),
@@ -137,7 +141,7 @@ let dpa = NTS::without_state_colors()
 // the DPA above accepts the ultimately periodic word consisting of only b, i.e. bbbbbb...
 assert!(dpa.accepts(upw!("b")));
 // but it rejects the word consisting two b followed by infinitely many a
-assert!(!dpa.accepts(upw("bb", "a")))
+assert!(!dpa.accepts(upw!("bb", "a")))
 ```
 
 As $\omega$-automata are syntactically the same, we may use the same operations as above on them.
@@ -161,7 +165,7 @@ This is done through the [graphviz](https://graphviz.org/) library and depends u
 ## Installation
 
 For now, there is no stable version on crates.io, add the dependency via git as so:
-```
+```ignore
 [dependencies]
 automata = { git = "https://github.com/leonbohn/automata.git" }
 ```
@@ -217,3 +221,6 @@ Further traits that are of importance are
 - `Pointed` which picks one designated initial state, this is important for deterministic automata
 - `Deterministic`, a marker trait that disambiguates between nondeterministic and deterministic TS. As `TransitionSystem` only provides iterators over the outgoing edges, it can be used to deal with nondeterministic TS, that have multiple overlapping edges. By implementing `Deterministic`, we guarantee, that there is always a single unique outgoing transition for each state.
 - `Sproutable` enables growing a TS state by state and edge/transition by edge/transition. Naturally, this is only implemented for the basic building blocks, i.e. `BTS`, `DTS` and `NTS`.
+
+
+### License 
