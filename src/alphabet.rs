@@ -166,10 +166,10 @@ impl Alphabet for Empty {
     type Expression = Empty;
 
     fn search_edge<X>(
-        _map: &Map<Self::Expression, X>,
+        map: &Map<Self::Expression, X>,
         _sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
-        todo!()
+        map.iter().next()
     }
 
     fn overlapping(&self, _left: &Self::Expression, _right: &Self::Expression) -> bool {
@@ -203,14 +203,7 @@ impl Alphabet for Empty {
 
 impl Show for Empty {
     fn show(&self) -> String {
-        todo!()
-    }
-
-    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(_iter: I) -> String
-    where
-        Self: 'a,
-    {
-        todo!()
+        panic!("trying to show empty thing")
     }
 }
 impl Expression<Empty> for Empty {
@@ -489,10 +482,10 @@ impl Alphabet for Directional {
     type Expression = InvertibleChar;
 
     fn search_edge<X>(
-        _map: &Map<Self::Expression, X>,
-        _sym: Self::Symbol,
+        map: &Map<Self::Expression, X>,
+        sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
-        todo!()
+        map.get_key_value(&sym)
     }
 
     fn size(&self) -> usize {
