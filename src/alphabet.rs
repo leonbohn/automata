@@ -51,6 +51,14 @@ pub trait Alphabet: Clone {
             .collect()
     }
 
+    /// Returns true if the two expressions are disjoint, meaning they share no common valuations.
+    fn disjoint(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
+        !self.overlapping(left, right)
+    }
+
+    /// Returns true if there exists a valuation/symbol matched by both expressions.
+    fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool;
+
     /// This method is used for an optimization: If we have a [`CharAlphabet`] alphabet, then an edge list essentially
     /// boils down to a map from `Self::Symbol` to an edge. For more complicated alphabets, this may not always
     /// be so easy. To allow for an optimization (i.e. just lookup the corresponding edge in a [`crate::Map`]),
@@ -100,6 +108,9 @@ impl<A: Alphabet> Alphabet for &A {
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         A::search_edge(map, sym)
+    }
+    fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
+        A::overlapping(self, left, right)
     }
     fn contains(&self, symbol: Self::Symbol) -> bool {
         A::contains(self, symbol)
@@ -159,6 +170,10 @@ impl Alphabet for Empty {
         _sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         todo!()
+    }
+
+    fn overlapping(&self, _left: &Self::Expression, _right: &Self::Expression) -> bool {
+        false
     }
 
     type Universe<'this> = std::iter::Empty<Empty>
@@ -291,6 +306,10 @@ impl Alphabet for CharAlphabet {
         self.0.len()
     }
 
+    fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
+        left == right
+    }
+
     fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
         expression == &symbol
     }
@@ -355,6 +374,10 @@ impl<S: Symbol + Expression<S>, const N: usize> Alphabet for Fixed<S, N> {
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.get_key_value(&sym)
+    }
+
+    fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
+        left == right
     }
 
     fn size(&self) -> usize {
@@ -474,6 +497,10 @@ impl Alphabet for Directional {
 
     fn size(&self) -> usize {
         self.0.len()
+    }
+
+    fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
+        left == right
     }
 
     type Universe<'this> = std::iter::Cloned<std::slice::Iter<'this, InvertibleChar>>

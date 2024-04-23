@@ -120,12 +120,12 @@ impl<A: HoaSuitableAlphabet> WriteHoa for DPA<A> {
 
 impl HoaSuitableAlphabet for CharAlphabet {
     fn write_alphabet_description<W: std::fmt::Write>(&self, w: &mut W) -> Result {
-        write!(
+        writeln!(
             w,
-            "AP: {} {}\n",
+            "AP: {} {}",
             self.size(),
             (0..self.size())
-                .map(|i| (('a' as u8) + (i as u8)) as char)
+                .map(|i| ((b'a') + (i as u8)) as char)
                 .map(|c| format!("\"{}\"", c))
                 .join(" ")
         )
@@ -136,7 +136,7 @@ impl HoaSuitableAlphabet for CharAlphabet {
             w,
             "{}",
             (0..self.size())
-                .map(|i| if i as u8 == (*expr as u8) - ('a' as u8) {
+                .map(|i| if i as u8 == (*expr as u8) - (b'a') {
                     format!("{i}")
                 } else {
                     format!("!{i}")
@@ -148,9 +148,9 @@ impl HoaSuitableAlphabet for CharAlphabet {
 
 impl HoaSuitableAlphabet for HoaAlphabet {
     fn write_alphabet_description<W: std::fmt::Write>(&self, w: &mut W) -> Result {
-        write!(
+        writeln!(
             w,
-            "AP: {} {}\n",
+            "AP: {} {}",
             self.apnames_len(),
             self.apnames()
                 .iter()
@@ -226,7 +226,7 @@ mod tests {
         let hoa = dpa.to_hoa();
         assert_eq!(
             hoa,
-            "HOA: v1\nAP: 3 \"a\" \"b\" \"c\"\nStates: 1\nStart: 0\nacc-name: parity min even 2\nAcceptance: Inf(0) | (Fin(1) & Inf(2))\n--BODY--\nState: 0\n[0 & !1 & !2] 0 {0}\n[!0 & 1 & !2] 0 {1}\n[!0 & !1 & 2] 0 {2}\n--END--\n"
+            "HOA: v1\nAP: 3 \"a\" \"b\" \"c\"\nStates: 1\nStart: 0\nacc-name: parity min even 3\nAcceptance: 3 Inf(0) | (Fin(1) & Inf(2))\n--BODY--\nState: 0\n[0 & !1 & !2] 0 {0}\n[!0 & 1 & !2] 0 {1}\n[!0 & !1 & 2] 0 {2}\n--END--\n"
         );
     }
 }

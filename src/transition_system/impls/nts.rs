@@ -8,6 +8,7 @@ pub use ntstate::{NTSEdgesFromIter, NTSEdgesToIter, NTState};
 
 mod ntedge;
 pub use ntedge::NTEdge;
+use tracing::trace;
 
 /// Type alias for the constituent parts of an [`NTS`] with the same associated types as the
 /// transition sytem `D`.
@@ -239,12 +240,21 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
     /// the same state with the same symbol.
     pub fn is_deterministic(&self) -> bool {
         for state in self.state_indices() {
-            let mut symbols = Set::default();
-            for edge in self.edges_from(state).unwrap() {
-                for sym in edge.expression().symbols() {
-                    if !symbols.insert(sym) {
-                        return false;
-                    }
+            for (l, r) in self
+                .edges_from(state)
+                .unwrap()
+                .zip(self.edges_from(state).unwrap().skip(1))
+            {
+                if self.alphabet().overlapping(l.expression(), r.expression()) {
+                    trace!(
+                        "found overlapping edges from {}: on {} to {} and on {} to {}",
+                        l.source(),
+                        l.expression().show(),
+                        l.target(),
+                        r.expression().show(),
+                        r.target(),
+                    );
+                    return false;
                 }
             }
         }
