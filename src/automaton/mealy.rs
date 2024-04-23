@@ -29,12 +29,14 @@ impl<C: Congruence> IntoMealyMachine<C>
 where
     EdgeColor<C>: Color,
 {
-    pub fn bisimilar<M>(&self, _other: M) -> bool
+    /// Returns true if and only if both machines are bisimilar, meaning for all possible
+    /// inputs, they will produce the same output.
+    pub fn bisimilar<M>(&self, other: &IntoMealyMachine<M>) -> bool
     where
-        M: Congruence,
+        M: Congruence<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
         EdgeColor<M>: Color,
     {
-        todo!()
+        self.witness_inequivalence(other).is_none()
     }
 
     /// Attempts to run the given finite word in `self`, returning the color of the last transition that
@@ -55,7 +57,13 @@ where
             .unique()
     }
 
-    pub fn restricted_inequivalence<
+    /// Checks for restricted inequivalence, meaning that the two machines produce
+    /// different outputs. But this considers all outgoing edges in `self`, if any
+    /// of those is missing, it will use this to produce a separating witness.
+    /// However if the other machine has an edge that is not present in `self`, it
+    /// will not be considered. This is why the operation needs to be run two times
+    /// in [`Self::witness_inequivalence`].
+    pub fn witness_restricted_inequivalence<
         O: Congruence<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
     >(
         &self,
@@ -85,14 +93,17 @@ where
         None
     }
 
+    /// Attempts to construct a word that separates the two machines, meaning
+    /// it produces different outputs whn run in both machines.
+    /// If no such word exists, the function returns `None`.
     pub fn witness_inequivalence<
         O: Congruence<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
     >(
         &self,
         other: &IntoMealyMachine<O>,
     ) -> Option<Vec<SymbolOf<C>>> {
-        self.restricted_inequivalence(other)
-            .or(other.restricted_inequivalence(self))
+        self.witness_restricted_inequivalence(other)
+            .or(other.witness_restricted_inequivalence(self))
     }
 }
 
