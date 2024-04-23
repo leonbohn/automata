@@ -186,15 +186,10 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
         set
     }
 
-    pub(crate) fn nts_remove_state(&mut self, _state: usize) -> Option<Q> {
-        // let mut current = self.first_edge(state);
-        // while let Some(idx) = current {
-        //     let edge = &self.edges[idx];
-        //     self.remove_edge(state, idx);
-        //     current = edge.next;
-        // }
-        // Some(self.states.remove(state).color)
-        todo!()
+    /// This removes a state from the NTS and returns the color of the removed state.
+    /// This method also removes any incoming edges to this state.
+    pub(crate) fn nts_remove_state(&mut self, state: usize) -> Option<Q> {
+        unimplemented!("This method is not yet implemented")
     }
 
     fn edge_position(&self, from: usize, on: &A::Expression) -> Option<usize> {

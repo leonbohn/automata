@@ -57,6 +57,18 @@ pub struct MappedEdgesToIter<'a, Idx, I, F, C> {
     _old_color: PhantomData<C>,
 }
 
+impl<'a, Idx, I, F, C> MappedEdgesToIter<'a, Idx, I, F, C> {
+    /// Creates a new instance.
+    pub fn new(it: I, target: Idx, f: &'a F) -> Self {
+        Self {
+            it,
+            target,
+            f,
+            _old_color: PhantomData,
+        }
+    }
+}
+
 impl<'a, Idx, I, F, C> Iterator for MappedEdgesToIter<'a, Idx, I, F, C>
 where
     I: Iterator,
@@ -88,8 +100,13 @@ where
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, _state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        todo!()
+    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
+        let index = state.to_index(self)?;
+        Some(MappedEdgesToIter::new(
+            self.ts().predecessors(index).unwrap(),
+            index,
+            self.f(),
+        ))
     }
 }
 
