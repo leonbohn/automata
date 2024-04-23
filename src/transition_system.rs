@@ -489,6 +489,19 @@ pub trait TransitionSystem: Sized {
         tarjan_scc_iterative(self)
     }
 
+    /// Performs an SCC decomposition of self using Kosaraju's algorithm, starting from the state `start`. This is an
+    /// efficient algorithm and it might provide more performance over Tarjan's algorithm in some cases.
+    fn sccs_kosaraju(
+        &self,
+        start: Self::StateIndex,
+    ) -> connected_components::SccDecomposition<'_, Self>
+    where
+        Self: Sized,
+        Self: PredecessorIterable,
+    {
+        connected_components::kosaraju(self, start)
+    }
+
     /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly
     /// connected components. Uses Tarjan's algorithm.
     fn sccs_recursive(&self) -> connected_components::SccDecomposition<'_, Self>

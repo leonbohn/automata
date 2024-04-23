@@ -136,7 +136,7 @@ where
     SccDecomposition::new(ts, sccs)
 }
 
-#[allow(unused)]
+/// Implementation of Kosaraju's algorithm for computing the SCC decomposition.
 pub fn kosaraju<Ts>(ts: &Ts, start: Ts::StateIndex) -> SccDecomposition<'_, Ts>
 where
     Ts: TransitionSystem + PredecessorIterable,

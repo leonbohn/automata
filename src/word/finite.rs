@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{prelude::Symbol, Show};
 
-use super::{Concat, LinearWord, PeriodicOmegaWord};
+use super::{omega::OmegaIteration, Concat, LinearWord, PeriodicOmegaWord};
 
 /// A finite word is a [`LinearWord`] that has a finite length.
 pub trait FiniteWord<S>: LinearWord<S> {
@@ -65,6 +65,20 @@ pub trait FiniteWord<S>: LinearWord<S> {
             "Omega iteration of an empty word is undefined!"
         );
         PeriodicOmegaWord::new(self)
+    }
+
+    /// Provides a thin wrapper around a finite word that represents the omega (infinite)
+    /// iteration of it.
+    fn omega_iteration(self) -> OmegaIteration<Self>
+    where
+        Self: Sized,
+        S: Symbol,
+    {
+        assert!(
+            !self.is_empty(),
+            "Omega iteration of an empty word is undefined!"
+        );
+        OmegaIteration::new(self)
     }
 
     /// Gives the length of the word, i.e. the number of symbols.
