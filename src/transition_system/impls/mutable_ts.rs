@@ -5,21 +5,25 @@ use std::{fmt::Debug, hash::Hash};
 /// the states and edges in a vector, which allows for fast access and iteration. The states and edges
 /// are indexed by their position in the respective vector.
 #[derive(Clone, PartialEq, Eq)]
-pub struct HashTs<A: Alphabet, Q = crate::Void, C: Hash + Eq = crate::Void, Idx: IndexType = usize>
-{
+pub struct MutableTs<
+    A: Alphabet,
+    Q = crate::Void,
+    C: Hash + Eq = crate::Void,
+    Idx: IndexType = usize,
+> {
     pub(crate) alphabet: A,
-    pub(crate) states: Map<Idx, HashTsState<A, Q, C, Idx>>,
+    pub(crate) states: Map<Idx, MutableTsState<A, Q, C, Idx>>,
 }
 
-/// Type alias that takes a [`TransitionSystem`] and gives the type of a corresponding [`HashTs`], i.e. one
+/// Type alias that takes a [`TransitionSystem`] and gives the type of a corresponding [`MutableTs`], i.e. one
 /// with the same alphabet, edge and state colors.
-pub type IntoHashTs<Ts> = HashTs<
+pub type IntoMutableTs<Ts> = MutableTs<
     <Ts as TransitionSystem>::Alphabet,
     <Ts as TransitionSystem>::StateColor,
     <Ts as TransitionSystem>::EdgeColor,
 >;
 
-impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C, Idx> {
+impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> MutableTs<A, Q, C, Idx> {
     /// Creates a new transition system with the given alphabet.
     pub fn new(alphabet: A) -> Self {
         Self {
@@ -28,7 +32,7 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
         }
     }
 
-    pub(crate) fn hashts_remove_state(&mut self, idx: Idx) -> Option<Q> {
+    pub(crate) fn mutablets_remove_state(&mut self, idx: Idx) -> Option<Q> {
         let state = self.states.remove(&idx)?;
         self.states.iter_mut().for_each(|(_, s)| {
             s.remove_incoming_edges_from(idx);
@@ -37,7 +41,11 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
         Some(state.color)
     }
 
-    pub(crate) fn hashts_remove_edge(&mut self, from: Idx, on: &A::Expression) -> Option<(C, Idx)> {
+    pub(crate) fn mutablets_remove_edge(
+        &mut self,
+        from: Idx,
+        on: &A::Expression,
+    ) -> Option<(C, Idx)> {
         let (to, color) = self.states.get_mut(&from)?.remove_edge(on)?;
         self.states
             .get_mut(&to)?
@@ -45,7 +53,7 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
         Some((color, to))
     }
 
-    pub(crate) fn hashts_remove_transitions(
+    pub(crate) fn mutablets_remove_transitions(
         &mut self,
         from: Idx,
         _symbol: SymbolOf<Self>,
@@ -66,18 +74,18 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
             .collect()
     }
 
-    /// Creates a `HASHTS` from the given alphabet and states.
-    pub(crate) fn from_parts(alphabet: A, states: Map<Idx, HashTsState<A, Q, C, Idx>>) -> Self {
+    /// Creates a `MutableTs` from the given alphabet and states.
+    pub(crate) fn from_parts(alphabet: A, states: Map<Idx, MutableTsState<A, Q, C, Idx>>) -> Self {
         Self { alphabet, states }
     }
 
-    /// Decomposes the `HASHTS` into its constituent parts.
+    /// Decomposes the `MutableTs` into its constituent parts.
     #[allow(clippy::type_complexity)]
-    pub(crate) fn into_parts(self) -> (A, Map<Idx, HashTsState<A, Q, C, Idx>>) {
+    pub(crate) fn into_parts(self) -> (A, Map<Idx, MutableTsState<A, Q, C, Idx>>) {
         (self.alphabet, self.states)
     }
 
-    /// Creates an empty `HASHTS` ensuring the given capacity.
+    /// Creates an empty `MutableTs` ensuring the given capacity.
     pub fn with_capacity(alphabet: A, states: usize) -> Self
     where
         StateColor<Self>: Default,
@@ -89,7 +97,7 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
                 .map(|i| {
                     (
                         i.into(),
-                        HashTsState::new(<StateColor<Self> as Default>::default()),
+                        MutableTsState::new(<StateColor<Self> as Default>::default()),
                     )
                 })
                 .collect(),
@@ -102,7 +110,7 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
     }
 
     /// Returns a reference to the underlying statemap.
-    pub fn raw_state_map(&self) -> &Map<Idx, HashTsState<A, Q, C, Idx>> {
+    pub fn raw_state_map(&self) -> &Map<Idx, MutableTsState<A, Q, C, Idx>> {
         &self.states
     }
 
@@ -131,9 +139,9 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> HashTs<A, Q, C
     }
 }
 
-impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone + Hash + Eq> HashTs<A, Q, C, Idx> {
+impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone + Hash + Eq> MutableTs<A, Q, C, Idx> {
     /// Returns an iterator over the [`EdgeIndex`]es of the edges leaving the given state.
-    pub(crate) fn index_ts_edges_from(
+    pub(crate) fn mutablets_edges_from(
         &self,
         source: Idx,
     ) -> Option<impl Iterator<Item = (&'_ A::Expression, &'_ (Idx, C))> + '_> {
@@ -149,13 +157,13 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone + Hash + Eq> HashTs<A, Q, C
 /// A state in a transition system. This stores the color of the state and the index of the
 /// first edge leaving the state.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct HashTsState<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> {
+pub struct MutableTsState<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> {
     color: Q,
     edges: Map<A::Expression, (Idx, C)>,
     predecessors: Set<(Idx, A::Expression, C)>,
 }
 
-impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> HashTsState<A, Q, C, Idx> {
+impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> MutableTsState<A, Q, C, Idx> {
     /// Creates a new state with the given color.
     pub fn new(color: Q) -> Self {
         Self {
@@ -205,8 +213,8 @@ impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> HashTsState<A, Q, C, Idx> {
         self.edges.remove(on)
     }
 
-    pub fn recolor<P: Color>(self, color: P) -> HashTsState<A, P, C, Idx> {
-        HashTsState {
+    pub fn recolor<P: Color>(self, color: P) -> MutableTsState<A, P, C, Idx> {
+        MutableTsState {
             color,
             edges: self.edges,
             predecessors: self.predecessors,
@@ -220,14 +228,14 @@ impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> HashTsState<A, Q, C, Idx> {
 }
 
 impl<A: Alphabet, IdxTy: IndexType, Q: Clone, C: Clone + Hash + Eq> TransitionSystem
-    for HashTs<A, Q, C, IdxTy>
+    for MutableTs<A, Q, C, IdxTy>
 {
     type StateColor = Q;
     type EdgeColor = C;
     type StateIndex = IdxTy;
     type EdgeRef<'this> = EdgeReference<'this, A::Expression, IdxTy, C> where Self: 'this;
-    type EdgesFromIter<'this> = BTSEdgesFrom<'this, A::Expression, IdxTy, C> where Self: 'this;
-    type StateIndices<'this> = std::iter::Cloned<std::collections::hash_map::Keys<'this, IdxTy, HashTsState<A, Q, C, IdxTy>>> where Self: 'this;
+    type EdgesFromIter<'this> = MutableTsEdgesFrom<'this, A::Expression, IdxTy, C> where Self: 'this;
+    type StateIndices<'this> = std::iter::Cloned<std::collections::hash_map::Keys<'this, IdxTy, MutableTsState<A, Q, C, IdxTy>>> where Self: 'this;
 
     type Alphabet = A;
 
@@ -245,7 +253,7 @@ impl<A: Alphabet, IdxTy: IndexType, Q: Clone, C: Clone + Hash + Eq> TransitionSy
 
     fn edges_from<X: Indexes<Self>>(&self, state: X) -> Option<Self::EdgesFromIter<'_>> {
         let source = state.to_index(self)?;
-        Some(BTSEdgesFrom::new(
+        Some(MutableTsEdgesFrom::new(
             source,
             self.raw_state_map()
                 .get(&source)
@@ -254,21 +262,20 @@ impl<A: Alphabet, IdxTy: IndexType, Q: Clone, C: Clone + Hash + Eq> TransitionSy
     }
 }
 
-/// Specialized iterator over the edges that leave a given state in a BTS.
-// TODO: rename to HashTsEdgesFrom
-pub struct BTSEdgesFrom<'ts, E, Idx, C> {
+/// Specialized iterator over the edges that leave a given state in a [`MutableTs`].
+pub struct MutableTsEdgesFrom<'ts, E, Idx, C> {
     edges: std::collections::hash_map::Iter<'ts, E, (Idx, C)>,
     source: Idx,
 }
 
-impl<'ts, E, Idx, C> BTSEdgesFrom<'ts, E, Idx, C> {
+impl<'ts, E, Idx, C> MutableTsEdgesFrom<'ts, E, Idx, C> {
     /// Creates a new instance from the given components.
     pub fn new(source: Idx, edges: std::collections::hash_map::Iter<'ts, E, (Idx, C)>) -> Self {
         Self { edges, source }
     }
 }
 
-impl<'ts, E, Idx: IndexType, C> Iterator for BTSEdgesFrom<'ts, E, Idx, C> {
+impl<'ts, E, Idx: IndexType, C> Iterator for MutableTsEdgesFrom<'ts, E, Idx, C> {
     type Item = EdgeReference<'ts, E, Idx, C>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -278,7 +285,7 @@ impl<'ts, E, Idx: IndexType, C> Iterator for BTSEdgesFrom<'ts, E, Idx, C> {
     }
 }
 
-impl<A, C, Q, Idx> std::fmt::Debug for HashTs<A, Q, C, Idx>
+impl<A, C, Q, Idx> std::fmt::Debug for MutableTs<A, Q, C, Idx>
 where
     A: Alphabet,
     C: Debug + Clone + Hash + Eq,
@@ -297,14 +304,14 @@ where
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for HashTs<A, Q, C, usize> {
+impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q, C, usize> {
     type ExtendStateIndexIter = std::ops::Range<Self::StateIndex>;
     fn extend_states<I: IntoIterator<Item = StateColor<Self>>>(
         &mut self,
         iter: I,
     ) -> Self::ExtendStateIndexIter {
         let n = self.states.len();
-        let it = (n..).zip(iter.into_iter().map(|c| HashTsState::new(c)));
+        let it = (n..).zip(iter.into_iter().map(|c| MutableTsState::new(c)));
         self.states.extend(it);
         n..self.states.len()
     }
@@ -313,7 +320,7 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for HashTs<A, Q, C,
     /// the new state.
     fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
         let id = self.states.len();
-        let state = HashTsState::new(color.into());
+        let state = MutableTsState::new(color.into());
         self.states.insert(id, state);
         id
     }
@@ -390,7 +397,9 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for HashTs<A, Q, C,
     }
 }
 
-impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq> ForAlphabet<A> for HashTs<A, Q, C> {
+impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq> ForAlphabet<A>
+    for MutableTs<A, Q, C>
+{
     fn for_alphabet(from: A) -> Self {
         Self {
             alphabet: from,

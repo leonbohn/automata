@@ -1,8 +1,8 @@
 #![allow(unused)]
 #![allow(missing_docs)]
 
-mod hash_ts;
-pub use hash_ts::{HashTs, HashTsState, IntoHashTs};
+mod mutable_ts;
+pub use mutable_ts::{IntoMutableTs, MutableTs, MutableTsState};
 
 mod nts;
 pub use nts::{NTEdge, NTSEdgesFromIter, NTSEdgesToIter, NTSPartsFor, NTState, NTS};

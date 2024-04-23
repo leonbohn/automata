@@ -19,7 +19,7 @@ use super::operations::RestrictByStateIndex;
 use super::operations::StateIndexFilter;
 use super::path::Lasso;
 use super::sproutable::{IndexedAlphabet, Sproutable};
-use super::IntoHashTs;
+use super::IntoMutableTs;
 use super::Path;
 
 pub type FiniteRunResult<A, Idx, Q, C> = Result<Path<A, Idx, Q, C>, Path<A, Idx, Q, C>>;
@@ -572,20 +572,20 @@ pub trait Deterministic: TransitionSystem {
         )
     }
 
-    /// Collects `self` into a new [`HashTs`] over the same alphabet. This is used, for example, after a chain of
+    /// Collects `self` into a new [`MutableTs`] over the same alphabet. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     /// This method additionally also returns the initial state of the collected TS.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_hash_ts_pointed(self) -> (IntoHashTs<Self>, usize)
+    fn collect_hash_ts_pointed(self) -> (IntoMutableTs<Self>, usize)
     where
         EdgeColor<Self>: Hash + Eq,
         StateColor<Self>: Hash + Eq,
         Self: Pointed,
     {
         let old_initial = self.initial();
-        let (ts, map) = HashTs::collect_with_index_mapping(self);
+        let (ts, map) = MutableTs::collect_with_index_mapping(self);
         (
             ts,
             *map.get_by_left(&old_initial)
@@ -593,17 +593,17 @@ pub trait Deterministic: TransitionSystem {
         )
     }
 
-    /// Collects `self` into a new [`HashTs`] over the same alphabet. This is used, for example, after a chain of
+    /// Collects `self` into a new [`MutableTs`] over the same alphabet. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_hash_ts(self) -> IntoHashTs<Self>
+    fn collect_hash_ts(self) -> IntoMutableTs<Self>
     where
         EdgeColor<Self>: Hash + Eq,
         StateColor<Self>: Hash + Eq,
     {
-        let (ts, _map) = HashTs::collect_with_index_mapping(self);
+        let (ts, _map) = MutableTs::collect_with_index_mapping(self);
         ts
     }
 
@@ -726,7 +726,7 @@ impl<D: Deterministic> Deterministic for &mut D {
 }
 
 impl<A: Alphabet, IdType: IndexType, Q: Clone, C: Hash + Eq + Clone> Deterministic
-    for HashTs<A, Q, C, IdType>
+    for MutableTs<A, Q, C, IdType>
 {
     fn edge_color<Idx: Indexes<Self>>(
         &self,

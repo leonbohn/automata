@@ -32,10 +32,10 @@ pub trait Shrinkable: TransitionSystem {
 }
 
 impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, Index: IndexType> Shrinkable
-    for HashTs<A, Q, C, Index>
+    for MutableTs<A, Q, C, Index>
 {
     fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor> {
-        self.hashts_remove_state(state.to_index(self)?)
+        self.mutablets_remove_state(state.to_index(self)?)
     }
 
     fn remove_edge<Idx: Indexes<Self>>(
@@ -43,7 +43,7 @@ impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, Index: IndexType> 
         source: Idx,
         expression: &ExpressionOf<Self>,
     ) -> Option<(Self::EdgeColor, Self::StateIndex)> {
-        self.hashts_remove_edge(source.to_index(self)?, expression)
+        self.mutablets_remove_edge(source.to_index(self)?, expression)
     }
 
     fn remove_transitions<Idx: Indexes<Self>>(
@@ -51,51 +51,7 @@ impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, Index: IndexType> 
         source: Idx,
         symbol: &SymbolOf<Self>,
     ) -> Option<Set<(ExpressionOf<Self>, Self::EdgeColor, Self::StateIndex)>> {
-        Some(self.hashts_remove_transitions(source.to_index(self)?, *symbol))
-    }
-}
-
-impl<A: Alphabet, Q: Color, C: Color> Shrinkable for NTS<A, Q, C> {
-    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor> {
-        self.nts_remove_state(state.to_index(self)?)
-    }
-
-    fn remove_edge<Idx: Indexes<Self>>(
-        &mut self,
-        source: Idx,
-        expression: &ExpressionOf<Self>,
-    ) -> Option<(Self::EdgeColor, Self::StateIndex)> {
-        self.nts_remove_edge(source.to_index(self)?, expression)
-    }
-
-    fn remove_transitions<Idx: Indexes<Self>>(
-        &mut self,
-        source: Idx,
-        symbol: &SymbolOf<Self>,
-    ) -> Option<Set<(ExpressionOf<Self>, Self::EdgeColor, Self::StateIndex)>> {
-        Some(self.nts_remove_transitions(source.to_index(self)?, *symbol))
-    }
-}
-
-impl<A: Alphabet, Q: Color, C: Color> Shrinkable for DTS<A, Q, C> {
-    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor> {
-        self.0.remove_state(state.to_index(self)?)
-    }
-
-    fn remove_edge<Idx: Indexes<Self>>(
-        &mut self,
-        source: Idx,
-        expression: &ExpressionOf<Self>,
-    ) -> Option<(Self::EdgeColor, Self::StateIndex)> {
-        self.0.remove_edge(source.to_index(self)?, expression)
-    }
-
-    fn remove_transitions<Idx: Indexes<Self>>(
-        &mut self,
-        source: Idx,
-        symbol: &SymbolOf<Self>,
-    ) -> Option<Set<(ExpressionOf<Self>, Self::EdgeColor, Self::StateIndex)>> {
-        self.0.remove_transitions(source.to_index(self)?, symbol)
+        Some(self.mutablets_remove_transitions(source.to_index(self)?, *symbol))
     }
 }
 

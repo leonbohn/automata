@@ -98,7 +98,9 @@ where
     }
 }
 
-impl<A: Alphabet, Id: IndexType, Q: Color, C: Color> PredecessorIterable for HashTs<A, Q, C, Id> {
+impl<A: Alphabet, Id: IndexType, Q: Color, C: Color> PredecessorIterable
+    for MutableTs<A, Q, C, Id>
+{
     type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, Id, C> where Self: 'this;
     type EdgesToIter<'this> = BTSPredecessors<'this, A, C, Id>
     where

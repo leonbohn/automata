@@ -368,7 +368,7 @@ where
     {
         let start = std::time::Instant::now();
 
-        let mut ts: Initialized<HashTs<_, D::StateColor, usize>> = self.collect_pointed().0;
+        let mut ts: Initialized<MutableTs<_, D::StateColor, usize>> = self.collect_pointed().0;
         let out = ts.clone();
 
         let mut recoloring = Vec::new();
