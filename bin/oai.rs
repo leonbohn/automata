@@ -8,7 +8,7 @@ use automata::{
 use tracing::{debug, info, trace};
 use tracing_subscriber::{filter, prelude::*};
 
-use clap::{Arg, ArgAction, ArgMatches, Command};
+use clap::{Arg, ArgMatches, Command};
 
 fn cli() -> clap::Command {
     Command::new("oai")
@@ -57,20 +57,30 @@ pub fn main() {
 
     setup_logging(&matches);
 
-    info!("reading automata from stdin");
+    debug!("reading automata from stdin");
     let mut stream = FilterDeterministicHoaAutomatonStream::new(std::io::stdin().lock());
 
     match matches.subcommand() {
-        Some(("todpa", sub_matches)) => {
-            info!("converting input automata into DPAs");
+        Some(("todpa", _sub_matches)) => {
+            debug!("converting input automata into DPAs");
 
             while let Some(aut) = stream.next() {
-                info!("read deterministic automaton with {} states", aut.size());
+                debug!("read deterministic automaton with {} states", aut.size());
 
+                let start = std::time::Instant::now();
                 let converted: DeterministicOmegaAutomaton<CharAlphabet> = aut.into();
-                trace!("first conversion successful");
+                info!(
+                    "conversion into char alphabet automaton took {}µs",
+                    start.elapsed().as_micros()
+                );
+
+                let start = std::time::Instant::now();
                 let reconverted: DeterministicOmegaAutomaton<HoaAlphabet> =
                     converted.try_into().unwrap();
+                info!(
+                    "conversion into HOA alphabet automaton took {}µs",
+                    start.elapsed().as_micros()
+                );
 
                 print!("{}", reconverted.into_dpa().to_hoa());
             }

@@ -73,6 +73,25 @@ impl HoaAlphabet {
         self.apnames.len()
     }
 
+    /// Attempts to build an instance of `Self` from the given pointer to a [`CharAlphabet`]. This
+    /// only works (for the moment) if the number of symbols in the given alphabet is an exact
+    /// power of two.
+    pub fn try_from_char_alphabet(value: &CharAlphabet) -> Result<Self, String> {
+        let alphabet_size = value.size();
+        if alphabet_size != alphabet_size.next_power_of_two() || alphabet_size == 0 {
+            return Err(format!(
+                "Alphabet size is not a power of two: {alphabet_size}"
+            ));
+        }
+
+        let aps = alphabet_size.ilog2() as u8;
+        assert!(aps > 0, "We do not want this edge case");
+
+        Ok(Self::from_apnames(
+            (0u8..aps).map(|i| ((b'a' + i) as char).to_string()),
+        ))
+    }
+
     pub fn from_apnames<I: IntoIterator<Item = String>>(apnames: I) -> Self {
         let apnames: Vec<_> = apnames.into_iter().collect();
         assert!(apnames.len() < MAX_APS);

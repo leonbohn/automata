@@ -17,7 +17,7 @@ pub fn from_hoa(value: &str) -> Result<HoaAutomaton, FromHoaError> {
             )
         })
         .map_err(FromHoaError::LexerError)?;
-    tracing::debug!("Tokenization took {}ms", start.elapsed().as_millis());
+    tracing::info!("Tokenization took {}µs", start.elapsed().as_micros());
 
     let length = input.chars().count();
     let start = std::time::Instant::now();
@@ -30,6 +30,6 @@ pub fn from_hoa(value: &str) -> Result<HoaAutomaton, FromHoaError> {
             )
         })
         .map_err(FromHoaError::ParserError);
-    tracing::debug!("Actual parsing took {}ms", start.elapsed().as_millis());
+    tracing::info!("Actual parsing took {}µs", start.elapsed().as_micros());
     out
 }
