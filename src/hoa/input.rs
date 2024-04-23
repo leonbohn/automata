@@ -128,7 +128,7 @@ pub fn pop_deterministic_omega_automaton(
     None
 }
 
-/// Tries to `pop` the foremost valid HOA automaton from the given [`HoaStream`].
+/// Tries to `pop` the foremost valid HOA automaton from the given [`HoaString`].
 /// If no valid automaton is found before the end of the stream is reached, the
 /// function returns `None`.
 pub fn pop_omega_automaton(hoa: HoaString) -> Option<(OmegaAutomaton<HoaAlphabet>, HoaString)> {
@@ -209,7 +209,7 @@ impl TryFrom<HoaAutomaton> for OmegaAutomaton<HoaAlphabet> {
     type Error = String;
     fn try_from(value: HoaAutomaton) -> Result<Self, Self::Error> {
         let acc = value.header().try_into()?;
-        let ts = hoa_automaton_to_nts(value);
+        let ts = hoa_automaton_to_nts(value)?;
         Ok(Self::new(ts, acc))
     }
 }
@@ -218,9 +218,10 @@ impl TryFrom<HoaAutomaton> for OmegaAutomaton<HoaAlphabet> {
 /// number of states and inserts transitions with the appropriate labels and colors.
 pub fn hoa_automaton_to_nts(
     aut: HoaAutomaton,
-) -> Initialized<NTS<HoaAlphabet, usize, AcceptanceMask>> {
+) -> Result<Initialized<NTS<HoaAlphabet, usize, AcceptanceMask>>, String> {
     let aps = aut.num_aps();
-    assert!(aps < MAX_APS);
+    assert!(aps <= MAX_APS);
+
     let mut ts = NTS::for_alphabet(HoaAlphabet::from_hoa_automaton(&aut));
     for (id, state) in aut.body().iter().enumerate() {
         assert_eq!(id, state.id() as usize);
@@ -234,7 +235,10 @@ pub fn hoa_automaton_to_nts(
                 .expect("Cannot yet deal with conjunctions of target states")
                 as usize;
             let label = edge.label().deref().clone();
-            let expr = HoaExpression::new(label, aps);
+
+            let bdd = label.try_into_bdd(&ts.alphabet().variable_set, &ts.alphabet().variables)?;
+
+            let expr = HoaExpression::new(bdd, aps);
 
             let color: AcceptanceMask = edge.acceptance_signature().into();
             ts.add_edge(state.id() as usize, expr, target, color);
@@ -247,7 +251,7 @@ pub fn hoa_automaton_to_nts(
         .get_singleton()
         .expect("Initial state must be a singleton") as usize;
 
-    ts.with_initial(initial)
+    Ok(ts.with_initial(initial))
 }
 
 #[cfg(test)]
@@ -255,25 +259,6 @@ mod tests {
     use tracing::debug;
 
     use crate::{hoa::HoaString, TransitionSystem};
-
-    #[test_log::test]
-    fn hoa_tdpa() {
-        let raw_hoa = r#"
-        HOA: v1
-        States: 2
-        Start: 0
-        acc-name: Rabin 1
-        Acceptance: 2 (Fin(0) & Inf(1))
-        AP: 2 "a" "b"
-        --BODY--
-        State: 0 "a U b"   /* An example of named state */
-        [0 & !1] 0 {0}
-        [1] 1 {0}
-        State: 1
-        [t] 1 {1}
-        --END--
-        "
-    }
 
     #[test_log::test]
     fn hoa_tdba_with_abort_and_nondeterministic() {

@@ -1,16 +1,18 @@
 use std::ops::{Deref, DerefMut};
 
-use biodivine_lib_bdd::Bdd;
 use chumsky::prelude::*;
 
-use crate::{lexer::Token, value, AcceptanceSignature, AtomicProposition, Id, StateConjunction};
+use crate::{
+    lexer::Token, value, AbstractLabelExpression, AcceptanceSignature, AtomicProposition, Id,
+    StateConjunction,
+};
 
 /// Newtype wrapper around a [`crate::LabelExpression`], implements [`Deref`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Label(pub Bdd);
+pub struct Label(pub AbstractLabelExpression);
 
 impl Deref for Label {
-    type Target = Bdd;
+    type Target = AbstractLabelExpression;
 
     fn deref(&self) -> &Self::Target {
         &self.0

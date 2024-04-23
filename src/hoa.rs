@@ -8,8 +8,10 @@ use crate::{prelude::*, Set};
 use biodivine_lib_bdd::{
     Bdd, BddPartialValuation, BddSatisfyingValuations, BddValuation, BddVariable,
 };
-use hoars::{HoaAutomaton, ALPHABET, MAX_APS, VARS};
+use hoars::HoaAutomaton;
 use itertools::Itertools;
+
+pub static MAX_APS: usize = 6;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HoaString(pub(crate) String);
@@ -27,10 +29,13 @@ pub struct HoaString(pub(crate) String);
 /// a symbol if the symbol satisfies the expression, i.e. if the expression evaluates to `true` under the given
 /// valuation. The expression from above, for example, would be matched by the symbol given above (`a & !b & c`),
 /// but not by the symbols `a & b & !c` or `!a & !b & c`.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct HoaAlphabet {
     apnames: Vec<String>,
-    expressions: RefCell<Set<HoaExpression>>,
+    variable_set: biodivine_lib_bdd::BddVariableSet,
+    variables: Vec<BddVariable>,
+    // TODO: introduce caching of Bdds
+    _expressions: RefCell<Set<HoaExpression>>,
 }
 
 impl HoaAlphabet {
@@ -40,6 +45,27 @@ impl HoaAlphabet {
             .expect("Cannot fit value into usize")
     }
 
+    pub fn char_to_hoa_symbol(&self, value: char) -> HoaSymbol {
+        assert!(value >= 'a');
+
+        let repr = (value as u8) - b'a';
+        HoaSymbol {
+            repr,
+            aps: self.apnames_len(),
+        }
+    }
+
+    pub fn hoa_symbol_to_char(&self, sym: &HoaSymbol) -> char {
+        assert_eq!(
+            sym.aps,
+            self.apnames_len(),
+            "symbol does not match alphabet"
+        );
+        assert!(sym.aps <= MAX_APS, "Too many APs");
+
+        (b'a' + sym.repr) as char
+    }
+
     pub fn apnames(&self) -> &[String] {
         &self.apnames
     }
@@ -47,48 +73,41 @@ impl HoaAlphabet {
         self.apnames.len()
     }
 
-    pub fn from_hoa_automaton(aut: &HoaAutomaton) -> Self {
-        let apnames = aut.aps().clone();
+    pub fn from_apnames<I: IntoIterator<Item = String>>(apnames: I) -> Self {
+        let apnames: Vec<_> = apnames.into_iter().collect();
         assert!(apnames.len() < MAX_APS);
         assert!(!apnames.is_empty());
 
+        let (vs, vars) = hoars::build_vars(apnames.len() as u16);
+
         Self {
             apnames,
-            expressions: RefCell::new(Set::default()),
+            variable_set: vs,
+            variables: vars,
+            _expressions: RefCell::new(Set::default()),
         }
     }
+
+    pub fn from_hoa_automaton(aut: &HoaAutomaton) -> Self {
+        Self::from_apnames(aut.aps().clone())
+    }
     pub fn top(&self) -> Bdd {
-        ALPHABET.mk_true()
+        self.variable_set.mk_true()
     }
     pub fn bot(&self) -> Bdd {
-        ALPHABET.mk_false()
+        self.variable_set.mk_false()
     }
     pub fn var(&self, n: usize) -> Bdd {
-        ALPHABET.mk_var(self.nth_variable(n))
+        self.variable_set.mk_var(self.nth_variable(n))
     }
     pub fn not_var(&self, n: usize) -> Bdd {
-        ALPHABET.mk_not_var(self.nth_variable(n))
+        self.variable_set.mk_not_var(self.nth_variable(n))
     }
     pub fn nth_variable(&self, n: usize) -> BddVariable {
         assert!(n < MAX_APS);
         assert!(n < self.apnames.len());
-        VARS[n]
+        self.variables[n]
     }
-}
-
-pub(crate) fn bdd_valuation_to_hoa_symbol(valuation: &BddValuation) -> HoaSymbol {
-    let aps: usize = valuation.num_vars().into();
-    assert!(
-        aps <= MAX_APS,
-        "We have {aps}, which is more than the maximum of {MAX_APS}"
-    );
-    let mut repr = 0;
-    for i in 0..MAX_APS {
-        if valuation.value(VARS[i]) {
-            repr |= 1 << i;
-        }
-    }
-    HoaSymbol { repr, aps }
 }
 
 pub(crate) fn hoa_symbol_to_hoa_expression(symbol: &HoaSymbol) -> HoaExpression {
@@ -99,6 +118,20 @@ pub(crate) fn hoa_symbol_to_hoa_expression(symbol: &HoaSymbol) -> HoaExpression 
     }
 }
 
+pub(crate) fn bdd_valuation_to_hoa_symbol(valuation: &BddValuation) -> HoaSymbol {
+    let aps: usize = valuation.num_vars().into();
+    assert!(
+        aps <= MAX_APS,
+        "We have {aps}, which is more than the maximum of {MAX_APS}"
+    );
+    let mut repr = 0;
+    for (var, b) in valuation.to_values() {
+        if b {
+            repr |= 1 << var.to_index()
+        }
+    }
+    HoaSymbol { repr, aps }
+}
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Copy)]
 pub struct HoaSymbol {
     repr: u8,
@@ -107,25 +140,27 @@ pub struct HoaSymbol {
 
 impl HoaSymbol {
     fn as_bdd_valuation(&self) -> BddValuation {
-        let mut valuation = BddValuation::all_false(MAX_APS.try_into().unwrap());
+        let mut valuation = BddValuation::all_false(self.aps.try_into().unwrap());
         for i in 0..self.aps {
             let val = ((1 << i) & self.repr) > 0;
-            valuation.set_value(VARS[i], val);
+            valuation.set_value(BddVariable::from_index(i), val);
         }
+
+        assert_eq!(valuation.num_vars() as usize, self.aps);
         valuation
     }
     pub fn to_char(&self) -> char {
         assert!(self.aps <= MAX_APS, "Too many APs");
-        (('a' as u8) + (self.repr & 0b1111)) as char
+        (b'a' + (self.repr & 0b1111)) as char
     }
     pub fn from_char(value: char, aps: usize) -> Self {
         assert!(aps <= MAX_APS);
         let val = value as u8;
-        assert!(('a' as u8) < val);
-        assert!(val <= ('p' as u8));
+        assert!(b'a' < val);
+        assert!(val <= b'p');
 
         Self {
-            repr: (val - ('a' as u8)) & 0b1111,
+            repr: (val - b'a') & 0b1111,
             aps,
         }
     }
@@ -164,6 +199,14 @@ pub struct HoaExpression {
 impl HoaExpression {
     pub fn new(bdd: Bdd, aps: usize) -> Self {
         Self { bdd, aps }
+    }
+
+    pub fn chars_iter(&self) -> impl Iterator<Item = char> + '_ {
+        self.symbols().map(|a| a.to_char())
+    }
+
+    pub fn aps(&self) -> usize {
+        self.aps
     }
 }
 
@@ -316,7 +359,7 @@ impl Iterator for HoaUniverse {
 
 impl HoaUniverse {
     pub fn new(aps: usize) -> Self {
-        assert!(aps < MAX_APS);
+        assert!(aps <= MAX_APS);
         Self {
             aps: aps.try_into().unwrap(),
             current: 0,
@@ -339,9 +382,13 @@ impl Alphabet for HoaAlphabet {
     where
         Self: 'this;
 
+    fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
+        left.bdd.and(&right.bdd).sat_valuations().next().is_some()
+    }
+
     fn universe(&self) -> Self::Universe<'_> {
         let aps = self.apnames.len();
-        assert!(aps < MAX_APS);
+        assert!(aps <= MAX_APS);
         HoaUniverse::new(self.apnames.len())
     }
 
@@ -365,9 +412,12 @@ impl Alphabet for HoaAlphabet {
 
 #[cfg(test)]
 mod tests {
-    use crate::{hoa::input::hoa_to_ts, TransitionSystem};
+    use crate::{
+        hoa::{input::hoa_to_ts, HoaAlphabet},
+        TransitionSystem,
+    };
 
-    #[test]
+    #[test_log::test]
     fn parse_generated_hoa() {
         let hoa = r#"HOA: v1
         States: 10
@@ -433,5 +483,18 @@ mod tests {
         assert_eq!(auts.len(), 1);
         let aut = &auts[0];
         assert_eq!(aut.size(), 10);
+    }
+
+    #[test]
+    fn hoa_symbol_char_conversion() {
+        let alphabet =
+            HoaAlphabet::from_apnames(["P0".to_string(), "P1".to_string(), "P2".to_string()]);
+
+        for chr in 'a'..='e' {
+            assert_eq!(
+                chr,
+                alphabet.hoa_symbol_to_char(&alphabet.char_to_hoa_symbol(chr))
+            );
+        }
     }
 }

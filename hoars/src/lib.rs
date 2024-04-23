@@ -8,21 +8,97 @@ mod lexer;
 pub mod output;
 mod value;
 
-use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
-use std::fmt::Display;
+use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddVariable, BddVariableSet};
+use std::fmt::{Debug, Display};
 
-pub type LabelExpression = Bdd;
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum AbstractLabelExpression {
+    Boolean(bool),
+    Integer(u16),
+    Negated(Box<AbstractLabelExpression>),
+    Conjunction(Vec<AbstractLabelExpression>),
+    Disjunction(Vec<AbstractLabelExpression>),
+}
+
+pub(crate) enum Atomic {
+    Positive(u16),
+    Negative(u16),
+}
+
+impl Atomic {
+    pub(crate) fn to_value(self, vars: &[BddVariable]) -> (BddVariable, bool) {
+        match self {
+            Atomic::Positive(i) => (vars[i as usize], true),
+            Atomic::Negative(i) => (vars[i as usize], false),
+        }
+    }
+}
+
+impl AbstractLabelExpression {
+    pub(crate) fn try_atom(&self) -> Option<Atomic> {
+        match self {
+            AbstractLabelExpression::Integer(i) => Some(Atomic::Positive(*i)),
+            AbstractLabelExpression::Negated(bx) => match **bx {
+                AbstractLabelExpression::Integer(i) => Some(Atomic::Negative(i)),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+    pub fn try_into_bdd(self, vs: &BddVariableSet, vars: &[BddVariable]) -> Result<Bdd, String> {
+        match self {
+            AbstractLabelExpression::Boolean(b) => Ok(match b {
+                true => vs.mk_true(),
+                false => vs.mk_false(),
+            }),
+            AbstractLabelExpression::Integer(i) => {
+                if i < vs.num_vars() {
+                    Ok(vs.mk_var(vars[i as usize]))
+                } else {
+                    Err(format!("AP identifier {i} is too high"))
+                }
+            }
+            AbstractLabelExpression::Negated(e) => Ok(e.try_into_bdd(vs, vars)?.not()),
+            AbstractLabelExpression::Conjunction(cs) => {
+                if let Some(ints) = cs.iter().map(|c| c.try_atom()).collect::<Option<Vec<_>>>() {
+                    let valuation = BddPartialValuation::from_values(
+                        &ints.into_iter().map(|a| a.to_value(vars)).collect_vec(),
+                    );
+                    Ok(vs.mk_conjunctive_clause(&valuation))
+                } else {
+                    Err(format!(
+                        "could not parse label expression conjunct {cs:?}, expected atom"
+                    ))
+                }
+            }
+            AbstractLabelExpression::Disjunction(ds) => {
+                if let Some(ints) = ds.iter().map(|c| c.try_atom()).collect::<Option<Vec<_>>>() {
+                    let valuation = BddPartialValuation::from_values(
+                        &ints.into_iter().map(|a| a.to_value(vars)).collect_vec(),
+                    );
+                    Ok(vs.mk_disjunctive_clause(&valuation))
+                } else {
+                    Err(format!(
+                        "could not parse label expression disjunct {ds:?}, expected atom"
+                    ))
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum LabelExpression {
+    Parsed(Bdd),
+    Abstract(AbstractLabelExpression),
+}
 
 pub const MAX_APS: usize = 8;
 
-fn build_bdd_vars(alphabet: &BddVariableSet) -> [BddVariable; MAX_APS] {
-    let x = alphabet.variables();
-    [x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]]
-}
-
-lazy_static::lazy_static! {
-    pub static ref ALPHABET: BddVariableSet = BddVariableSet::new_anonymous(8);
-    pub static ref VARS: [BddVariable; MAX_APS] = build_bdd_vars(&ALPHABET);
+pub fn build_vars(count: u16) -> (BddVariableSet, Vec<BddVariable>) {
+    let vs = BddVariableSet::new_anonymous(count);
+    let vars = vs.variables().into_iter().take(count as usize).collect();
+    (vs, vars)
 }
 
 pub fn first_automaton_split_position(input: &str) -> Option<usize> {
@@ -285,7 +361,7 @@ impl HoaAutomaton {
     }
 
     /// Returns the aliases of the automaton.
-    pub fn aliases(&self) -> Vec<(AliasName, LabelExpression)> {
+    pub fn aliases(&self) -> Vec<(AliasName, AbstractLabelExpression)> {
         self.header()
             .iter()
             .filter_map(|item| match item {
@@ -323,13 +399,48 @@ impl Default for HoaAutomaton {
     }
 }
 
-// fn reporter<D: std::fmt::Display>(input: &str) -> impl Fn(D)
-
 impl TryFrom<&str> for HoaAutomaton {
     type Error = FromHoaError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         input::from_hoa(value)
+    }
+}
+
+impl std::fmt::Display for AbstractLabelExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AbstractLabelExpression::Boolean(b) => match b {
+                true => write!(f, "t"),
+                false => write!(f, "f"),
+            },
+            AbstractLabelExpression::Integer(i) => write!(f, "{i}"),
+            AbstractLabelExpression::Negated(expr) => {
+                write!(f, "!{}", expr)
+            }
+            AbstractLabelExpression::Conjunction(conjuncts) => {
+                let mut it = conjuncts.iter();
+                if let Some(first) = it.next() {
+                    Display::fmt(first, f)?;
+                }
+                for succ in it {
+                    write!(f, " & ")?;
+                    Display::fmt(succ, f)?;
+                }
+                Ok(())
+            }
+            AbstractLabelExpression::Disjunction(disjuncts) => {
+                let mut it = disjuncts.iter();
+                if let Some(first) = it.next() {
+                    Display::fmt(first, f)?;
+                }
+                for succ in it {
+                    write!(f, " | ")?;
+                    Display::fmt(succ, f)?;
+                }
+                Ok(())
+            }
+        }
     }
 }
 

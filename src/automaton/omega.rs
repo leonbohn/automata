@@ -1,6 +1,6 @@
 use bit_set::BitSet;
 use itertools::Itertools;
-use tracing::warn;
+use tracing::{trace, warn};
 
 use crate::{hoa::HoaAlphabet, prelude::*, Set};
 
@@ -24,9 +24,7 @@ impl AcceptanceMask {
 
     pub fn try_as_priority(&self) -> Option<usize> {
         let mut it = self.iter();
-        let Some(priority) = it.next() else {
-            return None;
-        };
+        let priority = it.next()?;
         if it.next().is_some() {
             warn!("more than one priority is set! {:?}", self.0);
         }
@@ -131,13 +129,15 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
 
 impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
     fn from(value: DeterministicOmegaAutomaton<HoaAlphabet>) -> Self {
+        trace!("in From<DOA>");
         let ts = TSBuilder::default()
             .with_state_colors((0..value.size()).map(|i| value.state_color(i).unwrap()))
             .with_transitions(value.state_indices().flat_map(|q| {
                 value.edges_from(q).unwrap().flat_map(|edge| {
+                    trace!("edge has expression with {} aps", edge.expression().aps());
                     edge.expression()
-                        .symbols()
-                        .map(move |sym| (edge.source(), sym.to_char(), edge.color(), edge.target()))
+                        .chars_iter()
+                        .map(move |sym| (edge.source(), sym, edge.color(), edge.target()))
                 })
             }))
             .into_deterministic_initialized(value.initial());

@@ -1,9 +1,8 @@
-use biodivine_lib_bdd::Bdd;
 use chumsky::{prelude::*, select};
 
 use crate::{
-    AcceptanceAtom, AcceptanceCondition, AcceptanceInfo, AcceptanceSignature, HoaBool, Id,
-    StateConjunction, Token, MAX_APS,
+    AbstractLabelExpression, AcceptanceAtom, AcceptanceCondition, AcceptanceInfo,
+    AcceptanceSignature, HoaBool, Id, StateConjunction, Token,
 };
 
 #[allow(unused)]
@@ -61,25 +60,11 @@ pub fn acceptance_info() -> impl Parser<Token, AcceptanceInfo, Error = Simple<To
     }
 }
 
-pub fn label_expression() -> impl Parser<Token, Bdd, Error = Simple<Token>> {
+pub fn label_expression() -> impl Parser<Token, AbstractLabelExpression, Error = Simple<Token>> {
     recursive(|label_expression| {
         let value = boolean()
-            .map(|b| {
-                if b {
-                    crate::ALPHABET.mk_true()
-                } else {
-                    crate::ALPHABET.mk_false()
-                }
-            })
-            .or(integer().map(|i| {
-                assert!(
-                    (i as usize) < MAX_APS,
-                    "invalid AP, {} is above limit {}",
-                    i,
-                    MAX_APS
-                );
-                crate::ALPHABET.mk_var(crate::VARS[i as usize])
-            }));
+            .map(|b| AbstractLabelExpression::Boolean(b))
+            .or(integer().map(|i| AbstractLabelExpression::Integer(i as u16)));
         // .or(alias_name().map(|aname| LabelExpression::Alias(AliasName(aname))));
 
         let atom = value
@@ -88,39 +73,41 @@ pub fn label_expression() -> impl Parser<Token, Bdd, Error = Simple<Token>> {
         let unary = just(Token::Op('!'))
             .or_not()
             .then(atom)
-            .map(
-                |(negated, expr)| {
-                    if negated.is_some() {
-                        expr.not()
-                    } else {
-                        expr
-                    }
-                },
-            );
-
-        let f_conjunction = |l: Bdd, r: &Bdd| l.and(r);
+            .map(|(negated, expr)| {
+                if negated.is_some() {
+                    AbstractLabelExpression::Negated(Box::new(expr))
+                } else {
+                    expr
+                }
+            });
 
         let conjunction = unary
             .clone()
-            .then(
-                just(Token::Op('&'))
-                    .to(f_conjunction)
-                    .then(unary)
-                    .repeated(),
-            )
-            .foldl(|lhs, (f, rhs)| f(lhs, &rhs));
-
-        let f_disjunction = |l: Bdd, r: &Bdd| l.or(r);
+            .map(|x| vec![x])
+            .then(just(Token::Op('&')).then(unary).repeated())
+            .foldl(|mut acc, (_tok, expr)| {
+                acc.push(expr);
+                acc
+            })
+            .map(|acc| match acc.len() {
+                0 => panic!("we do not expect this to happen..."),
+                1 => acc.into_iter().next().unwrap(),
+                _ => AbstractLabelExpression::Conjunction(acc),
+            });
 
         conjunction
             .clone()
-            .then(
-                just(Token::Op('|'))
-                    .to(f_disjunction)
-                    .then(conjunction)
-                    .repeated(),
-            )
-            .foldl(|lhs, (f, rhs)| f(lhs, &rhs))
+            .map(|conj| vec![conj])
+            .then(just(Token::Op('|')).then(conjunction).repeated())
+            .foldl(|mut acc, (_tok, rhs)| {
+                acc.push(rhs);
+                acc
+            })
+            .map(|acc| match acc.len() {
+                0 => panic!("it seems we need to deal with the case where this is empty"),
+                1 => acc.into_iter().next().unwrap(),
+                _ => AbstractLabelExpression::Disjunction(acc),
+            })
     })
 }
 

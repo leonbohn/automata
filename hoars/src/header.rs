@@ -4,8 +4,8 @@ use chumsky::prelude::*;
 
 use crate::{
     format::{AtomicProposition, StateConjunction},
-    value, AcceptanceCondition, AcceptanceInfo, AcceptanceName, AliasName, Id, LabelExpression,
-    Property, Token,
+    value, AbstractLabelExpression, AcceptanceCondition, AcceptanceInfo, AcceptanceName, AliasName,
+    Id, Property, Token,
 };
 
 /// Represents a header item in a HOA file, for more information on each
@@ -23,7 +23,7 @@ pub enum HeaderItem {
     /// (1) Gives the atomic propositions of the automaton.
     AP(Vec<AtomicProposition>),
     /// (>=0) Allows the introduction of an alias for a label expression.
-    Alias(AliasName, LabelExpression),
+    Alias(AliasName, AbstractLabelExpression),
     /// (1) Gives the acceptance condition of the automaton.
     Acceptance(Id, AcceptanceCondition),
     /// (>=0) Gives the acceptance sets of the automaton.

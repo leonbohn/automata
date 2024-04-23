@@ -8,7 +8,7 @@ use automata::{
 use tracing::{debug, info, trace};
 use tracing_subscriber::{filter, prelude::*};
 
-use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 
 fn cli() -> clap::Command {
     Command::new("oai")
@@ -68,6 +68,7 @@ pub fn main() {
                 info!("read deterministic automaton with {} states", aut.size());
 
                 let converted: DeterministicOmegaAutomaton<CharAlphabet> = aut.into();
+                trace!("first conversion successful");
                 let reconverted: DeterministicOmegaAutomaton<HoaAlphabet> =
                     converted.try_into().unwrap();
 
