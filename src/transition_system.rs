@@ -18,10 +18,12 @@ pub mod operations;
 /// efficient for large systems and this implementation is used by default. There is a variant
 /// [`DTS`] which is simply a thin wrapper around [`NTS`], indicating that the wrapped transition
 /// system is deterministic, i.e. it implements [`Deterministic`].
-/// - [`HashTs`] is a (deterministic) transition system which is backed by a [`crate::Set`] of
+/// - [`MutableTs`] is a (deterministic) transition system which is backed by a [`crate::Set`] of
 /// states and a [`crate::math::Map`] of edges. In other words, it uses a hash table internally.
+/// This offers a distinct advantage over [`DTS`] in that states and edges can
+/// be removed. This is useful for constructing transition systems programmatically.
 pub mod impls;
-pub use impls::{CollectDTS, HashTs, IntoHashTs, DTS, NTS};
+pub use impls::{CollectDTS, IntoMutableTs, MutableTs, DTS, NTS};
 
 /// Contains implementations and definitions for dealing with paths through a transition system.
 pub mod path;
