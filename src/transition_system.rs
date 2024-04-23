@@ -742,6 +742,7 @@ impl<Ts: TransitionSystem> Indexes<Ts> for Ts::StateIndex {
         Some(*self)
     }
 }
+
 /// Encapsulates what is necessary for a type to be usable as a state index in a [`TransitionSystem`].
 pub trait IndexType: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show {}
 
