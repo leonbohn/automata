@@ -9,7 +9,7 @@
 //!
 //! The crate defines some basic building blocks of TS which can easily be manipulated (see `Sproutable`), these are
 //! - [`transition_system::NTS`]/[`transition_system::DTS`] (the latter is just a thin wrapper around the former). These store edges in a vector, a state contains a pointer to the first edge in this collection and each edge contains pointers to the previous/next one.
-//! - [`transition_system::HashTs`] which stores transitions in an efficient HashMap
+//! - [`transition_system::MutableTs`] which stores transitions in an efficient HashMap
 //!
 //! Further traits that are of importance are
 //! - [`Pointed`] which picks one designated initial state, this is important for deterministic automata
@@ -40,7 +40,7 @@ pub mod prelude {
             reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
             Congruence, Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, ExpressionOf,
-            ForAlphabet, HashTs, IndexType, Indexes, IntoEdge, IsEdge, Path, Sproutable,
+            ForAlphabet, IndexType, Indexes, IntoEdge, IsEdge, MutableTs, Path, Sproutable,
             StateColor, SymbolOf, TSBuilder, TransitionSystem, DTS, NTS,
         },
         upw,
