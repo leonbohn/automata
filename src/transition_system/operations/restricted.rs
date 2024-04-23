@@ -277,12 +277,17 @@ impl<D: PredecessorIterable<EdgeColor = usize>> PredecessorIterable for ColorRes
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = ColorRestrictedEdgesTo<'this, D>
+    type EdgesToIter<'this> = ColorRestrictedEdgesTo<'this, &'this D>
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, _state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        todo!()
+    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
+        let state = state.to_index(self)?;
+        Some(ColorRestrictedEdgesTo::new(
+            self.ts().predecessors(state)?,
+            self.min,
+            self.max,
+        ))
     }
 }
 
@@ -336,6 +341,18 @@ pub struct ColorRestrictedEdgesTo<'a, D: PredecessorIterable> {
     it: D::EdgesToIter<'a>,
     min: D::EdgeColor,
     max: D::EdgeColor,
+}
+
+impl<'a, D: PredecessorIterable> ColorRestrictedEdgesTo<'a, D> {
+    /// Creates a new instance of the iterator.
+    pub fn new(it: D::EdgesToIter<'a>, min: D::EdgeColor, max: D::EdgeColor) -> Self {
+        Self {
+            _phantom: PhantomData,
+            it,
+            min,
+            max,
+        }
+    }
 }
 
 impl<'a, D: PredecessorIterable> Iterator for ColorRestrictedEdgesTo<'a, D>
