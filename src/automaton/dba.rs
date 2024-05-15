@@ -33,7 +33,7 @@ impl<Q> OmegaSemantics<Q, bool> for DBASemantics {
 ///
 /// In a certain sense, it is a special case of a deterministic parity automaton [`super::DPA`] with
 /// min even and priorities 0 and 1.
-pub type DBA<A = CharAlphabet> = Automaton<Initialized<DTS<A, Void, bool>>, DBASemantics, true>;
+pub type DBA<A = CharAlphabet> = Automaton<DTS<A, Void, bool>, DBASemantics, true>;
 /// Helper trait for creating a [`DBA`] from a given transition system.
 pub type IntoDBA<T> = Automaton<T, DBASemantics, true>;
 

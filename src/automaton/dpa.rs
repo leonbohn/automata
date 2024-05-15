@@ -55,7 +55,7 @@ pub struct MaxOddParitySemantics;
 /// if the least color that appears infinitely often during
 /// a run is even.
 pub type DPA<A = CharAlphabet, Sem = MinEvenParitySemantics> =
-    Automaton<Initialized<DTS<A, Void, usize>>, Sem, true>;
+    Automaton<DTS<A, Void, usize>, Sem, true>;
 /// Helper trait for converting a given transition system into a [`DPA`]
 /// with the given semantics.
 pub type IntoDPA<T, Sem = MinEvenParitySemantics> = Automaton<T, Sem, true>;
@@ -368,7 +368,7 @@ where
     {
         let start = std::time::Instant::now();
 
-        let mut ts: Initialized<MutableTs<_, D::StateColor, usize>> = self.collect_pointed().0;
+        let (mut ts, initial) = self.collect_hash_ts_pointed();
         let out = ts.clone();
 
         let mut recoloring = Vec::new();
@@ -466,6 +466,7 @@ where
                 };
                 c
             })
+            .with_initial(initial)
             .collect_dpa();
 
         info!("normalizing DPA took {} μs", start.elapsed().as_micros());

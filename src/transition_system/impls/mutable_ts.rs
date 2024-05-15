@@ -397,9 +397,7 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q,
     }
 }
 
-impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq> ForAlphabet<A>
-    for MutableTs<A, Q, C>
-{
+impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq> ForAlphabet for MutableTs<A, Q, C> {
     fn for_alphabet(from: A) -> Self {
         Self {
             alphabet: from,

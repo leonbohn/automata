@@ -19,13 +19,13 @@ pub struct MealySemantics<C>(PhantomData<C>);
 /// on a word. In case of a deterministic Mealy machine, this is the only output that is
 /// produced.
 pub type MealyMachine<A = CharAlphabet, C = usize> =
-    Automaton<Initialized<DTS<A, Void, C>>, MealySemantics<C>, false>;
+    Automaton<DTS<A, Void, C>, MealySemantics<C>, false>;
 
 /// Helper type that takes a pointed transition system and returns the corresponding
 /// [`MealyMachine`].
 pub type IntoMealyMachine<D> = Automaton<D, MealySemantics<EdgeColor<D>>, false>;
 
-impl<C: Congruence> IntoMealyMachine<C>
+impl<C: Deterministic> IntoMealyMachine<C>
 where
     EdgeColor<C>: Color,
 {
@@ -33,7 +33,7 @@ where
     /// inputs, they will produce the same output.
     pub fn bisimilar<M>(&self, other: &IntoMealyMachine<M>) -> bool
     where
-        M: Congruence<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
+        M: Deterministic<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
         EdgeColor<M>: Color,
     {
         self.witness_inequivalence(other).is_none()
@@ -64,7 +64,7 @@ where
     /// will not be considered. This is why the operation needs to be run two times
     /// in [`Self::witness_inequivalence`].
     pub fn witness_restricted_inequivalence<
-        O: Congruence<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
+        O: Deterministic<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
     >(
         &self,
         other: &IntoMealyMachine<O>,
@@ -97,7 +97,7 @@ where
     /// it produces different outputs whn run in both machines.
     /// If no such word exists, the function returns `None`.
     pub fn witness_inequivalence<
-        O: Congruence<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
+        O: Deterministic<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
     >(
         &self,
         other: &IntoMealyMachine<O>,
@@ -131,7 +131,7 @@ mod tests {
             ])
             .into_dts()
             .with_initial(0)
-            .into_mealy();
+            .collect_mealy();
         let mm2: MealyMachine = NTS::builder()
             .default_color(Void)
             .with_transitions([
@@ -144,7 +144,7 @@ mod tests {
             ])
             .into_dts()
             .with_initial(0)
-            .into_mealy();
+            .collect_mealy();
         let _mm3: MealyMachine = NTS::builder()
             .default_color(Void)
             .with_transitions([
@@ -157,7 +157,7 @@ mod tests {
             ])
             .into_dts()
             .with_initial(0)
-            .into_mealy();
+            .collect_mealy();
 
         assert_eq!(mm1.witness_inequivalence(&mm2), Some(vec!['b', 'b', 'b']))
     }
