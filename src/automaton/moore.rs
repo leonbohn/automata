@@ -26,7 +26,7 @@ pub struct MooreSemantics<Q>(std::marker::PhantomData<Q>);
 /// is, however, prefered to use a [`MealyMachine`] for this purpose, as for infinite inputs
 /// switching to transition-based acceptance is preferable.
 pub type MooreMachine<A = CharAlphabet, Q = usize> =
-    Automaton<Initialized<DTS<A, Q, Void>>, MooreSemantics<Q>, false>;
+    Automaton<DTS<A, Q, Void>, MooreSemantics<Q>, false>;
 
 /// Helper type that takes a pointed transition system and returns the corresponding
 /// [`MooreMachine`], which the ts can be converted into using [`Into::into`].

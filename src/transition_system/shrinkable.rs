@@ -54,28 +54,3 @@ impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, Index: IndexType> 
         Some(self.mutablets_remove_transitions(source.to_index(self)?, *symbol))
     }
 }
-
-impl<Ts: Shrinkable> Shrinkable for Initialized<Ts> {
-    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor> {
-        let q = state.to_index(self)?;
-        self.ts_mut().remove_state(q)
-    }
-
-    fn remove_edge<Idx: Indexes<Self>>(
-        &mut self,
-        source: Idx,
-        expression: &ExpressionOf<Self>,
-    ) -> Option<(Self::EdgeColor, Self::StateIndex)> {
-        let q = source.to_index(self)?;
-        self.ts_mut().remove_edge(q, expression)
-    }
-
-    fn remove_transitions<Idx: Indexes<Self>>(
-        &mut self,
-        source: Idx,
-        symbol: &SymbolOf<Self>,
-    ) -> Option<Set<(ExpressionOf<Self>, Self::EdgeColor, Self::StateIndex)>> {
-        let q = source.to_index(self)?;
-        self.ts_mut().remove_transitions(q, symbol)
-    }
-}

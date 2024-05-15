@@ -625,32 +625,15 @@ pub trait Deterministic: TransitionSystem {
         &self,
         sink_color: Self::StateColor,
         edge_color: Self::EdgeColor,
-    ) -> Initialized<DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>>
+    ) -> (
+        DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
+        usize,
+    )
     where
         Self: Pointed,
         Self::Alphabet: IndexedAlphabet,
     {
-        let mut out: Initialized<DTS<_, _, _>> = self.trim_collect();
-        out.complete_with_colors(sink_color, edge_color);
-        out
-    }
-
-    /// Variant of [`Self::collect()`] which also considers the initial state.
-    fn collect_pointed<Ts>(&self) -> (Initialized<Ts>, Bijection<Self::StateIndex, Ts::StateIndex>)
-    where
-        Self: Pointed,
-        Ts: ForAlphabet<Self::Alphabet> + Sproutable,
-        EdgeColor<Self>: Into<EdgeColor<Ts>>,
-        StateColor<Self>: Into<StateColor<Ts>>,
-    {
-        let (ts, map) = self.collect::<Ts>();
-        (
-            ts.with_initial(
-                *map.get_by_left(&self.initial())
-                    .expect("Initial state did not get collected"),
-            ),
-            map,
-        )
+        todo!()
     }
 
     /// Returns true if `self` is accessible, meaning every state is reachable from the initial state.
@@ -665,25 +648,18 @@ pub trait Deterministic: TransitionSystem {
     /// Collects into a transition system of type `Ts`, but only considers states that
     /// are reachable from the initial state. Naturally, this means that `self` must
     /// be a pointed transition system.
-    fn trim_collect(&self) -> Initialized<DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>>
+    fn trim_collect(
+        &self,
+    ) -> (
+        DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
+        usize,
+    )
     where
         Self: Pointed,
     {
         let reachable_indices = self.reachable_state_indices().collect::<Set<_>>();
         let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
-        let (out, _map) = restricted.collect_pointed();
-        out
-    }
-
-    /// Collects `self` into a new transition system of type `Ts` with the same alphabet, state indices
-    /// and edge colors. **This does not consider the initial state.**
-    fn collect<Ts>(&self) -> (Ts, Bijection<Self::StateIndex, Ts::StateIndex>)
-    where
-        Ts: ForAlphabet<Self::Alphabet> + Sproutable,
-        EdgeColor<Self>: Into<EdgeColor<Ts>>,
-        StateColor<Self>: Into<StateColor<Ts>>,
-    {
-        Sproutable::collect_with_index_mapping(self)
+        todo!()
     }
 
     /// Compute the escape prefixes of a set of omega words on a transition system.
@@ -901,8 +877,7 @@ mod tests {
         let ts = NTS::builder()
             .with_transitions([(0, 'a', Void, 1), (1, 'b', Void, 1)])
             .default_color(Void)
-            .into_dts()
-            .with_initial(0);
+            .into_dts();
 
         assert!(ts
             .escape_prefixes(words.iter())

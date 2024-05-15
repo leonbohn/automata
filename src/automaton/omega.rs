@@ -4,8 +4,6 @@ use tracing::error;
 
 use crate::{hoa::HoaAlphabet, prelude::*, Set};
 
-use super::Initialized;
-
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AcceptanceMask(BitSet);
 
@@ -82,12 +80,14 @@ impl OmegaAcceptanceCondition {
 }
 
 pub struct OmegaAutomaton<A: Alphabet> {
-    pub(super) ts: Initialized<NTS<A, usize, AcceptanceMask>>,
+    pub(super) ts: NTS<A, usize, AcceptanceMask>,
+    pub(super) initial: usize,
     pub(super) acc: OmegaAcceptanceCondition,
 }
 
 pub struct DeterministicOmegaAutomaton<A: Alphabet> {
-    pub(super) ts: Initialized<DTS<A, usize, AcceptanceMask>>,
+    pub(super) ts: DTS<A, usize, AcceptanceMask>,
+    pub(super) initial: usize,
     pub(super) acc: OmegaAcceptanceCondition,
 }
 

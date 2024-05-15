@@ -223,6 +223,6 @@ mod tests {
 
         assert_eq!(dts.reachable_state_indices().count(), 3);
         assert_eq!(dts.state_indices().count(), 3);
-        assert_eq!(dts.trim_collect().size(), 3);
+        assert_eq!(dts.trim_collect().0.size(), 3);
     }
 }
