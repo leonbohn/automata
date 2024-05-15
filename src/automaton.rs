@@ -30,7 +30,7 @@ pub use omega::{
 };
 
 mod with_initial;
-pub use with_initial::Initialized;
+pub use with_initial::WithInitial;
 
 mod semantics;
 pub use semantics::{FiniteSemantics, OmegaSemantics, Semantics};
@@ -68,13 +68,62 @@ where
 }
 
 impl<D: TransitionSystem, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
+    /// Creates a new instance of `Self` for the given [`Alphabet`]. Also
+    /// takes the colour of the initial state as parameter as this method
+    /// simply creates a new transition system and adds a state with the
+    /// given color.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let mut dfa = DFA::new_with_initial_color(CharAlphabet::alphabetic(2), false);
+    /// assert_eq!(dfa.size(), 1);
+    /// dfa.add_edge(0, 0, 'a', 0, Void);
+    /// dfa.add_edge(0, 0, 'b', 0, Void);
+    /// assert!(!dfa.accepts("bbabababbabbba"));
+    /// ```
+    pub fn new_with_initial_color(alphabet: D::Alphabet, initial_color: D::StateColor) -> Self
+    where
+        D: ForAlphabet + Sproutable,
+        A: Default,
+    {
+        let mut ts = D::for_alphabet(alphabet);
+        let initial = ts.add_state(initial_color);
+        Self::from_parts(ts, initial)
+    }
+
     /// Creates a new automaton from the given transition system and acceptance condition.
-    pub fn from_parts(ts: D, initial: impl Indexes<D>, acceptance: A) -> Self {
+    pub fn from_parts_with_acceptance(ts: D, initial: D::StateIndex, acceptance: A) -> Self {
         Self {
-            initial: initial.to_index(&ts).unwrap(),
+            initial,
             ts,
             acceptance,
         }
+    }
+
+    pub fn from_parts(ts: D, initial: D::StateIndex) -> Self
+    where
+        A: Default,
+    {
+        Self::from_parts_with_acceptance(ts, initial, A::default())
+    }
+
+    pub fn from_pointed_with_acceptance(cong: D, acceptance: A) -> Self
+    where
+        D: Pointed,
+    {
+        let initial = cong.initial();
+        Self::from_parts_with_acceptance(cong, initial, acceptance)
+    }
+
+    pub fn from_pointed(cong: D) -> Self
+    where
+        D: Pointed,
+        A: Default,
+    {
+        let initial = cong.initial();
+        Self::from_parts(cong, initial)
     }
 
     /// Decomposes the automaton into its parts: the transition system and the acceptance condition.
@@ -100,7 +149,7 @@ impl<D: TransitionSystem, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
 
 impl<D, A> Automaton<D, A, false>
 where
-    D: Congruence,
+    D: Deterministic,
     A: FiniteSemantics<StateColor<D>, EdgeColor<D>>,
 {
     /// Returns whether the automaton accepts the given finite word.
@@ -114,13 +163,14 @@ where
     /// Transforms the given finite word using the automaton, that means it returns
     /// the output of the acceptance condition on the run of the word.
     pub fn transform<W: FiniteWord<SymbolOf<D>>>(&self, word: W) -> A::Output {
-        self.acceptance.evaluate(self.ts.finite_run(word))
+        self.acceptance
+            .evaluate(self.ts.finite_run_from(word, self.initial))
     }
 }
 
 impl<D, A> Automaton<D, A, true>
 where
-    D: Congruence,
+    D: Deterministic,
     A: OmegaSemantics<StateColor<D>, EdgeColor<D>>,
 {
     /// Returns whether the automaton accepts the given omega word.
@@ -128,13 +178,15 @@ where
     where
         A: OmegaSemantics<StateColor<D>, EdgeColor<D>, Output = bool>,
     {
-        self.acceptance.evaluate(self.ts.omega_run(word))
+        self.acceptance
+            .evaluate(self.ts.omega_run_from(word, self.initial))
     }
 
     /// Transforms the given omega word using the automaton, that means it returns
     /// the output of the acceptance condition on the run of the word.
     pub fn transform<W: OmegaWord<SymbolOf<D>>>(&self, word: W) -> A::Output {
-        self.acceptance.evaluate(self.ts.omega_run(word))
+        self.acceptance
+            .evaluate(self.ts.omega_run_from(word, self.initial))
     }
 }
 
@@ -326,7 +378,7 @@ where
 {
     fn from(value: D) -> Self {
         let initial = value.initial();
-        Self::from_parts(value, initial, A::default())
+        Self::from_parts(value, initial)
     }
 }
 

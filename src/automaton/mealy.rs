@@ -19,7 +19,7 @@ pub struct MealySemantics<C>(PhantomData<C>);
 /// on a word. In case of a deterministic Mealy machine, this is the only output that is
 /// produced.
 pub type MealyMachine<A = CharAlphabet, C = usize> =
-    Automaton<Initialized<DTS<A, Void, C>>, MealySemantics<C>, false>;
+    Automaton<DTS<A, Void, C>, MealySemantics<C>, false>;
 
 /// Helper type that takes a pointed transition system and returns the corresponding
 /// [`MealyMachine`].

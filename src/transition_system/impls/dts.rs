@@ -56,7 +56,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for DTS<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet<A> for DTS<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet for DTS<A, Q, C> {
     fn for_alphabet(from: A) -> Self {
         Self(NTS::for_alphabet(from))
     }
@@ -160,18 +160,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> TryFrom<NTS<A, Q, C>> for DTS<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> TryFrom<Initialized<NTS<A, Q, C>>>
-    for Initialized<DTS<A, Q, C>>
-{
-    /// Only fails if nts is not deterministic.
-    type Error = ();
-
-    fn try_from(value: Initialized<NTS<A, Q, C>>) -> Result<Self, Self::Error> {
-        let (nts, initial) = value.into_parts();
-        Ok(Initialized::from((nts.try_into()?, initial)))
-    }
-}
-
 impl<A: Alphabet, Q: Clone, C: Clone> TryFrom<&NTS<A, Q, C>> for DTS<A, Q, C> {
     type Error = ();
 
@@ -180,18 +168,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> TryFrom<&NTS<A, Q, C>> for DTS<A, Q, C> {
             return Err(());
         }
         Ok(Self(value.clone()))
-    }
-}
-
-impl<A: Alphabet, Q: Clone, C: Clone> TryFrom<&Initialized<NTS<A, Q, C>>>
-    for Initialized<DTS<A, Q, C>>
-{
-    /// Only fails if nts is not deterministic.
-    type Error = ();
-
-    fn try_from(value: &Initialized<NTS<A, Q, C>>) -> Result<Self, Self::Error> {
-        let (nts, initial) = value.clone().into_parts();
-        Ok(Initialized::from((nts.try_into()?, initial)))
     }
 }
 

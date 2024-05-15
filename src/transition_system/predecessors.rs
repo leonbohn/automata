@@ -140,11 +140,3 @@ impl<'a, A: Alphabet, C: Color, Idx: IndexType> BTSPredecessors<'a, A, C, Idx> {
         Self { it, state }
     }
 }
-
-impl<Ts: PredecessorIterable> PredecessorIterable for Initialized<Ts> {
-    type PreEdgeRef<'this> = Ts::PreEdgeRef<'this> where Self: 'this;
-    type EdgesToIter<'this> = Ts::EdgesToIter<'this> where Self: 'this;
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        self.ts().predecessors(state.to_index(self)?)
-    }
-}

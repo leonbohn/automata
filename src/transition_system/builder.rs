@@ -240,14 +240,6 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
         RightCongruence::from_ts(self.into_dts().with_initial(initial))
     }
 
-    /// Consumes `self` and returns an [`Initialized`] wrapping a [`DTS`].
-    pub fn into_deterministic_initialized(
-        self,
-        initial: usize,
-    ) -> Initialized<DTS<CharAlphabet, Q, C>> {
-        self.into_dts().with_initial(initial)
-    }
-
     /// Collects self into a non-deterministic transition system.
     pub fn into_nts(self) -> NTS<CharAlphabet, Q, C> {
         let alphabet =
