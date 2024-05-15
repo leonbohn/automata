@@ -209,8 +209,8 @@ impl TryFrom<HoaAutomaton> for OmegaAutomaton<HoaAlphabet> {
     type Error = String;
     fn try_from(value: HoaAutomaton) -> Result<Self, Self::Error> {
         let acc = value.header().try_into()?;
-        let ts = hoa_automaton_to_nts(value)?;
-        Ok(Self::new(ts, acc))
+        let (ts, initial) = hoa_automaton_to_nts(value)?.decompose();
+        Ok(Self::new(ts, initial, acc))
     }
 }
 

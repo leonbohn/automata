@@ -2,7 +2,6 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::math::Bijection;
 use crate::math::Map;
 use crate::math::Set;
 
@@ -623,8 +622,8 @@ pub trait Deterministic: TransitionSystem {
     /// ```
     fn collect_complete_pointed(
         &self,
-        sink_color: Self::StateColor,
-        edge_color: Self::EdgeColor,
+        _sink_color: Self::StateColor,
+        _edge_color: Self::EdgeColor,
     ) -> (
         DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
         usize,
@@ -658,7 +657,7 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
     {
         let reachable_indices = self.reachable_state_indices().collect::<Set<_>>();
-        let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
+        let _restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
         todo!()
     }
 
@@ -678,6 +677,46 @@ pub trait Deterministic: TransitionSystem {
                     .map(|path| w.prefix(path.len() + 1).as_string())
             })
             .unique()
+    }
+
+    /// Consumes and turns `self` into a [`DFA`] while using the given `initial` state.
+    fn into_dfa_with_initial(self, initial: Self::StateIndex) -> IntoDFA<Self>
+    where
+        Self: Deterministic<StateColor = bool>,
+    {
+        Automaton::from_parts(self, initial)
+    }
+
+    /// Consumes and turns `self` into a [`DPA`] while using the given `initial` state.
+    fn into_dpa_with_initial(self, initial: Self::StateIndex) -> IntoDPA<Self>
+    where
+        Self: Deterministic<EdgeColor = usize>,
+    {
+        Automaton::from_parts(self, initial)
+    }
+
+    /// Consumes and turns `self` into a [`DBA`] while using the given `initial` state.
+    fn into_dba_with_initial(self, initial: Self::StateIndex) -> IntoDBA<Self>
+    where
+        Self: Deterministic<EdgeColor = usize>,
+    {
+        Automaton::from_parts(self, initial)
+    }
+
+    /// Consumes and turns `self` into a [`MooreMachine`] while using the given `initial` state.
+    fn into_moore_with_initial(self, initial: Self::StateIndex) -> IntoMooreMachine<Self>
+    where
+        StateColor<Self>: Color,
+    {
+        Automaton::from_parts(self, initial)
+    }
+
+    /// Consumes and turns `self` into a [`MealyMachine`] while using the given `initial` state.
+    fn into_mealy_with_initial(self, initial: Self::StateIndex) -> IntoMealyMachine<Self>
+    where
+        EdgeColor<Self>: Color,
+    {
+        Automaton::from_parts(self, initial)
     }
 }
 
@@ -877,7 +916,8 @@ mod tests {
         let ts = NTS::builder()
             .with_transitions([(0, 'a', Void, 1), (1, 'b', Void, 1)])
             .default_color(Void)
-            .into_dts();
+            .into_dts()
+            .with_initial(0);
 
         assert!(ts
             .escape_prefixes(words.iter())

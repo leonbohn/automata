@@ -368,7 +368,7 @@ where
     {
         let start = std::time::Instant::now();
 
-        let (mut ts, initial) = self.collect_dts_pointed();
+        let (mut ts, initial) = self.collect_hash_ts_pointed();
         let out = ts.clone();
 
         let mut recoloring = Vec::new();
@@ -466,6 +466,7 @@ where
                 };
                 c
             })
+            .with_initial(initial)
             .collect_dpa();
 
         info!("normalizing DPA took {} μs", start.elapsed().as_micros());
