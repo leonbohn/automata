@@ -8,4 +8,4 @@ mod nts;
 pub use nts::{NTEdge, NTSEdgesFromIter, NTSEdgesToIter, NTSPartsFor, NTState, NTS};
 
 mod dts;
-pub use dts::{CollectDTS, DTS};
+pub use dts::{CollectDTS, DTSAndInitialState, DTS};

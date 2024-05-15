@@ -167,6 +167,12 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
         self.into_nts().try_into().expect("Not deterministic!")
     }
 
+    /// Build a deterministic transition system from `self` and set the given `initial` state as the
+    /// designated initial state of the output object. Panics if `self` is not deterministic.
+    pub fn into_dts_with_initial(self, initial: usize) -> WithInitial<DTS<CharAlphabet, Q, C>> {
+        self.into_dts().with_initial(initial)
+    }
+
     /// Assigns the given `color` to the state with the given index `idx`.
     pub fn color(mut self, idx: usize, color: Q) -> Self {
         assert!(self.colors.iter().all(|(q, _c)| q != &idx));

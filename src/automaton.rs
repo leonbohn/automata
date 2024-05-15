@@ -79,8 +79,8 @@ impl<D: TransitionSystem, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
     ///
     /// let mut dfa = DFA::new_with_initial_color(CharAlphabet::alphabetic(2), false);
     /// assert_eq!(dfa.size(), 1);
-    /// dfa.add_edge(0, 0, 'a', 0, Void);
-    /// dfa.add_edge(0, 0, 'b', 0, Void);
+    /// dfa.add_edge(0, 'a', 0, Void);
+    /// dfa.add_edge(0, 'b', 0, Void);
     /// assert!(!dfa.accepts("bbabababbabbba"));
     /// ```
     pub fn new_with_initial_color(alphabet: D::Alphabet, initial_color: D::StateColor) -> Self

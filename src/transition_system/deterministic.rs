@@ -615,24 +615,36 @@ pub trait Deterministic: TransitionSystem {
     /// use automata::prelude::*;
     ///
     /// let ts = TSBuilder::without_colors().with_edges([(0, 'a', 1), (1, 'b', 0)]).into_dts();
-    /// let collected = ts.with_initial(0).collect_complete_pointed(Void, Void);
+    /// let (collected, initial) = ts.with_initial(0).collect_complete_pointed(Void, Void);
     /// assert_eq!(collected.size(), 3);
     ///
-    /// assert_eq!(collected.reached_state_index("b"), collected.reached_state_index("aa"));
+    /// assert_eq!(collected.reached_state_index_from("b", 0), collected.reached_state_index_from("aa", 0));
     /// ```
     fn collect_complete_pointed(
         &self,
-        _sink_color: Self::StateColor,
-        _edge_color: Self::EdgeColor,
-    ) -> (
-        DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
-        usize,
-    )
+        sink_state_color: Self::StateColor,
+        sink_edge_color: Self::EdgeColor,
+    ) -> crate::transition_system::DTSAndInitialState<
+        Self::Alphabet,
+        Self::StateColor,
+        Self::EdgeColor,
+    >
     where
         Self: Pointed,
         Self::Alphabet: IndexedAlphabet,
     {
-        todo!()
+        let (mut ts, initial) = self.collect_dts_pointed();
+        if !ts.is_complete() {
+            let sink = ts.add_state(sink_state_color);
+            for q in ts.state_indices() {
+                for sym in self.alphabet().universe() {
+                    if ts.transition(q, sym).is_none() {
+                        ts.add_edge(q, ts.make_expression(sym), sink, sink_edge_color.clone());
+                    }
+                }
+            }
+        }
+        (ts, initial)
     }
 
     /// Returns true if `self` is accessible, meaning every state is reachable from the initial state.
@@ -649,16 +661,17 @@ pub trait Deterministic: TransitionSystem {
     /// be a pointed transition system.
     fn trim_collect(
         &self,
-    ) -> (
-        DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
-        usize,
-    )
+    ) -> crate::transition_system::DTSAndInitialState<
+        Self::Alphabet,
+        Self::StateColor,
+        Self::EdgeColor,
+    >
     where
         Self: Pointed,
     {
         let reachable_indices = self.reachable_state_indices().collect::<Set<_>>();
-        let _restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
-        todo!()
+        let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
+        restricted.collect_dts_pointed()
     }
 
     /// Compute the escape prefixes of a set of omega words on a transition system.
