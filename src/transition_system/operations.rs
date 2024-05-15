@@ -19,6 +19,15 @@ pub use quotient::{Quotient, QuotientEdgesFrom, QuotientTransition};
 mod with_state_color;
 pub use with_state_color::{DefaultIfMissing, ProvidesStateColor, WithStateColor};
 
+use crate::Void;
+
+use super::{EdgeColor, StateColor};
+
+/// Type alias for the transition system that results from erasing all
+/// colors, c.f. [`super::TransitionSystem::erase_colors`].
+pub type EraseColors<Ts> =
+    MapEdgeColor<MapStateColor<Ts, fn(StateColor<Ts>) -> Void>, fn(EdgeColor<Ts>) -> Void>;
+
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;

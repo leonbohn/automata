@@ -2,7 +2,6 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::math::Bijection;
 use crate::math::Map;
 use crate::math::Set;
 
@@ -616,41 +615,36 @@ pub trait Deterministic: TransitionSystem {
     /// use automata::prelude::*;
     ///
     /// let ts = TSBuilder::without_colors().with_edges([(0, 'a', 1), (1, 'b', 0)]).into_dts();
-    /// let collected = ts.with_initial(0).collect_complete_pointed(Void, Void);
+    /// let (collected, initial) = ts.with_initial(0).collect_complete_pointed(Void, Void);
     /// assert_eq!(collected.size(), 3);
     ///
-    /// assert_eq!(collected.reached_state_index("b"), collected.reached_state_index("aa"));
+    /// assert_eq!(collected.reached_state_index_from("b", 0), collected.reached_state_index_from("aa", 0));
     /// ```
     fn collect_complete_pointed(
         &self,
-        sink_color: Self::StateColor,
-        edge_color: Self::EdgeColor,
-    ) -> Initialized<DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>>
+        sink_state_color: Self::StateColor,
+        sink_edge_color: Self::EdgeColor,
+    ) -> crate::transition_system::DTSAndInitialState<
+        Self::Alphabet,
+        Self::StateColor,
+        Self::EdgeColor,
+    >
     where
         Self: Pointed,
         Self::Alphabet: IndexedAlphabet,
     {
-        let mut out: Initialized<DTS<_, _, _>> = self.trim_collect();
-        out.complete_with_colors(sink_color, edge_color);
-        out
-    }
-
-    /// Variant of [`Self::collect()`] which also considers the initial state.
-    fn collect_pointed<Ts>(&self) -> (Initialized<Ts>, Bijection<Self::StateIndex, Ts::StateIndex>)
-    where
-        Self: Pointed,
-        Ts: ForAlphabet<Self::Alphabet> + Sproutable,
-        EdgeColor<Self>: Into<EdgeColor<Ts>>,
-        StateColor<Self>: Into<StateColor<Ts>>,
-    {
-        let (ts, map) = self.collect::<Ts>();
-        (
-            ts.with_initial(
-                *map.get_by_left(&self.initial())
-                    .expect("Initial state did not get collected"),
-            ),
-            map,
-        )
+        let (mut ts, initial) = self.collect_dts_pointed();
+        if !ts.is_complete() {
+            let sink = ts.add_state(sink_state_color);
+            for q in ts.state_indices() {
+                for sym in self.alphabet().universe() {
+                    if ts.transition(q, sym).is_none() {
+                        ts.add_edge(q, ts.make_expression(sym), sink, sink_edge_color.clone());
+                    }
+                }
+            }
+        }
+        (ts, initial)
     }
 
     /// Returns true if `self` is accessible, meaning every state is reachable from the initial state.
@@ -665,25 +659,19 @@ pub trait Deterministic: TransitionSystem {
     /// Collects into a transition system of type `Ts`, but only considers states that
     /// are reachable from the initial state. Naturally, this means that `self` must
     /// be a pointed transition system.
-    fn trim_collect(&self) -> Initialized<DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>>
+    fn trim_collect(
+        &self,
+    ) -> crate::transition_system::DTSAndInitialState<
+        Self::Alphabet,
+        Self::StateColor,
+        Self::EdgeColor,
+    >
     where
         Self: Pointed,
     {
         let reachable_indices = self.reachable_state_indices().collect::<Set<_>>();
         let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
-        let (out, _map) = restricted.collect_pointed();
-        out
-    }
-
-    /// Collects `self` into a new transition system of type `Ts` with the same alphabet, state indices
-    /// and edge colors. **This does not consider the initial state.**
-    fn collect<Ts>(&self) -> (Ts, Bijection<Self::StateIndex, Ts::StateIndex>)
-    where
-        Ts: ForAlphabet<Self::Alphabet> + Sproutable,
-        EdgeColor<Self>: Into<EdgeColor<Ts>>,
-        StateColor<Self>: Into<StateColor<Ts>>,
-    {
-        Sproutable::collect_with_index_mapping(self)
+        restricted.collect_dts_pointed()
     }
 
     /// Compute the escape prefixes of a set of omega words on a transition system.
@@ -702,6 +690,46 @@ pub trait Deterministic: TransitionSystem {
                     .map(|path| w.prefix(path.len() + 1).as_string())
             })
             .unique()
+    }
+
+    /// Consumes and turns `self` into a [`DFA`] while using the given `initial` state.
+    fn into_dfa_with_initial(self, initial: Self::StateIndex) -> IntoDFA<Self>
+    where
+        Self: Deterministic<StateColor = bool>,
+    {
+        Automaton::from_parts(self, initial)
+    }
+
+    /// Consumes and turns `self` into a [`DPA`] while using the given `initial` state.
+    fn into_dpa_with_initial(self, initial: Self::StateIndex) -> IntoDPA<Self>
+    where
+        Self: Deterministic<EdgeColor = usize>,
+    {
+        Automaton::from_parts(self, initial)
+    }
+
+    /// Consumes and turns `self` into a [`DBA`] while using the given `initial` state.
+    fn into_dba_with_initial(self, initial: Self::StateIndex) -> IntoDBA<Self>
+    where
+        Self: Deterministic<EdgeColor = usize>,
+    {
+        Automaton::from_parts(self, initial)
+    }
+
+    /// Consumes and turns `self` into a [`MooreMachine`] while using the given `initial` state.
+    fn into_moore_with_initial(self, initial: Self::StateIndex) -> IntoMooreMachine<Self>
+    where
+        StateColor<Self>: Color,
+    {
+        Automaton::from_parts(self, initial)
+    }
+
+    /// Consumes and turns `self` into a [`MealyMachine`] while using the given `initial` state.
+    fn into_mealy_with_initial(self, initial: Self::StateIndex) -> IntoMealyMachine<Self>
+    where
+        EdgeColor<Self>: Color,
+    {
+        Automaton::from_parts(self, initial)
     }
 }
 

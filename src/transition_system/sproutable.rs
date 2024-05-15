@@ -9,10 +9,10 @@ use crate::{math::Bijection, prelude::*};
 ///
 /// Usually, this will *not* be implemented by TS that have a [designated initial state](`Pointed`).
 /// For those, a dedicated method should be used.
-pub trait ForAlphabet<A: Alphabet>: TransitionSystem<Alphabet = A> {
+pub trait ForAlphabet: TransitionSystem {
     /// Creates an instance of `Self` for the given [`Alphabet`]. The resulting
     /// TS should be empty.
-    fn for_alphabet(from: A) -> Self;
+    fn for_alphabet(from: Self::Alphabet) -> Self;
 }
 
 /// Marker trait for [`Alphabet`]s that can be indexed, i.e. where we can associate each
@@ -86,7 +86,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     fn collect_with_index_mapping<Ts>(ts: Ts) -> (Self, Bijection<Ts::StateIndex, Self::StateIndex>)
     where
-        Self: ForAlphabet<Ts::Alphabet> + Sproutable,
+        Self: ForAlphabet<Alphabet = Ts::Alphabet> + Sproutable,
         Ts: TransitionSystem,
         StateColor<Ts>: Into<StateColor<Self>>,
         EdgeColor<Ts>: Into<EdgeColor<Self>>,

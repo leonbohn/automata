@@ -4,8 +4,6 @@ use tracing::error;
 
 use crate::{hoa::HoaAlphabet, prelude::*, Set};
 
-use super::Initialized;
-
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AcceptanceMask(BitSet);
 
@@ -82,21 +80,24 @@ impl OmegaAcceptanceCondition {
 }
 
 pub struct OmegaAutomaton<A: Alphabet> {
-    pub(super) ts: Initialized<NTS<A, usize, AcceptanceMask>>,
+    pub(super) ts: NTS<A, usize, AcceptanceMask>,
+    pub(super) initial: usize,
     pub(super) acc: OmegaAcceptanceCondition,
 }
 
 pub struct DeterministicOmegaAutomaton<A: Alphabet> {
-    pub(super) ts: Initialized<DTS<A, usize, AcceptanceMask>>,
+    pub(super) ts: DTS<A, usize, AcceptanceMask>,
+    pub(super) initial: usize,
     pub(super) acc: OmegaAcceptanceCondition,
 }
 
 impl<A: Alphabet> OmegaAutomaton<A> {
     pub fn new(
-        ts: Initialized<NTS<A, usize, AcceptanceMask>>,
+        ts: NTS<A, usize, AcceptanceMask>,
+        initial: usize,
         acc: OmegaAcceptanceCondition,
     ) -> Self {
-        Self { ts, acc }
+        Self { ts, initial, acc }
     }
 
     pub fn into_deterministic(self) -> Option<DeterministicOmegaAutomaton<A>> {
@@ -106,10 +107,11 @@ impl<A: Alphabet> OmegaAutomaton<A> {
 
 impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
     pub fn new(
-        ts: Initialized<DTS<A, usize, AcceptanceMask>>,
+        ts: DTS<A, usize, AcceptanceMask>,
+        initial: usize,
         acc: OmegaAcceptanceCondition,
     ) -> Self {
-        Self { ts, acc }
+        Self { ts, initial, acc }
     }
 
     pub fn into_dpa(self) -> DPA<A> {
@@ -120,6 +122,7 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
 
         self.ts
             .map_edge_colors(|mask| mask.as_priority())
+            .with_initial(self.initial)
             .collect_dpa()
     }
 }
@@ -137,8 +140,8 @@ impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutoma
                         .map(move |sym| (edge.source(), sym, edge.color(), edge.target()))
                 })
             }))
-            .into_deterministic_initialized(value.initial());
-        DeterministicOmegaAutomaton::new(ts, value.acc)
+            .into_dts();
+        DeterministicOmegaAutomaton::new(ts, value.initial, value.acc)
     }
 }
 
@@ -175,7 +178,8 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
 
         assert!(value.initial() < size);
         Ok(DeterministicOmegaAutomaton::new(
-            ts.with_initial(value.initial()),
+            ts,
+            value.initial,
             value.acc,
         ))
     }
@@ -187,7 +191,7 @@ impl<A: Alphabet> TryFrom<OmegaAutomaton<A>> for DeterministicOmegaAutomaton<A> 
 
     fn try_from(value: OmegaAutomaton<A>) -> Result<Self, Self::Error> {
         let dts = value.ts.try_into()?;
-        Ok(Self::new(dts, value.acc))
+        Ok(Self::new(dts, value.initial, value.acc))
     }
 }
 
@@ -197,19 +201,19 @@ impl<A: Alphabet> TryFrom<&OmegaAutomaton<A>> for DeterministicOmegaAutomaton<A>
 
     fn try_from(value: &OmegaAutomaton<A>) -> Result<Self, Self::Error> {
         let dts = (&value.ts).try_into()?;
-        Ok(Self::new(dts, value.acc))
+        Ok(Self::new(dts, value.initial, value.acc))
     }
 }
 
 impl<A: Alphabet> Pointed for OmegaAutomaton<A> {
     fn initial(&self) -> Self::StateIndex {
-        self.ts.initial()
+        self.initial
     }
 }
 
 impl<A: Alphabet> Pointed for DeterministicOmegaAutomaton<A> {
     fn initial(&self) -> Self::StateIndex {
-        self.ts.initial()
+        self.initial
     }
 }
 

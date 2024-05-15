@@ -1,7 +1,7 @@
 use std::{io::BufRead, ops::Deref};
 
 use crate::{
-    automaton::{AcceptanceMask, DeterministicOmegaAutomaton},
+    automaton::{AcceptanceMask, DeterministicOmegaAutomaton, WithInitial},
     hoa::HoaExpression,
     prelude::*,
 };
@@ -209,8 +209,8 @@ impl TryFrom<HoaAutomaton> for OmegaAutomaton<HoaAlphabet> {
     type Error = String;
     fn try_from(value: HoaAutomaton) -> Result<Self, Self::Error> {
         let acc = value.header().try_into()?;
-        let ts = hoa_automaton_to_nts(value)?;
-        Ok(Self::new(ts, acc))
+        let (ts, initial) = hoa_automaton_to_nts(value)?.decompose();
+        Ok(Self::new(ts, initial, acc))
     }
 }
 
@@ -218,7 +218,7 @@ impl TryFrom<HoaAutomaton> for OmegaAutomaton<HoaAlphabet> {
 /// number of states and inserts transitions with the appropriate labels and colors.
 pub fn hoa_automaton_to_nts(
     aut: HoaAutomaton,
-) -> Result<Initialized<NTS<HoaAlphabet, usize, AcceptanceMask>>, String> {
+) -> Result<WithInitial<NTS<HoaAlphabet, usize, AcceptanceMask>>, String> {
     let aps = aut.num_aps();
     assert!(aps <= MAX_APS);
 

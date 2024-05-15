@@ -15,6 +15,105 @@ pub use transitionprofile::{Accumulates, RunProfile, RunSignature, TransitionMon
 mod cayley;
 pub use cayley::{Cayley, RightCayley};
 
+/// A congruence is a [`TransitionSystem`], which additionally has a distinguished initial state. On top
+/// of that, a congruence does not have any coloring on either states or symbols. This
+/// functionality is abstracted in [`Pointed`]. This trait is automatically implemented.
+pub trait Congruence: Deterministic + Pointed {
+    /// Takes ownership of `self` and builds a new [`DFA`] from it.
+    fn into_dfa(self) -> IntoDFA<Self>
+    where
+        Self: Congruence<StateColor = bool>,
+    {
+        Automaton::from_pointed(self)
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`DFA`].
+    fn collect_dfa(&self) -> DFA<Self::Alphabet>
+    where
+        Self: Congruence<StateColor = bool>,
+    {
+        let (dts, initial) = self.erase_edge_colors().collect_dts_pointed();
+        DFA::from_parts(dts, initial)
+    }
+
+    /// Takes ownership of `self` and builds a new [`DPA`] from it.
+    fn into_dpa(self) -> IntoDPA<Self>
+    where
+        Self: Congruence<EdgeColor = usize>,
+    {
+        Automaton::from_pointed(self)
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`DPA`].
+    fn collect_dpa(&self) -> DPA<Self::Alphabet>
+    where
+        Self: Congruence<EdgeColor = usize>,
+    {
+        let (ts, initial) = self.erase_state_colors().collect_dts_pointed();
+        DPA::from_parts(ts, initial)
+    }
+
+    /// Takes ownership of `self` and builds a new [`DBA`] from it.
+    fn into_dba(self) -> IntoDBA<Self>
+    where
+        Self: Congruence<EdgeColor = bool>,
+    {
+        Automaton::from_pointed(self)
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`DBA`].
+    fn collect_dba(&self) -> DBA<Self::Alphabet>
+    where
+        Self: Congruence<EdgeColor = bool>,
+    {
+        let (ts, initial) = self.erase_state_colors().collect_dts_pointed();
+        DBA::from_parts(ts, initial)
+    }
+
+    /// Takes ownership of `self` and builds a new [`MooreMachine`] from it.
+    fn into_moore(self) -> IntoMooreMachine<Self>
+    where
+        StateColor<Self>: Color,
+    {
+        Automaton::from_pointed(self)
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`MooreMachine`].
+    fn collect_moore(&self) -> MooreMachine<Self::Alphabet, StateColor<Self>>
+    where
+        StateColor<Self>: Color,
+    {
+        let (ts, initial) = self.erase_edge_colors().collect_dts_pointed();
+        MooreMachine::from_parts(ts, initial)
+    }
+
+    /// Collects the transition system representing `self` and builds a new [`MealyMachine`].
+    fn into_mealy(self) -> IntoMealyMachine<Self>
+    where
+        EdgeColor<Self>: Color,
+    {
+        Automaton::from_pointed(self)
+    }
+    /// Collects the transition system representing `self` and builds a new [`MealyMachine`].
+    fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, EdgeColor<Self>>
+    where
+        EdgeColor<Self>: Color,
+    {
+        let (ts, initial) = self.erase_state_colors().collect_dts_pointed();
+        MealyMachine::from_parts(ts, initial)
+    }
+
+    /// Creates a new instance of a [`RightCongruence`] from the transition structure of `self`.
+    /// Note, that this method might not preserve state indices!
+    fn right_congruence(self) -> RightCongruence<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
+    where
+        Self: Pointed,
+    {
+        RightCongruence::from_ts(self)
+    }
+}
+impl<Sim: Deterministic + Pointed> Congruence for Sim {}
+
 /// Represents a right congruence relation, which is in essence a trim, deterministic
 /// transition system with a designated initial state.
 #[derive(Clone)]

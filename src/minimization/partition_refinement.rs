@@ -193,7 +193,7 @@ where
 
     let start = Instant::now();
 
-    let out = mm
+    let (ts, initial) = mm
         .quotient(partition)
         .map_state_colors(|c| {
             // assert!(c.iter().all_equal());
@@ -201,13 +201,12 @@ where
         })
         // TODO: Should we not get rid of the edge colors entirely?
         .erase_edge_colors()
-        .collect_pointed()
-        .0;
+        .collect_dts_pointed();
     debug!(
         "Collecting into Moore machine took {} microseconds",
         start.elapsed().as_micros()
     );
-    out.into()
+    ts.into_moore_with_initial(initial)
 }
 
 #[cfg(test)]

@@ -23,7 +23,7 @@ pub mod operations;
 /// This offers a distinct advantage over [`DTS`] in that states and edges can
 /// be removed. This is useful for constructing transition systems programmatically.
 pub mod impls;
-pub use impls::{CollectDTS, IntoMutableTs, MutableTs, DTS, NTS};
+pub use impls::{CollectDTS, DTSAndInitialState, IntoMutableTs, MutableTs, DTS, NTS};
 
 /// Contains implementations and definitions for dealing with paths through a transition system.
 pub mod path;
@@ -136,6 +136,16 @@ pub trait TransitionSystem: Sized {
             self.edges_from(q)
                 .expect("should return iterator for state that exists")
         })
+    }
+
+    /// Consumes `self` and sets the given `initial` to be the designated initial state. This constructs
+    /// an instance of [`crate::automaton::WithInitial`] which is in turn simply an [`Automaton`]
+    /// without semantics.
+    fn with_initial(self, initial: Self::StateIndex) -> crate::automaton::WithInitial<Self>
+    where
+        Self: Sized,
+    {
+        crate::automaton::WithInitial::from_parts(self, initial)
     }
 
     /// Returns true if the transition system has no edges. This is rather costly, as it
@@ -357,22 +367,6 @@ pub trait TransitionSystem: Sized {
         elem.to_index(self)
     }
 
-    /// Returns a [`Initialized`] wrapper around `self`, which designates the given `initial` state.
-    /// Note that this function does not (yet) ensure that the index actually exists!
-    fn with_initial<Idx: Indexes<Self>>(self, initial: Idx) -> Initialized<Self>
-    where
-        Self: Sized,
-    {
-        let initial = initial
-            .to_index(&self)
-            .expect("Cannot set initial state that does not exist");
-        assert!(
-            self.contains_state_index(initial),
-            "Cannot set initial state that does not exist"
-        );
-        (self, initial).into()
-    }
-
     /// Builds the [`operations::Quotient`] of `self` with regard to some given [`Partition`].
     fn quotient(self, partition: Partition<Self::StateIndex>) -> operations::Quotient<Self>
     where
@@ -415,6 +409,15 @@ pub trait TransitionSystem: Sized {
         operations::MapEdges::new(self, f)
     }
 
+    /// Removes all coloring from `self`, giving a transition system that has edges and states
+    /// colored with type [`Void`].
+    fn erase_colors(self) -> operations::EraseColors<Self>
+    where
+        Self: Sized,
+    {
+        self.erase_state_colors().erase_edge_colors()
+    }
+
     /// Completely removes the edge coloring.
     fn erase_edge_colors(self) -> operations::MapEdgeColor<Self, fn(Self::EdgeColor) -> Void>
     where
@@ -451,10 +454,10 @@ pub trait TransitionSystem: Sized {
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
-    ///     .into_deterministic_initialized(0);
+    ///     .into_dts_with_initial(0);
     /// let colored = ts.with_state_color(false);
     /// assert_eq!(colored.reached_state_color("a"), Some(false));
-    /// assert_eq!(colored.reached_state_color("aaa"), Some(false));
+    /// assert_eq!(colored.with_state_color(true).reached_state_color("a"), Some(true));
     /// ```
     fn with_state_color<P: ProvidesStateColor<Self::StateIndex>>(
         self,
@@ -825,101 +828,6 @@ pub mod dot;
 pub use dot::Dottable;
 
 use self::operations::{ProvidesStateColor, WithStateColor};
-
-/// A congruence is a [`TransitionSystem`], which additionally has a distinguished initial state. On top
-/// of that, a congruence does not have any coloring on either states or symbols. This
-/// functionality is abstracted in [`Pointed`]. This trait is automatically implemented.
-pub trait Congruence: Deterministic + Pointed {
-    /// Takes ownership of `self` and builds a new [`DFA`] from it.
-    fn into_dfa(self) -> IntoDFA<Self>
-    where
-        Self: Congruence<StateColor = bool>,
-    {
-        self.into()
-    }
-
-    /// Collects the transition system representing `self` and builds a new [`DFA`].
-    fn collect_dfa(&self) -> DFA<Self::Alphabet>
-    where
-        Self: Congruence<StateColor = bool>,
-    {
-        self.erase_edge_colors().collect_pointed().0.into_dfa()
-    }
-
-    /// Takes ownership of `self` and builds a new [`DPA`] from it.
-    fn into_dpa(self) -> IntoDPA<Self>
-    where
-        Self: Congruence<EdgeColor = usize>,
-    {
-        self.into()
-    }
-
-    /// Collects the transition system representing `self` and builds a new [`DPA`].
-    fn collect_dpa(&self) -> DPA<Self::Alphabet>
-    where
-        Self: Congruence<EdgeColor = usize>,
-    {
-        self.erase_state_colors().collect_pointed().0.into_dpa()
-    }
-
-    /// Takes ownership of `self` and builds a new [`DBA`] from it.
-    fn into_dba(self) -> IntoDBA<Self>
-    where
-        Self: Congruence<EdgeColor = bool>,
-    {
-        self.into()
-    }
-
-    /// Collects the transition system representing `self` and builds a new [`DBA`].
-    fn collect_dba(&self) -> DBA<Self::Alphabet>
-    where
-        Self: Congruence<EdgeColor = bool>,
-    {
-        self.erase_state_colors().collect_pointed().0.into_dba()
-    }
-
-    /// Takes ownership of `self` and builds a new [`MooreMachine`] from it.
-    fn into_moore(self) -> IntoMooreMachine<Self>
-    where
-        StateColor<Self>: Color,
-    {
-        self.into()
-    }
-
-    /// Collects the transition system representing `self` and builds a new [`MooreMachine`].
-    fn collect_moore(&self) -> MooreMachine<Self::Alphabet, StateColor<Self>>
-    where
-        StateColor<Self>: Color,
-    {
-        self.erase_edge_colors().collect_pointed().0.into_moore()
-    }
-
-    /// Collects the transition system representing `self` and builds a new [`MealyMachine`].
-    fn into_mealy(self) -> IntoMealyMachine<Self>
-    where
-        EdgeColor<Self>: Color,
-    {
-        self.into()
-    }
-
-    /// Collects the transition system representing `self` and builds a new [`MealyMachine`].
-    fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, EdgeColor<Self>>
-    where
-        EdgeColor<Self>: Color,
-    {
-        self.erase_state_colors().collect_pointed().0.into_mealy()
-    }
-
-    /// Creates a new instance of a [`RightCongruence`] from the transition structure of `self`.
-    /// Note, that this method might not preserve state indices!
-    fn right_congruence(self) -> RightCongruence<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
-    where
-        Self: Pointed,
-    {
-        RightCongruence::from_ts(self)
-    }
-}
-impl<Sim: Deterministic + Pointed> Congruence for Sim {}
 
 #[cfg(test)]
 pub mod tests {}

@@ -9,6 +9,10 @@ use super::nts::{NTEdge, NTSEdgesFromIter, NTSEdgesToIter, NTSPartsFor, NTState}
 #[derive(Clone)]
 pub struct DTS<A: Alphabet = CharAlphabet, Q = Void, C = Void>(pub(crate) NTS<A, Q, C>);
 
+/// Type alias that is used when we want a pair (tuple) consisiting of a DTS and its initial
+/// state. This is mainly used to make clippy happy...
+pub type DTSAndInitialState<A, Q, C> = (DTS<A, Q, C>, usize);
+
 /// Type alias to create a deterministic transition with the same alphabet, state and edge color
 /// as the given [`Ts`](`crate::prelude::TransitionSystem`).
 pub type CollectDTS<Ts> = DTS<
@@ -56,7 +60,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for DTS<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet<A> for DTS<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet for DTS<A, Q, C> {
     fn for_alphabet(from: A) -> Self {
         Self(NTS::for_alphabet(from))
     }
@@ -160,18 +164,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> TryFrom<NTS<A, Q, C>> for DTS<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> TryFrom<Initialized<NTS<A, Q, C>>>
-    for Initialized<DTS<A, Q, C>>
-{
-    /// Only fails if nts is not deterministic.
-    type Error = ();
-
-    fn try_from(value: Initialized<NTS<A, Q, C>>) -> Result<Self, Self::Error> {
-        let (nts, initial) = value.into_parts();
-        Ok(Initialized::from((nts.try_into()?, initial)))
-    }
-}
-
 impl<A: Alphabet, Q: Clone, C: Clone> TryFrom<&NTS<A, Q, C>> for DTS<A, Q, C> {
     type Error = ();
 
@@ -180,18 +172,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> TryFrom<&NTS<A, Q, C>> for DTS<A, Q, C> {
             return Err(());
         }
         Ok(Self(value.clone()))
-    }
-}
-
-impl<A: Alphabet, Q: Clone, C: Clone> TryFrom<&Initialized<NTS<A, Q, C>>>
-    for Initialized<DTS<A, Q, C>>
-{
-    /// Only fails if nts is not deterministic.
-    type Error = ();
-
-    fn try_from(value: &Initialized<NTS<A, Q, C>>) -> Result<Self, Self::Error> {
-        let (nts, initial) = value.clone().into_parts();
-        Ok(Initialized::from((nts.try_into()?, initial)))
     }
 }
 

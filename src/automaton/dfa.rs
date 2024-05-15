@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use crate::prelude::*;
 
 use self::operations::DefaultIfMissing;
@@ -34,7 +32,8 @@ impl<C> FiniteSemantics<bool, C> for DFASemantics {
 }
 
 /// A deterministic finite automaton (DFA) is a deterministic automaton with a simple acceptance condition. It accepts a finite word if it reaches an accepting state.
-pub type DFA<A = CharAlphabet> = Automaton<Initialized<DTS<A, bool, Void>>, DFASemantics, false>;
+pub type DFA<A = CharAlphabet> = Automaton<DTS<A, bool, Void>, DFASemantics, false>;
+
 /// Helper trait for creating a [`DFA`] from a given transition system.
 pub type IntoDFA<T> = Automaton<T, DFASemantics, false>;
 
@@ -51,7 +50,7 @@ where
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
-    ///     .into_deterministic_initialized(0);
+    ///     .into_dts_with_initial(0);
     /// assert!(DFA::from_ts(&ts, [0]).accepts(""));
     /// assert!(!DFA::from_ts(&ts, [1]).accepts("a"));
     /// assert!(!DFA::from_ts(ts, []).accepts("a"));
@@ -176,38 +175,5 @@ where
                     None
                 }
             })
-    }
-}
-
-/// Helper trait to convert from boolean to usize. Normally, a `true` value corresponds to `1`, while
-/// a `false` value corresponds to `0`. This does not really work well with min-even parity conditions
-/// so this helper trait is introduced.
-// TODO: remove this if possible.
-pub trait ReducesTo<T = bool> {
-    /// Reduce `self` to a value of type `T`.
-    fn reduce(self) -> T;
-}
-
-impl ReducesTo<bool> for bool {
-    fn reduce(self) -> bool {
-        self
-    }
-}
-
-impl ReducesTo<bool> for usize {
-    fn reduce(self) -> bool {
-        (self % 2) == 0
-    }
-}
-
-impl ReducesTo<bool> for BTreeSet<bool> {
-    fn reduce(self) -> bool {
-        self.into_iter().any(|x| x)
-    }
-}
-
-impl ReducesTo<bool> for BTreeSet<usize> {
-    fn reduce(self) -> bool {
-        self.into_iter().min().unwrap() % 2 == 0
     }
 }

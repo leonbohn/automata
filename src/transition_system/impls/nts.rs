@@ -27,7 +27,7 @@ pub struct NTS<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
     edges: Vec<NTEdge<A::Expression, C>>,
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet<A> for NTS<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet for NTS<A, Q, C> {
     fn for_alphabet(alphabet: Self::Alphabet) -> Self {
         Self {
             alphabet,

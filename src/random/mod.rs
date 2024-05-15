@@ -12,7 +12,7 @@ use crate::prelude::*;
 ///   add a back edge that state.
 /// 3. If no back edge to some state was added, we insert an edge to a new state.
 /// 4. Repeat until all states and symbols have been treated.
-pub fn generate_random_ts(symbols: usize, probability: f64) -> Initialized<DTS> {
+pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, usize) {
     let alphabet = CharAlphabet::alphabetic(symbols);
     let mut dts = DTS::for_alphabet(alphabet.clone());
 
@@ -48,13 +48,14 @@ pub fn generate_random_ts(symbols: usize, probability: f64) -> Initialized<DTS> 
         dts.add_edge(current, symbol, target, Void);
     }
 
-    dts.with_initial(0)
+    (dts, 0)
 }
 
 /// Works as [`generate_random_ts`], but returns a [`DFA`] instead by randomly coloring the states.
 pub fn generate_random_dfa(symbols: usize, probability: f64) -> DFA {
-    generate_random_ts(symbols, probability)
-        .map_state_colors(|_| fastrand::bool())
+    let (ts, initial) = generate_random_ts(symbols, probability);
+    ts.map_state_colors(|_| fastrand::bool())
+        .with_initial(initial)
         .collect_dfa()
 }
 
@@ -141,9 +142,9 @@ pub(crate) fn print_random_ts_benchmark(
                     debug!("{i}% done for {symbol_count} symbols and probability 1/{reciprocal}");
                 }
                 let probability = 1f64 / *reciprocal as f64;
-                let ts = generate_random_ts(*symbol_count, probability);
+                let (ts, initial) = generate_random_ts(*symbol_count, probability);
 
-                assert!(ts.is_accessible());
+                assert!((&ts).with_initial(initial).is_accessible());
                 averages.append(&ts);
             }
 

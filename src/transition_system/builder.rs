@@ -110,14 +110,14 @@ impl TSBuilder<Void, usize> {
         self.default_color(Void)
             .into_dts()
             .with_initial(initial)
-            .into_mealy()
+            .collect_mealy()
     }
 }
 
 impl TSBuilder<usize, Void> {
     /// Builds a Moore machine from `self`. Panics if `self` is not deterministic.
     pub fn into_moore(self, initial: usize) -> MooreMachine<CharAlphabet> {
-        self.into_dts().with_initial(initial).into_moore()
+        self.into_dts().with_initial(initial).collect_moore()
     }
 }
 
@@ -165,6 +165,12 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     /// Build a deterministic transition system from `self`. Panics if `self` is not deterministic.
     pub fn into_dts(self) -> DTS<CharAlphabet, Q, C> {
         self.into_nts().try_into().expect("Not deterministic!")
+    }
+
+    /// Build a deterministic transition system from `self` and set the given `initial` state as the
+    /// designated initial state of the output object. Panics if `self` is not deterministic.
+    pub fn into_dts_with_initial(self, initial: usize) -> WithInitial<DTS<CharAlphabet, Q, C>> {
+        self.into_dts().with_initial(initial)
     }
 
     /// Assigns the given `color` to the state with the given index `idx`.
@@ -238,14 +244,6 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     /// Turns `self` into a [`RightCongruence`] with the given initial state. Panics if `self` is not deterministic.
     pub fn into_right_congruence(self, initial: usize) -> RightCongruence<CharAlphabet, Q, C> {
         RightCongruence::from_ts(self.into_dts().with_initial(initial))
-    }
-
-    /// Consumes `self` and returns an [`Initialized`] wrapping a [`DTS`].
-    pub fn into_deterministic_initialized(
-        self,
-        initial: usize,
-    ) -> Initialized<DTS<CharAlphabet, Q, C>> {
-        self.into_dts().with_initial(initial)
     }
 
     /// Collects self into a non-deterministic transition system.
