@@ -23,7 +23,7 @@ pub mod operations;
 /// This offers a distinct advantage over [`DTS`] in that states and edges can
 /// be removed. This is useful for constructing transition systems programmatically.
 pub mod impls;
-pub use impls::{CollectDTS, IntoMutableTs, MutableTs, DTS, NTS};
+pub use impls::{CollectDTS, DTSAndInitialState, IntoMutableTs, MutableTs, DTS, NTS};
 
 /// Contains implementations and definitions for dealing with paths through a transition system.
 pub mod path;
@@ -454,10 +454,10 @@ pub trait TransitionSystem: Sized {
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
-    ///     .into_deterministic_initialized(0);
+    ///     .into_dts_with_initial(0);
     /// let colored = ts.with_state_color(false);
     /// assert_eq!(colored.reached_state_color("a"), Some(false));
-    /// assert_eq!(colored.reached_state_color("aaa"), Some(false));
+    /// assert_eq!(colored.with_state_color(true).reached_state_color("a"), Some(true));
     /// ```
     fn with_state_color<P: ProvidesStateColor<Self::StateIndex>>(
         self,

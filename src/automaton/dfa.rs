@@ -50,7 +50,7 @@ where
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
-    ///     .into_deterministic_initialized(0);
+    ///     .into_dts_with_initial(0);
     /// assert!(DFA::from_ts(&ts, [0]).accepts(""));
     /// assert!(!DFA::from_ts(&ts, [1]).accepts("a"));
     /// assert!(!DFA::from_ts(ts, []).accepts("a"));

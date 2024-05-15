@@ -9,6 +9,10 @@ use super::nts::{NTEdge, NTSEdgesFromIter, NTSEdgesToIter, NTSPartsFor, NTState}
 #[derive(Clone)]
 pub struct DTS<A: Alphabet = CharAlphabet, Q = Void, C = Void>(pub(crate) NTS<A, Q, C>);
 
+/// Type alias that is used when we want a pair (tuple) consisiting of a DTS and its initial
+/// state. This is mainly used to make clippy happy...
+pub type DTSAndInitialState<A, Q, C> = (DTS<A, Q, C>, usize);
+
 /// Type alias to create a deterministic transition with the same alphabet, state and edge color
 /// as the given [`Ts`](`crate::prelude::TransitionSystem`).
 pub type CollectDTS<Ts> = DTS<
