@@ -102,6 +102,8 @@ impl<D: TransitionSystem, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
         }
     }
 
+    /// Builds a new instance of `Self` from the given parts, that is a transition system `ts` and
+    /// a designated `initial` state. Assumes the acceptance type implements `Default`.
     pub fn from_parts(ts: D, initial: D::StateIndex) -> Self
     where
         A: Default,
@@ -109,6 +111,8 @@ impl<D: TransitionSystem, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
         Self::from_parts_with_acceptance(ts, initial, A::default())
     }
 
+    /// Builds a new instance of `Self` from a given congruence (transition system with designated
+    /// initial state) as well as an acceptance condition.
     pub fn from_pointed_with_acceptance(cong: D, acceptance: A) -> Self
     where
         D: Pointed,
@@ -117,7 +121,8 @@ impl<D: TransitionSystem, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
         Self::from_parts_with_acceptance(cong, initial, acceptance)
     }
 
-    pub fn from_pointed(cong: D) -> Self
+    /// Builds an instance of `Self` from a pointed transition system. Assumes the acceptance type implements `Default`.
+    pub fn from_pointed(cong: D) -> Automaton<D, A, OMEGA>
     where
         D: Pointed,
         A: Default,

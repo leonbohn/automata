@@ -409,15 +409,11 @@ mod tests {
         let l: MealyMachine = NTS::builder()
             .default_color(Void)
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
-            .into_dts()
-            .with_initial(0)
-            .into_mealy();
+            .into_mealy(0);
         let r: MealyMachine = NTS::builder()
             .default_color(Void)
             .with_transitions([(0, 'a', 0, 0)])
-            .into_dts()
-            .with_initial(0)
-            .into_mealy();
+            .into_mealy(0);
         assert!((&l).ts_product(&l).reached_state_index("b").is_some());
         let prod = l.ts_product(r);
         assert!(prod.reached_state_index("a").is_some());

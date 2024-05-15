@@ -53,8 +53,9 @@ pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, usize) {
 
 /// Works as [`generate_random_ts`], but returns a [`DFA`] instead by randomly coloring the states.
 pub fn generate_random_dfa(symbols: usize, probability: f64) -> DFA {
-    generate_random_ts(symbols, probability)
-        .map_state_colors(|_| fastrand::bool())
+    let (ts, initial) = generate_random_ts(symbols, probability);
+    ts.map_state_colors(|_| fastrand::bool())
+        .with_initial(initial)
         .collect_dfa()
 }
 
@@ -141,9 +142,9 @@ pub(crate) fn print_random_ts_benchmark(
                     debug!("{i}% done for {symbol_count} symbols and probability 1/{reciprocal}");
                 }
                 let probability = 1f64 / *reciprocal as f64;
-                let ts = generate_random_ts(*symbol_count, probability);
+                let (ts, initial) = generate_random_ts(*symbol_count, probability);
 
-                assert!(ts.is_accessible());
+                assert!((&ts).with_initial(initial).is_accessible());
                 averages.append(&ts);
             }
 

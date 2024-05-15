@@ -138,6 +138,9 @@ pub trait TransitionSystem: Sized {
         })
     }
 
+    /// Consumes `self` and sets the given `initial` to be the designated initial state. This constructs
+    /// an instance of [`crate::automaton::WithInitial`] which is in turn simply an [`Automaton`]
+    /// without semantics.
     fn with_initial(self, initial: Self::StateIndex) -> crate::automaton::WithInitial<Self>
     where
         Self: Sized,

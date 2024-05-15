@@ -24,7 +24,7 @@ pub trait Congruence: Deterministic + Pointed {
     where
         Self: Congruence<StateColor = bool>,
     {
-        DFA::from_pointed(self)
+        Automaton::from_pointed(self)
     }
 
     /// Collects the transition system representing `self` and builds a new [`DFA`].
@@ -41,7 +41,7 @@ pub trait Congruence: Deterministic + Pointed {
     where
         Self: Congruence<EdgeColor = usize>,
     {
-        DPA::from_pointed(self)
+        Automaton::from_pointed(self)
     }
 
     /// Collects the transition system representing `self` and builds a new [`DPA`].
@@ -58,7 +58,7 @@ pub trait Congruence: Deterministic + Pointed {
     where
         Self: Congruence<EdgeColor = bool>,
     {
-        DBA::from_pointed(self)
+        Automaton::from_pointed(self)
     }
 
     /// Collects the transition system representing `self` and builds a new [`DBA`].
@@ -75,7 +75,7 @@ pub trait Congruence: Deterministic + Pointed {
     where
         StateColor<Self>: Color,
     {
-        MooreMachine::from_pointed(self)
+        Automaton::from_pointed(self)
     }
 
     /// Collects the transition system representing `self` and builds a new [`MooreMachine`].
@@ -92,9 +92,8 @@ pub trait Congruence: Deterministic + Pointed {
     where
         EdgeColor<Self>: Color,
     {
-        MealyMachine::from_pointed(self)
+        Automaton::from_pointed(self)
     }
-
     /// Collects the transition system representing `self` and builds a new [`MealyMachine`].
     fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, EdgeColor<Self>>
     where
