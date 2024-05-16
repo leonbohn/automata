@@ -14,19 +14,12 @@ pub use mealy::{IntoMealyMachine, MealyMachine, MealySemantics};
 mod dfa;
 pub use dfa::{DFASemantics, IntoDFA, DFA};
 
-mod dpa;
-pub use dpa::{
-    IntoDPA, MaxEvenParitySemantics, MaxOddParitySemantics, MinEvenParitySemantics,
-    MinOddParitySemantics, DPA,
-};
-
-mod dba;
-pub use dba::{DBASemantics, IntoDBA, DBA};
-
 #[allow(missing_docs)]
 mod omega;
 pub use omega::{
-    AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
+    AcceptanceMask, DBASemantics, DeterministicOmegaAutomaton, IntoDBA, IntoDPA,
+    MaxEvenParitySemantics, MaxOddParitySemantics, MinEvenParitySemantics, MinOddParitySemantics,
+    OmegaAcceptanceCondition, OmegaAutomaton, DBA, DPA,
 };
 
 mod with_initial;

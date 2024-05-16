@@ -21,7 +21,7 @@ impl<Q> OmegaSemantics<Q, bool> for DBASemantics {
     where
         R: OmegaRun<StateColor = Q, EdgeColor = bool>,
     {
-        run.infinity_edge_colors()
+        run.recurring_edge_colors_iter()
             .map(|mut colors| colors.any(|b| b))
             .unwrap_or(false)
     }

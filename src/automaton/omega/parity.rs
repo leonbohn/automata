@@ -28,7 +28,7 @@ impl<Q> OmegaSemantics<Q, usize> for MinEvenParitySemantics {
     where
         R: OmegaRun<StateColor = Q, EdgeColor = usize>,
     {
-        run.infinity_edge_colors()
+        run.recurring_edge_colors_iter()
             .and_then(|colors| colors.min())
             .map(|x| x % 2 == 0)
             .unwrap_or(false)
