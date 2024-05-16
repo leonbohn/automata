@@ -8,19 +8,19 @@ use super::StatesWithColor;
 /// [`DFA`]. This leads to a [`FiniteWord`] being accepted if the state that it reaches
 /// is colored with `true`, and the word being rejected otherwise.
 #[derive(Clone, Copy, Default, Hash, Eq, PartialEq)]
-pub struct DFASemantics;
+pub struct ReachabilityCondition;
 
-impl std::fmt::Debug for DFASemantics {
+impl std::fmt::Debug for ReachabilityCondition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "DFA (reach true)")
     }
 }
 
-impl<C> Semantics<bool, C> for DFASemantics {
+impl<C> Semantics<bool, C> for ReachabilityCondition {
     type Output = bool;
 }
 
-impl<C> FiniteSemantics<bool, C> for DFASemantics {
+impl<C> FiniteSemantics<bool, C> for ReachabilityCondition {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
         R: FiniteRun<StateColor = bool, EdgeColor = C>,
@@ -32,10 +32,10 @@ impl<C> FiniteSemantics<bool, C> for DFASemantics {
 }
 
 /// A deterministic finite automaton (DFA) is a deterministic automaton with a simple acceptance condition. It accepts a finite word if it reaches an accepting state.
-pub type DFA<A = CharAlphabet> = Automaton<DTS<A, bool, Void>, DFASemantics, false>;
+pub type DFA<A = CharAlphabet> = Automaton<DTS<A, bool, Void>, ReachabilityCondition, false>;
 
 /// Helper trait for creating a [`DFA`] from a given transition system.
-pub type IntoDFA<T> = Automaton<T, DFASemantics, false>;
+pub type IntoDFA<T> = Automaton<T, ReachabilityCondition, false>;
 
 impl<D> IntoDFA<D>
 where

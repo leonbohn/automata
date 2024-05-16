@@ -10,18 +10,18 @@ use crate::prelude::*;
 /// This type will rarely be used on its own, for the automaton that makes
 /// use of it, see [`DBA`].
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, Copy)]
-pub struct DBASemantics;
+pub struct BuchiCondition;
 
-impl<Q> Semantics<Q, bool> for DBASemantics {
+impl<Q> Semantics<Q, bool> for BuchiCondition {
     type Output = bool;
 }
 
-impl<Q> OmegaSemantics<Q, bool> for DBASemantics {
+impl<Q> OmegaSemantics<Q, bool> for BuchiCondition {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
         R: OmegaRun<StateColor = Q, EdgeColor = bool>,
     {
-        run.infinity_edge_colors()
+        run.recurring_edge_colors_iter()
             .map(|mut colors| colors.any(|b| b))
             .unwrap_or(false)
     }
@@ -33,9 +33,9 @@ impl<Q> OmegaSemantics<Q, bool> for DBASemantics {
 ///
 /// In a certain sense, it is a special case of a deterministic parity automaton [`super::DPA`] with
 /// min even and priorities 0 and 1.
-pub type DBA<A = CharAlphabet> = Automaton<DTS<A, Void, bool>, DBASemantics, true>;
+pub type DBA<A = CharAlphabet> = Automaton<DTS<A, Void, bool>, BuchiCondition, true>;
 /// Helper trait for creating a [`DBA`] from a given transition system.
-pub type IntoDBA<T> = Automaton<T, DBASemantics, true>;
+pub type IntoDBA<T> = Automaton<T, BuchiCondition, true>;
 
 impl<C> IntoDBA<C>
 where

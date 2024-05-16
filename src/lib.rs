@@ -9,10 +9,11 @@ pub mod prelude {
         alphabet,
         alphabet::{CharAlphabet, Expression, Symbol},
         automaton::{
-            Automaton, DBASemantics, DFASemantics, FiniteSemantics, IntoDBA, IntoDFA, IntoDPA,
-            IntoMealyMachine, IntoMooreMachine, MealyMachine, MealySemantics,
-            MinEvenParitySemantics, MooreMachine, MooreSemantics, OmegaAcceptanceCondition,
-            OmegaAutomaton, OmegaSemantics, Semantics, WithInitial, DBA, DFA, DPA,
+            Automaton, BuchiCondition, FiniteSemantics, IntoDBA, IntoDFA, IntoDMA, IntoDPA,
+            IntoDRA, IntoMealyMachine, IntoMooreMachine, MealyMachine, MealySemantics,
+            MinEvenParityCondition, MooreMachine, MooreSemantics, MullerCondition,
+            OmegaAcceptanceCondition, OmegaAutomaton, OmegaSemantics, ReachabilityCondition,
+            Semantics, WithInitial, DBA, DFA, DMA, DPA,
         },
         congruence::{Congruence, RightCongruence},
         math,
@@ -57,7 +58,7 @@ pub mod automaton;
 
 /// Defines congruence relations and congruence classes.
 pub mod congruence;
-pub use congruence::{Class, RightCongruence};
+pub use congruence::{Class, Congruence, RightCongruence};
 
 /// Module that contains definitions for dealing with words.
 #[macro_use]
