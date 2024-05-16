@@ -1,6 +1,8 @@
 use crate::{math::Map, math::Set, prelude::*, transition_system::EdgeReference};
 use std::{fmt::Debug, hash::Hash};
 
+use self::alphabet::Matches;
+
 /// An implementation of a transition system with states of type `Q` and colors of type `C`. It stores
 /// the states and edges in a vector, which allows for fast access and iteration. The states and edges
 /// are indexed by their position in the respective vector.
@@ -39,39 +41,6 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> MutableTs<A, Q
             s.remove_outgoing_edges_to(idx)
         });
         Some(state.color)
-    }
-
-    pub(crate) fn mutablets_remove_edge(
-        &mut self,
-        from: Idx,
-        on: &A::Expression,
-    ) -> Option<(C, Idx)> {
-        let (to, color) = self.states.get_mut(&from)?.remove_edge(on)?;
-        self.states
-            .get_mut(&to)?
-            .remove_pre_edge(from, on.clone(), color.clone());
-        Some((color, to))
-    }
-
-    pub(crate) fn mutablets_remove_transitions(
-        &mut self,
-        from: Idx,
-        _symbol: SymbolOf<Self>,
-    ) -> Set<(ExpressionOf<Self>, C, Idx)> {
-        let mut edges = self
-            .states
-            .get_mut(&from)
-            .map(|s| s.edges.clone())
-            .unwrap_or_default();
-        edges
-            .drain()
-            .map(move |(on, (to, color))| {
-                self.states
-                    .get_mut(&to)
-                    .map(|s| s.remove_pre_edge(from, on.clone(), color.clone()));
-                (on, color, to)
-            })
-            .collect()
     }
 
     /// Creates a `MutableTs` from the given alphabet and states.
@@ -136,6 +105,44 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> MutableTs<A, Q
     /// Returns an iterator emitting pairs of state indices and their colors.
     pub fn indices_with_color(&self) -> impl Iterator<Item = (Idx, &StateColor<Self>)> {
         self.states.iter().map(|(idx, state)| (*idx, state.color()))
+    }
+}
+
+impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, Index: IndexType>
+    crate::transition_system::Shrinkable for MutableTs<A, Q, C, Index>
+{
+    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Q> {
+        self.mutablets_remove_state(state.to_index(self)?)
+    }
+    fn remove_all_matching(
+        &mut self,
+        source: impl Indexes<Self>,
+        matcher: impl Matches<EdgeExpression<Self>>,
+    ) -> Option<
+        Set<(
+            EdgeExpression<Self>,
+            EdgeColor<Self>,
+            crate::transition_system::StateIndex<Self>,
+        )>,
+    > {
+        let q = source.to_index(self)?;
+        self.states
+            .get_mut(&q)
+            .map(|s| s.remove_all_matching(matcher))
+    }
+    fn remove_first_matching(
+        &mut self,
+        source: impl Indexes<Self>,
+        matcher: impl Matches<EdgeExpression<Self>>,
+    ) -> Option<(
+        EdgeExpression<Self>,
+        EdgeColor<Self>,
+        crate::transition_system::StateIndex<Self>,
+    )> {
+        let q = source.to_index(self)?;
+        self.states
+            .get_mut(&q)
+            .and_then(|s| s.remove_edge_matching(matcher))
     }
 }
 
@@ -205,8 +212,37 @@ impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> MutableTsState<A, Q, C, Idx> 
         &self.edges
     }
 
-    pub fn add_edge(&mut self, on: A::Expression, to: Idx, color: C) -> Option<(Idx, C)> {
+    pub fn add_edge(&mut self, on: A::Expression, color: C, to: Idx) -> Option<(Idx, C)> {
         self.edges.insert(on, (to, color))
+    }
+
+    pub fn remove_edge_matching(
+        &mut self,
+        m: impl Matches<A::Expression>,
+    ) -> Option<(A::Expression, C, Idx)> {
+        let (on, _) = self.edges.iter().find(|(e, _)| m.matches(e))?;
+        let expr = on.clone();
+        self.edges
+            .remove(&expr)
+            .map(|(to, color)| (expr, color, to))
+    }
+
+    pub fn remove_all_matching(
+        &mut self,
+        m: impl Matches<A::Expression>,
+    ) -> Set<(A::Expression, C, Idx)> {
+        let expressions: Vec<_> = self
+            .edges
+            .iter()
+            .filter_map(|(e, _)| if m.matches(e) { Some(e.clone()) } else { None })
+            .collect();
+        expressions
+            .into_iter()
+            .map(move |e| {
+                let (to, color) = self.edges.remove(&e).unwrap();
+                (e, color, to)
+            })
+            .collect()
     }
 
     pub fn remove_edge(&mut self, on: &A::Expression) -> Option<(Idx, C)> {
@@ -305,17 +341,6 @@ where
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q, C, usize> {
-    type ExtendStateIndexIter = std::ops::Range<Self::StateIndex>;
-    fn extend_states<I: IntoIterator<Item = StateColor<Self>>>(
-        &mut self,
-        iter: I,
-    ) -> Self::ExtendStateIndexIter {
-        let n = self.states.len();
-        let it = (n..).zip(iter.into_iter().map(|c| MutableTsState::new(c)));
-        self.states.extend(it);
-        n..self.states.len()
-    }
-
     /// Adds a state with given `color` to the transition system, returning the index of
     /// the new state.
     fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
@@ -325,38 +350,23 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q,
         id
     }
 
-    /// Adds an edge from `source` to `target` with the given `trigger` and `color`. If an edge
-    /// was already present, its target index and color are returned, otherwise, the function gives back
-    /// `None`. This method panics if `source` or `target` do not exist in the graph.
-    fn add_edge<X, Y, CI>(
-        &mut self,
-        from: X,
-        on: <Self::Alphabet as Alphabet>::Expression,
-        to: Y,
-        color: CI,
-    ) -> Option<(Self::StateIndex, Self::EdgeColor)>
+    fn add_edge<E>(&mut self, t: E) -> Option<(Self::StateIndex, Self::EdgeColor)>
     where
-        X: Indexes<Self>,
-        Y: Indexes<Self>,
-        CI: Into<EdgeColor<Self>>,
+        E: IntoEdgeTuple<Self>,
     {
-        let source = from.to_index(self)?;
-        let target = to.to_index(self)?;
-        let color = color.into();
+        let (q, a, c, p) = t.into_edge_tuple();
 
         assert!(
-            self.contains_state(source) && self.contains_state(target),
+            self.contains_state(q) && self.contains_state(p),
             "Source {} or target {} vertex does not exist in the graph.",
-            source,
-            target
+            q,
+            p
         );
         self.states
-            .get_mut(&target)
+            .get_mut(&q)
             .expect("We know this exists")
-            .add_pre_edge(source, on.clone(), color.clone());
-        self.states
-            .get_mut(&source)
-            .and_then(|o| o.add_edge(on, target, color))
+            .add_pre_edge(q, a.clone(), c.clone());
+        self.states.get_mut(&q).and_then(|o| o.add_edge(a, c, p))
     }
 
     fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(

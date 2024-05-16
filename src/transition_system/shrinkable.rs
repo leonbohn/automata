@@ -1,11 +1,26 @@
-use std::hash::Hash;
-
 use crate::{math::Set, prelude::*};
+
+use self::alphabet::Matches;
+
+use super::StateIndex;
 
 /// Encapsulates the ability to remove states, edges, and transitions from a transition system.
 pub trait Shrinkable: TransitionSystem {
     /// Removes a state from the transition system and returns the color associated with the removed state.
-    /// If the state is not present, returns `None`.
+    /// Returns `None` if the state does not exist.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let q0 = ts.add_state(false);
+    /// let q1 = ts.add_state(true);
+    /// let edge = ts.add_edge((q0, 'a', q1));
+    /// assert_eq!(ts.reached_state_index_from(q0, "a"), Some(q1));
+    /// assert_eq!(ts.remove_state(q1), Some(true));
+    /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
+    /// ```
     fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor>;
 
     /// Removes the first edge from the transition system that originates in `source` and matches the given
@@ -14,43 +29,19 @@ pub trait Shrinkable: TransitionSystem {
     ///
     /// This method expects to identify the edge that should be removed based on its [`crate::prelude::Expression`], for
     /// a method that identifies the edge based on its target, see [`Self::remove_transitions`].
-    fn remove_edge<Idx: Indexes<Self>>(
+    fn remove_first_matching(
         &mut self,
-        source: Idx,
-        expression: &ExpressionOf<Self>,
-    ) -> Option<(Self::EdgeColor, Self::StateIndex)>;
+        source: impl Indexes<Self>,
+        matcher: impl Matches<EdgeExpression<Self>>,
+    ) -> Option<(EdgeExpression<Self>, EdgeColor<Self>, StateIndex<Self>)>;
 
     /// Removes **all** transitions from the transition system that originate in `source` and match the given
     /// `symbol`. The call returns a [`Set`] of triples, each consisting of the expression, color, and target of
     /// the removed transition. If no suitable transitions are present, returns `None`.
     #[allow(clippy::type_complexity)]
-    fn remove_transitions<Idx: Indexes<Self>>(
+    fn remove_all_matching(
         &mut self,
-        source: Idx,
-        symbol: &SymbolOf<Self>,
-    ) -> Option<Set<(ExpressionOf<Self>, Self::EdgeColor, Self::StateIndex)>>;
-}
-
-impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, Index: IndexType> Shrinkable
-    for MutableTs<A, Q, C, Index>
-{
-    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor> {
-        self.mutablets_remove_state(state.to_index(self)?)
-    }
-
-    fn remove_edge<Idx: Indexes<Self>>(
-        &mut self,
-        source: Idx,
-        expression: &ExpressionOf<Self>,
-    ) -> Option<(Self::EdgeColor, Self::StateIndex)> {
-        self.mutablets_remove_edge(source.to_index(self)?, expression)
-    }
-
-    fn remove_transitions<Idx: Indexes<Self>>(
-        &mut self,
-        source: Idx,
-        symbol: &SymbolOf<Self>,
-    ) -> Option<Set<(ExpressionOf<Self>, Self::EdgeColor, Self::StateIndex)>> {
-        Some(self.mutablets_remove_transitions(source.to_index(self)?, *symbol))
-    }
+        source: impl Indexes<Self>,
+        matcher: impl Matches<EdgeExpression<Self>>,
+    ) -> Option<Set<(EdgeExpression<Self>, EdgeColor<Self>, StateIndex<Self>)>>;
 }

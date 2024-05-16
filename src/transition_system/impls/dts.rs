@@ -85,15 +85,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for DTS<A, Q, C> {
         self.0.add_state(color)
     }
 
-    type ExtendStateIndexIter = std::ops::Range<usize>;
-
-    fn extend_states<I: IntoIterator<Item = StateColor<Self>>>(
-        &mut self,
-        iter: I,
-    ) -> Self::ExtendStateIndexIter {
-        self.0.extend_states(iter)
-    }
-
     fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
         &mut self,
         index: Idx,
@@ -106,21 +97,13 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for DTS<A, Q, C> {
         self.0.set_state_color(index, color)
     }
 
-    fn add_edge<X, Y, CI>(
-        &mut self,
-        from: X,
-        on: <Self::Alphabet as Alphabet>::Expression,
-        to: Y,
-        color: CI,
-    ) -> Option<(Self::StateIndex, Self::EdgeColor)>
+    fn add_edge<E>(&mut self, t: E) -> Option<(Self::StateIndex, Self::EdgeColor)>
     where
-        X: Indexes<Self>,
-        Y: Indexes<Self>,
-        CI: Into<EdgeColor<Self>>,
+        E: IntoEdgeTuple<Self>,
     {
-        self.0
-            .add_edge(from.to_index(self)?, on, to.to_index(self)?, color.into())
+        self.0.add_edge(t.into_edge_tuple())
     }
+
     fn remove_edges<X>(&mut self, from: X, on: <Self::Alphabet as Alphabet>::Expression) -> bool
     where
         X: Indexes<Self>,

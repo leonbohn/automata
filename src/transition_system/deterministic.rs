@@ -59,12 +59,18 @@ pub trait Deterministic: TransitionSystem {
         let mut it = self
             .edges_from(state)
             .expect("We know this state exists")
-            .filter(|e| e.expression().matches(symbol));
+            .filter(|e| e.expression().matched_by(symbol));
         let first = it.next()?;
-        debug_assert!(
-            it.next().is_none(),
-            "There should be only one edge with the given symbol"
-        );
+        if let Some(second) = it.next() {
+            panic!(
+                "There are multiple edges matching {} from state {}, namely {} and {} and even {} more",
+                symbol.show(),
+                state.show(),
+                first.expression().show(),
+                second.expression().show(),
+                it.count()
+            );
+        }
         Some(first)
     }
 
@@ -87,7 +93,7 @@ pub trait Deterministic: TransitionSystem {
     fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
+        expression: &EdgeExpression<Self>,
     ) -> Option<Self::EdgeRef<'_>> {
         let state = state.to_index(self)?;
         let mut it = self
@@ -131,7 +137,7 @@ pub trait Deterministic: TransitionSystem {
     fn edge_color<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
+        expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
         let mut symbols = expression.symbols();
         let sym = symbols.next().unwrap();
@@ -540,7 +546,7 @@ pub trait Deterministic: TransitionSystem {
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
     fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
-        let (ts, _map) = DTS::collect_with_index_mapping(self);
+        let (ts, _map) = DTS::sprout_from_ts(self);
         ts
     }
 
@@ -563,7 +569,7 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
     {
         let old_initial = self.initial();
-        let (ts, map) = DTS::collect_with_index_mapping(self);
+        let (ts, map) = DTS::sprout_from_ts(self);
         (
             ts,
             *map.get_by_left(&old_initial)
@@ -584,7 +590,7 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
     {
         let old_initial = self.initial();
-        let (ts, map) = MutableTs::collect_with_index_mapping(self);
+        let (ts, map) = MutableTs::sprout_from_ts(self);
         (
             ts,
             *map.get_by_left(&old_initial)
@@ -602,7 +608,7 @@ pub trait Deterministic: TransitionSystem {
         EdgeColor<Self>: Hash + Eq,
         StateColor<Self>: Hash + Eq,
     {
-        let (ts, _map) = MutableTs::collect_with_index_mapping(self);
+        let (ts, _map) = MutableTs::sprout_from_ts(self);
         ts
     }
 
@@ -639,7 +645,7 @@ pub trait Deterministic: TransitionSystem {
             for q in ts.state_indices() {
                 for sym in self.alphabet().universe() {
                     if ts.transition(q, sym).is_none() {
-                        ts.add_edge(q, ts.make_expression(sym), sink, sink_edge_color.clone());
+                        ts.add_edge((q, ts.make_expression(sym), sink_edge_color.clone(), sink));
                     }
                 }
             }
@@ -759,7 +765,7 @@ impl<A: Alphabet, IdType: IndexType, Q: Clone, C: Hash + Eq + Clone> Determinist
     fn edge_color<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
+        expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
         self.raw_state_map()
             .get(&state.to_index(self)?)
@@ -789,7 +795,7 @@ where
     fn edge_color<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
+        expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
         let ProductIndex(l, r) = state.to_index(self)?;
         let left = self.0.edge_color(l, expression)?;
@@ -853,7 +859,7 @@ where
     fn edge_color<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
+        expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
         self.ts()
             .edge_color(state.to_index(self)?, expression)
@@ -879,7 +885,7 @@ where
     fn edge_color<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
+        expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
         let state = state.to_index(self)?;
         self.ts()
@@ -902,7 +908,7 @@ impl<Ts, D, F> Deterministic for MapEdges<Ts, F>
 where
     Ts: Deterministic,
     D: Clone,
-    F: Fn(Ts::StateIndex, &ExpressionOf<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
+    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
     fn transition<Idx: crate::transition_system::Indexes<Self>>(
         &self,

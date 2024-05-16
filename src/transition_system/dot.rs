@@ -29,7 +29,7 @@ pub trait Dottable: TransitionSystem {
     fn dot_representation<'a>(&'a self) -> String
     where
         (String, StateColor<Self>): Show,
-        (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
+        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
     {
         let header = std::iter::once(format!(
             "digraph {} {{",
@@ -82,7 +82,7 @@ pub trait Dottable: TransitionSystem {
         _t: Self::EdgeRef<'a>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute>
     where
-        (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
+        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
     {
         []
     }
@@ -102,7 +102,7 @@ pub trait Dottable: TransitionSystem {
     #[cfg(feature = "graphviz")]
     fn render<'a>(&'a self) -> Result<Vec<u8>, std::io::Error>
     where
-        (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
+        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
         (String, StateColor<Self>): Show,
     {
         use std::io::{Read, Write};
@@ -142,7 +142,7 @@ pub trait Dottable: TransitionSystem {
     #[cfg(feature = "graphviz")]
     fn render_to_file_name<'a>(&'a self, filename: &str) -> Result<(), std::io::Error>
     where
-        (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
+        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
         (String, StateColor<Self>): Show,
     {
         use std::io::{Read, Write};
@@ -190,7 +190,7 @@ pub trait Dottable: TransitionSystem {
     #[cfg(feature = "graphviz")]
     fn display_rendered<'a>(&'a self) -> Result<(), std::io::Error>
     where
-        (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
+        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
         (String, StateColor<Self>): Show,
     {
         display_png(self.render()?)?;
@@ -212,7 +212,7 @@ impl<A: Alphabet> Dottable for DFA<A> {
         t: Self::EdgeRef<'a>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute>
     where
-        (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
+        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
     {
         [DotTransitionAttribute::Label(t.expression().show())].into_iter()
     }
@@ -249,7 +249,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Dottable for crate::RightCongruence<A, Q, 
         t: Self::EdgeRef<'a>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute>
     where
-        (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
+        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
     {
         [DotTransitionAttribute::Label(
             (t.expression(), t.color()).show(),
@@ -301,7 +301,7 @@ where
         t: Self::EdgeRef<'a>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute>
     where
-        (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
+        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
     {
         vec![DotTransitionAttribute::Label(t.expression().show())]
     }
@@ -332,7 +332,7 @@ where
         t: Self::EdgeRef<'a>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute>
     where
-        (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
+        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
     {
         vec![DotTransitionAttribute::Label(format!(
             "{}|{}",
@@ -367,7 +367,7 @@ where
         t: Self::EdgeRef<'a>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute>
     where
-        (&'a ExpressionOf<Self>, EdgeColor<Self>): Show,
+        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
     {
         vec![DotTransitionAttribute::Label(format!(
             "{}|{}",

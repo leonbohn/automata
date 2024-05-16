@@ -226,14 +226,6 @@ where
         self.ts.add_state(color)
     }
 
-    type ExtendStateIndexIter = D::ExtendStateIndexIter;
-
-    fn extend_states<I: IntoIterator<Item = StateColor<Self>>>(
-        &mut self,
-        iter: I,
-    ) -> Self::ExtendStateIndexIter {
-        self.ts.extend_states(iter)
-    }
     fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
         &mut self,
         index: Idx,
@@ -246,21 +238,12 @@ where
             color,
         )
     }
-    fn add_edge<X, Y, CI>(
-        &mut self,
-        from: X,
-        on: <Self::Alphabet as Alphabet>::Expression,
-        to: Y,
-        color: CI,
-    ) -> Option<(Self::StateIndex, Self::EdgeColor)>
+
+    fn add_edge<E>(&mut self, t: E) -> Option<(Self::StateIndex, Self::EdgeColor)>
     where
-        X: Indexes<Self>,
-        Y: Indexes<Self>,
-        CI: Into<EdgeColor<Self>>,
+        E: IntoEdgeTuple<Self>,
     {
-        let from = from.to_index(self)?;
-        let to = to.to_index(self)?;
-        self.ts.add_edge(from, on, to, color.into())
+        self.ts.add_edge(t.into_edge_tuple())
     }
 
     fn remove_edges<X: Indexes<Self>>(

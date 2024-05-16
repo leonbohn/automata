@@ -16,7 +16,7 @@ use crate::{math::Partition, math::Set, prelude::*};
 #[derive(Debug, Clone)]
 pub struct Quotient<Ts: TransitionSystem> {
     ts: Ts,
-    expressions: crate::Map<SymbolOf<Ts>, ExpressionOf<Ts>>,
+    expressions: crate::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
     partition: Partition<Ts::StateIndex>,
 }
 
@@ -140,7 +140,7 @@ where
     Ts: Deterministic,
     I: Iterator<Item = SymbolOf<Ts>>,
 {
-    type Item = QuotientTransition<'a, usize, ExpressionOf<Ts>, Ts::EdgeColor>;
+    type Item = QuotientTransition<'a, usize, EdgeExpression<Ts>, Ts::EdgeColor>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let sym = self.it.next()?;
@@ -167,7 +167,7 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
 
     type EdgeColor = Vec<Ts::EdgeColor>;
 
-    type EdgeRef<'this> = QuotientTransition<'this, usize, ExpressionOf<Self>, Ts::EdgeColor>
+    type EdgeRef<'this> = QuotientTransition<'this, usize, EdgeExpression<Self>, Ts::EdgeColor>
     where
         Self: 'this;
 

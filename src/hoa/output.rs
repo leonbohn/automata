@@ -47,7 +47,7 @@ pub trait WriteHoa: TransitionSystem + Pointed {
 
     fn write_edge_color<W: std::fmt::Write>(&self, w: &mut W, label: EdgeColor<Self>) -> Result;
 
-    fn write_expression<W: std::fmt::Write>(&self, w: &mut W, expr: &ExpressionOf<Self>) -> Result;
+    fn write_expression<W: std::fmt::Write>(&self, w: &mut W, expr: &EdgeExpression<Self>) -> Result;
 
     fn write_state_id<W: std::fmt::Write>(
         &self,
@@ -95,7 +95,7 @@ impl<A: HoaSuitableAlphabet> WriteHoa for DPA<A> {
         write!(w, "{{{}}}", label)
     }
 
-    fn write_expression<W: std::fmt::Write>(&self, w: &mut W, expr: &ExpressionOf<Self>) -> Result {
+    fn write_expression<W: std::fmt::Write>(&self, w: &mut W, expr: &EdgeExpression<Self>) -> Result {
         self.alphabet().write_expression(w, expr)
     }
 

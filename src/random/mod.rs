@@ -13,7 +13,7 @@ use crate::prelude::*;
 /// 3. If no back edge to some state was added, we insert an edge to a new state.
 /// 4. Repeat until all states and symbols have been treated.
 pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, usize) {
-    let alphabet = CharAlphabet::alphabetic(symbols);
+    let alphabet = CharAlphabet::of_size(symbols);
     let mut dts = DTS::for_alphabet(alphabet.clone());
 
     let mut current = dts.add_state(());
@@ -38,14 +38,14 @@ pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, usize) {
         for target in 0..=current {
             let value: f64 = fastrand::f64();
             if value < probability {
-                dts.add_edge(current, symbol, target, Void);
+                dts.add_edge((current, symbol, target));
                 continue 'outer;
             }
         }
 
         // no target was found so we create it
         let target = dts.add_state(Void);
-        dts.add_edge(current, symbol, target, Void);
+        dts.add_edge((current, symbol, target));
     }
 
     (dts, 0)

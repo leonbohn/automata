@@ -67,14 +67,14 @@ impl<L, R> TransitionSystem for MatchingProduct<L, R>
 where
     L: TransitionSystem,
     R: TransitionSystem,
-    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = ExpressionOf<L>>,
+    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = EdgeExpression<L>>,
     L::StateColor: Clone,
     R::StateColor: Clone,
 {
     type StateIndex = ProductIndex<L::StateIndex, R::StateIndex>;
     type EdgeColor = (L::EdgeColor, R::EdgeColor);
     type StateColor = (L::StateColor, R::StateColor);
-    type EdgeRef<'this> = ProductTransition<'this, L::StateIndex, R::StateIndex, ExpressionOf<L>, L::EdgeColor, R::EdgeColor> where Self: 'this;
+    type EdgeRef<'this> = ProductTransition<'this, L::StateIndex, R::StateIndex, EdgeExpression<L>, L::EdgeColor, R::EdgeColor> where Self: 'this;
     type EdgesFromIter<'this> = ProductEdgesFrom<'this, L, R> where Self: 'this;
     type StateIndices<'this> = ProductStatesIter<'this, L, R> where Self: 'this;
     type Alphabet = L::Alphabet;
@@ -243,13 +243,13 @@ impl<'a, L, R> Iterator for ProductEdgesFrom<'a, L, R>
 where
     L: TransitionSystem,
     R: TransitionSystem,
-    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = ExpressionOf<L>>,
+    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = EdgeExpression<L>>,
 {
     type Item = ProductTransition<
         'a,
         L::StateIndex,
         R::StateIndex,
-        ExpressionOf<L>,
+        EdgeExpression<L>,
         L::EdgeColor,
         R::EdgeColor,
     >;
@@ -345,13 +345,13 @@ impl<'a, L, R> Iterator for ProductEdgesTo<'a, L, R>
 where
     L: PredecessorIterable,
     R: PredecessorIterable,
-    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = ExpressionOf<L>>,
+    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = EdgeExpression<L>>,
 {
     type Item = ProductPreTransition<
         'a,
         L::StateIndex,
         R::StateIndex,
-        ExpressionOf<L>,
+        EdgeExpression<L>,
         L::EdgeColor,
         R::EdgeColor,
     >;
