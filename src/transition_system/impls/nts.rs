@@ -38,9 +38,9 @@ impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet for NTS<A, Q, C> {
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
-    fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
+    fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         let id = self.states.len();
-        let state = NTState::new(color.into());
+        let state = NTState::new(color);
         self.states.push(state);
         id
     }

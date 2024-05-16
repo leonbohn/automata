@@ -343,9 +343,9 @@ where
 impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q, C, usize> {
     /// Adds a state with given `color` to the transition system, returning the index of
     /// the new state.
-    fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
+    fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         let id = self.states.len();
-        let state = MutableTsState::new(color.into());
+        let state = MutableTsState::new(color);
         self.states.insert(id, state);
         id
     }

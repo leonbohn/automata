@@ -70,7 +70,7 @@ impl<D: TransitionSystem, A, const OMEGA: bool> Automaton<D, A, OMEGA> {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut dfa = DFA::new_with_initial_color(CharAlphabet::alphabetic(2), false);
+    /// let mut dfa = DFA::new_with_initial_color(CharAlphabet::of_size(2), false);
     /// assert_eq!(dfa.size(), 1);
     /// dfa.add_edge(0, 'a', 0, Void);
     /// dfa.add_edge(0, 'b', 0, Void);
@@ -222,10 +222,9 @@ impl<D: Sproutable, A: Default, const OMEGA: bool> Sproutable for Automaton<D, A
 where
     D::StateColor: Default,
 {
-    fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
+    fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         self.ts.add_state(color)
     }
-
     fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
         &mut self,
         index: Idx,

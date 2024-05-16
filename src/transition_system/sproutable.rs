@@ -82,7 +82,7 @@ pub trait Sproutable: TransitionSystem {
     /// let q1 = ts.add_state(true);
     /// assert_eq!(ts.size(), before + 1);
     /// ```
-    fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex;
+    fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex;
 
     /// Adds a new edge to the transition system. The method returns the index of the source state
     /// and the color of the edge.
@@ -289,6 +289,15 @@ pub trait Sproutable: TransitionSystem {
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
+
+    #[test]
+    fn sprout_after_creating() {
+        let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+        let q0 = ts.add_state(false);
+        let q1 = ts.add_state(true);
+        let edge = ts.add_edge((q0, 'a', q1));
+        assert_eq!(edge, Some((q0, Void)));
+    }
 
     #[test]
     fn complete_ts() {
