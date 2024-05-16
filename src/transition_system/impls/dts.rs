@@ -81,7 +81,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> PredecessorIterable for DTS<A, Q, C> {
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for DTS<A, Q, C> {
-    fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex {
+    fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         self.0.add_state(color)
     }
 
