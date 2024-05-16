@@ -20,7 +20,7 @@ use crate::prelude::*;
 /// Examples of this semantic are for example the [`MooreSemantics`], which
 /// for a finite word `w` simply produce the color of the state that is
 /// reached when running `w` in the transition system from the initial state.
-/// This is similar to the [`DFASemantics`], which additionaly demand that
+/// This is similar to the [`ReachabilityCondition`], which additionaly demand that
 /// the state colors are `bool`.
 /// Further, there is also the [`MealySemantics`], which outputs the last
 /// transition that is taken when reading `w`.
@@ -30,10 +30,10 @@ use crate::prelude::*;
 /// `Output` type. This is now computed in the [`OmegaSemantics::evaluate`] method on
 /// the [`OmegaSemantics`] trait. It does this based on an [`OmegaRun`].
 ///
-/// Examples include the [`DBASemantics`], which may be applied to `bool`
+/// Examples include the [`BuchiCondition`], which may be applied to `bool`
 /// edge-colored transition systems. It outputs `true` if any edge labeled
 /// with `true` is visited infinitely often and `false` otherwise.
-/// This can actually be viewed as an instantiation of the [`MinEvenParitySemantics`]
+/// This can actually be viewed as an instantiation of the [`MinEvenParityCondition`]
 /// semantics that a [`DPA`] uses, which outputs the least priority/color
 /// among those that are labels of edges taken infinitely often.
 pub trait Semantics<Q, C> {

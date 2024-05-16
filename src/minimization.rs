@@ -4,7 +4,7 @@ use crate::prelude::*;
 
 impl<D> IntoMooreMachine<D>
 where
-    D: Congruence,
+    D: Deterministic,
     StateColor<D>: Color,
 {
     /// Returns the unique minimal moore machine that is bisimilar to `self`. This means
@@ -18,7 +18,7 @@ where
 
 impl<D> IntoMealyMachine<D>
 where
-    D: Congruence,
+    D: Deterministic,
     EdgeColor<D>: Color,
 {
     /// Minimizes `self` using Hopcroft's partition refinement algorithm.
@@ -29,7 +29,7 @@ where
 
 impl<D> IntoDFA<D>
 where
-    D: Congruence<StateColor = bool>,
+    D: Deterministic<StateColor = bool>,
 {
     /// Minimizes `self` using Hopcroft's partition refinement algorithm.
     pub fn minimize(self) -> DFA<D::Alphabet> {

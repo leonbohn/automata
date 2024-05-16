@@ -8,22 +8,34 @@ use tracing::{info, trace};
 
 use crate::{math::Partition, prelude::*, transition_system::Shrinkable};
 
+/// A deterministic parity automaton (DPA). It uses a [`DTS`]
+/// as its transition system and a `usize` as its edge color.
+/// The acceptance condition is given by the type `Sem`, which
+/// defaults to [`MinEvenParityCondition`], meaning the automaton accepts
+/// if the least color that appears infinitely often during
+/// a run is even.
+pub type DPA<A = CharAlphabet, Sem = MinEvenParityCondition> =
+    Automaton<DTS<A, Void, usize>, Sem, true>;
+/// Helper type alias for converting a given transition system into a [`DPA`]
+/// with the given semantics.
+pub type IntoDPA<T, Sem = MinEvenParityCondition> = Automaton<T, Sem, true>;
+
 /// Represents a min even parity condition which accepts if and only if the least color
 /// that labels a transition that is taken infinitely often, is even. For the automaton
 /// type that makes use of this semantics, see [`DPA`].
 ///
 /// Other (equivalent) types of parity conditions, that consider the maximal seen color
 /// or demand that the minimal/maximal recurring color are odd, are defined as
-/// [`MaxEvenParitySemantics`], [`MinOddParitySemantics`] and [`MaxOddParitySemantics`],
+/// [`MaxEvenParityCondition`], [`MinOddParityCondition`] and [`MaxOddParityCondition`],
 /// respectively.
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
-pub struct MinEvenParitySemantics;
+pub struct MinEvenParityCondition;
 
-impl<Q> Semantics<Q, usize> for MinEvenParitySemantics {
+impl<Q> Semantics<Q, usize> for MinEvenParityCondition {
     type Output = bool;
 }
 
-impl<Q> OmegaSemantics<Q, usize> for MinEvenParitySemantics {
+impl<Q> OmegaSemantics<Q, usize> for MinEvenParityCondition {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
         R: OmegaRun<StateColor = Q, EdgeColor = usize>,
@@ -36,29 +48,17 @@ impl<Q> OmegaSemantics<Q, usize> for MinEvenParitySemantics {
 }
 
 /// Defines an [`OmegaSemantics`] that outputs `true` if the *maximum* color/priority that
-/// appears infinitely often is *even*. See also [`MinEvenParitySemantics`].
+/// appears infinitely often is *even*. See also [`MinEvenParityCondition`].
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
-pub struct MaxEvenParitySemantics;
+pub struct MaxEvenParityCondition;
 /// Defines an [`OmegaSemantics`] that outputs `true` if the *minimum* color/priority that
-/// appears infinitely often is *odd*. See also [`MinEvenParitySemantics`].
+/// appears infinitely often is *odd*. See also [`MinEvenParityCondition`].
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
-pub struct MinOddParitySemantics;
+pub struct MinOddParityCondition;
 /// Defines an [`OmegaSemantics`] that outputs `true` if the *maximum* color/priority that
-/// appears infinitely often is *odd*. See also [`MinEvenParitySemantics`].
+/// appears infinitely often is *odd*. See also [`MinEvenParityCondition`].
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
-pub struct MaxOddParitySemantics;
-
-/// A deterministic parity automaton (DPA). It uses a [`DTS`]
-/// as its transition system and a `usize` as its edge color.
-/// The acceptance condition is given by the type `Sem`, which
-/// defaults to [`MinEvenParitySemantics`], meaning the automaton accepts
-/// if the least color that appears infinitely often during
-/// a run is even.
-pub type DPA<A = CharAlphabet, Sem = MinEvenParitySemantics> =
-    Automaton<DTS<A, Void, usize>, Sem, true>;
-/// Helper trait for converting a given transition system into a [`DPA`]
-/// with the given semantics.
-pub type IntoDPA<T, Sem = MinEvenParitySemantics> = Automaton<T, Sem, true>;
+pub struct MaxOddParityCondition;
 
 impl<D> IntoDPA<D>
 where
