@@ -6,7 +6,7 @@ use crate::{math::Map, math::Set, prelude::*};
 
 type InteriorEdgeSet<Ts> = Set<(
     <Ts as TransitionSystem>::StateIndex,
-    ExpressionOf<Ts>,
+    EdgeExpression<Ts>,
     <Ts as TransitionSystem>::EdgeColor,
     <Ts as TransitionSystem>::StateIndex,
 )>;

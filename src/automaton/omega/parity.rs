@@ -379,7 +379,7 @@ where
         'outer: loop {
             for (source, expression) in remove_edges.drain(..) {
                 assert!(
-                    ts.remove_edge(source, &expression).is_some(),
+                    ts.remove_first_matching(source, expression).is_some(),
                     "We must be able to actually remove these edges"
                 );
             }
@@ -601,7 +601,7 @@ mod tests {
         }
     }
 
-    #[test_log::test]
+    #[test]
     fn dpa_run() {
         let dpa = NTS::builder()
             .with_transitions([

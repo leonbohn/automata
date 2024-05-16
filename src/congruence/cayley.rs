@@ -26,7 +26,7 @@ where
     Ts::StateColor: Accumulates,
 {
     alphabet: Directional,
-    expressions: crate::Map<SymbolOf<Self>, ExpressionOf<Self>>,
+    expressions: crate::Map<SymbolOf<Self>, EdgeExpression<Self>>,
     m: TransitionMonoid<Ts>,
 }
 
@@ -34,7 +34,7 @@ where
 /// the transition profiles of the ts as nodes. See [`Cayley`] for more details.
 #[derive(Clone)]
 pub struct RightCayley<Ts: TransitionSystem + Pointed> {
-    expressions: crate::Map<SymbolOf<Ts>, ExpressionOf<Ts>>,
+    expressions: crate::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
     m: TransitionMonoid<Ts>,
 }
 
@@ -177,7 +177,7 @@ where
 
     type EdgeColor = ();
 
-    type EdgeRef<'this> = EdgeReference<'this, ExpressionOf<Ts>, usize, ()> where Self: 'this;
+    type EdgeRef<'this> = EdgeReference<'this, EdgeExpression<Ts>, usize, ()> where Self: 'this;
 
     type StateIndices<'this> = std::ops::Range<usize> where Self: 'this;
 

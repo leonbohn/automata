@@ -11,6 +11,8 @@ use biodivine_lib_bdd::{
 use hoars::HoaAutomaton;
 use itertools::Itertools;
 
+use self::alphabet::Matches;
+
 pub static MAX_APS: usize = 6;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -342,14 +344,21 @@ impl<'a> Iterator for HoaExpressionIter<'a> {
     }
 }
 
-impl Expression<HoaSymbol> for HoaExpression {
+impl Matches<HoaExpression> for HoaSymbol {
+    fn matches(&self, expression: &HoaExpression) -> bool {
+        expression.matched_by(*self)
+    }
+}
+
+impl Expression for HoaExpression {
+    type S = HoaSymbol;
     type SymbolsIter<'this> = HoaExpressionIter<'this> where Self: 'this;
 
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         HoaExpressionIter::new(self)
     }
 
-    fn matches(&self, symbol: HoaSymbol) -> bool {
+    fn matched_by(&self, symbol: HoaSymbol) -> bool {
         self.bdd.eval_in(&symbol.as_bdd_valuation())
     }
 }
@@ -417,10 +426,6 @@ impl Alphabet for HoaAlphabet {
             }
         }
         true
-    }
-
-    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
-        expression.matches(symbol)
     }
 
     fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {

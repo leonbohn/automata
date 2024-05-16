@@ -15,7 +15,7 @@ use tracing::trace;
 pub type NTSPartsFor<D> = (
     <D as TransitionSystem>::Alphabet,
     Vec<NTState<StateColor<D>>>,
-    Vec<NTEdge<ExpressionOf<D>, EdgeColor<D>>>,
+    Vec<NTEdge<EdgeExpression<D>, EdgeColor<D>>>,
 );
 
 /// Represents a non-deterministic transition system. It stores an [`Alphabet`], a list of [`NTState`]s and a list of [`NTEdge`]s.
@@ -45,19 +45,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
         id
     }
 
-    type ExtendStateIndexIter = std::ops::Range<usize>;
-
-    fn extend_states<I: IntoIterator<Item = StateColor<Self>>>(
-        &mut self,
-        iter: I,
-    ) -> Self::ExtendStateIndexIter {
-        let i = self.states.len();
-        for state in iter.into_iter() {
-            self.add_state(state);
-        }
-        i..self.states.len()
-    }
-
     fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
         &mut self,
         index: Idx,
@@ -76,32 +63,22 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
         self.states[index].color = color.into();
     }
 
-    fn add_edge<X, Y, CI>(
-        &mut self,
-        from: X,
-        on: <Self::Alphabet as Alphabet>::Expression,
-        to: Y,
-        color: CI,
-    ) -> Option<(Self::StateIndex, Self::EdgeColor)>
+    fn add_edge<E>(&mut self, t: E) -> Option<(Self::StateIndex, Self::EdgeColor)>
     where
-        X: Indexes<Self>,
-        Y: Indexes<Self>,
-        CI: Into<EdgeColor<Self>>,
+        E: IntoEdgeTuple<Self>,
     {
-        let source = from.to_index(self)?;
-        let target = to.to_index(self)?;
-
-        let mut edge = NTEdge::new(source, on, color.into(), target);
+        let (q, a, c, p) = t.into_edge_tuple();
+        let mut edge = NTEdge::new(q, a, c, p);
         let edge_id = self.edges.len();
 
-        if let Some(last_edge_id) = self.last_edge(source) {
+        if let Some(last_edge_id) = self.last_edge(q) {
             assert!(last_edge_id < self.edges.len());
             assert!(self.edges[last_edge_id].next.is_none());
             self.edges[last_edge_id].next = Some(edge_id);
             edge.prev = Some(last_edge_id);
         } else {
-            assert!(self.states[source].first_edge.is_none());
-            self.states[source].first_edge = Some(edge_id);
+            assert!(self.states[q].first_edge.is_none());
+            self.states[q].first_edge = Some(edge_id);
         }
         self.edges.push(edge);
         None
@@ -153,7 +130,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
     pub(crate) fn nts_remove_edge(
         &mut self,
         from: usize,
-        on: &ExpressionOf<Self>,
+        on: &EdgeExpression<Self>,
     ) -> Option<(C, usize)> {
         let pos = self.edge_position(from, on)?;
         let (color, target) = (self.edges[pos].color.clone(), self.edges[pos].target);
@@ -165,7 +142,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
         &mut self,
         from: usize,
         on: SymbolOf<Self>,
-    ) -> Set<(ExpressionOf<Self>, C, usize)>
+    ) -> Set<(EdgeExpression<Self>, C, usize)>
     where
         C: Hash + Eq,
     {

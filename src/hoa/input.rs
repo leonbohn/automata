@@ -241,7 +241,7 @@ pub fn hoa_automaton_to_nts(
             let expr = HoaExpression::new(bdd, aps);
 
             let color: AcceptanceMask = edge.acceptance_signature().into();
-            ts.add_edge(state.id() as usize, expr, target, color);
+            ts.add_edge((state.id() as usize, expr, color, target));
         }
     }
 

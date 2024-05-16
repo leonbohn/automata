@@ -147,13 +147,13 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
         for q in value.state_indices() {
             for edge in value.edges_from(q).unwrap() {
                 assert!(
-                    ts.add_edge(
+                    ts.add_edge((
                         edge.source(),
                         ts.alphabet()
                             .make_expression(ts.alphabet().char_to_hoa_symbol(*edge.expression())),
-                        edge.target(),
                         edge.color(),
-                    )
+                        edge.target(),
+                    ))
                     .is_none(),
                     "Expected a deterministic automaton"
                 );

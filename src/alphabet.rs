@@ -12,12 +12,27 @@ use crate::{math::Map, Show};
 pub trait Symbol: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show {}
 impl<S: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show> Symbol for S {}
 
+/// Encapsulates that an [`Expression`] can be matched by some [`Symbol`], or by another expression.
+/// For simple [`CharAlphabet`]s, where expressions are single symbols, this is just equality.
+pub trait Matches<E> {
+    /// Returns if `self` matches the given expression.
+    fn matches(&self, expression: &E) -> bool;
+}
+
+impl<X: Eq> Matches<X> for X {
+    fn matches(&self, expression: &X) -> bool {
+        self == expression
+    }
+}
+
 /// An expression is used to label edges of a [`crate::transition_system::TransitionSystem`]. For [`CharAlphabet`]
 /// alphabets, an expression is simply a single symbol, whereas for a propositional alphabet, an expression
 /// is a propositional formula over the atomic propositions. See propositional for more details.
-pub trait Expression<S: Symbol>: Hash + Clone + Debug + Eq + Ord + Show {
+pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show {
+    /// The type of symbols that this expression matches.
+    type S: Symbol + Matches<Self>;
     /// Type of iterator over the concrete symbols matched by this expression.
-    type SymbolsIter<'this>: Iterator<Item = S>
+    type SymbolsIter<'this>: Iterator<Item = Self::S>
     where
         Self: 'this;
     /// Returns an iterator over the [`Symbol`]s that match this expression.
@@ -26,10 +41,12 @@ pub trait Expression<S: Symbol>: Hash + Clone + Debug + Eq + Ord + Show {
     /// Checks whether the given [`Symbol`] matches the expression `self`. For [`CharAlphabet`] alphabets, this just
     /// means that the expression equals the given symbol. For a propositional alphabet, this means that
     /// the expression is satisfied by the given symbol, an example of this is illustrated in propositional.
-    fn matches(&self, symbol: S) -> bool;
+    fn matched_by(&self, symbol: Self::S) -> bool {
+        symbol.matches(self)
+    }
 
     /// Apply the given function `f` to each symbol matched by this expression.
-    fn for_each<F: Fn(S)>(&self, f: F) {
+    fn for_each<F: Fn(Self::S)>(&self, f: F) {
         self.symbols().for_each(f)
     }
 }
@@ -37,9 +54,9 @@ pub trait Expression<S: Symbol>: Hash + Clone + Debug + Eq + Ord + Show {
 /// An alphabet abstracts a collection of [`Symbol`]s and complex [`Expression`]s over those.
 pub trait Alphabet: Clone {
     /// The type of symbols in this alphabet.
-    type Symbol: Symbol;
+    type Symbol: Symbol + Matches<Self::Expression>;
     /// The type of expressions in this alphabet.
-    type Expression: Expression<Self::Symbol>;
+    type Expression: Expression<S = Self::Symbol>;
 
     /// Creates an expression from a single symbol.
     fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression;
@@ -67,8 +84,13 @@ pub trait Alphabet: Clone {
         map: &Map<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
-        map.iter()
-            .find_map(|(e, x)| if e.matches(sym) { Some((e, x)) } else { None })
+        map.iter().find_map(|(e, x)| {
+            if e.matched_by(sym) {
+                Some((e, x))
+            } else {
+                None
+            }
+        })
     }
 
     /// Type for an iterator over all possible symbols in the alphabet. For propositional alphabets,
@@ -83,11 +105,6 @@ pub trait Alphabet: Clone {
 
     /// Returns true if the given symbol is present in the alphabet.
     fn contains(&self, symbol: Self::Symbol) -> bool;
-
-    /// Checks whether the given expression matches the given symbol. For [`CharAlphabet`]s, this just
-    /// means that the expression equals the given symbol. For a propositional alphabet, this means that
-    /// the expression is satisfied by the given symbol, an example of this is illustrated in propositional.
-    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool;
 
     /// Returns the number of symbols in the alphabet.
     fn size(&self) -> usize;
@@ -115,9 +132,6 @@ impl<A: Alphabet> Alphabet for &A {
     fn contains(&self, symbol: Self::Symbol) -> bool {
         A::contains(self, symbol)
     }
-    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
-        A::matches(self, expression, symbol)
-    }
     fn size(&self) -> usize {
         A::size(self)
     }
@@ -136,7 +150,7 @@ pub struct CharAlphabet(pub(crate) Vec<char>);
 impl CharAlphabet {
     /// Creates a new [`CharAlphabet`] alphabet of the given size. The symbols are just the first `size` letters
     /// of the alphabet, i.e. 'a' to 'z'.
-    pub fn alphabetic(size: usize) -> Self {
+    pub fn of_size(size: usize) -> Self {
         assert!(size < 26, "Alphabet is too large");
         Self((0..size).map(|i| (b'a' + i as u8) as char).collect())
     }
@@ -187,11 +201,6 @@ impl Alphabet for Empty {
     fn contains(&self, _symbol: Self::Symbol) -> bool {
         true
     }
-
-    fn matches(&self, _expression: &Self::Expression, _symbol: Self::Symbol) -> bool {
-        true
-    }
-
     fn size(&self) -> usize {
         0
     }
@@ -206,14 +215,15 @@ impl Show for Empty {
         panic!("trying to show empty thing")
     }
 }
-impl Expression<Empty> for Empty {
+impl Expression for Empty {
+    type S = Empty;
     type SymbolsIter<'this> = std::iter::Empty<Empty> where Self: 'this;
 
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         std::iter::empty()
     }
 
-    fn matches(&self, _: Empty) -> bool {
+    fn matched_by(&self, _: Empty) -> bool {
         true
     }
 }
@@ -271,7 +281,8 @@ impl Show for char {
         )
     }
 }
-impl Expression<char> for char {
+impl Expression for char {
+    type S = char;
     type SymbolsIter<'this> = std::iter::Once<char> where Self: 'this;
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         std::iter::once(*self)
@@ -281,7 +292,7 @@ impl Expression<char> for char {
         (f)(*self)
     }
 
-    fn matches(&self, symbol: char) -> bool {
+    fn matched_by(&self, symbol: char) -> bool {
         self == &symbol
     }
 }
@@ -301,10 +312,6 @@ impl Alphabet for CharAlphabet {
 
     fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
         left == right
-    }
-
-    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
-        expression == &symbol
     }
 
     fn universe(&self) -> Self::Universe<'_> {
@@ -338,14 +345,15 @@ impl Alphabet for CharAlphabet {
 #[derive(Clone, Debug)]
 pub struct Fixed<S: Symbol, const N: usize>([S; N]);
 
-impl Expression<usize> for usize {
+impl Expression for usize {
+    type S = usize;
     type SymbolsIter<'this> = std::iter::Once<usize> where Self: 'this;
 
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         std::iter::once(*self)
     }
 
-    fn matches(&self, symbol: usize) -> bool {
+    fn matched_by(&self, symbol: usize) -> bool {
         *self == symbol
     }
 }
@@ -357,7 +365,7 @@ impl<S: Symbol, const N: usize> Fixed<S, N> {
     }
 }
 
-impl<S: Symbol + Expression<S>, const N: usize> Alphabet for Fixed<S, N> {
+impl<S: Symbol + Expression<S = S>, const N: usize> Alphabet for Fixed<S, N> {
     type Symbol = S;
 
     type Expression = S;
@@ -387,10 +395,6 @@ impl<S: Symbol + Expression<S>, const N: usize> Alphabet for Fixed<S, N> {
 
     fn contains(&self, symbol: Self::Symbol) -> bool {
         self.0.contains(&symbol)
-    }
-
-    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
-        expression == &symbol
     }
 
     fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
@@ -425,14 +429,15 @@ impl InvertibleChar {
     }
 }
 
-impl Expression<InvertibleChar> for InvertibleChar {
+impl Expression for InvertibleChar {
+    type S = InvertibleChar;
     type SymbolsIter<'this> = std::iter::Once<InvertibleChar> where Self: 'this;
 
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         std::iter::once(*self)
     }
 
-    fn matches(&self, symbol: InvertibleChar) -> bool {
+    fn matched_by(&self, symbol: InvertibleChar) -> bool {
         *self == symbol
     }
 }
@@ -506,10 +511,6 @@ impl Alphabet for Directional {
 
     fn contains(&self, symbol: Self::Symbol) -> bool {
         self.0.contains(&symbol)
-    }
-
-    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
-        *expression == symbol
     }
 
     fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {

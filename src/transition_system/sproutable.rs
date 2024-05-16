@@ -13,6 +13,15 @@ pub trait ForAlphabet: TransitionSystem {
     /// Creates an instance of `Self` for the given [`Alphabet`]. The resulting
     /// TS should be empty.
     fn for_alphabet(from: Self::Alphabet) -> Self;
+
+    /// Creates an instance of `Self` with a [`CharAlphabet`] of size `size`, consisting
+    /// of the first `size` characters of the ASCII alphabet.
+    fn for_char_alphabet_of_size(size: usize) -> Self
+    where
+        Self: TransitionSystem<Alphabet = CharAlphabet>,
+    {
+        Self::for_alphabet(CharAlphabet::of_size(size))
+    }
 }
 
 /// Marker trait for [`Alphabet`]s that can be indexed, i.e. where we can associate each
@@ -60,12 +69,61 @@ impl IndexedAlphabet for CharAlphabet {
 
 /// Trait for transition systems that allow insertion of states and transitions.
 pub trait Sproutable: TransitionSystem {
+    /// Adds a new state with the given color. The method returns the index of the newly created
+    /// state.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///     
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+    /// let q0 = ts.add_state(false);
+    /// let before = ts.size();
+    /// let q1 = ts.add_state(true);
+    /// assert_eq!(ts.size(), before + 1);
+    /// ```
+    fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex;
+
+    /// Adds a new edge to the transition system. The method returns the index of the source state
+    /// and the color of the edge.
+    ///
+    /// The details of the edge are given as a type that implements [`IntoEdgeTuple`]. This allows
+    /// for a more flexible way of adding edges, as the method can be called with a tuple, a struct
+    /// or any other type that can be converted into a tuple of the form
+    /// `(StateIndex, Expression, EdgeColor, StateIndex)`. Moreover, if `EdgeColor` is `Void`, then
+    /// we can simply call the method with a tuple of the form `(StateIndex, Expression, StateIndex)`
+    /// and the method will automatically convert the tuple into the correct form.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+    /// let q0 = ts.add_state(false);
+    /// let q1 = ts.add_state(true);
+    /// let edge = ts.add_edge((q0, 'a', q1));
+    /// assert_eq!(edge, Some((q0, Void)));
+    /// ```
+    fn add_edge<E>(&mut self, t: E) -> Option<(Self::StateIndex, Self::EdgeColor)>
+    where
+        E: IntoEdgeTuple<Self>;
+
+    /// Removes the transition from the state `from` to the state `to` on the given expression.
+    /// Returns `true` if the transition existed and was removed, `false` otherwise.
+    fn remove_edges<X: Indexes<Self>>(
+        &mut self,
+        from: X,
+        on: <Self::Alphabet as Alphabet>::Expression,
+    ) -> bool;
+    /// Builds a new transition system by collecting all states and transitions present in another.
+    /// The method returns the new transition system and a [bijective mapping](`Bijection`) between the old and new
+    /// state indices.
+    ///
     /// Creates a new transition system, by collecting all states and transitions present in `ts`.
     /// This is done by using a naive approach, which simply iterates through all states and adds
-    /// them one by one. At the same time, a [bijective mapping](`Bijection`) between old and
-    /// new state indices is created. Subequently, the transitions are inserted one by one. Finally,
-    /// the newly created transition system is returned together with the bijective state index
-    /// mapping.
+    /// them one by one. At the same time, a bijective mapping between old and new state indices is
+    /// created. Subequently, the transitions are inserted one by one. Finally, the newly created
+    /// transition system is returned together with the bijective state index mapping.
     ///
     /// Note, that this procedure allows a form of 'downcasting' of edge and state colors. If the
     /// transition system that we want to collect into does not use any edge colors (i.e. the edges
@@ -84,7 +142,7 @@ pub trait Sproutable: TransitionSystem {
     /// let (without_state_colors, map2): (DTS<CharAlphabet, Void, usize>, _) = DTS::collect_with_index_mapping(&source);
     /// assert_eq!(map1.get_by_left(&0).unwrap(), map2.get_by_left(&0).unwrap());
     /// ```
-    fn collect_with_index_mapping<Ts>(ts: Ts) -> (Self, Bijection<Ts::StateIndex, Self::StateIndex>)
+    fn sprout_from_ts<Ts>(ts: Ts) -> (Self, Bijection<Ts::StateIndex, Self::StateIndex>)
     where
         Self: ForAlphabet<Alphabet = Ts::Alphabet> + Sproutable,
         Ts: TransitionSystem,
@@ -106,12 +164,12 @@ pub trait Sproutable: TransitionSystem {
         for index in ts.state_indices() {
             let source = *map.get_by_left(&index).unwrap();
             for edge in ts.edges_from(index).expect("State exists") {
-                out.add_edge(
+                out.add_edge((
                     source,
                     edge.expression().clone(),
-                    *map.get_by_left(&edge.target()).unwrap(),
                     edge.color().into(),
-                );
+                    *map.get_by_left(&edge.target()).unwrap(),
+                ));
             }
         }
         (out, map)
@@ -165,12 +223,12 @@ pub trait Sproutable: TransitionSystem {
 
         let sink = self.add_state(sink_color);
         for sym in self.alphabet().universe().collect_vec() {
-            self.add_edge(
+            self.add_edge((
                 sink,
                 self.alphabet().symbol_to_expression(sym),
-                sink,
                 edge_color.clone(),
-            );
+                sink,
+            ));
         }
         let mut seen = BitSet::with_capacity(self.alphabet().size());
         for state in self.state_indices().collect_vec() {
@@ -180,70 +238,52 @@ pub trait Sproutable: TransitionSystem {
             }
             for missing in (0..self.alphabet().size()).filter(|i| !seen.contains(*i)) {
                 assert!(self
-                    .add_edge(
+                    .add_edge((
                         state,
                         self.alphabet().expression_from_index(missing),
+                        edge_color.clone(),
                         sink,
-                        edge_color.clone()
-                    )
+                    ))
                     .is_none());
             }
         }
     }
 
-    /// Adds a new state with the given color, returning the index of the newly created state.
+    /// Add a new states with colors given by an iterator. For each provided color, a new state is
+    /// created. Returns an iterator over the indices of the newly created states.
     ///
-    fn add_state<X: Into<StateColor<Self>>>(&mut self, color: X) -> Self::StateIndex;
-    /// The type of iterator that is returned when calling [`Self::extend_states()`].
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
     ///
-    type ExtendStateIndexIter: IntoIterator<Item = Self::StateIndex>;
-    /// For each element that `iter` provides, a new state with the corresponding color is added.
-    /// The function returns something which can be turned into an iterator over the indices of
-    /// the newly created states.
-    ///
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+    /// let states = ts.extend_states([true, false, true]);
+    /// assert_eq!(states.collect::<Vec<_>>(), vec![0, 1, 2]);
+    /// ```
     fn extend_states<I: IntoIterator<Item = StateColor<Self>>>(
         &mut self,
         iter: I,
-    ) -> Self::ExtendStateIndexIter;
-    /// Removes the state with the given index. Note, that this should also remove all transitions
-    /// that start or end in the given state. If the no state with the given `index` exists, the
-    /// method may panic or simply print an error!
-    /// TODO: Decide on the behavior of this method for states that do not exist.
+    ) -> impl Iterator<Item = Self::StateIndex> {
+        iter.into_iter().map(move |color| self.add_state(color))
+    }
+
+    /// Sets the color of the state with the given index. If the state does not exist, the method
+    /// should panic. Usually, we would like to avoid recoloring states individually, and instead
+    /// use the [`TransitionSystem::map_state_colors`] method.
     fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
         &mut self,
         index: Idx,
         color: X,
     );
-    /// Sets the state color of the initial state.
+
+    /// Sets the state color of the initial state. This method is only available for a ts if it
+    /// is [`Pointed`] and it simply obtains the initial state and subsequetly [sets its color](`Self::set_state_color`).
     fn set_initial_color<X: Into<StateColor<Self>>>(&mut self, color: X)
     where
         Self: Pointed,
     {
         self.set_state_color(self.initial(), color);
     }
-    /// Adds a new transition from the state `from` to the state `to` on the given expression. If
-    /// a transition already exists, the method returns the index of the original target and the
-    /// color of the original edge. Otherwise, the method returns `None`.
-    ///
-    fn add_edge<X, Y, CI>(
-        &mut self,
-        from: X,
-        on: <Self::Alphabet as Alphabet>::Expression,
-        to: Y,
-        color: CI,
-    ) -> Option<(Self::StateIndex, Self::EdgeColor)>
-    where
-        X: Indexes<Self>,
-        Y: Indexes<Self>,
-        CI: Into<EdgeColor<Self>>;
-
-    /// Removes the transition from the state `from` to the state `to` on the given expression.
-    /// Returns `true` if the transition existed and was removed, `false` otherwise.
-    fn remove_edges<X: Indexes<Self>>(
-        &mut self,
-        from: X,
-        on: <Self::Alphabet as Alphabet>::Expression,
-    ) -> bool;
 }
 
 #[cfg(test)]

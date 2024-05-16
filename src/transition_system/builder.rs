@@ -4,7 +4,7 @@ use crate::{congruence::RightCongruence, prelude::*, Void};
 
 use self::math::Set;
 
-use super::IntoEdge;
+use super::IntoEdgeTuple;
 
 /// Helper struct for the construction of non-deterministic transition systems. It stores a list of edges, a list of colors and a default color.
 /// This can also be used to construct deterministic transition systems, deterministic parity automata and Mealy machines.
@@ -199,11 +199,15 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 0)])
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
-    pub fn with_transitions<E: IntoEdge<usize, char, C>, T: IntoIterator<Item = E>>(
+    pub fn with_transitions<
+        E: IntoEdgeTuple<DTS<CharAlphabet, Q, C>>,
+        T: IntoIterator<Item = E>,
+    >(
         mut self,
         iter: T,
     ) -> Self {
-        self.edges.extend(iter.into_iter().map(|t| t.into_edge()));
+        self.edges
+            .extend(iter.into_iter().map(|t| t.into_edge_tuple()));
         self
     }
 
@@ -233,11 +237,12 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     ///     .with_edges([(1, 'b', 0)]) // We can also skip the `Void` entry at position 3
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
-    pub fn with_edges<E: IntoEdge<usize, char, C>, I: IntoIterator<Item = E>>(
+    pub fn with_edges<E: IntoEdgeTuple<DTS<CharAlphabet, Q, C>>, I: IntoIterator<Item = E>>(
         mut self,
         iter: I,
     ) -> Self {
-        self.edges.extend(iter.into_iter().map(|e| e.into_edge()));
+        self.edges
+            .extend(iter.into_iter().map(|e| e.into_edge_tuple()));
         self
     }
 
@@ -276,8 +281,8 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
         let created_states_number = ts.extend_states(colors_it).count();
         assert_eq!(created_states_number, num_states);
 
-        for (p, a, c, q) in self.edges {
-            ts.add_edge(p, a, q, c);
+        for edge in self.edges {
+            ts.add_edge(edge);
         }
         ts
     }

@@ -32,7 +32,7 @@ impl<'a, Ts: TransitionSystem> DeterministicEdgesFrom<'a, Ts> {
 /// a transition system.
 pub struct TransitionsFrom<'a, D: TransitionSystem + 'a> {
     edges: D::EdgesFromIter<'a>,
-    symbols: Option<<ExpressionOf<D> as Expression<SymbolOf<D>>>::SymbolsIter<'a>>,
+    symbols: Option<<EdgeExpression<D> as Expression>::SymbolsIter<'a>>,
     target: Option<D::StateIndex>,
     color: Option<D::EdgeColor>,
     source: D::StateIndex,

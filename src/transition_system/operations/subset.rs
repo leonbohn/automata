@@ -54,7 +54,7 @@ impl<Ts: TransitionSystem> StateSet<Ts> {
 pub struct SubsetConstruction<Ts: TransitionSystem> {
     ts: Ts,
     states: RefCell<Vec<StateSet<Ts>>>,
-    expressions: crate::Map<SymbolOf<Ts>, ExpressionOf<Ts>>,
+    expressions: crate::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
 }
 
 impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
@@ -112,7 +112,7 @@ impl<Ts: TransitionSystem> TransitionSystem for SubsetConstruction<Ts> {
 
     type EdgeColor = Vec<Ts::EdgeColor>;
 
-    type EdgeRef<'this> = TransitionOwnedColor<'this, ExpressionOf<Ts>, usize, Self::EdgeColor>
+    type EdgeRef<'this> = TransitionOwnedColor<'this, EdgeExpression<Ts>, usize, Self::EdgeColor>
     where
         Self: 'this;
 

@@ -80,7 +80,7 @@ pub trait TransitionSystem: Sized {
     /// The type of the colors of the edges of the transition system.
     type EdgeColor: Clone;
     /// The type of the references to the transitions of the transition system.
-    type EdgeRef<'this>: IsEdge<'this, ExpressionOf<Self>, Self::StateIndex, EdgeColor<Self>>
+    type EdgeRef<'this>: IsEdge<'this, EdgeExpression<Self>, Self::StateIndex, EdgeColor<Self>>
     where
         Self: 'this;
     /// The type of the iterator over the transitions that start in a given state.
@@ -126,7 +126,7 @@ pub trait TransitionSystem: Sized {
 
     /// Helper function which creates an expression from the given symbol.
     /// This is a convenience function that simply calls [`Alphabet::make_expression`].
-    fn make_expression(&self, sym: SymbolOf<Self>) -> ExpressionOf<Self> {
+    fn make_expression(&self, sym: SymbolOf<Self>) -> EdgeExpression<Self> {
         self.alphabet().make_expression(sym)
     }
 
@@ -203,7 +203,7 @@ pub trait TransitionSystem: Sized {
         impl Iterator<
             Item = (
                 Self::StateIndex,
-                &ExpressionOf<Self>,
+                &EdgeExpression<Self>,
                 Self::EdgeColor,
                 Self::StateIndex,
             ),
@@ -214,7 +214,7 @@ pub trait TransitionSystem: Sized {
     {
         let idx = state.to_index(self)?;
         Some(self.edges_from(state)?.filter_map(move |t| {
-            if t.expression().matches(sym) {
+            if t.expression().matched_by(sym) {
                 Some((idx, t.expression(), t.color().clone(), t.target()))
             } else {
                 None
@@ -260,7 +260,7 @@ pub trait TransitionSystem: Sized {
             return false;
         };
         if let Some(mut it) = self.edges_from(source) {
-            it.any(|t| t.target() == target && t.expression().matches(sym))
+            it.any(|t| t.target() == target && t.expression().matched_by(sym))
         } else {
             false
         }
@@ -402,7 +402,7 @@ pub trait TransitionSystem: Sized {
     /// the origin, target and expression of the respective edge.
     fn map_edge_colors_full<D, F>(self, f: F) -> operations::MapEdges<Self, F>
     where
-        F: Fn(Self::StateIndex, &ExpressionOf<Self>, Self::EdgeColor, Self::StateIndex) -> D,
+        F: Fn(Self::StateIndex, &EdgeExpression<Self>, Self::EdgeColor, Self::StateIndex) -> D,
         D: Clone,
         Self: Sized,
     {
@@ -755,49 +755,59 @@ impl<TY: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show> IndexType f
 
 /// Implementors of this trait can be transformed into a owned tuple representation of
 /// an edge in a [`TransitionSystem`].
-pub trait IntoEdge<Idx, E, C> {
+pub trait IntoEdgeTuple<Ts: TransitionSystem> {
     /// Consumes `self` and returns a tuple representing an edge in a [`TransitionSystem`].
     /// Owned edges in their tuple representation may simply be cloned, whereas if we have
     /// a tuple represetation of an edge with a borrowed expression, this operation may
     /// have to clone the expression.
-    fn into_edge(self) -> (Idx, E, C, Idx);
+    fn into_edge_tuple(self) -> EdgeTuple<Ts>;
 }
 
-impl<Idx, E, C: Color> IntoEdge<Idx, E, C> for (Idx, E, C, Idx) {
-    fn into_edge(self) -> (Idx, E, C, Idx) {
+impl<T: TransitionSystem> IntoEdgeTuple<T> for EdgeTuple<T> {
+    #[inline(always)]
+    fn into_edge_tuple(self) -> EdgeTuple<T> {
         self
     }
 }
 
-impl<Idx, E, C> IntoEdge<Idx, E, Void> for (Idx, E, C, Idx) {
-    fn into_edge(self) -> (Idx, E, Void, Idx) {
-        (self.0, self.1, Void, self.3)
-    }
-}
-
-impl<Idx, E> IntoEdge<Idx, E, Void> for (Idx, E, Idx) {
-    fn into_edge(self) -> (Idx, E, Void, Idx) {
+impl<T: TransitionSystem<EdgeColor = Void>> IntoEdgeTuple<T>
+    for (StateIndex<T>, EdgeExpression<T>, StateIndex<T>)
+{
+    #[inline(always)]
+    fn into_edge_tuple(self) -> EdgeTuple<T> {
         (self.0, self.1, Void, self.2)
     }
 }
 
-impl<Idx, E, C, X: IntoEdge<Idx, E, C>> IntoEdge<Idx, E, C> for &X
+impl<T: TransitionSystem, TT: IntoEdgeTuple<T>> IntoEdgeTuple<T> for &TT
 where
-    X: Clone,
+    TT: Clone,
 {
-    fn into_edge(self) -> (Idx, E, C, Idx) {
-        X::into_edge(self.clone())
+    #[inline(always)]
+    fn into_edge_tuple(self) -> EdgeTuple<T> {
+        self.clone().into_edge_tuple()
     }
 }
 
 /// Helper trait for extracting the [`crate::alphabet::Symbol`] type from an a transition system.
 pub type SymbolOf<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Symbol;
 /// Helper trait for extracting the [`Expression`] type from an a transition system.
-pub type ExpressionOf<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Expression;
+pub type EdgeExpression<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Expression;
 /// Type alias for extracting the state color in a [`TransitionSystem`].
 pub type StateColor<X> = <X as TransitionSystem>::StateColor;
 /// Type alias for extracting the edge color in a [`TransitionSystem`].
 pub type EdgeColor<X> = <X as TransitionSystem>::EdgeColor;
+/// Type alias for extracting the state index in a [`TransitionSystem`].
+pub type StateIndex<X> = <X as TransitionSystem>::StateIndex;
+/// Type alias for a tuple representing an edge in a [`TransitionSystem`].
+pub type EdgeTuple<Ts> = (
+    StateIndex<Ts>,
+    EdgeExpression<Ts>,
+    EdgeColor<Ts>,
+    StateIndex<Ts>,
+);
+/// Type alias to obtain the type of a reference to an edge in a given [`TransitionSystem`].
+pub type EdgeRef<'a, T> = <T as TransitionSystem>::EdgeRef<'a>;
 
 /// Implementors of this trait have a distinguished (initial) state.
 pub trait Pointed: TransitionSystem {

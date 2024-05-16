@@ -5,7 +5,7 @@ use super::EdgeReference;
 /// Implementors of this trait are [`TransitionSystem`]s which allow iterating over the predecessors of a state.
 pub trait PredecessorIterable: TransitionSystem {
     /// The type of pre-transition that the iterator yields.
-    type PreEdgeRef<'this>: IsEdge<'this, ExpressionOf<Self>, Self::StateIndex, EdgeColor<Self>>
+    type PreEdgeRef<'this>: IsEdge<'this, EdgeExpression<Self>, Self::StateIndex, EdgeColor<Self>>
     where
         Self: 'this;
 
@@ -87,11 +87,11 @@ impl<L, R> PredecessorIterable for operations::MatchingProduct<L, R>
 where
     L: PredecessorIterable,
     R: PredecessorIterable,
-    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = ExpressionOf<L>>,
+    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = EdgeExpression<L>>,
     L::StateColor: Clone,
     R::StateColor: Clone,
 {
-    type PreEdgeRef<'this> = operations::ProductPreTransition<'this, L::StateIndex, R::StateIndex, ExpressionOf<L>, L::EdgeColor, R::EdgeColor> where Self: 'this;
+    type PreEdgeRef<'this> = operations::ProductPreTransition<'this, L::StateIndex, R::StateIndex, EdgeExpression<L>, L::EdgeColor, R::EdgeColor> where Self: 'this;
     type EdgesToIter<'this> = operations::ProductEdgesTo<'this, L, R> where Self: 'this;
     fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
         operations::ProductEdgesTo::new(&self.0, &self.1, state.to_index(self)?)

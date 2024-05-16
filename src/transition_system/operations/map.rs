@@ -90,7 +90,7 @@ impl<Ts, D, F> PredecessorIterable for MapEdges<Ts, F>
 where
     D: Clone,
     Ts: PredecessorIterable,
-    F: Fn(Ts::StateIndex, &ExpressionOf<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
+    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
     type PreEdgeRef<'this> = MappedPreEdge<Ts::StateIndex, Ts::PreEdgeRef<'this>, &'this F, Ts::EdgeColor>
     where
@@ -187,7 +187,7 @@ impl<Ts, D, F> TransitionSystem for MapEdges<Ts, F>
 where
     Ts: TransitionSystem,
     D: Clone,
-    F: Fn(Ts::StateIndex, &ExpressionOf<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
+    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
     type StateIndex = Ts::StateIndex;
 
@@ -253,7 +253,7 @@ impl<D, Ts, F> Pointed for MapEdges<Ts, F>
 where
     D: Clone,
     Ts: TransitionSystem + Pointed,
-    F: Fn(Ts::StateIndex, &ExpressionOf<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
+    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
     fn initial(&self) -> Self::StateIndex {
         self.ts.initial()
