@@ -124,6 +124,14 @@ pub struct RightCongruence<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
+    /// Creates a new [`RightCongruence`] for the given [`Alphabet`]. Since there always has be an initial state,
+    /// the method also expects a color for the initial state which it inserts.
+    pub fn new_with_initial_color(alphabet: A, initial_color: Q) -> Self {
+        let mut ts = DTS::for_alphabet(alphabet);
+        let initial = ts.add_state(initial_color);
+        Self::from_ts(ts.with_initial(initial))
+    }
+
     /// Returns a reference to the underlying transition system.
     pub fn ts(&self) -> &DTS<A, Q, C> {
         &self.ts

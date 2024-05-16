@@ -11,19 +11,19 @@ pub use moore::{IntoMooreMachine, MooreMachine, MooreSemantics};
 mod mealy;
 pub use mealy::{IntoMealyMachine, MealyMachine, MealySemantics};
 
-mod dfa;
-pub use dfa::{DFASemantics, IntoDFA, DFA};
+mod reachability;
+pub use reachability::{IntoDFA, ReachabilityCondition, DFA};
 
-#[allow(missing_docs)]
 mod omega;
 pub use omega::{
-    AcceptanceMask, DBASemantics, DeterministicOmegaAutomaton, IntoDBA, IntoDPA,
-    MaxEvenParitySemantics, MaxOddParitySemantics, MinEvenParitySemantics, MinOddParitySemantics,
-    OmegaAcceptanceCondition, OmegaAutomaton, DBA, DPA,
+    AcceptanceMask, BuchiCondition, DeterministicOmegaAutomaton, IntoDBA, IntoDMA, IntoDPA,
+    IntoDRA, MaxEvenParityCondition, MaxOddParityCondition, MinEvenParityCondition,
+    MinOddParityCondition, MullerCondition, OmegaAcceptanceCondition, OmegaAutomaton,
+    RabinCondition, RabinPair, DBA, DMA, DPA, DRA,
 };
 
 mod with_initial;
-pub use with_initial::WithInitial;
+pub use with_initial::{WithInitial, WithoutCondition};
 
 mod semantics;
 pub use semantics::{FiniteSemantics, OmegaSemantics, Semantics};
