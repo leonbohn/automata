@@ -1,59 +1,27 @@
-use bit_set::BitSet;
-use itertools::Itertools;
-use tracing::error;
-
 use crate::{hoa::HoaAlphabet, prelude::*, Set};
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct AcceptanceMask(BitSet);
+mod buchi;
+pub use buchi::*;
 
-impl AcceptanceMask {
-    pub fn max(&self) -> Option<usize> {
-        self.iter().max()
-    }
+mod parity;
+pub use parity::*;
 
-    pub fn iter(&self) -> impl Iterator<Item = usize> + '_ {
-        self.0.iter()
-    }
+mod rabin;
+pub use rabin::*;
 
-    pub fn min(&self) -> Option<usize> {
-        self.iter().min()
-    }
+mod muller;
+pub use muller::*;
 
-    pub fn as_priority(&self) -> usize {
-        let mut it = self.iter();
-        let Some(priority) = it.next() else {
-            error!(
-                "no priority is set on the edge, we require each edge to have precisely one color"
-            );
-            panic!("could not extract priority from acceptance mask");
-        };
-        if it.next().is_some() {
-            error!(
-                "more than one priority is set on the edge: {:?}, but we require edges to have precisely one color",
-                self.0
-            );
-            panic!("could not extract priority from acceptance mask");
-        }
-        priority
-    }
-}
+#[allow(missing_docs)]
+mod acceptance_mask;
+pub use acceptance_mask::AcceptanceMask;
 
-impl Show for AcceptanceMask {
-    fn show(&self) -> String {
-        self.iter().map(|i| format!("{{{i}}}")).join(", ")
-    }
-}
-
-impl From<&hoars::AcceptanceSignature> for AcceptanceMask {
-    fn from(value: &hoars::AcceptanceSignature) -> Self {
-        Self(BitSet::from_iter(value.iter().map(|&i| {
-            i.try_into().expect("Could not cast {i} to usize")
-        })))
-    }
-}
-
+/// Disambiguates between the different types of acceptance conditions. This is only
+/// used in conjunction with [`OmegaAutomaton`]/[`DeterministicOmegaAutomaton`] when
+/// the exact type is not known beforehand (such as when parsing an automaton). Usually
+/// one should prefer using specific automaton types such as [`DBA`]/[`DPA`] etc.
 #[derive(Debug, Clone, Eq, Copy, PartialEq, Ord, PartialOrd)]
+#[allow(missing_docs)]
 pub enum OmegaAcceptanceCondition {
     Parity(usize, usize),
     Buchi,
@@ -66,6 +34,8 @@ pub enum OmegaAcceptanceCondition {
 }
 
 impl OmegaAcceptanceCondition {
+    /// Returns true if and only if the condition is satisfied by the given set of
+    /// [`AcceptanceMask`]s.
     pub fn satisfied(&self, infset: &Set<AcceptanceMask>) -> bool {
         match self {
             OmegaAcceptanceCondition::Parity(_low, _high) => infset
@@ -79,12 +49,17 @@ impl OmegaAcceptanceCondition {
     }
 }
 
+/// Represents a generic omega automaton, i.e. an automaton over infinite words.
+/// This type is mainly used when the exact type of automaton is not known beforehand
+/// such as when parsing automata. One should prefer using specific types such as
+/// [`DPA`] whenever possible.
 pub struct OmegaAutomaton<A: Alphabet> {
     pub(super) ts: NTS<A, usize, AcceptanceMask>,
     pub(super) initial: usize,
     pub(super) acc: OmegaAcceptanceCondition,
 }
 
+/// A deterministic variant of [`OmegaAutomaton`].
 pub struct DeterministicOmegaAutomaton<A: Alphabet> {
     pub(super) ts: DTS<A, usize, AcceptanceMask>,
     pub(super) initial: usize,
@@ -92,6 +67,8 @@ pub struct DeterministicOmegaAutomaton<A: Alphabet> {
 }
 
 impl<A: Alphabet> OmegaAutomaton<A> {
+    /// Creates a new instance from the given transition system, initial state and
+    /// acceptance condition.
     pub fn new(
         ts: NTS<A, usize, AcceptanceMask>,
         initial: usize,
@@ -100,12 +77,17 @@ impl<A: Alphabet> OmegaAutomaton<A> {
         Self { ts, initial, acc }
     }
 
+    /// Attempts to convert `self` into a [`DeterministicOmegaAutomaton`]. Returns
+    /// `None` if this is not possible because the transition system underlying `self`
+    /// is not deterministic.
     pub fn into_deterministic(self) -> Option<DeterministicOmegaAutomaton<A>> {
         self.try_into().ok()
     }
 }
 
 impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
+    /// Creates a new instance from the given *deterministic* transition system,
+    /// initial state and acceptance condition.
     pub fn new(
         ts: DTS<A, usize, AcceptanceMask>,
         initial: usize,
@@ -114,6 +96,8 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
         Self { ts, initial, acc }
     }
 
+    /// Consumes and converts `self` into a [`DPA`]. Since [`DPA`]s can capture the
+    /// full class of omega-regular languages, this operation never fails.
     pub fn into_dpa(self) -> DPA<A> {
         assert!(
             matches!(self.acc, OmegaAcceptanceCondition::Parity(_, _)),
