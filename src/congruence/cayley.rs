@@ -95,22 +95,23 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let idx = state.to_index(self)?;
-        let (_tp, string) = self.monoid().get_profile(idx)?;
-        let mut word = string.to_deque();
-        symbol.mul(&mut word);
-        let tp = self.monoid().profile_for(&word)?;
-        Some(EdgeReference::new(
-            idx,
-            self.expressions.get(&symbol).unwrap(),
-            &(),
-            tp,
-        ))
+        // let idx = state.to_index(self)?;
+        // let (_tp, string) = self.monoid().get_profile(idx)?;
+        // let mut word = string.to_deque();
+        // symbol.mul(&mut word);
+        // let tp = self.monoid().profile_for(&word)?;
+        // Some(EdgeReference::new(
+        //     idx,
+        //     self.expressions.get(&matcher).unwrap(),
+        //     &(),
+        //     tp,
+        // ))
+        todo!("First get expression from matcher, then get edge from expression.")
     }
 }
 
@@ -209,22 +210,23 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let idx = state.to_index(self)?;
-        let (_tp, string) = self.monoid().get_profile(idx)?;
-        let mut word = string.to_vec();
-        word.push(symbol);
-        let tp = self.monoid().profile_for(&word)?;
-        Some(EdgeReference::new(
-            idx,
-            self.expressions.get(&symbol).unwrap(),
-            &(),
-            tp,
-        ))
+        // let idx = state.to_index(self)?;
+        // let (_tp, string) = self.monoid().get_profile(idx)?;
+        // let mut word = string.to_vec();
+        // word.push(symbol);
+        // let tp = self.monoid().profile_for(&word)?;
+        // Some(EdgeReference::new(
+        //     idx,
+        //     self.expressions.get(&symbol).unwrap(),
+        //     &(),
+        //     tp,
+        // ))
+        todo!("same as other cayley")
     }
 }
 impl<Ts> RightCayley<Ts>

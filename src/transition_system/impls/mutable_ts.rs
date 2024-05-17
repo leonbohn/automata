@@ -1,5 +1,11 @@
+use super::Idx;
 use crate::{math::Map, math::Set, prelude::*, transition_system::EdgeReference};
-use std::{fmt::Debug, hash::Hash};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::{Debug, Display},
+    hash::Hash,
+    ops::Deref,
+};
 
 use self::alphabet::Matcher;
 
@@ -7,14 +13,9 @@ use self::alphabet::Matcher;
 /// the states and edges in a vector, which allows for fast access and iteration. The states and edges
 /// are indexed by their position in the respective vector.
 #[derive(Clone, PartialEq, Eq)]
-pub struct MutableTs<
-    A: Alphabet,
-    Q = crate::Void,
-    C: Hash + Eq = crate::Void,
-    Idx: IndexType = usize,
-> {
+pub struct MutableTs<A: Alphabet, Q = crate::Void, C: Hash + Eq = crate::Void> {
     pub(crate) alphabet: A,
-    pub(crate) states: Map<Idx, MutableTsState<A, Q, C, Idx>>,
+    pub(crate) states: BTreeMap<Idx, MutableTsState<A, Q, C>>,
 }
 
 /// Type alias that takes a [`TransitionSystem`] and gives the type of a corresponding [`MutableTs`], i.e. one
@@ -25,12 +26,12 @@ pub type IntoMutableTs<Ts> = MutableTs<
     <Ts as TransitionSystem>::EdgeColor,
 >;
 
-impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> MutableTs<A, Q, C, Idx> {
+impl<A: Alphabet, C: Clone + Hash + Eq, Q: Clone> MutableTs<A, Q, C> {
     /// Creates a new transition system with the given alphabet.
     pub fn new(alphabet: A) -> Self {
         Self {
             alphabet,
-            states: Map::default(),
+            states: BTreeMap::default(),
         }
     }
 
@@ -44,13 +45,13 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> MutableTs<A, Q
     }
 
     /// Creates a `MutableTs` from the given alphabet and states.
-    pub(crate) fn from_parts(alphabet: A, states: Map<Idx, MutableTsState<A, Q, C, Idx>>) -> Self {
+    pub(crate) fn from_parts(alphabet: A, states: BTreeMap<Idx, MutableTsState<A, Q, C>>) -> Self {
         Self { alphabet, states }
     }
 
     /// Decomposes the `MutableTs` into its constituent parts.
     #[allow(clippy::type_complexity)]
-    pub(crate) fn into_parts(self) -> (A, Map<Idx, MutableTsState<A, Q, C, Idx>>) {
+    pub(crate) fn into_parts(self) -> (A, BTreeMap<Idx, MutableTsState<A, Q, C>>) {
         (self.alphabet, self.states)
     }
 
@@ -62,14 +63,17 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> MutableTs<A, Q
     {
         Self {
             alphabet,
-            states: (0..states)
-                .map(|i| {
-                    (
-                        i.into(),
-                        MutableTsState::new(<StateColor<Self> as Default>::default()),
-                    )
-                })
-                .collect(),
+            states:
+                (0..states)
+                    .map(|i| {
+                        (
+                            i.into(),
+                            MutableTsState::new_with_intial_id(
+                                <StateColor<Self> as Default>::default(),
+                            ),
+                        )
+                    })
+                    .collect(),
         }
     }
 
@@ -79,7 +83,7 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> MutableTs<A, Q
     }
 
     /// Returns a reference to the underlying statemap.
-    pub fn raw_state_map(&self) -> &Map<Idx, MutableTsState<A, Q, C, Idx>> {
+    pub fn raw_state_map(&self) -> &BTreeMap<Idx, MutableTsState<A, Q, C>> {
         &self.states
     }
 
@@ -108,8 +112,8 @@ impl<A: Alphabet, Idx: IndexType, C: Clone + Hash + Eq, Q: Clone> MutableTs<A, Q
     }
 }
 
-impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, Index: IndexType>
-    crate::transition_system::Shrinkable for MutableTs<A, Q, C, Index>
+impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq> crate::transition_system::Shrinkable
+    for MutableTs<A, Q, C>
 {
     fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Q> {
         self.mutablets_remove_state(state.to_index(self)?)
@@ -119,20 +123,13 @@ impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, Index: IndexType>
         source: impl Indexes<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let q = source.to_index(self)?;
-        self.states
-            .get_mut(&q)
-            .map(|s| s.remove_all_matching(q, matcher))
+        todo!()
     }
     fn remove_edge<'a>(
         &'a mut self,
         edge: crate::transition_system::EdgeRef<'a, Self>,
     ) -> Option<crate::transition_system::EdgeTuple<Self>> {
-        let q = edge.source();
-        self.states
-            .get_mut(&q)?
-            .remove_edge(edge.expression(), &edge.color(), edge.target())
-            .map(|(a, c, p)| (q, a, c, p))
+        todo!()
     }
 
     fn remove_edges_between_matching(
@@ -141,7 +138,12 @@ impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, Index: IndexType>
         target: impl Indexes<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        todo!()
+        let q = source.to_index(self)?;
+        let p = target.to_index(self)?;
+
+        let mut removed = vec![];
+
+        Some(removed)
     }
 
     fn remove_edges_between(
@@ -160,12 +162,12 @@ impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, Index: IndexType>
     }
 }
 
-impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone + Hash + Eq> MutableTs<A, Q, C, Idx> {
+impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> MutableTs<A, Q, C> {
     /// Returns an iterator over the [`EdgeIndex`]es of the edges leaving the given state.
     pub(crate) fn mutablets_edges_from(
         &self,
         source: Idx,
-    ) -> Option<impl Iterator<Item = (&'_ A::Expression, &'_ (Idx, C))> + '_> {
+    ) -> Option<impl Iterator<Item = &'_ (A::Expression, C, Idx)> + '_> {
         self.states.get(&source).map(|s| s.edges.iter())
     }
 
@@ -178,19 +180,30 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone + Hash + Eq> MutableTs<A, Q
 /// A state in a transition system. This stores the color of the state and the index of the
 /// first edge leaving the state.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct MutableTsState<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> {
+pub struct MutableTsState<A: Alphabet, Q, C: Hash + Eq> {
+    id: Idx,
     color: Q,
-    edges: Map<A::Expression, (Idx, C)>,
-    predecessors: Set<(Idx, A::Expression, C)>,
+    edges: Vec<(A::Expression, C, Idx)>,
+    predecessors: Vec<(Idx, A::Expression, C)>,
 }
 
-impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> MutableTsState<A, Q, C, Idx> {
-    /// Creates a new state with the given color.
-    pub fn new(color: Q) -> Self {
+impl<A: Alphabet, Q, C: Hash + Eq> MutableTsState<A, Q, C> {
+    pub fn new_with_intial_id(color: Q) -> Self {
         Self {
+            id: Idx::initial(),
             color,
-            edges: Map::default(),
-            predecessors: Set::default(),
+            edges: Default::default(),
+            predecessors: Default::default(),
+        }
+    }
+
+    /// Creates a new state with the given color.
+    pub fn new(id: Idx, color: Q) -> Self {
+        Self {
+            id,
+            color,
+            edges: Default::default(),
+            predecessors: Default::default(),
         }
     }
 
@@ -198,16 +211,54 @@ impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> MutableTsState<A, Q, C, Idx> 
         self.color = color;
     }
 
-    pub fn predecessors(&self) -> &Set<(Idx, A::Expression, C)> {
+    pub fn predecessors(&self) -> &[(Idx, A::Expression, C)] {
         &self.predecessors
     }
 
-    pub fn add_pre_edge(&mut self, from: Idx, on: A::Expression, color: C) -> bool {
-        self.predecessors.insert((from, on, color))
+    pub fn add_pre_edge(&mut self, from: Idx, on: A::Expression, color: C) {
+        debug_assert!(
+            !self
+                .predecessors
+                .iter()
+                .any(|(idx, e, c)| *idx == from && e == &on && c == &color),
+            "Predecessor edge already exists!"
+        );
+
+        self.predecessors.push((from, on, color))
     }
 
-    pub fn remove_pre_edge(&mut self, from: Idx, on: A::Expression, color: C) -> bool {
-        self.predecessors.remove(&(from, on, color))
+    pub(crate) fn remove_pre_edge(
+        &mut self,
+        from: Idx,
+        on: &A::Expression,
+        color: &C,
+    ) -> Option<(Idx, A::Expression, C)> {
+        if let Some(position) = self
+            .predecessors
+            .iter()
+            .position(|(idx, e, c)| *idx == from && e == on && c == color)
+        {
+            Some(self.predecessors.swap_remove(position))
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn remove_out_edge(
+        &mut self,
+        on: &A::Expression,
+        color: &C,
+        to: Idx,
+    ) -> Option<(A::Expression, C, Idx)> {
+        if let Some(position) = self
+            .edges
+            .iter()
+            .position(|(e, c, q)| *q == to && e == on && c == color)
+        {
+            Some(self.edges.swap_remove(position))
+        } else {
+            None
+        }
     }
 
     pub fn remove_incoming_edges_from(&mut self, target: Idx) {
@@ -215,62 +266,32 @@ impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> MutableTsState<A, Q, C, Idx> 
     }
 
     pub fn remove_outgoing_edges_to(&mut self, target: Idx) {
-        self.edges.retain(|_, (idx, _)| *idx != target);
+        self.edges.retain(|(_e, _c, q)| *q != target);
     }
 
-    pub fn edges(&self) -> impl Iterator<Item = (&A::Expression, &(Idx, C))> {
+    pub fn edges(&self) -> std::slice::Iter<'_, (A::Expression, C, Idx)> {
         self.edges.iter()
     }
 
-    pub fn edge_map(&self) -> &Map<A::Expression, (Idx, C)> {
+    pub fn edge_map(&self) -> &[(A::Expression, C, Idx)] {
         &self.edges
     }
 
     pub fn add_edge(&mut self, on: A::Expression, color: C, to: Idx) {
-        assert!(self.edges.insert(on, (to, color)).map(|(t, c)| (c, t)).is_none(), "Edge was overwritten! We should change the implementation to use a vec or multimap instead!");
+        debug_assert!(
+            !self
+                .edges
+                .iter()
+                .any(|(e, c, q)| e == &on && c == &color && *q == to),
+            "Edge already exists."
+        );
+
+        self.edges.push((on, color, to));
     }
 
-    pub fn remove_edge_matching(
-        &mut self,
-        m: impl Matcher<A::Expression>,
-    ) -> Option<(A::Expression, C, Idx)> {
-        let (on, _) = self.edges.iter().find(|(e, _)| m.matches(e))?;
-        let expr = on.clone();
-        self.edges
-            .remove(&expr)
-            .map(|(to, color)| (expr, color, to))
-    }
-
-    pub fn remove_all_matching(
-        &mut self,
-        source: Idx,
-        m: impl Matcher<A::Expression>,
-    ) -> Vec<(Idx, A::Expression, C, Idx)> {
-        let expressions: Vec<_> = self
-            .edges
-            .iter()
-            .filter_map(|(e, _)| if m.matches(e) { Some(e.clone()) } else { None })
-            .collect();
-        expressions
-            .into_iter()
-            .map(move |e| {
-                let (to, color) = self.edges.remove(&e).unwrap();
-                (source, e, color, to)
-            })
-            .collect()
-    }
-
-    pub fn remove_edge(
-        &mut self,
-        on: &A::Expression,
-        color: &C,
-        target: Idx,
-    ) -> Option<(A::Expression, C, Idx)> {
-        todo!()
-    }
-
-    pub fn recolor<P: Color>(self, color: P) -> MutableTsState<A, P, C, Idx> {
+    pub fn recolor<P: Color>(self, color: P) -> MutableTsState<A, P, C> {
         MutableTsState {
+            id: self.id,
             color,
             edges: self.edges,
             predecessors: self.predecessors,
@@ -283,15 +304,12 @@ impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> MutableTsState<A, Q, C, Idx> 
     }
 }
 
-impl<A: Alphabet, IdxTy: IndexType, Q: Clone, C: Clone + Hash + Eq> TransitionSystem
-    for MutableTs<A, Q, C, IdxTy>
-{
+impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> TransitionSystem for MutableTs<A, Q, C> {
     type StateColor = Q;
     type EdgeColor = C;
-    type StateIndex = IdxTy;
-    type EdgeRef<'this> = EdgeReference<'this, A::Expression, IdxTy, C> where Self: 'this;
-    type EdgesFromIter<'this> = MutableTsEdgesFrom<'this, A::Expression, IdxTy, C> where Self: 'this;
-    type StateIndices<'this> = std::iter::Cloned<std::collections::hash_map::Keys<'this, IdxTy, MutableTsState<A, Q, C, IdxTy>>> where Self: 'this;
+    type StateIndex = Idx;
+    type EdgeRef<'this> = EdgeReference<'this, A::Expression, Idx, C> where Self: 'this;
+    type StateIndices<'this> = std::iter::Cloned<std::collections::btree_map::Keys<'this, Idx, MutableTsState<A, Q, C>>> where Self: 'this;
 
     type Alphabet = A;
 
@@ -308,64 +326,60 @@ impl<A: Alphabet, IdxTy: IndexType, Q: Clone, C: Clone + Hash + Eq> TransitionSy
     }
 
     fn edges_from<X: Indexes<Self>>(&self, state: X) -> Option<Self::EdgesFromIter<'_>> {
-        let source = state.to_index(self)?;
-        Some(MutableTsEdgesFrom::new(
-            source,
-            self.raw_state_map()
-                .get(&source)
-                .map(|o| o.edge_map().iter())?,
-        ))
+        let q = state.to_index(self)?;
+        Some(EdgesFrom::new(q, self.states.get(&q).unwrap().edges.iter()))
     }
+    type EdgesFromIter<'this> = EdgesFrom<'this, A::Expression, Idx, C> where Self: 'this;
 }
 
 /// Specialized iterator over the edges that leave a given state in a [`MutableTs`].
-pub struct MutableTsEdgesFrom<'ts, E, Idx, C> {
-    edges: std::collections::hash_map::Iter<'ts, E, (Idx, C)>,
+pub struct EdgesFrom<'ts, E, Idx, C> {
+    edges: std::slice::Iter<'ts, (E, C, Idx)>,
     source: Idx,
 }
 
-impl<'ts, E, Idx, C> MutableTsEdgesFrom<'ts, E, Idx, C> {
+impl<'ts, E, Idx, C> EdgesFrom<'ts, E, Idx, C> {
     /// Creates a new instance from the given components.
-    pub fn new(source: Idx, edges: std::collections::hash_map::Iter<'ts, E, (Idx, C)>) -> Self {
+    pub fn new(source: Idx, edges: std::slice::Iter<'ts, (E, C, Idx)>) -> Self {
         Self { edges, source }
     }
 }
 
-impl<'ts, E, Idx: IndexType, C> Iterator for MutableTsEdgesFrom<'ts, E, Idx, C> {
+impl<'ts, E, Idx: IndexType, C> Iterator for EdgesFrom<'ts, E, Idx, C> {
     type Item = EdgeReference<'ts, E, Idx, C>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.edges
             .next()
-            .map(|(e, (t, c))| EdgeReference::new(self.source, e, c, *t))
+            .map(|(e, c, q)| EdgeReference::new(self.source, e, c, *q))
     }
 }
 
-impl<A, C, Q, Idx> std::fmt::Debug for MutableTs<A, Q, C, Idx>
+impl<A, C, Q> std::fmt::Debug for MutableTs<A, Q, C>
 where
     A: Alphabet,
     C: Debug + Clone + Hash + Eq,
     Q: Debug + Clone + Hash + Eq,
-    Idx: IndexType,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{}",
-            self.build_transition_table(
-                |idx, c| format!("{} : {:?}", idx.show(), c),
-                |edge| format!("{:?}->{}", edge.color(), edge.target().show())
-            )
-        )
+        // writeln!(
+        //     f,
+        //     "{}",
+        //     self.build_transition_table(
+        //         |idx, c| format!("{} : {:?}", idx.show(), c),
+        //         |edge| format!("{:?}->{}", edge.color(), edge.target().show())
+        //     )
+        // )
+        unimplemented!("Debug for MutableTs, shold be collection of edges")
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q, C, usize> {
+impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q, C> {
     /// Adds a state with given `color` to the transition system, returning the index of
     /// the new state.
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
-        let id = self.states.len();
-        let state = MutableTsState::new(color);
+        let id = self.states.len().into();
+        let state = MutableTsState::new(id, color);
         self.states.insert(id, state);
         id
     }
@@ -379,8 +393,8 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q,
         assert!(
             self.contains_state(q) && self.contains_state(p),
             "Source {} or target {} vertex does not exist in the graph.",
-            q,
-            p
+            q.show(),
+            p.show()
         );
         self.states
             .get_mut(&q)
@@ -409,7 +423,7 @@ impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq> ForAlphabet for Mu
     fn for_alphabet(from: A) -> Self {
         Self {
             alphabet: from,
-            states: Map::default(),
+            states: BTreeMap::default(),
         }
     }
 }

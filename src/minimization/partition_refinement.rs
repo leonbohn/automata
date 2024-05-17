@@ -30,7 +30,7 @@ where
         for sym in mm.symbols() {
             let mut splitter = Map::default();
             for q in mm.state_indices() {
-                if let Some(t) = mm.transition(q, sym) {
+                if let Some(t) = mm.edge(q, sym) {
                     if set.contains(&t.target()) {
                         splitter
                             .entry(t.color())
@@ -133,7 +133,7 @@ where
             let x = mm
                 .state_indices()
                 .filter(|q| {
-                    mm.transition(*q, sym)
+                    mm.edge(*q, sym)
                         .map(|t| a.contains(&t.target()))
                         .unwrap_or(false)
                 })

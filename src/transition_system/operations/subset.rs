@@ -58,10 +58,10 @@ pub struct SubsetConstruction<Ts: TransitionSystem> {
 }
 
 impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         let source = state.to_index(self)?;
         let (colorset, stateset): (Vec<Ts::EdgeColor>, StateSet<Ts>) = self
@@ -70,28 +70,29 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
             .get(source)?
             .iter()
             .flat_map(|q| {
-                self.ts.transitions_from(*q).filter_map(|(_q, a, c, p)| {
-                    if a == symbol {
-                        Some((c, p))
+                self.ts.edges_from(*q).unwrap().filter_map(|tt| {
+                    if matcher.matches(tt.expression()) {
+                        Some((tt.color(), tt.target()))
                     } else {
                         None
                     }
                 })
             })
             .unzip();
+        let expression = self
+            .expressions
+            .values()
+            .find(|e| matcher.matches(e))
+            .unwrap();
+
         if let Some(pos) = self.states.borrow().iter().position(|s| stateset.eq(s)) {
-            return Some(TransitionOwnedColor::new(
-                source,
-                self.expressions.get(&symbol).unwrap(),
-                colorset,
-                pos,
-            ));
+            return Some(TransitionOwnedColor::new(source, expression, colorset, pos));
         }
 
         self.states.borrow_mut().push(stateset);
         Some(TransitionOwnedColor::new(
             source,
-            self.expressions.get(&symbol).unwrap(),
+            expression,
             colorset,
             self.states.borrow().len(),
         ))

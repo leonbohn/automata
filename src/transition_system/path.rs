@@ -132,7 +132,7 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
     where
         D: Deterministic<StateColor = Q, EdgeColor = C, StateIndex = Idx, Alphabet = A>,
     {
-        let transition = ts.transition(self.end, symbol)?;
+        let transition = ts.edge(self.end, symbol)?;
         self.transitions
             .push((self.end, symbol, transition.color().clone()));
         self.end = transition.target();

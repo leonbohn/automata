@@ -144,7 +144,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let sym = self.it.next()?;
-        self.quot.transition(self.class, sym)
+        self.quot.edge(self.class, sym)
     }
 }
 
@@ -204,16 +204,16 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
     }
 }
 impl<D: Deterministic> Deterministic for Quotient<D> {
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         let origin = state.to_index(self)?;
         let (states, colors): (Set<_>, Vec<_>) = self
             .class_iter_by_id(origin)?
             .filter_map(|q| {
-                self.ts.transition(q, symbol).map(|tt| {
+                self.ts.edge(q, &matcher).map(|tt| {
                     (
                         self.find_id_by_state(tt.target()).expect("Unknown state"),
                         tt.color().clone(),
@@ -225,7 +225,17 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
         match states.len() {
             0 => None,
             1 => {
-                let expression = self.expressions.get(&symbol).unwrap();
+                let expression = self
+                    .expressions
+                    .iter()
+                    .find_map(|(_, expr)| {
+                        if matcher.matches(expr) {
+                            Some(expr)
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap();
                 Some(QuotientTransition {
                     source: origin,
                     expression,
@@ -238,7 +248,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
                     "{{{}}}",
                     states.iter().map(|idx| idx.to_string()).join(", ")
                 );
-                panic!("From {origin}|{} on symbol {}, we reach {} while precisely one state should be reached!", self.class_iter_by_id(origin).unwrap().map(|c| c.show()).join(", "), symbol.show(), string)
+                panic!("From {origin}|{} with matcher {:?}, we reach {} while precisely one state should be reached!", self.class_iter_by_id(origin).unwrap().map(|c| c.show()).join(", "), matcher, string)
             }
         }
     }
