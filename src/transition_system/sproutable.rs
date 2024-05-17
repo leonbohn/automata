@@ -285,7 +285,7 @@ mod tests {
         let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
         let q0 = ts.add_state(false);
         let q1 = ts.add_state(true);
-        assert_eq!(ts.transition(q0, 'a'), None);
+        assert_eq!(ts.edge(q0, 'a'), None);
         ts.add_edge((q0, 'a', q1));
         assert_eq!(ts.reached_state_index_from("a", q0), Some(q1));
     }

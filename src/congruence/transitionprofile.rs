@@ -158,7 +158,7 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
     where
         Ts: Deterministic<StateIndex = Idx, StateColor = Q, EdgeColor = C>,
     {
-        match ts.transition(self.0, symbol) {
+        match ts.edge(self.0, symbol) {
             Some(tt) => {
                 let target = tt.target();
                 let mut sc = Q::from_or_neutral(ts.state_color(target));

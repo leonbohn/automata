@@ -14,7 +14,7 @@ impl<S: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show> Symbol f
 
 /// Encapsulates that an [`Expression`] can be matched by some [`Symbol`], or by another expression.
 /// For simple [`CharAlphabet`]s, where expressions are single symbols, this is just equality.
-pub trait Matcher<E> {
+pub trait Matcher<E>: Debug {
     /// Returns if `self` matches the given expression.
     fn matches(&self, expression: &E) -> bool;
 }

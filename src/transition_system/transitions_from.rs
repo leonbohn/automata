@@ -13,7 +13,7 @@ impl<'a, Ts: Deterministic> Iterator for DeterministicEdgesFrom<'a, Ts> {
     fn next(&mut self) -> Option<Self::Item> {
         self.symbols
             .next()
-            .and_then(|sym| self.ts.transition(self.state, sym))
+            .and_then(|sym| self.ts.edge(self.state, sym))
     }
 }
 

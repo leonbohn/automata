@@ -1,5 +1,6 @@
 use std::hash::Hash;
 
+use hoars::Edge;
 use itertools::Itertools;
 
 use crate::math::Map;
@@ -35,46 +36,7 @@ pub type OmegaRunResult<A, Idx, Q, C> = Result<Lasso<A, Idx, Q, C>, Path<A, Idx,
 /// transition system implementations should be overridden. By default, they simply insert states
 /// and edges one by one and are therefore horribly inefficient.
 pub trait Deterministic: TransitionSystem {
-    /// For a given `state`, returns the unique edge that matches the given `symbol`. Panics if multiple
-    /// edges match the symbol. If the state does not exist or no edge matches the symbol, `None` is returned.
-    ///
-    /// # Example
-    /// ```
-    /// use automata::prelude::*;
-    /// let ts = TSBuilder::without_state_colors()
-    ///     .with_transitions([(0, 'a', Void, 1), (1, 'a', Void, 2), (2, 'a', Void, 0)])
-    ///     .into_right_congruence_bare(0);
-    /// assert_eq!(ts.transition(0, 'a').unwrap().target(), 1);
-    /// assert_eq!(ts.transition(1, 'a').unwrap().target(), 2);
-    /// assert_eq!(ts.transition(2, 'a').unwrap().target(), 0);
-    /// assert_eq!(ts.transition(0, 'b'), None);
-    /// assert_eq!(ts.transition(3, 'a'), None);
-    /// ```
-    fn transition<Idx: Indexes<Self>>(
-        &self,
-        state: Idx,
-        symbol: SymbolOf<Self>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        let state = state.to_index(self)?;
-        let mut it = self
-            .edges_from(state)
-            .expect("We know this state exists")
-            .filter(|e| e.expression().matched_by(symbol));
-        let first = it.next()?;
-        if let Some(second) = it.next() {
-            panic!(
-                "There are multiple edges matching {} from state {}, namely {} and {} and even {} more",
-                symbol.show(),
-                state.show(),
-                first.expression().show(),
-                second.expression().show(),
-                it.count()
-            );
-        }
-        Some(first)
-    }
-
-    /// Attempts to find the first edge that matches the given `expression` from the given `state`. If no
+    /// Attempts to find the first edge that matches the given `matcher` from the given `state`. If no
     /// suitable transition exists, `None` is returned. If more than one edge matches the expression, the
     /// method panics.
     ///
@@ -93,13 +55,13 @@ pub trait Deterministic: TransitionSystem {
     fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &EdgeExpression<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         let state = state.to_index(self)?;
         let mut it = self
             .edges_from(state)
             .expect("We know this state exists")
-            .filter(|e| e.expression() == expression);
+            .filter(|e| matcher.matches(e.expression()));
 
         let first = it.next()?;
         debug_assert!(
@@ -128,8 +90,7 @@ pub trait Deterministic: TransitionSystem {
         state: Idx,
         symbol: SymbolOf<Self>,
     ) -> Option<Self::StateIndex> {
-        self.transition(state.to_index(self)?, symbol)
-            .map(|t| t.target())
+        self.edge(state.to_index(self)?, symbol).map(|t| t.target())
     }
 
     /// Returns the color of an edge starting in the given `state` and labeled with the given
@@ -146,7 +107,7 @@ pub trait Deterministic: TransitionSystem {
             None,
             "There are multiple symbols for this expression"
         );
-        Some(self.transition(state.to_index(self)?, sym)?.color().clone())
+        Some(self.edge(state.to_index(self)?, sym)?.color().clone())
     }
 
     /// Attempts to find the minimal representative of the indexed `state`, which the the length-lexicographically
@@ -480,7 +441,7 @@ pub trait Deterministic: TransitionSystem {
                 )
             )];
             for sym in self.alphabet().universe() {
-                if let Some(edge) = self.transition(id, sym) {
+                if let Some(edge) = self.edge(id, sym) {
                     row.push(edge_decorator(edge));
                 } else {
                     row.push("-".to_string());
@@ -593,7 +554,8 @@ pub trait Deterministic: TransitionSystem {
         let (ts, map) = MutableTs::sprout_from_ts(self);
         (
             ts,
-            *map.get_by_left(&old_initial)
+            **map
+                .get_by_left(&old_initial)
                 .expect("Initial state did not get collected"),
         )
     }
@@ -644,7 +606,7 @@ pub trait Deterministic: TransitionSystem {
             let sink = ts.add_state(sink_state_color);
             for q in ts.state_indices() {
                 for sym in self.alphabet().universe() {
-                    if ts.transition(q, sym).is_none() {
+                    if ts.edge(q, sym).is_none() {
                         ts.add_edge((q, ts.make_expression(sym), sink_edge_color.clone(), sink));
                     }
                 }
@@ -740,48 +702,39 @@ pub trait Deterministic: TransitionSystem {
 }
 
 impl<D: Deterministic> Deterministic for &D {
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        D::transition(self, state.to_index(self)?, symbol)
+        D::edge(self, state.to_index(self)?, matcher)
     }
 }
 
 impl<D: Deterministic> Deterministic for &mut D {
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        D::transition(self, state.to_index(self)?, symbol)
+        D::edge(self, state.to_index(self)?, matcher)
     }
 }
 
-impl<A: Alphabet, IdType: IndexType, Q: Clone, C: Hash + Eq + Clone> Deterministic
-    for MutableTs<A, Q, C, IdType>
-{
-    fn edge_color<Idx: Indexes<Self>>(
+impl<A: Alphabet, Q: Clone, C: Hash + Eq + Clone> Deterministic for MutableTs<A, Q, C> {
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &EdgeExpression<Self>,
-    ) -> Option<EdgeColor<Self>> {
-        self.raw_state_map()
-            .get(&state.to_index(self)?)
-            .and_then(|o| o.edge_map().get(expression).map(|(_, c)| c.clone()))
-    }
-
-    fn transition<X: Indexes<Self>>(
-        &self,
-        state: X,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         let source = state.to_index(self)?;
-        self.raw_state_map()
-            .get(&source)
-            .and_then(|o| A::search_edge(o.edge_map(), symbol))
-            .map(|(e, (q, c))| crate::transition_system::EdgeReference::new(source, e, c, *q))
+        let mut it = self.edges_matching(source, matcher)?;
+        let out = Some(it.next()?);
+        debug_assert!(
+            it.next().is_none(),
+            "Not deterministic, {source} has mutliple edges on the same expression!"
+        );
+        out
     }
 }
 
@@ -803,15 +756,15 @@ where
         Some((left, right))
     }
 
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         let ProductIndex(l, r) = state.to_index(self)?;
 
-        let ll = self.0.transition(l, symbol)?;
-        let rr = self.1.transition(r, symbol)?;
+        let ll = self.0.edge(l, &matcher)?;
+        let rr = self.1.edge(r, matcher)?;
         Some(ProductTransition::new(
             ProductIndex(l, r),
             ll.expression(),
@@ -834,12 +787,12 @@ where
         DTS::from_parts(alphabet, states, edges)
     }
 
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        self.ts().transition(state.to_index(self)?, symbol)
+        self.ts().edge(state.to_index(self)?, matcher)
     }
 }
 
@@ -866,13 +819,13 @@ where
             .map(|c| (self.f())(c))
     }
 
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         Some(MappedTransition::new(
-            self.ts().transition(state.to_index(self)?, symbol)?,
+            self.ts().edge(state.to_index(self)?, matcher)?,
             self.f(),
         ))
     }
@@ -892,14 +845,14 @@ where
             .edge_color(state, expression)
             .filter(|_| (self.filter()).is_unmasked(state))
     }
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         let q = state.to_index(self)?;
         self.ts()
-            .transition(q, symbol)
+            .edge(q, matcher)
             .filter(|t| self.filter().is_unmasked(q) && self.filter().is_unmasked(t.target()))
     }
 }
@@ -910,13 +863,13 @@ where
     D: Clone,
     F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
-    fn transition<Idx: crate::transition_system::Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: crate::prelude::SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         Some(MappedEdge::new(
-            self.ts().transition(state.to_index(self)?, symbol)?,
+            self.ts().edge(state.to_index(self)?, matcher)?,
             state.to_index(self)?,
             self.f(),
         ))

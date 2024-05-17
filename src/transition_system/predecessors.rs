@@ -1,3 +1,4 @@
+use super::impls::Idx;
 use crate::prelude::*;
 
 use super::EdgeReference;
@@ -98,11 +99,9 @@ where
     }
 }
 
-impl<A: Alphabet, Id: IndexType, Q: Color, C: Color> PredecessorIterable
-    for MutableTs<A, Q, C, Id>
-{
-    type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, Id, C> where Self: 'this;
-    type EdgesToIter<'this> = BTSPredecessors<'this, A, C, Id>
+impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for MutableTs<A, Q, C> {
+    type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, Idx, C> where Self: 'this;
+    type EdgesToIter<'this> = BTSPredecessors<'this, A, C>
     where
         Self: 'this;
     fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
@@ -116,12 +115,12 @@ impl<A: Alphabet, Id: IndexType, Q: Color, C: Color> PredecessorIterable
 
 /// Iterator over the predecessors of a state in a BTS.
 #[derive(Clone)]
-pub struct BTSPredecessors<'a, A: Alphabet, C: Color, Idx: IndexType> {
-    it: std::collections::hash_set::Iter<'a, (Idx, A::Expression, C)>,
+pub struct BTSPredecessors<'a, A: Alphabet, C: Color> {
+    it: std::slice::Iter<'a, (Idx, A::Expression, C)>,
     state: Idx,
 }
 
-impl<'a, A: Alphabet, C: Color, Idx: IndexType> Iterator for BTSPredecessors<'a, A, C, Idx> {
+impl<'a, A: Alphabet, C: Color> Iterator for BTSPredecessors<'a, A, C> {
     type Item = EdgeReference<'a, A::Expression, Idx, C>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -131,12 +130,9 @@ impl<'a, A: Alphabet, C: Color, Idx: IndexType> Iterator for BTSPredecessors<'a,
     }
 }
 
-impl<'a, A: Alphabet, C: Color, Idx: IndexType> BTSPredecessors<'a, A, C, Idx> {
+impl<'a, A: Alphabet, C: Color> BTSPredecessors<'a, A, C> {
     /// Creates a new instance from an iterator and a state.
-    pub fn new(
-        it: std::collections::hash_set::Iter<'a, (Idx, A::Expression, C)>,
-        state: Idx,
-    ) -> Self {
+    pub fn new(it: std::slice::Iter<'a, (Idx, A::Expression, C)>, state: Idx) -> Self {
         Self { it, state }
     }
 }

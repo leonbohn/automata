@@ -369,7 +369,7 @@ where
         let start = std::time::Instant::now();
 
         let (mut ts, initial) = self.collect_hash_ts_pointed();
-        let out = ts.clone();
+        let out = self.collect_dts_pointed();
 
         let mut recoloring = Vec::new();
         let mut remove_states = Vec::new();
@@ -405,10 +405,10 @@ where
                         for edge in ts.edges_from(*state).unwrap() {
                             trace!(
                                 "recolouring and removing {} --{}|{}--> {} with priority {}",
-                                state,
+                                state.show(),
                                 edge.expression().show(),
                                 edge.color().show(),
-                                edge.target(),
+                                edge.target().show(),
                                 priority
                             );
                             recoloring.push(((*state, edge.expression().clone()), priority));
@@ -439,10 +439,10 @@ where
                 {
                     trace!(
                         "recolouring and removing {} --{}|{}--> {} with priority {}",
-                        q,
+                        q.show(),
                         a.show(),
                         c.show(),
-                        p,
+                        p.show(),
                         priority
                     );
                     recoloring.push(((*q, a.clone()), priority));
@@ -456,17 +456,18 @@ where
         }
 
         let ret = out
+            .0
             .map_edge_colors_full(|q, e, _, _| {
                 let Some(c) = recoloring
                     .iter()
-                    .find(|((p, f), _)| *p == q && f == e)
+                    .find(|((p, f), _)| usize::from(*p) == q && f == e)
                     .map(|(_, c)| *c)
                 else {
                     panic!("Could not find recoloring for edge ({}, {:?})", q, e);
                 };
                 c
             })
-            .with_initial(initial)
+            .with_initial(out.1)
             .collect_dpa();
 
         info!("normalizing DPA took {} μs", start.elapsed().as_micros());
