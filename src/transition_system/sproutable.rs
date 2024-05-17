@@ -84,8 +84,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex;
 
-    /// Adds a new edge to the transition system. The method returns the index of the source state
-    /// and the color of the edge.
+    /// Adds a new edge to the transition system.
     ///
     /// The details of the edge are given as a type that implements [`IntoEdgeTuple`]. This allows
     /// for a more flexible way of adding edges, as the method can be called with a tuple, a struct
@@ -104,7 +103,7 @@ pub trait Sproutable: TransitionSystem {
     /// let edge = ts.add_edge((q0, 'a', q1));
     /// assert_eq!(edge, Some((q0, Void)));
     /// ```
-    fn add_edge<E>(&mut self, t: E) -> Option<(Self::StateIndex, Self::EdgeColor)>
+    fn add_edge<E>(&mut self, t: E)
     where
         E: IntoEdgeTuple<Self>;
 
@@ -237,14 +236,12 @@ pub trait Sproutable: TransitionSystem {
                 seen.insert(self.alphabet().expression_to_index(edge.expression()));
             }
             for missing in (0..self.alphabet().size()).filter(|i| !seen.contains(*i)) {
-                assert!(self
-                    .add_edge((
-                        state,
-                        self.alphabet().expression_from_index(missing),
-                        edge_color.clone(),
-                        sink,
-                    ))
-                    .is_none());
+                self.add_edge((
+                    state,
+                    self.alphabet().expression_from_index(missing),
+                    edge_color.clone(),
+                    sink,
+                ))
             }
         }
     }
@@ -295,8 +292,9 @@ mod tests {
         let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
         let q0 = ts.add_state(false);
         let q1 = ts.add_state(true);
-        let edge = ts.add_edge((q0, 'a', q1));
-        assert_eq!(edge, Some((q0, Void)));
+        assert_eq!(ts.transition(q0, 'a'), None);
+        ts.add_edge((q0, 'a', q1));
+        assert_eq!(ts.reached_state_index_from("a", q0), Some(q1));
     }
 
     #[test]
