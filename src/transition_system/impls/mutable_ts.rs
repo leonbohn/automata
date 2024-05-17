@@ -212,8 +212,8 @@ impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> MutableTsState<A, Q, C, Idx> 
         &self.edges
     }
 
-    pub fn add_edge(&mut self, on: A::Expression, color: C, to: Idx) -> Option<(Idx, C)> {
-        self.edges.insert(on, (to, color))
+    pub fn add_edge(&mut self, on: A::Expression, color: C, to: Idx) {
+        assert!(self.edges.insert(on, (to, color)).map(|(t, c)| (c, t)).is_none(), "Edge was overwritten! We should change the implementation to use a vec or multimap instead!");
     }
 
     pub fn remove_edge_matching(
@@ -350,7 +350,7 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q,
         id
     }
 
-    fn add_edge<E>(&mut self, t: E) -> Option<(Self::StateIndex, Self::EdgeColor)>
+    fn add_edge<E>(&mut self, t: E)
     where
         E: IntoEdgeTuple<Self>,
     {
@@ -366,7 +366,7 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q,
             .get_mut(&q)
             .expect("We know this exists")
             .add_pre_edge(q, a.clone(), c.clone());
-        self.states.get_mut(&q).and_then(|o| o.add_edge(a, c, p))
+        self.states.get_mut(&q).map(|o| o.add_edge(a, c, p));
     }
 
     fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(

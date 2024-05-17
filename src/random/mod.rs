@@ -16,7 +16,7 @@ pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, usize) {
     let alphabet = CharAlphabet::of_size(symbols);
     let mut dts = DTS::for_alphabet(alphabet.clone());
 
-    let mut current = dts.add_state(());
+    let mut current = dts.add_state(Void);
     let mut symbol_position = 0;
 
     'outer: loop {

@@ -97,7 +97,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for DTS<A, Q, C> {
         self.0.set_state_color(index, color)
     }
 
-    fn add_edge<E>(&mut self, t: E) -> Option<(Self::StateIndex, Self::EdgeColor)>
+    fn add_edge<E>(&mut self, t: E)
     where
         E: IntoEdgeTuple<Self>,
     {

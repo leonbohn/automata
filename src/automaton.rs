@@ -238,7 +238,7 @@ where
         )
     }
 
-    fn add_edge<E>(&mut self, t: E) -> Option<(Self::StateIndex, Self::EdgeColor)>
+    fn add_edge<E>(&mut self, t: E)
     where
         E: IntoEdgeTuple<Self>,
     {

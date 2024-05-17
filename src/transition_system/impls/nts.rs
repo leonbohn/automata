@@ -63,7 +63,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
         self.states[index].color = color.into();
     }
 
-    fn add_edge<E>(&mut self, t: E) -> Option<(Self::StateIndex, Self::EdgeColor)>
+    fn add_edge<E>(&mut self, t: E)
     where
         E: IntoEdgeTuple<Self>,
     {
@@ -81,7 +81,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
             self.states[q].first_edge = Some(edge_id);
         }
         self.edges.push(edge);
-        None
     }
 
     fn remove_edges<X: Indexes<Self>>(
