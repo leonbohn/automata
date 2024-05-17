@@ -216,7 +216,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     /// Note, that in comparison to [`Self::with_transitions`], this method adds **edges** and so the individual
     /// elements that are added must store/provide [`Expression`]s instead of [`Symbol`]s.
     ///
-    /// This method accepts any iterable yielding objects that implement [`IntoEdge`] for the stored color `C`.
+    /// This method accepts any iterable yielding objects that implement [`IntoEdgeTuple`] for the stored color `C`.
     /// If the desired edge color is [`Void`], then we may simply omit it from the tuples. The only restriction
     /// on this is that either all or none of the yielded tuples have a color.
     ///

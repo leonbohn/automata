@@ -7,7 +7,7 @@
 pub mod prelude {
     pub use super::{
         alphabet,
-        alphabet::{CharAlphabet, Expression, Symbol},
+        alphabet::{CharAlphabet, Expression, Matcher, Symbol},
         automaton::{
             Automaton, BuchiCondition, FiniteSemantics, IntoDBA, IntoDFA, IntoDMA, IntoDPA,
             IntoDRA, IntoMealyMachine, IntoMooreMachine, MealyMachine, MealySemantics,

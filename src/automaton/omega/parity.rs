@@ -379,7 +379,7 @@ where
         'outer: loop {
             for (source, expression) in remove_edges.drain(..) {
                 assert!(
-                    ts.remove_first_matching(source, expression).is_some(),
+                    ts.remove_edges_from_matching(source, expression).is_some(),
                     "We must be able to actually remove these edges"
                 );
             }

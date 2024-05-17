@@ -14,23 +14,23 @@ impl<S: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show> Symbol f
 
 /// Encapsulates that an [`Expression`] can be matched by some [`Symbol`], or by another expression.
 /// For simple [`CharAlphabet`]s, where expressions are single symbols, this is just equality.
-pub trait Matches<E> {
+pub trait Matcher<E> {
     /// Returns if `self` matches the given expression.
     fn matches(&self, expression: &E) -> bool;
 }
 
-impl<X: Eq> Matches<X> for X {
-    fn matches(&self, expression: &X) -> bool {
-        self == expression
+impl<E, M: Matcher<E>> Matcher<E> for &M {
+    fn matches(&self, expression: &E) -> bool {
+        M::matches(*self, expression)
     }
 }
 
 /// An expression is used to label edges of a [`crate::transition_system::TransitionSystem`]. For [`CharAlphabet`]
 /// alphabets, an expression is simply a single symbol, whereas for a propositional alphabet, an expression
 /// is a propositional formula over the atomic propositions. See propositional for more details.
-pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show {
+pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show + Matcher<Self> {
     /// The type of symbols that this expression matches.
-    type S: Symbol + Matches<Self>;
+    type S: Symbol + Matcher<Self>;
     /// Type of iterator over the concrete symbols matched by this expression.
     type SymbolsIter<'this>: Iterator<Item = Self::S>
     where
@@ -54,7 +54,7 @@ pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show {
 /// An alphabet abstracts a collection of [`Symbol`]s and complex [`Expression`]s over those.
 pub trait Alphabet: Clone {
     /// The type of symbols in this alphabet.
-    type Symbol: Symbol + Matches<Self::Expression>;
+    type Symbol: Symbol + Matcher<Self::Expression>;
     /// The type of expressions in this alphabet.
     type Expression: Expression<S = Self::Symbol>;
 
@@ -164,70 +164,6 @@ impl std::ops::Index<usize> for CharAlphabet {
     }
 }
 
-/// A special type of [`Alphabet`], which has no symbols.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug, PartialOrd, Ord)]
-pub struct Empty;
-
-impl std::fmt::Display for Empty {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "->")
-    }
-}
-
-impl Alphabet for Empty {
-    type Symbol = Empty;
-
-    type Expression = Empty;
-
-    fn search_edge<X>(
-        map: &Map<Self::Expression, X>,
-        _sym: Self::Symbol,
-    ) -> Option<(&Self::Expression, &X)> {
-        map.iter().next()
-    }
-
-    fn overlapping(&self, _left: &Self::Expression, _right: &Self::Expression) -> bool {
-        false
-    }
-
-    type Universe<'this> = std::iter::Empty<Empty>
-    where
-        Self: 'this;
-
-    fn universe(&self) -> Self::Universe<'_> {
-        std::iter::empty()
-    }
-
-    fn contains(&self, _symbol: Self::Symbol) -> bool {
-        true
-    }
-    fn size(&self) -> usize {
-        0
-    }
-
-    fn make_expression(&self, _symbol: Self::Symbol) -> Self::Expression {
-        Empty
-    }
-}
-
-impl Show for Empty {
-    fn show(&self) -> String {
-        panic!("trying to show empty thing")
-    }
-}
-impl Expression for Empty {
-    type S = Empty;
-    type SymbolsIter<'this> = std::iter::Empty<Empty> where Self: 'this;
-
-    fn symbols(&self) -> Self::SymbolsIter<'_> {
-        std::iter::empty()
-    }
-
-    fn matched_by(&self, _: Empty) -> bool {
-        true
-    }
-}
-
 /// Helper macro for creating a [`CharAlphabet`] alphabet. Is called simply with a list of symbols
 /// that are separated by commata.
 ///
@@ -263,6 +199,12 @@ impl CharAlphabet {
         I: IntoIterator<Item = char>,
     {
         Self(symbols.into_iter().collect())
+    }
+}
+
+impl Matcher<char> for char {
+    fn matches(&self, expression: &char) -> bool {
+        self == expression
     }
 }
 
@@ -345,6 +287,12 @@ impl Alphabet for CharAlphabet {
 #[derive(Clone, Debug)]
 pub struct Fixed<S: Symbol, const N: usize>([S; N]);
 
+impl Matcher<usize> for usize {
+    fn matches(&self, expression: &usize) -> bool {
+        self == expression
+    }
+}
+
 impl Expression for usize {
     type S = usize;
     type SymbolsIter<'this> = std::iter::Once<usize> where Self: 'this;
@@ -365,7 +313,7 @@ impl<S: Symbol, const N: usize> Fixed<S, N> {
     }
 }
 
-impl<S: Symbol + Expression<S = S>, const N: usize> Alphabet for Fixed<S, N> {
+impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> Alphabet for Fixed<S, N> {
     type Symbol = S;
 
     type Expression = S;
@@ -426,6 +374,12 @@ impl InvertibleChar {
     /// Returns true if this symbol is inverted.
     pub fn is_inverted(&self) -> bool {
         self.1
+    }
+}
+
+impl Matcher<InvertibleChar> for InvertibleChar {
+    fn matches(&self, expression: &InvertibleChar) -> bool {
+        self == expression
     }
 }
 
