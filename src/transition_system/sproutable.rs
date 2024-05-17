@@ -107,13 +107,6 @@ pub trait Sproutable: TransitionSystem {
     where
         E: IntoEdgeTuple<Self>;
 
-    /// Removes the transition from the state `from` to the state `to` on the given expression.
-    /// Returns `true` if the transition existed and was removed, `false` otherwise.
-    fn remove_edges<X: Indexes<Self>>(
-        &mut self,
-        from: X,
-        on: <Self::Alphabet as Alphabet>::Expression,
-    ) -> bool;
     /// Builds a new transition system by collecting all states and transitions present in another.
     /// The method returns the new transition system and a [bijective mapping](`Bijection`) between the old and new
     /// state indices.

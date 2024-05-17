@@ -244,17 +244,6 @@ where
     {
         self.ts.add_edge(t.into_edge_tuple())
     }
-
-    fn remove_edges<X: Indexes<Self>>(
-        &mut self,
-        from: X,
-        on: <Self::Alphabet as Alphabet>::Expression,
-    ) -> bool {
-        let Some(from) = from.to_index(self) else {
-            return false;
-        };
-        self.ts.remove_edges(from, on)
-    }
 }
 
 impl<D: TransitionSystem, A, const OMEGA: bool> TransitionSystem for Automaton<D, A, OMEGA> {

@@ -67,7 +67,7 @@ pub mod predecessors;
 /// Internally, a transition system is represented as a graph, where the states are the nodes and the
 /// transitions are the edges. However, the transitions are not the same as the edges.
 /// Both store the source and target vertex as well as the color, however an edge is labelled
-/// with an expression, while a transition is labelled with an actual symbol (that [`Alphabet::matches`]
+/// with an expression, while a transition is labelled with an actual symbol (that [`Matches::matches`]
 /// the expression). So a transition is a concrete edge that is taken (usually by the run on a word), while
 /// an edge may represent any different number of transitions.
 pub trait TransitionSystem: Sized {
@@ -195,31 +195,18 @@ pub trait TransitionSystem: Sized {
 
     /// Returns an iterator over all transitions that start in the given `state` and whose expression
     /// matches the given `sym`. If the state does not exist, `None` is returned.
-    fn edges_matching<Idx: Indexes<Self>>(
+    fn edges_matching(
         &self,
-        state: Idx,
-        sym: SymbolOf<Self>,
-    ) -> Option<
-        impl Iterator<
-            Item = (
-                Self::StateIndex,
-                &EdgeExpression<Self>,
-                Self::EdgeColor,
-                Self::StateIndex,
-            ),
-        >,
-    >
+        state: impl Indexes<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<impl Iterator<Item = EdgeRef<'_, Self>>>
     where
         EdgeColor<Self>: Clone,
     {
-        let idx = state.to_index(self)?;
-        Some(self.edges_from(state)?.filter_map(move |t| {
-            if t.expression().matched_by(sym) {
-                Some((idx, t.expression(), t.color().clone(), t.target()))
-            } else {
-                None
-            }
-        }))
+        Some(
+            self.edges_from(state)?
+                .filter(move |t| matcher.matches(t.expression())),
+        )
     }
 
     /// Checks whether `self` is complete, meaning every state has a transition for every symbol

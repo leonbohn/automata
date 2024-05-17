@@ -1,7 +1,7 @@
 use crate::{math::Map, math::Set, prelude::*, transition_system::EdgeReference};
 use std::{fmt::Debug, hash::Hash};
 
-use self::alphabet::Matches;
+use self::alphabet::Matcher;
 
 /// An implementation of a transition system with states of type `Q` and colors of type `C`. It stores
 /// the states and edges in a vector, which allows for fast access and iteration. The states and edges
@@ -114,35 +114,49 @@ impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, Index: IndexType>
     fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Q> {
         self.mutablets_remove_state(state.to_index(self)?)
     }
-    fn remove_all_matching(
+    fn remove_edges_from_matching(
         &mut self,
         source: impl Indexes<Self>,
-        matcher: impl Matches<EdgeExpression<Self>>,
-    ) -> Option<
-        Set<(
-            EdgeExpression<Self>,
-            EdgeColor<Self>,
-            crate::transition_system::StateIndex<Self>,
-        )>,
-    > {
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
         let q = source.to_index(self)?;
         self.states
             .get_mut(&q)
-            .map(|s| s.remove_all_matching(matcher))
+            .map(|s| s.remove_all_matching(q, matcher))
     }
-    fn remove_first_matching(
+    fn remove_edge<'a>(
+        &'a mut self,
+        edge: crate::transition_system::EdgeRef<'a, Self>,
+    ) -> Option<crate::transition_system::EdgeTuple<Self>> {
+        let q = edge.source();
+        self.states
+            .get_mut(&q)?
+            .remove_edge(edge.expression(), &edge.color(), edge.target())
+            .map(|(a, c, p)| (q, a, c, p))
+    }
+
+    fn remove_edges_between_matching(
         &mut self,
         source: impl Indexes<Self>,
-        matcher: impl Matches<EdgeExpression<Self>>,
-    ) -> Option<(
-        EdgeExpression<Self>,
-        EdgeColor<Self>,
-        crate::transition_system::StateIndex<Self>,
-    )> {
-        let q = source.to_index(self)?;
-        self.states
-            .get_mut(&q)
-            .and_then(|s| s.remove_edge_matching(matcher))
+        target: impl Indexes<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
+    }
+
+    fn remove_edges_between(
+        &mut self,
+        source: impl Indexes<Self>,
+        target: impl Indexes<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
+    }
+
+    fn remove_edges_from(
+        &mut self,
+        source: impl Indexes<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
     }
 }
 
@@ -218,7 +232,7 @@ impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> MutableTsState<A, Q, C, Idx> 
 
     pub fn remove_edge_matching(
         &mut self,
-        m: impl Matches<A::Expression>,
+        m: impl Matcher<A::Expression>,
     ) -> Option<(A::Expression, C, Idx)> {
         let (on, _) = self.edges.iter().find(|(e, _)| m.matches(e))?;
         let expr = on.clone();
@@ -229,8 +243,9 @@ impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> MutableTsState<A, Q, C, Idx> 
 
     pub fn remove_all_matching(
         &mut self,
-        m: impl Matches<A::Expression>,
-    ) -> Set<(A::Expression, C, Idx)> {
+        source: Idx,
+        m: impl Matcher<A::Expression>,
+    ) -> Vec<(Idx, A::Expression, C, Idx)> {
         let expressions: Vec<_> = self
             .edges
             .iter()
@@ -240,13 +255,18 @@ impl<A: Alphabet, Q, C: Hash + Eq, Idx: IndexType> MutableTsState<A, Q, C, Idx> 
             .into_iter()
             .map(move |e| {
                 let (to, color) = self.edges.remove(&e).unwrap();
-                (e, color, to)
+                (source, e, color, to)
             })
             .collect()
     }
 
-    pub fn remove_edge(&mut self, on: &A::Expression) -> Option<(Idx, C)> {
-        self.edges.remove(on)
+    pub fn remove_edge(
+        &mut self,
+        on: &A::Expression,
+        color: &C,
+        target: Idx,
+    ) -> Option<(A::Expression, C, Idx)> {
+        todo!()
     }
 
     pub fn recolor<P: Color>(self, color: P) -> MutableTsState<A, P, C, Idx> {
@@ -382,28 +402,6 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q,
             .get_mut(&index)
             .expect("State must exist")
             .set_color(color.into());
-    }
-
-    fn remove_edges<X: Indexes<Self>>(
-        &mut self,
-        from: X,
-        on: <Self::Alphabet as Alphabet>::Expression,
-    ) -> bool {
-        let Some(from) = from.to_index(self) else {
-            return false;
-        };
-        let target = self.states.get_mut(&from).and_then(|o| o.remove_edge(&on));
-        if let Some((target, color)) = target {
-            let removed = self
-                .states
-                .get_mut(&target)
-                .expect("Something must have gone wrong...")
-                .remove_pre_edge(from, on, color);
-            debug_assert!(removed);
-            true
-        } else {
-            false
-        }
     }
 }
 

@@ -1,8 +1,8 @@
-use crate::{math::Set, prelude::*};
+use crate::prelude::*;
 
-use self::alphabet::Matches;
+use self::alphabet::Matcher;
 
-use super::StateIndex;
+use super::{EdgeRef, EdgeTuple};
 
 /// Encapsulates the ability to remove states, edges, and transitions from a transition system.
 pub trait Shrinkable: TransitionSystem {
@@ -23,25 +23,41 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor>;
 
-    /// Removes the first edge from the transition system that originates in `source` and matches the given
-    /// `crate::prelude::Expression`. The call returns a pair consisting of the color and target of the removed edge.
-    /// If no suitable edge is present, returns `None`.
+    /// Removes all transitions originating in and a given state whose expression is matched by the given [`Matcher`].
+    /// Returns a [`Set`] of [`EdgeTuple`]s that were removed, if the state exists and `None` otherwise.
     ///
-    /// This method expects to identify the edge that should be removed based on its [`crate::prelude::Expression`], for
-    /// a method that identifies the edge based on its target, see [`Self::remove_transitions`].
-    fn remove_first_matching(
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let q0 = ts.add_state(false);
+    /// let q1 = ts.add_state(true);
+    /// let edge = ts.add_edge((q0, 'a', q1));
+    /// assert_eq!(ts.reached_state_index_from(q0, "a"), Some(q1));
+    /// assert_eq!(ts.remove_all_edges_matching(q0, 'a'), Some(vec![('a', None, q1)]));
+    /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
+    /// ```
+    fn remove_edges_from_matching(
         &mut self,
         source: impl Indexes<Self>,
-        matcher: impl Matches<EdgeExpression<Self>>,
-    ) -> Option<(EdgeExpression<Self>, EdgeColor<Self>, StateIndex<Self>)>;
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<EdgeTuple<Self>>>;
 
-    /// Removes **all** transitions from the transition system that originate in `source` and match the given
-    /// `symbol`. The call returns a [`Set`] of triples, each consisting of the expression, color, and target of
-    /// the removed transition. If no suitable transitions are present, returns `None`.
-    #[allow(clippy::type_complexity)]
-    fn remove_all_matching(
+    fn remove_edges_between_matching(
         &mut self,
         source: impl Indexes<Self>,
-        matcher: impl Matches<EdgeExpression<Self>>,
-    ) -> Option<Set<(EdgeExpression<Self>, EdgeColor<Self>, StateIndex<Self>)>>;
+        target: impl Indexes<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<EdgeTuple<Self>>>;
+
+    fn remove_edges_between(
+        &mut self,
+        source: impl Indexes<Self>,
+        target: impl Indexes<Self>,
+    ) -> Option<Vec<EdgeTuple<Self>>>;
+
+    fn remove_edges_from(&mut self, source: impl Indexes<Self>) -> Option<Vec<EdgeTuple<Self>>>;
+
+    fn remove_edge<'a>(&'a mut self, edge: EdgeRef<'a, Self>) -> Option<EdgeTuple<Self>>;
 }

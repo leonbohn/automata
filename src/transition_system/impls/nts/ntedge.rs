@@ -13,6 +13,17 @@ pub struct NTEdge<E, C> {
     pub(super) next: Option<usize>,
 }
 
+impl<A: Alphabet, Q: Clone, C: Clone> IntoEdgeTuple<NTS<A, Q, C>> for NTEdge<A::Expression, C> {
+    fn into_edge_tuple(self) -> crate::transition_system::EdgeTuple<NTS<A, Q, C>> {
+        (
+            self.source,
+            self.expression.clone(),
+            self.color.clone(),
+            self.target,
+        )
+    }
+}
+
 impl<'a, E, C: Clone> IsEdge<'a, E, usize, C> for &'a NTEdge<E, C> {
     fn target(&self) -> usize {
         self.target

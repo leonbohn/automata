@@ -103,15 +103,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for DTS<A, Q, C> {
     {
         self.0.add_edge(t.into_edge_tuple())
     }
-
-    fn remove_edges<X>(&mut self, from: X, on: <Self::Alphabet as Alphabet>::Expression) -> bool
-    where
-        X: Indexes<Self>,
-    {
-        from.to_index(self)
-            .map(|idx| self.0.remove_edges(idx, on))
-            .unwrap_or(false)
-    }
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone> DTS<A, Q, C> {

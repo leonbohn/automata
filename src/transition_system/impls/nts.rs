@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, hash::Hash};
 
-use crate::{math::Set, prelude::*, Void};
+use crate::{math::Set, prelude::*, transition_system::Shrinkable, Void};
 use itertools::Itertools;
 
 mod ntstate;
@@ -82,21 +82,57 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
         }
         self.edges.push(edge);
     }
+}
 
-    fn remove_edges<X: Indexes<Self>>(
+impl<A: Alphabet, Q: Clone, C: Clone> Shrinkable for NTS<A, Q, C> {
+    fn remove_edges_from_matching(
         &mut self,
-        from: X,
-        on: <Self::Alphabet as Alphabet>::Expression,
-    ) -> bool {
-        let Some(from) = from.to_index(self) else {
-            return false;
+        source: impl Indexes<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        let Some(from) = source.to_index(self) else {
+            return None;
         };
-        let mut b = false;
-        while let Some(pos) = self.edge_position(from, &on) {
-            self.remove_edge(from, pos);
-            b = true;
+
+        let mut out = vec![];
+        while let Some(pos) = self.edge_position(from, &matcher) {
+            let edge = self.remove_edge(from, pos);
+            out.push(IntoEdgeTuple::<Self>::into_edge_tuple(edge));
         }
-        b
+        Some(out)
+    }
+    fn remove_edge<'a>(
+        &'a mut self,
+        edge: crate::transition_system::EdgeRef<'a, Self>,
+    ) -> Option<crate::transition_system::EdgeTuple<Self>> {
+        todo!()
+    }
+    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor> {
+        todo!()
+    }
+
+    fn remove_edges_between_matching(
+        &mut self,
+        source: impl Indexes<Self>,
+        target: impl Indexes<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
+    }
+
+    fn remove_edges_between(
+        &mut self,
+        source: impl Indexes<Self>,
+        target: impl Indexes<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
+    }
+
+    fn remove_edges_from(
+        &mut self,
+        source: impl Indexes<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
     }
 }
 
@@ -168,17 +204,17 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
         unimplemented!("This method is not yet implemented")
     }
 
-    fn edge_position(&self, from: usize, on: &A::Expression) -> Option<usize> {
+    fn edge_position(&self, from: usize, matcher: impl Matcher<A::Expression>) -> Option<usize> {
         let mut idx = self.states.get(from)?.first_edge?;
         loop {
             // FIXME: Make this be a match
-            if (&self.edges[idx]).expression() == on {
+            if matcher.matches((&self.edges[idx]).expression()) {
                 return Some(idx);
             }
             idx = self.edges[idx].next?;
         }
     }
-    fn remove_edge(&mut self, from: usize, idx: usize) {
+    fn remove_edge(&mut self, from: usize, idx: usize) -> &NTEdge<A::Expression, C> {
         assert!(idx < self.edges.len());
 
         let pred = self.edges[idx].prev;
@@ -187,17 +223,18 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
         if self.states[from].first_edge == Some(idx) {
             assert!(pred.is_none());
             self.states[from].first_edge = succ;
-            return;
+        } else {
+            assert!(
+                pred.is_some(),
+                "This must exist, otherwise we would be first edge"
+            );
+            if succ.is_some() {
+                self.edges[succ.unwrap()].prev = pred;
+            }
+            self.edges[pred.unwrap()].next = succ;
         }
 
-        assert!(
-            pred.is_some(),
-            "This must exist, otherwise we would be first edge"
-        );
-        if succ.is_some() {
-            self.edges[succ.unwrap()].prev = pred;
-        }
-        self.edges[pred.unwrap()].next = succ;
+        return &self.edges[idx];
     }
     /// Builds a new non-deterministic transition system for the given alphabet with a specified capacity.
     pub fn with_capacity(alphabet: A, cap: usize) -> Self {
