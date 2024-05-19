@@ -147,7 +147,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
             match map.insert(cur, count) {
                 None => {
                     count += 1;
-                    cur = cong.reached_state_index_from(self.cycle(), cur)?;
+                    cur = cong.reached_state_index_from(cur, self.cycle())?;
                 }
                 Some(i) => {
                     // the spoke is the spoke of self plus `i` times the cycle, while the

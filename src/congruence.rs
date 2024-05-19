@@ -95,11 +95,11 @@ pub trait Congruence: Deterministic + Pointed {
         Automaton::from_pointed(self)
     }
     /// Collects the transition system representing `self` and builds a new [`MealyMachine`].
-    fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, EdgeColor<Self>>
+    fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
     where
         EdgeColor<Self>: Color,
     {
-        let (ts, initial) = self.erase_state_colors().collect_dts_pointed();
+        let (ts, initial) = self.collect_dts_pointed();
         MealyMachine::from_parts(ts, initial)
     }
 
@@ -186,7 +186,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
             panic!("The class {} is not labeled!", idx);
         };
         if let Some(q) = self.get(elem) {
-            self.reached_state_index_from(mr, q) == Some(q)
+            self.reached_state_index_from(q, mr) == Some(q)
         } else {
             false
         }

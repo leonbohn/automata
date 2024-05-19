@@ -27,8 +27,8 @@ pub struct NTS<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
     edges: Vec<NTEdge<A::Expression, C>>,
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet for NTS<A, Q, C> {
-    fn for_alphabet(alphabet: Self::Alphabet) -> Self {
+impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet<A> for NTS<A, Q, C> {
+    fn for_alphabet(alphabet: A) -> Self {
         Self {
             alphabet,
             states: vec![],
@@ -63,7 +63,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
         self.states[index].color = color.into();
     }
 
-    fn add_edge<E>(&mut self, t: E)
+    fn add_edge<E>(&mut self, t: E) -> Option<Self::EdgeRef<'_>>
     where
         E: IntoEdgeTuple<Self>,
     {
@@ -80,7 +80,9 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
             assert!(self.states[q].first_edge.is_none());
             self.states[q].first_edge = Some(edge_id);
         }
+
         self.edges.push(edge);
+        Some(self.edges.last().expect("We just added one element!"))
     }
 }
 
@@ -90,9 +92,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Shrinkable for NTS<A, Q, C> {
         source: impl Indexes<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let Some(from) = source.to_index(self) else {
-            return None;
-        };
+        let from = source.to_index(self)?;
 
         let mut out = vec![];
         while let Some(pos) = self.edge_position(from, &matcher) {
@@ -100,12 +100,6 @@ impl<A: Alphabet, Q: Clone, C: Clone> Shrinkable for NTS<A, Q, C> {
             out.push(IntoEdgeTuple::<Self>::into_edge_tuple(edge));
         }
         Some(out)
-    }
-    fn remove_edge<'a>(
-        &'a mut self,
-        edge: crate::transition_system::EdgeRef<'a, Self>,
-    ) -> Option<crate::transition_system::EdgeTuple<Self>> {
-        todo!()
     }
     fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor> {
         todo!()
@@ -131,6 +125,13 @@ impl<A: Alphabet, Q: Clone, C: Clone> Shrinkable for NTS<A, Q, C> {
     fn remove_edges_from(
         &mut self,
         source: impl Indexes<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
+    }
+
+    fn remove_edges_to(
+        &mut self,
+        target: impl Indexes<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
         todo!()
     }
@@ -234,8 +235,9 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
             self.edges[pred.unwrap()].next = succ;
         }
 
-        return &self.edges[idx];
+        &self.edges[idx]
     }
+
     /// Builds a new non-deterministic transition system for the given alphabet with a specified capacity.
     pub fn with_capacity(alphabet: A, cap: usize) -> Self {
         Self {
@@ -244,6 +246,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
             edges: Vec::with_capacity(cap),
         }
     }
+
     /// Returns true if the transition system is deterministic, i.e. if there are no two edges leaving
     /// the same state with the same symbol.
     pub fn is_deterministic(&self) -> bool {

@@ -104,12 +104,8 @@ impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for MutableTs<A, Q, C>
     type EdgesToIter<'this> = BTSPredecessors<'this, A, C>
     where
         Self: 'this;
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        let state = state.to_index(self)?;
-        Some(BTSPredecessors::new(
-            self.raw_state_map().get(&state)?.predecessors().iter(),
-            state,
-        ))
+    fn predecessors<Idx: Indexes<Self>>(&self, _state: Idx) -> Option<Self::EdgesToIter<'_>> {
+        unimplemented!("Due to a recent change in the implementation of `MutableTs`, this method is not yet implemented.")
     }
 }
 

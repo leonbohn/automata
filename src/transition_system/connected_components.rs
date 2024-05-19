@@ -80,9 +80,9 @@ impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
 #[cfg(test)]
 mod tests {
     use crate::{
+        math::Set,
         prelude::*,
         transition_system::connected_components::{Scc, SccDecomposition},
-        Set,
     };
 
     pub(super) fn ts() -> RightCongruence<CharAlphabet> {

@@ -6,7 +6,7 @@ use std::{
 use itertools::Itertools;
 use tracing::{info, trace};
 
-use crate::{math::Partition, prelude::*, transition_system::Shrinkable};
+use crate::{automaton::InfiniteWordAutomaton, math::Partition, prelude::*};
 
 /// A deterministic parity automaton (DPA). It uses a [`DTS`]
 /// as its transition system and a `usize` as its edge color.
@@ -14,11 +14,12 @@ use crate::{math::Partition, prelude::*, transition_system::Shrinkable};
 /// defaults to [`MinEvenParityCondition`], meaning the automaton accepts
 /// if the least color that appears infinitely often during
 /// a run is even.
-pub type DPA<A = CharAlphabet, Sem = MinEvenParityCondition> =
-    Automaton<DTS<A, Void, usize>, Sem, true>;
+pub type DPA<A = CharAlphabet, Q = Void, Sem = MinEvenParityCondition, D = DTS<A, Q, usize>> =
+    InfiniteWordAutomaton<A, Sem, Q, usize, D>;
 /// Helper type alias for converting a given transition system into a [`DPA`]
 /// with the given semantics.
-pub type IntoDPA<T, Sem = MinEvenParityCondition> = Automaton<T, Sem, true>;
+pub type IntoDPA<T, Sem = MinEvenParityCondition> =
+    DPA<<T as TransitionSystem>::Alphabet, StateColor<T>, Sem, T>;
 
 /// Represents a min even parity condition which accepts if and only if the least color
 /// that labels a transition that is taken infinitely often, is even. For the automaton
@@ -141,7 +142,10 @@ where
     pub fn complement(
         self,
     ) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>> {
-        self.map_edge_colors(|c| c + 1).into_dpa()
+        let initial = self.initial;
+        self.map_edge_colors(|c| c + 1)
+            .with_initial(initial)
+            .into_dpa()
     }
 
     /// Gives a witness for the fact that `left` and `right` are not language-equivalent. This is
@@ -368,8 +372,8 @@ where
     {
         let start = std::time::Instant::now();
 
-        let (mut ts, initial) = self.collect_hash_ts_pointed();
-        let out = self.collect_dts_pointed();
+        let (mut ts, _initial) = self.with_initial(self.initial).collect_hash_ts_pointed();
+        let out = self.with_initial(self.initial).collect_dts_pointed();
 
         let mut recoloring = Vec::new();
         let mut remove_states = Vec::new();

@@ -60,7 +60,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for DTS<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet for DTS<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet<A> for DTS<A, Q, C> {
     fn for_alphabet(from: A) -> Self {
         Self(NTS::for_alphabet(from))
     }
@@ -97,7 +97,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for DTS<A, Q, C> {
         self.0.set_state_color(index, color)
     }
 
-    fn add_edge<E>(&mut self, t: E)
+    fn add_edge<E>(&mut self, t: E) -> Option<Self::EdgeRef<'_>>
     where
         E: IntoEdgeTuple<Self>,
     {

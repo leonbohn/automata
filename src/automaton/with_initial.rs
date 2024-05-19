@@ -8,7 +8,8 @@ pub struct WithoutCondition;
 
 /// An [`Automaton`] which has no semantics. Essentially, this just fixes one
 /// state as initial.
-pub type WithInitial<Ts> = Automaton<Ts, WithoutCondition>;
+pub type WithInitial<T> =
+    Automaton<<T as TransitionSystem>::Alphabet, WithoutCondition, StateColor<T>, EdgeColor<T>, T>;
 
 impl<Ts: TransitionSystem> WithInitial<Ts> {
     /// Decompose `self` into the transition system and the initial state. This operation

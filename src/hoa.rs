@@ -4,7 +4,7 @@ pub mod output;
 
 use std::cell::RefCell;
 
-use crate::{prelude::*, Set};
+use crate::prelude::*;
 use biodivine_lib_bdd::{
     Bdd, BddPartialValuation, BddSatisfyingValuations, BddValuation, BddVariable,
 };
@@ -37,7 +37,7 @@ pub struct HoaAlphabet {
     variable_set: biodivine_lib_bdd::BddVariableSet,
     variables: Vec<BddVariable>,
     // TODO: introduce caching of Bdds
-    _expressions: RefCell<Set<HoaExpression>>,
+    _expressions: RefCell<math::Set<HoaExpression>>,
 }
 
 impl HoaAlphabet {
@@ -105,7 +105,7 @@ impl HoaAlphabet {
             apnames,
             variable_set: vs,
             variables: vars,
-            _expressions: RefCell::new(Set::default()),
+            _expressions: RefCell::new(math::Set::default()),
         }
     }
 

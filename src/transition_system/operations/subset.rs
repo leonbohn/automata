@@ -54,7 +54,7 @@ impl<Ts: TransitionSystem> StateSet<Ts> {
 pub struct SubsetConstruction<Ts: TransitionSystem> {
     ts: Ts,
     states: RefCell<Vec<StateSet<Ts>>>,
-    expressions: crate::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
+    expressions: math::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
 }
 
 impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {

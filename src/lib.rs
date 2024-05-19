@@ -25,8 +25,8 @@ pub mod prelude {
             reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, ForAlphabet,
-            IndexType, Indexes, IntoEdgeTuple, IsEdge, MutableTs, Path, Sproutable, StateColor,
-            SymbolOf, TSBuilder, TransitionSystem, DTS, NTS,
+            IndexType, Indexes, IntoEdgeTuple, IsEdge, MutableTs, Path, Shrinkable, Sproutable,
+            StateColor, SymbolOf, TSBuilder, TransitionSystem, DTS, NTS,
         },
         upw,
         word::{
@@ -274,11 +274,6 @@ impl<S: Show> Show for &S {
         S::show(*self)
     }
 }
-
-/// Type alias for sets, we use this to hide which type of `HashSet` we are actually using.
-pub type Set<S> = fxhash::FxHashSet<S>;
-/// Type alias for maps, we use this to hide which type of `HashMap` we are actually using.
-pub type Map<K, V> = fxhash::FxHashMap<K, V>;
 
 #[cfg(test)]
 mod tests {

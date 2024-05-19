@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use crate::automaton::InfiniteWordAutomaton;
 use crate::math::Set;
 use crate::prelude::*;
 
@@ -9,9 +10,10 @@ use crate::prelude::*;
 /// if no color from `fin` is visited infinitely often and at least one color from `inf` is
 /// visited infinitely often. Overall, a Rabin condition is then satisfied if at least one of
 /// its constituent pairs is satisfied.
-pub type DRA<A = CharAlphabet, C = usize> = Automaton<DTS<A, Void, C>, RabinCondition<C>, true>;
+pub type DRA<A = CharAlphabet, Q = Void, C = usize, D = DTS<A, Q, C>> =
+    InfiniteWordAutomaton<A, RabinCondition<C>, Q, C, D>;
 /// Helper type alias for casting a given transition system `T` into a [`DRA`].
-pub type IntoDRA<T> = Automaton<T, RabinCondition<EdgeColor<T>>, true>;
+pub type IntoDRA<T> = DRA<<T as TransitionSystem>::Alphabet, StateColor<T>, EdgeColor<T>, T>;
 
 /// Represents a Rabin condition, which is a set of [`RabinPair`]s. Such a condition is satisfied
 /// if at least one of its pairs is satisfied.
