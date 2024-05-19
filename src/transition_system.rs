@@ -18,7 +18,7 @@ pub mod operations;
 /// efficient for large systems and this implementation is used by default. There is a variant
 /// [`DTS`] which is simply a thin wrapper around [`NTS`], indicating that the wrapped transition
 /// system is deterministic, i.e. it implements [`Deterministic`].
-/// - [`MutableTs`] is a (deterministic) transition system which is backed by a [`crate::Set`] of
+/// - [`MutableTs`] is a (deterministic) transition system which is backed by a [`math::Set`] of
 /// states and a [`crate::math::Map`] of edges. In other words, it uses a hash table internally.
 /// This offers a distinct advantage over [`DTS`] in that states and edges can
 /// be removed. This is useful for constructing transition systems programmatically.
@@ -67,7 +67,7 @@ pub mod predecessors;
 /// Internally, a transition system is represented as a graph, where the states are the nodes and the
 /// transitions are the edges. However, the transitions are not the same as the edges.
 /// Both store the source and target vertex as well as the color, however an edge is labelled
-/// with an expression, while a transition is labelled with an actual symbol (that [`Matches::matches`]
+/// with an expression, while a transition is labelled with an actual symbol (that [`Matcher::matches`]
 /// the expression). So a transition is a concrete edge that is taken (usually by the run on a word), while
 /// an edge may represent any different number of transitions.
 pub trait TransitionSystem: Sized {
@@ -539,7 +539,7 @@ pub trait TransitionSystem: Sized {
         state: Jdx,
     ) -> bool
     where
-        Self: Sized + Pointed,
+        Self: Sized,
     {
         let Some(origin) = origin.to_index(self) else {
             tracing::error!("Origin state does not exist");

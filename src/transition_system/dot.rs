@@ -348,8 +348,7 @@ where
 
 impl<D> Dottable for IntoDPA<D>
 where
-    D: Deterministic,
-    EdgeColor<D>: Show,
+    D: Deterministic<EdgeColor = usize>,
 {
     fn dot_name(&self) -> Option<String> {
         Some("DPA".into())

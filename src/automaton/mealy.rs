@@ -4,6 +4,8 @@ use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use crate::prelude::*;
 
+use super::FiniteWordAutomaton;
+
 /// Represents the semantics of a Mealy machine. Concretely, this type returns for
 /// a finite run, the last transition color that is taken. It panics if the run has
 /// no transitions at all.
@@ -18,12 +20,18 @@ pub struct MealySemantics<C>(PhantomData<C>);
 /// Usually, we are interested in the output of the last state that is reached during a run
 /// on a word. In case of a deterministic Mealy machine, this is the only output that is
 /// produced.
-pub type MealyMachine<A = CharAlphabet, C = usize> =
-    Automaton<DTS<A, Void, C>, MealySemantics<C>, false>;
+pub type MealyMachine<A = CharAlphabet, Q = Void, C = usize, D = DTS<A, Q, C>> =
+    FiniteWordAutomaton<A, MealySemantics<C>, Q, C, D>;
 
 /// Helper type that takes a pointed transition system and returns the corresponding
 /// [`MealyMachine`].
-pub type IntoMealyMachine<D> = Automaton<D, MealySemantics<EdgeColor<D>>, false>;
+pub type IntoMealyMachine<D> = FiniteWordAutomaton<
+    <D as TransitionSystem>::Alphabet,
+    MealySemantics<EdgeColor<D>>,
+    StateColor<D>,
+    EdgeColor<D>,
+    D,
+>;
 
 impl<C: Deterministic> IntoMealyMachine<C>
 where
@@ -42,7 +50,7 @@ where
     /// Attempts to run the given finite word in `self`, returning the color of the last transition that
     /// is taken wrapped in `Some`. If no successful run on `input` is possible, the function returns `None`.
     pub fn map<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> Option<EdgeColor<C>> {
-        self.finite_run(input)
+        self.finite_run_from(self.initial, input)
             .ok()
             .and_then(|r| r.last_transition_color().cloned())
     }
@@ -52,7 +60,7 @@ where
     where
         EdgeColor<Self>: Clone + Hash + Eq,
     {
-        self.reachable_state_indices()
+        self.reachable_state_indices_from(self.initial)
             .flat_map(|o| self.edges_from(o).unwrap().map(|e| IsEdge::color(&e)))
             .unique()
     }
@@ -70,7 +78,9 @@ where
         other: &IntoMealyMachine<O>,
     ) -> Option<Vec<SymbolOf<C>>> {
         let prod = self.ts_product(other);
-        for (mut rep, ProductIndex(l, r)) in prod.minimal_representatives() {
+        for (mut rep, ProductIndex(l, r)) in
+            prod.minimal_representatives_from(ProductIndex(self.initial, other.initial))
+        {
             'edges: for edge in self.edges_from(l).unwrap() {
                 let Some(sym) = edge.expression().symbols().next() else {
                     continue 'edges;

@@ -1,4 +1,4 @@
-use crate::{hoa::HoaAlphabet, prelude::*, Set};
+use crate::{hoa::HoaAlphabet, math::Set, prelude::*};
 
 mod buchi;
 pub use buchi::*;
@@ -152,7 +152,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
                         .make_expression(ts.alphabet().char_to_hoa_symbol(*edge.expression())),
                     edge.color(),
                     edge.target(),
-                ))
+                ));
             }
         }
 

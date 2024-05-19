@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::{math::Partition, math::Set, prelude::*};
+use crate::{math::Partition, prelude::*};
 
 /// A quotient takes a transition system and merges states which are in the same
 /// congruence class of some [`Partition`]. We assume that the [`Partition`] is
@@ -16,7 +16,7 @@ use crate::{math::Partition, math::Set, prelude::*};
 #[derive(Debug, Clone)]
 pub struct Quotient<Ts: TransitionSystem> {
     ts: Ts,
-    expressions: crate::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
+    expressions: math::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
     partition: Partition<Ts::StateIndex>,
 }
 
@@ -210,7 +210,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         let origin = state.to_index(self)?;
-        let (states, colors): (Set<_>, Vec<_>) = self
+        let (states, colors): (math::Set<_>, Vec<_>) = self
             .class_iter_by_id(origin)?
             .filter_map(|q| {
                 self.ts.edge(q, &matcher).map(|tt| {

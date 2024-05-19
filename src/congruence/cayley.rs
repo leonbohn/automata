@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::{prelude::*, transition_system::EdgeReference};
 
 use self::alphabet::{Directional, InvertibleChar};
@@ -26,7 +28,7 @@ where
     Ts::StateColor: Accumulates,
 {
     alphabet: Directional,
-    expressions: crate::Map<SymbolOf<Self>, EdgeExpression<Self>>,
+    expressions: math::Map<SymbolOf<Self>, EdgeExpression<Self>>,
     m: TransitionMonoid<Ts>,
 }
 
@@ -34,7 +36,7 @@ where
 /// the transition profiles of the ts as nodes. See [`Cayley`] for more details.
 #[derive(Clone)]
 pub struct RightCayley<Ts: TransitionSystem + Pointed> {
-    expressions: crate::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
+    expressions: math::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
     m: TransitionMonoid<Ts>,
 }
 
@@ -97,8 +99,8 @@ where
 {
     fn edge<Idx: Indexes<Self>>(
         &self,
-        state: Idx,
-        matcher: impl Matcher<EdgeExpression<Self>>,
+        _state: Idx,
+        _matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         // let idx = state.to_index(self)?;
         // let (_tp, string) = self.monoid().get_profile(idx)?;
@@ -212,8 +214,8 @@ where
 {
     fn edge<Idx: Indexes<Self>>(
         &self,
-        state: Idx,
-        matcher: impl Matcher<EdgeExpression<Self>>,
+        _state: Idx,
+        _matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         // let idx = state.to_index(self)?;
         // let (_tp, string) = self.monoid().get_profile(idx)?;

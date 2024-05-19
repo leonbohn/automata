@@ -2,7 +2,7 @@ use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
 use itertools::Itertools;
 
-use crate::{math::Map, Show};
+use crate::prelude::*;
 
 /// A symbol of an alphabet, which is also the type of the symbols in a word. We consider different types
 /// of alphabets:
@@ -62,7 +62,7 @@ pub trait Alphabet: Clone {
     fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression;
 
     /// Returns a map from each symbol in the alphabet to the corresponding expression.
-    fn expression_map(&self) -> crate::Map<Self::Symbol, Self::Expression> {
+    fn expression_map(&self) -> math::Map<Self::Symbol, Self::Expression> {
         self.universe()
             .map(|sym| (sym, self.make_expression(sym)))
             .collect()
@@ -78,10 +78,10 @@ pub trait Alphabet: Clone {
 
     /// This method is used for an optimization: If we have a [`CharAlphabet`] alphabet, then an edge list essentially
     /// boils down to a map from `Self::Symbol` to an edge. For more complicated alphabets, this may not always
-    /// be so easy. To allow for an optimization (i.e. just lookup the corresponding edge in a [`crate::Map`]),
+    /// be so easy. To allow for an optimization (i.e. just lookup the corresponding edge in a [`math::Map`]),
     /// we force alphabets to implement this method.
     fn search_edge<X>(
-        map: &Map<Self::Expression, X>,
+        map: &math::Map<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.iter().find_map(|(e, x)| {
@@ -121,7 +121,7 @@ impl<A: Alphabet> Alphabet for &A {
         A::make_expression(self, symbol)
     }
     fn search_edge<X>(
-        map: &Map<Self::Expression, X>,
+        map: &math::Map<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         A::search_edge(map, sym)
@@ -266,7 +266,7 @@ impl Alphabet for CharAlphabet {
 
     #[inline(always)]
     fn search_edge<X>(
-        map: &Map<Self::Expression, X>,
+        map: &math::Map<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.get_key_value(&sym)
@@ -319,7 +319,7 @@ impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> Alphabet for Fi
     type Expression = S;
 
     fn search_edge<X>(
-        map: &Map<Self::Expression, X>,
+        map: &math::Map<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.get_key_value(&sym)
@@ -441,7 +441,7 @@ impl Alphabet for Directional {
     type Expression = InvertibleChar;
 
     fn search_edge<X>(
-        map: &Map<Self::Expression, X>,
+        map: &math::Map<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.get_key_value(&sym)

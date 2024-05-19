@@ -77,7 +77,9 @@ where
 /// Partition refinement algorithm for deterministic finite automata that have outputs on the edges.
 /// Runs in O(n log n) time, where n is the number of states of the automaton and returns the unique
 /// minimal automaton that is bisimilar to the input.
-pub fn mealy_partition_refinement<D>(mm: D) -> MealyMachine<D::Alphabet, EdgeColor<D>>
+pub fn mealy_partition_refinement<D>(
+    mm: D,
+) -> MealyMachine<D::Alphabet, Vec<StateColor<D>>, EdgeColor<D>>
 where
     D: Congruence,
     EdgeColor<D>: Color,
@@ -99,7 +101,6 @@ where
             // assert!(c.iter().all_equal());
             c[0].clone()
         })
-        .erase_state_colors()
         .collect_mealy();
     info!(
         "Collecting into Mealy machine took {} microseconds",

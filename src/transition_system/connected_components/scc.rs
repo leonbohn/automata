@@ -334,7 +334,7 @@ impl<'a, Ts: TransitionSystem> Debug for Scc<'a, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{prelude::*, Set};
+    use crate::{math::Set, prelude::*};
 
     #[test]
     fn interior_transitions() {

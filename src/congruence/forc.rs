@@ -1,4 +1,4 @@
-use crate::{prelude::*, Map};
+use crate::prelude::*;
 use std::{fmt::Debug, hash::Hash};
 
 /// A family of right congruences (FORC) consists of a *leading* right congruence and for each
@@ -6,14 +6,14 @@ use std::{fmt::Debug, hash::Hash};
 #[derive(Clone)]
 pub struct FORC<A: Alphabet, Q = Void, C = Void> {
     pub(crate) leading: RightCongruence<A>,
-    pub(crate) progress: Map<usize, RightCongruence<A, Q, C>>,
+    pub(crate) progress: math::Map<usize, RightCongruence<A, Q, C>>,
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone> FORC<A, Q, C> {
     /// Creates a new FORC with the given leading congruence and progress congruences.
     pub fn new(
         leading: RightCongruence<A>,
-        progress: Map<usize, RightCongruence<A, Q, C>>,
+        progress: math::Map<usize, RightCongruence<A, Q, C>>,
     ) -> Self {
         Self { leading, progress }
     }
@@ -75,19 +75,20 @@ impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> PartialEq for FORC<A, 
 impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> Eq for FORC<A, Q, C> {}
 
 impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> std::fmt::Debug for FORC<A, Q, C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use owo_colors::OwoColorize;
-        write!(f, "{}\n{:?}", "LEADING".bold(), self.leading())?;
-        for (c, rc) in self.prc_iter() {
-            let class_name = self.leading.class_name(*c).unwrap();
-            write!(
-                f,
-                "{} \"{}\"\n{:?}",
-                "PRC FOR CLASS ".bold(),
-                &class_name,
-                rc
-            )?;
-        }
-        Ok(())
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // use owo_colors::OwoColorize;
+        // write!(f, "{}\n{:?}", "LEADING".bold(), self.leading())?;
+        // for (c, rc) in self.prc_iter() {
+        //     let class_name = self.leading.class_name(*c).unwrap();
+        //     write!(
+        //         f,
+        //         "{} \"{}\"\n{:?}",
+        //         "PRC FOR CLASS ".bold(),
+        //         &class_name,
+        //         rc
+        //     )?;
+        // }
+        // Ok(())
+        todo!()
     }
 }

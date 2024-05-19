@@ -3,25 +3,18 @@ use itertools::Itertools;
 
 use crate::{math::Bijection, prelude::*};
 
+use super::StateIndex;
+
 /// Implemented by [`TransitionSystem`]s (TS) that can be created for a given [`Alphabet`],
 /// which is may be used in conjunction with [`Sproutable`] to successively grow a
 /// TS.
 ///
 /// Usually, this will *not* be implemented by TS that have a [designated initial state](`Pointed`).
 /// For those, a dedicated method should be used.
-pub trait ForAlphabet: TransitionSystem {
+pub trait ForAlphabet<A: Alphabet> {
     /// Creates an instance of `Self` for the given [`Alphabet`]. The resulting
     /// TS should be empty.
-    fn for_alphabet(from: Self::Alphabet) -> Self;
-
-    /// Creates an instance of `Self` with a [`CharAlphabet`] of size `size`, consisting
-    /// of the first `size` characters of the ASCII alphabet.
-    fn for_char_alphabet_of_size(size: usize) -> Self
-    where
-        Self: TransitionSystem<Alphabet = CharAlphabet>,
-    {
-        Self::for_alphabet(CharAlphabet::of_size(size))
-    }
+    fn for_alphabet(from: A) -> Self;
 }
 
 /// Marker trait for [`Alphabet`]s that can be indexed, i.e. where we can associate each
@@ -76,12 +69,14 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///     
-    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+    /// let mut ts = DTS::<_, _, Void>::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
     /// let q0 = ts.add_state(false);
     /// let before = ts.size();
     /// let q1 = ts.add_state(true);
     /// assert_eq!(ts.size(), before + 1);
     /// ```
+    /// We need to explicitly give the state color for the created transition system as we do not
+    /// add any edges and the type can therefore not be inferred.
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex;
 
     /// Adds a new edge to the transition system.
@@ -100,10 +95,11 @@ pub trait Sproutable: TransitionSystem {
     /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
-    /// let edge = ts.add_edge((q0, 'a', q1));
-    /// assert_eq!(edge, Some((q0, Void)));
+    /// assert!(ts.edge(q0, 'a').is_none());
+    /// assert!(ts.add_edge((q0, 'a', q1)).is_some());
+    /// assert!(ts.edge(q0, 'a').is_some());
     /// ```
-    fn add_edge<E>(&mut self, t: E)
+    fn add_edge<E>(&mut self, t: E) -> Option<Self::EdgeRef<'_>>
     where
         E: IntoEdgeTuple<Self>;
 
@@ -130,18 +126,18 @@ pub trait Sproutable: TransitionSystem {
     ///     .with_state_colors([0])
     ///     .into_dts();
     ///
-    /// let (without_edge_colors, map1): (DTS<CharAlphabet, usize, Void>, _) = DTS::collect_with_index_mapping(&source);
-    /// let (without_state_colors, map2): (DTS<CharAlphabet, Void, usize>, _) = DTS::collect_with_index_mapping(&source);
+    /// let (without_edge_colors, map1): (DTS<CharAlphabet, usize, Void>, _) = DTS::sprout_from_ts(&source);
+    /// let (without_state_colors, map2): (DTS<CharAlphabet, Void, usize>, _) = DTS::sprout_from_ts(&source);
     /// assert_eq!(map1.get_by_left(&0).unwrap(), map2.get_by_left(&0).unwrap());
     /// ```
-    fn sprout_from_ts<Ts>(ts: Ts) -> (Self, Bijection<Ts::StateIndex, Self::StateIndex>)
+    fn sprout_from_ts<Ts>(ts: Ts) -> (Self, Bijection<Ts::StateIndex, StateIndex<Self>>)
     where
-        Self: ForAlphabet<Alphabet = Ts::Alphabet> + Sproutable,
-        Ts: TransitionSystem,
+        Self: ForAlphabet<Ts::Alphabet>,
+        Ts: TransitionSystem<Alphabet = Self::Alphabet>,
         StateColor<Ts>: Into<StateColor<Self>>,
         EdgeColor<Ts>: Into<EdgeColor<Self>>,
     {
-        let mut out = Self::for_alphabet(ts.alphabet().clone());
+        let mut out: Self = Self::for_alphabet(ts.alphabet().clone());
         let mut map = Bijection::new();
         for index in ts.state_indices() {
             map.insert(
@@ -234,7 +230,7 @@ pub trait Sproutable: TransitionSystem {
                     self.alphabet().expression_from_index(missing),
                     edge_color.clone(),
                     sink,
-                ))
+                ));
             }
         }
     }
@@ -246,10 +242,13 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+    ///
+    /// let mut ts = DTS::<_, _, Void>::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
     /// let states = ts.extend_states([true, false, true]);
     /// assert_eq!(states.collect::<Vec<_>>(), vec![0, 1, 2]);
     /// ```
+    /// We need to explicitly give the edge color for the created transition system as we do not
+    /// add any edges and the type can therefore not be inferred.
     fn extend_states<I: IntoIterator<Item = StateColor<Self>>>(
         &mut self,
         iter: I,
@@ -281,13 +280,25 @@ mod tests {
     use crate::prelude::*;
 
     #[test]
+    fn for_alphabet_inference() {
+        let mut ts = DTS::for_alphabet(CharAlphabet::of_size(3));
+        assert_eq!(ts.alphabet().size(), 3);
+
+        let q0 = ts.add_state(false);
+        let q1 = ts.add_state(true);
+        assert_eq!(ts.edge(q0, 'a'), None);
+        ts.add_edge((q0, 'a', q1));
+        assert_eq!(ts.reached_state_index_from(q0, "a"), Some(q1));
+    }
+
+    #[test]
     fn sprout_after_creating() {
         let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
         let q0 = ts.add_state(false);
         let q1 = ts.add_state(true);
         assert_eq!(ts.edge(q0, 'a'), None);
         ts.add_edge((q0, 'a', q1));
-        assert_eq!(ts.reached_state_index_from("a", q0), Some(q1));
+        assert_eq!(ts.reached_state_index_from(q0, "a"), Some(q1));
     }
 
     #[test]
@@ -301,12 +312,12 @@ mod tests {
                 (1, 'a', 0, 0),
             ])
             .into_dts();
-        assert_eq!(partial.reached_state_index_from("aaacb", 0), None);
+        assert_eq!(partial.reached_state_index_from(0, "aaacb"), None);
         assert!(!partial.is_complete());
 
         partial.complete_with_colors((), 2);
         for w in ["abbaccababcab", "bbcca", "cc", "aababbabbabbccbabba"] {
-            if partial.reached_state_index_from(w, 0).unwrap() < 1 {
+            if partial.reached_state_index_from(0, w).unwrap() < 1 {
                 panic!("Word {} misclassified", w);
             }
         }
