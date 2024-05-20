@@ -633,7 +633,7 @@ mod tests {
     #[test_log::test]
     #[ignore]
     fn render_dfa() {
-        let dfa = NTS::builder()
+        let dfa = LinkedListNondeterministic::builder()
             .with_transitions([
                 (0, 'a', Void, 0),
                 (0, 'b', Void, 1),

@@ -3,44 +3,58 @@ use std::{collections::BTreeSet, hash::Hash};
 use crate::{math::Set, prelude::*, transition_system::Shrinkable, Void};
 use itertools::Itertools;
 
-mod ntstate;
-pub use ntstate::{NTSEdgesFromIter, NTSEdgesToIter, NTState};
+mod linked_state;
+pub use linked_state::{
+    LinkedListTransitionSystemEdgesToIter, LinkedListTransitionSystemState, NTSEdgesFromIter,
+};
 
-mod ntedge;
-pub use ntedge::NTEdge;
+mod linked_edge;
+pub use linked_edge::LinkedListTransitionSystemEdge;
 use tracing::trace;
 
 /// Type alias for the constituent parts of an [`NTS`] with the same associated types as the
 /// transition sytem `D`.
-pub type NTSPartsFor<D> = (
+pub type IntoLinkedListNondeterministic<D> = (
     <D as TransitionSystem>::Alphabet,
-    Vec<NTState<StateColor<D>>>,
-    Vec<NTEdge<EdgeExpression<D>, EdgeColor<D>>>,
+    Vec<LinkedListTransitionSystemState<StateColor<D>>>,
+    Vec<LinkedListTransitionSystemEdge<EdgeExpression<D>, EdgeColor<D>>>,
 );
 
+pub type LinkedListNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
+    LinkedListTransitionSystem<A, Q, C, false>;
+
+pub type LinkedListDeterministic<A = CharAlphabet, Q = Void, C = Void> =
+    LinkedListTransitionSystem<A, Q, C, true>;
+
+/// Type alias to create a deterministic transition with the same alphabet, state and edge color
+/// as the given [`Ts`](`crate::prelude::TransitionSystem`).
+pub type CollectLinkedListDeterministic<Ts> = LinkedListDeterministic<
+    <Ts as TransitionSystem>::Alphabet,
+    <Ts as TransitionSystem>::StateColor,
+    <Ts as TransitionSystem>::EdgeColor,
+>;
+
 /// Represents a non-deterministic transition system. It stores an [`Alphabet`], a list of [`NTState`]s and a list of [`NTEdge`]s.
-/// Each state
 #[derive(Clone)]
-pub struct NTS<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
+pub struct LinkedListTransitionSystem<
+    A: Alphabet = CharAlphabet,
+    Q = Void,
+    C = Void,
+    const DET: bool = true,
+> {
     alphabet: A,
-    states: Vec<NTState<Q>>,
-    edges: Vec<NTEdge<A::Expression, C>>,
+    states: Vec<LinkedListTransitionSystemState<Q>>,
+    edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> ForAlphabet<A> for NTS<A, Q, C> {
-    fn for_alphabet(alphabet: A) -> Self {
-        Self {
-            alphabet,
-            states: vec![],
-            edges: vec![],
-        }
-    }
-}
+impl<A: Alphabet, Q: Clone, C: Clone> Deterministic for LinkedListDeterministic<A, Q, C> {}
 
-impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> Sproutable
+    for LinkedListTransitionSystem<A, Q, C, DET>
+{
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         let id = self.states.len();
-        let state = NTState::new(color);
+        let state = LinkedListTransitionSystemState::new(color);
         self.states.push(state);
         id
     }
@@ -68,7 +82,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
         E: IntoEdgeTuple<Self>,
     {
         let (q, a, c, p) = t.into_edge_tuple();
-        let mut edge = NTEdge::new(q, a, c, p);
+        let mut edge = LinkedListTransitionSystemEdge::new(q, a, c, p);
         let edge_id = self.edges.len();
 
         if let Some(last_edge_id) = self.last_edge(q) {
@@ -86,7 +100,9 @@ impl<A: Alphabet, Q: Clone, C: Clone> Sproutable for NTS<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> Shrinkable for NTS<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> Shrinkable
+    for LinkedListTransitionSystem<A, Q, C, DET>
+{
     fn remove_edges_from_matching(
         &mut self,
         source: impl Indexes<Self>,
@@ -137,7 +153,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> Shrinkable for NTS<A, Q, C> {
     }
 }
 
-impl<Q, C> NTS<CharAlphabet, Q, C> {
+impl<Q, C, const DET: bool> LinkedListTransitionSystem<CharAlphabet, Q, C, DET> {
     /// Returns a transition system builder for a non-deterministic transition system. This should be the main method for the
     /// construction of non-deterministic transition systems on the fly.
     ///
@@ -162,7 +178,7 @@ impl<Q, C> NTS<CharAlphabet, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> LinkedListTransitionSystem<A, Q, C, DET> {
     pub(crate) fn nts_remove_edge(
         &mut self,
         from: usize,
@@ -215,7 +231,11 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
             idx = self.edges[idx].next?;
         }
     }
-    fn remove_edge(&mut self, from: usize, idx: usize) -> &NTEdge<A::Expression, C> {
+    fn remove_edge(
+        &mut self,
+        from: usize,
+        idx: usize,
+    ) -> &LinkedListTransitionSystemEdge<A::Expression, C> {
         assert!(idx < self.edges.len());
 
         let pred = self.edges[idx].prev;
@@ -273,9 +293,12 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
     }
 
     /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
-    pub fn into_deterministic(self) -> DTS<A, Q, C> {
-        debug_assert!(self.is_deterministic());
-        DTS(self)
+    pub fn into_deterministic(self) -> LinkedListDeterministic<A, Q, C> {
+        copy_from(self)
+    }
+
+    pub fn into_nondeterministic(self) -> LinkedListNondeterministic<A, Q, C> {
+        copy_from(self)
     }
 
     fn first_edge(&self, idx: usize) -> Option<usize> {
@@ -300,8 +323,8 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
     /// Builds a new [`NTS`] from its constituent parts.
     pub fn from_parts(
         alphabet: A,
-        states: Vec<NTState<Q>>,
-        edges: Vec<NTEdge<A::Expression, C>>,
+        states: Vec<LinkedListTransitionSystemState<Q>>,
+        edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
     ) -> Self {
         Self {
             alphabet,
@@ -311,19 +334,21 @@ impl<A: Alphabet, Q: Clone, C: Clone> NTS<A, Q, C> {
     }
 
     /// Decomposes `self` into a tuple of its constituents.
-    pub fn into_parts(self) -> NTSPartsFor<Self> {
+    pub fn into_parts(self) -> IntoLinkedListNondeterministic<Self> {
         (self.alphabet, self.states, self.edges)
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for NTS<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> TransitionSystem
+    for LinkedListTransitionSystem<A, Q, C, DET>
+{
     type StateIndex = usize;
 
     type StateColor = Q;
 
     type EdgeColor = C;
 
-    type EdgeRef<'this> = &'this NTEdge<A::Expression, C>
+    type EdgeRef<'this> = &'this LinkedListTransitionSystemEdge<A::Expression, C>
     where
         Self: 'this;
 
@@ -365,12 +390,26 @@ impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for NTS<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> PredecessorIterable for NTS<A, Q, C> {
-    type PreEdgeRef<'this> = &'this NTEdge<A::Expression, C>
+impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> ForAlphabet<A>
+    for LinkedListTransitionSystem<A, Q, C, DET>
+{
+    fn for_alphabet(alphabet: A) -> Self {
+        Self {
+            alphabet,
+            states: vec![],
+            edges: vec![],
+        }
+    }
+}
+
+impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> PredecessorIterable
+    for LinkedListTransitionSystem<A, Q, C, DET>
+{
+    type PreEdgeRef<'this> = &'this LinkedListTransitionSystemEdge<A::Expression, C>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = NTSEdgesToIter<'this, A::Expression, C>
+    type EdgesToIter<'this> = LinkedListTransitionSystemEdgesToIter<'this, A::Expression, C, DET>
     where
         Self: 'this;
 
@@ -378,11 +417,13 @@ impl<A: Alphabet, Q: Clone, C: Clone> PredecessorIterable for NTS<A, Q, C> {
         let state = state.to_index(self)?;
         assert!(state < self.states.len());
 
-        Some(NTSEdgesToIter::new(self, state))
+        Some(LinkedListTransitionSystemEdgesToIter::new(self, state))
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> PartialEq for NTS<A, Q, C> {
+impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq, const DET: bool> PartialEq
+    for LinkedListTransitionSystem<A, Q, C, DET>
+{
     fn eq(&self, other: &Self) -> bool {
         if self.alphabet != other.alphabet || self.states.len() != other.states.len() {
             return false;
@@ -403,7 +444,47 @@ impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> PartialEq for NTS<A, Q
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> Eq for NTS<A, Q, C> {}
+impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq, const DET: bool> Eq
+    for LinkedListTransitionSystem<A, Q, C, DET>
+{
+}
+
+fn copy_from<A: Alphabet, Q: Clone, C: Clone, const DET: bool, const OUT_DET: bool>(
+    ts: LinkedListTransitionSystem<A, Q, C, DET>,
+) -> LinkedListTransitionSystem<A, Q, C, OUT_DET> {
+    if !DET && OUT_DET && !ts.is_deterministic() {
+        panic!("cannot convert non-deterministic transition system to deterministic");
+    }
+    let LinkedListTransitionSystem {
+        alphabet,
+        states,
+        edges,
+    } = ts;
+    LinkedListTransitionSystem {
+        alphabet,
+        states,
+        edges,
+    }
+}
+
+impl<
+        A: Alphabet + std::fmt::Debug,
+        Q: std::fmt::Debug + Clone,
+        C: std::fmt::Debug + Clone,
+        const DET: bool,
+    > std::fmt::Debug for LinkedListTransitionSystem<A, Q, C, DET>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "alphabet: {:?}", self.alphabet)?;
+        for (i, state) in self.states.iter().enumerate() {
+            writeln!(f, "state {}: {:?}", i, state)?;
+            for edge in self.edges_from(i).unwrap() {
+                writeln!(f, "  {:?}", edge)?;
+            }
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -419,7 +500,7 @@ mod tests {
                 (1, 'a', 200, 0),
                 (1, 'b', 2000, 1),
             ])
-            .into_dts();
+            .into_linked_list_deterministic();
         let second = TSBuilder::default()
             .with_state_colors([0, 1])
             .with_edges([
@@ -428,7 +509,7 @@ mod tests {
                 (0, 'a', 100u32, 0),
                 (1, 'a', 200, 0),
             ])
-            .into_dts();
+            .into_linked_list_deterministic();
         assert!(first == second, "equality should disregard order of edges");
     }
 }

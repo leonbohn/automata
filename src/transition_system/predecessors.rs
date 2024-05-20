@@ -99,7 +99,7 @@ where
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for MutableTs<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for EdgeLists<A, Q, C> {
     type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, Idx, C> where Self: 'this;
     type EdgesToIter<'this> = BTSPredecessors<'this, A, C>
     where

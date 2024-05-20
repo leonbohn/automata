@@ -56,6 +56,7 @@ pub struct Automaton<
     C,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C> = DTS<A, Q, C>,
     const OMEGA: bool = false,
+    const DET: bool = true,
 > {
     ts: D,
     initial: D::StateIndex,
@@ -63,7 +64,7 @@ pub struct Automaton<
 }
 
 impl<Z, Q: Clone, C: Clone + std::hash::Hash + Eq, const OMEGA: bool>
-    Automaton<CharAlphabet, Z, Q, C, MutableTs<CharAlphabet, Q, C>, OMEGA>
+    Automaton<CharAlphabet, Z, Q, C, EdgeLists<CharAlphabet, Q, C>, OMEGA>
 {
     /// Instantiates a new [`TSBuilder`] for the edge and state color of `self`.
     pub fn builder() -> TSBuilder<Q, C> {

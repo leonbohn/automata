@@ -218,11 +218,11 @@ impl TryFrom<HoaAutomaton> for OmegaAutomaton<HoaAlphabet> {
 /// number of states and inserts transitions with the appropriate labels and colors.
 pub fn hoa_automaton_to_nts(
     aut: HoaAutomaton,
-) -> Result<WithInitial<NTS<HoaAlphabet, usize, AcceptanceMask>>, String> {
+) -> Result<WithInitial<LinkedListNondeterministic<HoaAlphabet, usize, AcceptanceMask>>, String> {
     let aps = aut.num_aps();
     assert!(aps <= MAX_APS);
 
-    let mut ts = NTS::for_alphabet(HoaAlphabet::from_hoa_automaton(&aut));
+    let mut ts = LinkedListNondeterministic::for_alphabet(HoaAlphabet::from_hoa_automaton(&aut));
     for (id, state) in aut.body().iter().enumerate() {
         assert_eq!(id, state.id() as usize);
         assert_eq!(id, ts.add_state(state.id() as usize));

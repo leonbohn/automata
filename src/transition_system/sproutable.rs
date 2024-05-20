@@ -277,11 +277,11 @@ pub trait Sproutable: TransitionSystem {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
+    use crate::{prelude::*, transition_system::LinkedListNondeterministic};
 
     #[test]
     fn for_alphabet_inference() {
-        let mut ts = DTS::for_alphabet(CharAlphabet::of_size(3));
+        let mut ts = LinkedListDeterministic::for_alphabet(CharAlphabet::of_size(3));
         assert_eq!(ts.alphabet().size(), 3);
 
         let q0 = ts.add_state(false);
@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn sprout_after_creating() {
-        let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+        let mut ts = LinkedListDeterministic::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
         let q0 = ts.add_state(false);
         let q1 = ts.add_state(true);
         assert_eq!(ts.edge(q0, 'a'), None);
@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn complete_ts() {
-        let mut partial = NTS::builder()
+        let mut partial = LinkedListNondeterministic::builder()
             .default_color(())
             .with_transitions([
                 (0, 'a', 0, 0),
@@ -311,7 +311,7 @@ mod tests {
                 (0, 'c', 0, 1),
                 (1, 'a', 0, 0),
             ])
-            .into_dts();
+            .into_linked_list_deterministic();
         assert_eq!(partial.reached_state_index_from(0, "aaacb"), None);
         assert!(!partial.is_complete());
 

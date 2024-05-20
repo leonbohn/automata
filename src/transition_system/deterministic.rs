@@ -18,7 +18,7 @@ use super::operations::RestrictByStateIndex;
 use super::operations::StateIndexFilter;
 use super::path::Lasso;
 use super::sproutable::{IndexedAlphabet, Sproutable};
-use super::IntoMutableTs;
+use super::IntoEdgeListsDeterministic;
 use super::Path;
 
 pub type FiniteRunResult<A, Idx, Q, C> = Result<Path<A, Idx, Q, C>, Path<A, Idx, Q, C>>;
@@ -504,8 +504,10 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
-        let (ts, _map) = DTS::sprout_from_ts(self);
+    fn collect_dts(
+        self,
+    ) -> LinkedListDeterministic<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
+        let (ts, _map) = LinkedListDeterministic::sprout_from_ts(self);
         ts
     }
 
@@ -521,14 +523,14 @@ pub trait Deterministic: TransitionSystem {
     fn collect_dts_pointed(
         self,
     ) -> (
-        DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
+        LinkedListDeterministic<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
         usize,
     )
     where
         Self: Pointed,
     {
         let old_initial = self.initial();
-        let (ts, map) = DTS::sprout_from_ts(self);
+        let (ts, map) = LinkedListDeterministic::sprout_from_ts(self);
         (
             ts,
             *map.get_by_left(&old_initial)
@@ -542,14 +544,14 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_hash_ts_pointed(self) -> (IntoMutableTs<Self>, usize)
+    fn collect_hash_ts_pointed(self) -> (IntoEdgeListsDeterministic<Self>, usize)
     where
         EdgeColor<Self>: Hash + Eq,
         StateColor<Self>: Hash + Eq,
         Self: Pointed,
     {
         let old_initial = self.initial();
-        let (ts, map) = MutableTs::sprout_from_ts(self);
+        let (ts, map) = EdgeLists::sprout_from_ts(self);
         (
             ts,
             **map
@@ -563,12 +565,12 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_hash_ts(self) -> IntoMutableTs<Self>
+    fn collect_hash_ts(self) -> IntoEdgeListsDeterministic<Self>
     where
         EdgeColor<Self>: Hash + Eq,
         StateColor<Self>: Hash + Eq,
     {
-        let (ts, _map) = MutableTs::sprout_from_ts(self);
+        let (ts, _map) = EdgeLists::sprout_from_ts(self);
         ts
     }
 
@@ -586,15 +588,19 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// assert_eq!(collected.reached_state_index_from(0, "b"), collected.reached_state_index_from(0, "aa"));
     /// ```
+    #[allow(clippy::type_complexity)]
     fn collect_complete_pointed(
         &self,
         sink_state_color: Self::StateColor,
         sink_edge_color: Self::EdgeColor,
-    ) -> crate::transition_system::DTSAndInitialState<
-        Self::Alphabet,
-        Self::StateColor,
-        Self::EdgeColor,
-    >
+    ) -> (
+        crate::transition_system::LinkedListDeterministic<
+            Self::Alphabet,
+            Self::StateColor,
+            Self::EdgeColor,
+        >,
+        usize,
+    )
     where
         Self: Pointed,
         Self::Alphabet: IndexedAlphabet,
@@ -625,13 +631,17 @@ pub trait Deterministic: TransitionSystem {
     /// Collects into a transition system of type `Ts`, but only considers states that
     /// are reachable from the initial state. Naturally, this means that `self` must
     /// be a pointed transition system.
+    #[allow(clippy::type_complexity)]
     fn trim_collect(
         &self,
-    ) -> crate::transition_system::DTSAndInitialState<
-        Self::Alphabet,
-        Self::StateColor,
-        Self::EdgeColor,
-    >
+    ) -> (
+        crate::transition_system::LinkedListDeterministic<
+            Self::Alphabet,
+            Self::StateColor,
+            Self::EdgeColor,
+        >,
+        usize,
+    )
     where
         Self: Pointed,
     {
@@ -719,7 +729,7 @@ impl<D: Deterministic> Deterministic for &mut D {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Hash + Eq + Clone> Deterministic for MutableTs<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Hash + Eq + Clone> Deterministic for EdgeLists<A, Q, C> {
     fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
@@ -778,11 +788,13 @@ where
     Ts: Deterministic,
     F: Fn(Ts::StateColor) -> D,
 {
-    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
+    fn collect_dts(
+        self,
+    ) -> LinkedListDeterministic<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
         let (ts, f) = self.into_parts();
         let (alphabet, states, edges) = ts.collect_dts().into_parts();
         let states = states.into_iter().map(|q| q.recolor(&f)).collect();
-        DTS::from_parts(alphabet, states, edges)
+        LinkedListDeterministic::from_parts(alphabet, states, edges)
     }
 
     fn edge<Idx: Indexes<Self>>(
@@ -800,11 +812,13 @@ where
     Ts: Deterministic,
     F: Fn(Ts::EdgeColor) -> D,
 {
-    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
+    fn collect_dts(
+        self,
+    ) -> LinkedListDeterministic<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
         let (ts, f) = self.into_parts();
         let (alphabet, states, edges) = ts.collect_dts().into_parts();
         let edges = edges.into_iter().map(|e| e.recolor(&f)).collect();
-        DTS::from_parts(alphabet, states, edges)
+        LinkedListDeterministic::from_parts(alphabet, states, edges)
     }
 
     fn edge_color<Idx: Indexes<Self>>(
@@ -883,10 +897,10 @@ mod tests {
         let words = [upw!("a"), upw!("a", "b"), upw!("b"), upw!("aa", "b")];
 
         // build transition system
-        let ts = NTS::builder()
+        let ts = LinkedListNondeterministic::builder()
             .with_transitions([(0, 'a', Void, 1), (1, 'b', Void, 1)])
             .default_color(Void)
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(0);
 
         assert!(ts

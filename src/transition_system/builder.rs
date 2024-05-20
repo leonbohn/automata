@@ -1,6 +1,8 @@
 use itertools::Itertools;
 
-use crate::{congruence::RightCongruence, prelude::*, Void};
+use crate::{
+    congruence::RightCongruence, prelude::*, transition_system::LinkedListNondeterministic, Void,
+};
 
 use self::math::Set;
 
@@ -82,7 +84,9 @@ impl<Q, C> Default for TSBuilder<Q, C> {
 impl TSBuilder<bool, Void> {
     /// Tries to turn `self` into a deterministic finite automaton. Panics if `self` is not deterministic.
     pub fn into_dfa(self, initial: usize) -> DFA<CharAlphabet> {
-        self.into_dts().with_initial(initial).collect_dfa()
+        self.into_linked_list_deterministic()
+            .with_initial(initial)
+            .collect_dfa()
     }
 }
 
@@ -90,7 +94,7 @@ impl TSBuilder<Void, bool> {
     /// Attempts to turn `self` into a deterministic Büchi automaton. Panics if `self` is not deterministic.
     pub fn into_dba(self, initial: usize) -> DBA<CharAlphabet> {
         self.default_color(Void)
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(initial)
             .collect_dba()
     }
@@ -100,7 +104,7 @@ impl TSBuilder<Void, usize> {
     /// Attempts to turn `self` into a deterministic parity automaton. Panics if `self` is not deterministic.
     pub fn into_dpa(self, initial: usize) -> DPA<CharAlphabet> {
         self.default_color(Void)
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(initial)
             .collect_dpa()
     }
@@ -108,7 +112,7 @@ impl TSBuilder<Void, usize> {
     /// Builds a Mealy machine from `self`. Panics if `self` is not deterministic.
     pub fn into_mealy(self, initial: usize) -> MealyMachine<CharAlphabet> {
         self.default_color(Void)
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(initial)
             .collect_mealy()
     }
@@ -117,7 +121,9 @@ impl TSBuilder<Void, usize> {
 impl TSBuilder<usize, Void> {
     /// Builds a Moore machine from `self`. Panics if `self` is not deterministic.
     pub fn into_moore(self, initial: usize) -> MooreMachine<CharAlphabet> {
-        self.into_dts().with_initial(initial).collect_moore()
+        self.into_linked_list_deterministic()
+            .with_initial(initial)
+            .collect_moore()
     }
 }
 
@@ -126,7 +132,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     /// colors. Panics if `self` is not deterministic.
     pub fn into_right_congruence_bare(self, initial: usize) -> RightCongruence<CharAlphabet> {
         RightCongruence::from_ts(
-            self.into_dts()
+            self.into_linked_list_deterministic()
                 .with_initial(initial)
                 .erase_state_colors()
                 .erase_edge_colors(),
@@ -163,14 +169,18 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     }
 
     /// Build a deterministic transition system from `self`. Panics if `self` is not deterministic.
-    pub fn into_dts(self) -> DTS<CharAlphabet, Q, C> {
-        self.into_nts().try_into().expect("Not deterministic!")
+    pub fn into_linked_list_deterministic(self) -> LinkedListDeterministic<CharAlphabet, Q, C> {
+        self.into_linked_list_nondeterministic()
+            .into_deterministic()
     }
 
     /// Build a deterministic transition system from `self` and set the given `initial` state as the
     /// designated initial state of the output object. Panics if `self` is not deterministic.
-    pub fn into_dts_with_initial(self, initial: usize) -> WithInitial<DTS<CharAlphabet, Q, C>> {
-        self.into_dts().with_initial(initial)
+    pub fn into_linked_list_deterministic_with_initial(
+        self,
+        initial: usize,
+    ) -> WithInitial<LinkedListDeterministic<CharAlphabet, Q, C>> {
+        self.into_linked_list_deterministic().with_initial(initial)
     }
 
     /// Assigns the given `color` to the state with the given index `idx`.
@@ -200,7 +210,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
     pub fn with_transitions<
-        E: IntoEdgeTuple<DTS<CharAlphabet, Q, C>>,
+        E: IntoEdgeTuple<LinkedListDeterministic<CharAlphabet, Q, C>>,
         T: IntoIterator<Item = E>,
     >(
         mut self,
@@ -237,7 +247,10 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     ///     .with_edges([(1, 'b', 0)]) // We can also skip the `Void` entry at position 3
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
-    pub fn with_edges<E: IntoEdgeTuple<DTS<CharAlphabet, Q, C>>, I: IntoIterator<Item = E>>(
+    pub fn with_edges<
+        E: IntoEdgeTuple<LinkedListDeterministic<CharAlphabet, Q, C>>,
+        I: IntoIterator<Item = E>,
+    >(
         mut self,
         iter: I,
     ) -> Self {
@@ -248,11 +261,13 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
 
     /// Turns `self` into a [`RightCongruence`] with the given initial state. Panics if `self` is not deterministic.
     pub fn into_right_congruence(self, initial: usize) -> RightCongruence<CharAlphabet, Q, C> {
-        RightCongruence::from_ts(self.into_dts().with_initial(initial))
+        RightCongruence::from_ts(self.into_linked_list_deterministic().with_initial(initial))
     }
 
     /// Collects self into a non-deterministic transition system.
-    pub fn into_nts(self) -> NTS<CharAlphabet, Q, C> {
+    pub fn into_linked_list_nondeterministic(
+        self,
+    ) -> LinkedListNondeterministic<CharAlphabet, Q, C> {
         let alphabet =
             CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
         let num_states = self
@@ -261,7 +276,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
             .flat_map(|(q, _, _, p)| [*p, *q])
             .unique()
             .count();
-        let mut ts = NTS::for_alphabet(alphabet);
+        let mut ts = LinkedListNondeterministic::for_alphabet(alphabet);
         let colors_it = (0..num_states).map(|x| {
             if let Some(color) =
                 self.colors

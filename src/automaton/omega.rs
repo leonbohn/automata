@@ -54,14 +54,14 @@ impl OmegaAcceptanceCondition {
 /// such as when parsing automata. One should prefer using specific types such as
 /// [`DPA`] whenever possible.
 pub struct OmegaAutomaton<A: Alphabet> {
-    pub(super) ts: NTS<A, usize, AcceptanceMask>,
+    pub(super) ts: LinkedListNondeterministic<A, usize, AcceptanceMask>,
     pub(super) initial: usize,
     pub(super) acc: OmegaAcceptanceCondition,
 }
 
 /// A deterministic variant of [`OmegaAutomaton`].
 pub struct DeterministicOmegaAutomaton<A: Alphabet> {
-    pub(super) ts: DTS<A, usize, AcceptanceMask>,
+    pub(super) ts: LinkedListDeterministic<A, usize, AcceptanceMask>,
     pub(super) initial: usize,
     pub(super) acc: OmegaAcceptanceCondition,
 }
@@ -70,7 +70,7 @@ impl<A: Alphabet> OmegaAutomaton<A> {
     /// Creates a new instance from the given transition system, initial state and
     /// acceptance condition.
     pub fn new(
-        ts: NTS<A, usize, AcceptanceMask>,
+        ts: LinkedListNondeterministic<A, usize, AcceptanceMask>,
         initial: usize,
         acc: OmegaAcceptanceCondition,
     ) -> Self {
@@ -89,7 +89,7 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
     /// Creates a new instance from the given *deterministic* transition system,
     /// initial state and acceptance condition.
     pub fn new(
-        ts: DTS<A, usize, AcceptanceMask>,
+        ts: LinkedListDeterministic<A, usize, AcceptanceMask>,
         initial: usize,
         acc: OmegaAcceptanceCondition,
     ) -> Self {
@@ -124,7 +124,7 @@ impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutoma
                         .map(move |sym| (edge.source(), sym, edge.color(), edge.target()))
                 })
             }))
-            .into_dts();
+            .into_linked_list_deterministic();
         DeterministicOmegaAutomaton::new(ts, value.initial, value.acc)
     }
 }
@@ -137,7 +137,9 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
     type Error = String;
     fn try_from(value: DeterministicOmegaAutomaton<CharAlphabet>) -> Result<Self, Self::Error> {
         let size = value.size();
-        let mut ts = DTS::for_alphabet(HoaAlphabet::try_from_char_alphabet(value.alphabet())?);
+        let mut ts = LinkedListDeterministic::for_alphabet(HoaAlphabet::try_from_char_alphabet(
+            value.alphabet(),
+        )?);
 
         for q in value.state_indices() {
             assert!(q < size, "The state indices must be contiguous for this!");
@@ -170,7 +172,10 @@ impl<A: Alphabet> TryFrom<OmegaAutomaton<A>> for DeterministicOmegaAutomaton<A> 
     type Error = ();
 
     fn try_from(value: OmegaAutomaton<A>) -> Result<Self, Self::Error> {
-        let dts = value.ts.try_into()?;
+        if !value.ts.is_deterministic() {
+            return Err(());
+        }
+        let dts = value.ts.into_deterministic();
         Ok(Self::new(dts, value.initial, value.acc))
     }
 }
@@ -180,7 +185,10 @@ impl<A: Alphabet> TryFrom<&OmegaAutomaton<A>> for DeterministicOmegaAutomaton<A>
     type Error = ();
 
     fn try_from(value: &OmegaAutomaton<A>) -> Result<Self, Self::Error> {
-        let dts = (&value.ts).try_into()?;
+        if !value.ts.is_deterministic() {
+            return Err(());
+        }
+        let dts = value.ts.clone().into_deterministic();
         Ok(Self::new(dts, value.initial, value.acc))
     }
 }
@@ -204,15 +212,15 @@ impl<A: Alphabet> TransitionSystem for OmegaAutomaton<A> {
 
     type EdgeColor = AcceptanceMask;
 
-    type EdgeRef<'this> = <DTS<A, usize, AcceptanceMask> as TransitionSystem>::EdgeRef<'this>
+    type EdgeRef<'this> = <LinkedListDeterministic<A, usize, AcceptanceMask> as TransitionSystem>::EdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = <DTS<A, usize, AcceptanceMask> as TransitionSystem>::EdgesFromIter<'this>
+    type EdgesFromIter<'this> = <LinkedListDeterministic<A, usize, AcceptanceMask> as TransitionSystem>::EdgesFromIter<'this>
     where
         Self: 'this;
 
-    type StateIndices<'this> = <DTS<A, usize, AcceptanceMask> as TransitionSystem>::StateIndices<'this>
+    type StateIndices<'this> = <LinkedListDeterministic<A, usize, AcceptanceMask> as TransitionSystem>::StateIndices<'this>
     where
         Self: 'this;
 
@@ -242,15 +250,15 @@ impl<A: Alphabet> TransitionSystem for DeterministicOmegaAutomaton<A> {
 
     type EdgeColor = AcceptanceMask;
 
-    type EdgeRef<'this> = <DTS<A, usize, AcceptanceMask> as TransitionSystem>::EdgeRef<'this>
+    type EdgeRef<'this> = <LinkedListDeterministic<A, usize, AcceptanceMask> as TransitionSystem>::EdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = <DTS<A, usize, AcceptanceMask> as TransitionSystem>::EdgesFromIter<'this>
+    type EdgesFromIter<'this> = <LinkedListDeterministic<A, usize, AcceptanceMask> as TransitionSystem>::EdgesFromIter<'this>
     where
         Self: 'this;
 
-    type StateIndices<'this> = <DTS<A, usize, AcceptanceMask> as TransitionSystem>::StateIndices<'this>
+    type StateIndices<'this> = <LinkedListDeterministic<A, usize, AcceptanceMask> as TransitionSystem>::StateIndices<'this>
     where
         Self: 'this;
 
@@ -274,11 +282,11 @@ impl<A: Alphabet> TransitionSystem for DeterministicOmegaAutomaton<A> {
 }
 
 impl<A: Alphabet> PredecessorIterable for OmegaAutomaton<A> {
-    type PreEdgeRef<'this> = <DTS<A, usize, AcceptanceMask> as PredecessorIterable>::PreEdgeRef<'this>
+    type PreEdgeRef<'this> = <LinkedListDeterministic<A, usize, AcceptanceMask> as PredecessorIterable>::PreEdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> =  <DTS<A, usize, AcceptanceMask> as PredecessorIterable>::EdgesToIter<'this>
+    type EdgesToIter<'this> =  <LinkedListNondeterministic<A, usize, AcceptanceMask> as PredecessorIterable>::EdgesToIter<'this>
     where
         Self: 'this;
 
@@ -288,11 +296,11 @@ impl<A: Alphabet> PredecessorIterable for OmegaAutomaton<A> {
 }
 
 impl<A: Alphabet> PredecessorIterable for DeterministicOmegaAutomaton<A> {
-    type PreEdgeRef<'this> = <DTS<A, usize, AcceptanceMask> as PredecessorIterable>::PreEdgeRef<'this>
+    type PreEdgeRef<'this> = <LinkedListDeterministic<A, usize, AcceptanceMask> as PredecessorIterable>::PreEdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> =  <DTS<A, usize, AcceptanceMask> as PredecessorIterable>::EdgesToIter<'this>
+    type EdgesToIter<'this> =  <LinkedListDeterministic<A, usize, AcceptanceMask> as PredecessorIterable>::EdgesToIter<'this>
     where
         Self: 'this;
 

@@ -14,8 +14,12 @@ use crate::{automaton::InfiniteWordAutomaton, math::Partition, prelude::*};
 /// defaults to [`MinEvenParityCondition`], meaning the automaton accepts
 /// if the least color that appears infinitely often during
 /// a run is even.
-pub type DPA<A = CharAlphabet, Q = Void, Sem = MinEvenParityCondition, D = DTS<A, Q, usize>> =
-    InfiniteWordAutomaton<A, Sem, Q, usize, D>;
+pub type DPA<
+    A = CharAlphabet,
+    Q = Void,
+    Sem = MinEvenParityCondition,
+    D = LinkedListDeterministic<A, Q, usize>,
+> = InfiniteWordAutomaton<A, Sem, Q, usize, D>;
 /// Helper type alias for converting a given transition system into a [`DPA`]
 /// with the given semantics.
 pub type IntoDPA<T, Sem = MinEvenParityCondition> =
@@ -488,7 +492,7 @@ mod tests {
 
     #[test_log::test]
     fn normalize_dpa() {
-        let dpa = NTS::builder()
+        let dpa = LinkedListNondeterministic::builder()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 2, 0),
@@ -496,7 +500,7 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 1),
             ])
-            .into_nts()
+            .into_linked_list_nondeterministic()
             .into_deterministic()
             .with_initial(0)
             .collect_dpa();
@@ -510,7 +514,7 @@ mod tests {
     }
 
     fn example_dpa() -> DPA {
-        NTS::builder()
+        LinkedListNondeterministic::builder()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 0, 0),
@@ -541,7 +545,7 @@ mod tests {
     #[test_log::test]
     fn dpa_equivalences() {
         let good = [
-            NTS::builder()
+            LinkedListNondeterministic::builder()
                 .default_color(())
                 .with_transitions([
                     (0, 'a', 0, 1),
@@ -549,10 +553,10 @@ mod tests {
                     (1, 'a', 1, 1),
                     (1, 'b', 0, 0),
                 ])
-                .into_dts()
+                .into_linked_list_deterministic()
                 .with_initial(0)
                 .collect_dpa(),
-            NTS::builder()
+            LinkedListNondeterministic::builder()
                 .default_color(())
                 .with_transitions([
                     (0, 'a', 5, 1),
@@ -562,24 +566,24 @@ mod tests {
                     (2, 'a', 3, 0),
                     (2, 'b', 5, 2),
                 ])
-                .into_dts()
+                .into_linked_list_deterministic()
                 .with_initial(0)
                 .collect_dpa(),
         ];
         let bad = [
-            NTS::builder()
+            LinkedListNondeterministic::builder()
                 .default_color(())
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 0, 0)])
-                .into_dts()
+                .into_linked_list_deterministic()
                 .with_initial(0)
                 .collect_dpa(),
-            NTS::builder()
+            LinkedListNondeterministic::builder()
                 .default_color(())
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 2, 0)])
-                .into_dts()
+                .into_linked_list_deterministic()
                 .with_initial(0)
                 .collect_dpa(),
-            NTS::builder()
+            LinkedListNondeterministic::builder()
                 .default_color(())
                 .with_transitions([
                     (0, 'a', 4, 1),
@@ -587,7 +591,7 @@ mod tests {
                     (1, 'a', 5, 0),
                     (1, 'b', 3, 1),
                 ])
-                .into_dts()
+                .into_linked_list_deterministic()
                 .with_initial(0)
                 .collect_dpa(),
         ];
@@ -608,7 +612,7 @@ mod tests {
 
     #[test]
     fn dpa_run() {
-        let dpa = NTS::builder()
+        let dpa = LinkedListNondeterministic::builder()
             .with_transitions([
                 (0, 'a', 1, 1),
                 (0, 'b', 1, 0),
@@ -624,16 +628,16 @@ mod tests {
 
     #[test]
     fn dpa_inclusion() {
-        let univ = NTS::builder()
+        let univ = LinkedListNondeterministic::builder()
             .default_color(())
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 2, 0)])
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(0)
             .collect_dpa();
-        let aomega = NTS::builder()
+        let aomega = LinkedListNondeterministic::builder()
             .default_color(())
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(0)
             .collect_dpa();
         assert!(univ.includes(&aomega));
@@ -642,7 +646,7 @@ mod tests {
 
     #[test_log::test]
     fn dpa_equivalence_clases() {
-        let dpa = NTS::builder()
+        let dpa = LinkedListNondeterministic::builder()
             .with_transitions([
                 (0, 'a', 0, 1),
                 (0, 'b', 1, 0),
@@ -659,7 +663,7 @@ mod tests {
         assert!(cong.congruent("", "aa"));
         assert!(cong.congruent("ab", "baaba"));
 
-        let dpa = NTS::builder()
+        let dpa = LinkedListNondeterministic::builder()
             .with_transitions([
                 (0, 'a', 0, 0),
                 (0, 'b', 0, 1),

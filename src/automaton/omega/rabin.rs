@@ -10,7 +10,7 @@ use crate::prelude::*;
 /// if no color from `fin` is visited infinitely often and at least one color from `inf` is
 /// visited infinitely often. Overall, a Rabin condition is then satisfied if at least one of
 /// its constituent pairs is satisfied.
-pub type DRA<A = CharAlphabet, Q = Void, C = usize, D = DTS<A, Q, C>> =
+pub type DRA<A = CharAlphabet, Q = Void, C = usize, D = LinkedListDeterministic<A, Q, C>> =
     InfiniteWordAutomaton<A, RabinCondition<C>, Q, C, D>;
 /// Helper type alias for casting a given transition system `T` into a [`DRA`].
 pub type IntoDRA<T> = DRA<<T as TransitionSystem>::Alphabet, StateColor<T>, EdgeColor<T>, T>;
@@ -115,7 +115,7 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 1),
             ])
-            .into_dts();
+            .into_linked_list_deterministic();
         let dra = DRA::from_parts_with_acceptance(ts, 0, [RabinPair::from_iters([], [1])].into());
         assert!(dra.accepts(upw!("ba")));
         assert!(!dra.accepts(upw!("a")));

@@ -406,11 +406,11 @@ mod tests {
 
     #[test]
     fn product_subalphabet() {
-        let l: MealyMachine = NTS::builder()
+        let l: MealyMachine = LinkedListNondeterministic::builder()
             .default_color(Void)
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
             .into_mealy(0);
-        let r: MealyMachine = NTS::builder()
+        let r: MealyMachine = LinkedListNondeterministic::builder()
             .default_color(Void)
             .with_transitions([(0, 'a', 0, 0)])
             .into_mealy(0);

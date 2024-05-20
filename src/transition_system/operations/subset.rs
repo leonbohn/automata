@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn subset_construction() {
-        let nts = NTS::builder()
+        let nts = LinkedListNondeterministic::builder()
             .default_color(false)
             .with_transitions([
                 (0, 'a', 0),
@@ -217,7 +217,7 @@ mod tests {
                 (1, 'b', 1),
                 (1, 'a', 0),
             ])
-            .into_nts()
+            .into_linked_list_nondeterministic()
             .with_initial(0);
 
         let dts = nts.subset_construction();
