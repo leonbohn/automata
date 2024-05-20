@@ -287,7 +287,7 @@ mod tests {
 
     #[test]
     fn for_alphabet_inference() {
-        let mut ts = LinkedListDeterministic::for_alphabet(CharAlphabet::of_size(3));
+        let mut ts = LinkedListTransitionSystem::for_alphabet(CharAlphabet::of_size(3));
         assert_eq!(ts.alphabet().size(), 3);
 
         let q0 = ts.add_state(false);
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn sprout_after_creating() {
-        let mut ts = LinkedListDeterministic::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+        let mut ts = LinkedListTransitionSystem::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
         let q0 = ts.add_state(false);
         let q1 = ts.add_state(true);
         assert_eq!(ts.edge(q0, 'a'), None);

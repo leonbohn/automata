@@ -24,9 +24,9 @@ pub mod operations;
 /// be removed. This is useful for constructing transition systems programmatically.
 pub mod impls;
 pub use impls::{
-    CollectLinkedListDeterministic, EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic,
-    IntoEdgeListsDeterministic, IntoLinkedListNondeterministic, LinkedListDeterministic,
-    LinkedListNondeterministic,
+    CollectLinkedList, EdgeLists, EdgeListsNondeterministic, IntoEdgeLists,
+    IntoLinkedListNondeterministic, LinkedListNondeterministic, LinkedListTransitionSystem,
+    LinkedListTransitionSystemEdge,
 };
 
 /// Contains implementations and definitions for dealing with paths through a transition system.

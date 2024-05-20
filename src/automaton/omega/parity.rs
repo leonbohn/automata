@@ -14,12 +14,8 @@ use crate::{automaton::InfiniteWordAutomaton, math::Partition, prelude::*};
 /// defaults to [`MinEvenParityCondition`], meaning the automaton accepts
 /// if the least color that appears infinitely often during
 /// a run is even.
-pub type DPA<
-    A = CharAlphabet,
-    Q = Void,
-    Sem = MinEvenParityCondition,
-    D = LinkedListDeterministic<A, Q, usize>,
-> = InfiniteWordAutomaton<A, Sem, Q, usize, D>;
+pub type DPA<A = CharAlphabet, Q = Void, Sem = MinEvenParityCondition, D = DTS<A, Q, usize>> =
+    InfiniteWordAutomaton<A, Sem, Q, usize, D>;
 /// Helper type alias for converting a given transition system into a [`DPA`]
 /// with the given semantics.
 pub type IntoDPA<T, Sem = MinEvenParityCondition> =
@@ -472,7 +468,7 @@ where
             .map_edge_colors_full(|q, e, _, _| {
                 let Some(c) = recoloring
                     .iter()
-                    .find(|((p, f), _)| usize::from(*p) == q && f == e)
+                    .find(|((p, f), _)| *p == q && f == e)
                     .map(|(_, c)| *c)
                 else {
                     panic!("Could not find recoloring for edge ({}, {:?})", q, e);

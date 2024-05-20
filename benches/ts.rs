@@ -3,7 +3,7 @@ use automata::prelude::*;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use itertools::Itertools;
 
-fn bench_dts() -> WithInitial<LinkedListDeterministic<CharAlphabet, usize, usize>> {
+fn bench_dts() -> WithInitial<LinkedListTransitionSystem<CharAlphabet, usize, usize>> {
     TSBuilder::default()
         .with_state_colors([1, 13, 72, 891, 3, 5])
         .with_transitions([

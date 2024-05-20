@@ -20,8 +20,12 @@ pub struct MealySemantics<C>(PhantomData<C>);
 /// Usually, we are interested in the output of the last state that is reached during a run
 /// on a word. In case of a deterministic Mealy machine, this is the only output that is
 /// produced.
-pub type MealyMachine<A = CharAlphabet, Q = Void, C = usize, D = LinkedListDeterministic<A, Q, C>> =
-    FiniteWordAutomaton<A, MealySemantics<C>, Q, C, D>;
+pub type MealyMachine<
+    A = CharAlphabet,
+    Q = Void,
+    C = usize,
+    D = LinkedListTransitionSystem<A, Q, C>,
+> = FiniteWordAutomaton<A, MealySemantics<C>, Q, C, D>;
 
 /// Helper type that takes a pointed transition system and returns the corresponding
 /// [`MealyMachine`].
