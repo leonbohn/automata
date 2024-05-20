@@ -31,7 +31,7 @@ pub type OmegaRunResult<A, Idx, Q, C> = Result<Lasso<A, Idx, Q, C>, Path<A, Idx,
 ///
 /// # Implementaiton
 /// This trait contains mostly convenience functions and provides default implementations. To ensure
-/// performance, the [`Self::collect_dts`] function and any other collectors for different types of
+/// performance, the [`Self::collect_linked_list_deterministic`] function and any other collectors for different types of
 /// transition system implementations should be overridden. By default, they simply insert states
 /// and edges one by one and are therefore horribly inefficient.
 pub trait Deterministic: TransitionSystem {
@@ -499,28 +499,48 @@ pub trait Deterministic: TransitionSystem {
         self.finite_run_from(origin, word).ok().map(|p| p.reached())
     }
 
-    /// Collects `self` into a new [`DTS`] over the same alphabet. This is used, for example, after a chain of
+    /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
+    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
+    #[cfg(feature = "linked_list_ts")]
+    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>
+    where
+        Self: Sized,
+    {
+        DTS::from_parts(self)
+    }
+    /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
+    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
+    #[cfg(not(feature = "linked_list_ts"))]
+    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>
+    where
+        Self: Sized,
+        EdgeColor<Self>: Hash + Eq,
+    {
+        self.collect_edge_lists_deterministic()
+    }
+
+    /// Collects `self` into a new [`LinkedListDeterministic`] over the same alphabet. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_dts(
+    /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
+    fn collect_linked_list_deterministic(
         self,
     ) -> LinkedListDeterministic<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
         let (ts, _map) = LinkedListDeterministic::sprout_from_ts(self);
         ts
     }
 
-    /// Collects `self` into a new [`DTS`] over the same alphabet, while also returning the
+    /// Collects `self` into a new [`LinkedListDeterministic`] over the same alphabet, while also returning the
     /// index of the state corresponding to the old initial state.
     /// This is used, for example, after a chain of  manipulations on a transition system,
     /// to obtain a condensed version that is then faster to work with.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one
     /// after the other and subsequently inserts all transitions, see
-    /// [`Deterministic::collect_dts`] for details.
+    /// [`Deterministic::collect_linked_list_deterministic`] for details.
     #[allow(clippy::type_complexity)]
-    fn collect_dts_pointed(
+    fn collect_linked_list_determinsitic_pointed(
         self,
     ) -> (
         LinkedListDeterministic<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
@@ -538,16 +558,15 @@ pub trait Deterministic: TransitionSystem {
         )
     }
 
-    /// Collects `self` into a new [`MutableTs`] over the same alphabet. This is used, for example, after a chain of
+    /// Collects `self` into a new [`EdgeListsDeterministic`] over the same alphabet. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     /// This method additionally also returns the initial state of the collected TS.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_hash_ts_pointed(self) -> (IntoEdgeListsDeterministic<Self>, usize)
+    /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
+    fn collect_edge_lists_deterministic_pointed(self) -> (IntoEdgeListsDeterministic<Self>, usize)
     where
         EdgeColor<Self>: Hash + Eq,
-        StateColor<Self>: Hash + Eq,
         Self: Pointed,
     {
         let old_initial = self.initial();
@@ -560,15 +579,14 @@ pub trait Deterministic: TransitionSystem {
         )
     }
 
-    /// Collects `self` into a new [`MutableTs`] over the same alphabet. This is used, for example, after a chain of
+    /// Collects `self` into a new [`EdgeListsDeterministic`] over the same alphabet. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_hash_ts(self) -> IntoEdgeListsDeterministic<Self>
+    /// subsequently inserts all transitions, see [`Deterministic::collect_edge_lists_deterministic`] for details.
+    fn collect_edge_lists_deterministic(self) -> IntoEdgeListsDeterministic<Self>
     where
         EdgeColor<Self>: Hash + Eq,
-        StateColor<Self>: Hash + Eq,
     {
         let (ts, _map) = EdgeLists::sprout_from_ts(self);
         ts
@@ -582,7 +600,7 @@ pub trait Deterministic: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let ts = TSBuilder::without_colors().with_edges([(0, 'a', 1), (1, 'b', 0)]).into_dts();
+    /// let ts = TSBuilder::without_colors().with_edges([(0, 'a', 1), (1, 'b', 0)]).into_linked_list_deterministic();
     /// let (collected, initial) = ts.with_initial(0).collect_complete_pointed(Void, Void);
     /// assert_eq!(collected.size(), 3);
     ///
@@ -605,7 +623,7 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
         Self::Alphabet: IndexedAlphabet,
     {
-        let (mut ts, initial) = self.collect_dts_pointed();
+        let (mut ts, initial) = self.collect_linked_list_determinsitic_pointed();
         if !ts.is_complete() {
             let sink = ts.add_state(sink_state_color);
             for q in ts.state_indices() {
@@ -647,7 +665,7 @@ pub trait Deterministic: TransitionSystem {
     {
         let reachable_indices = self.reachable_state_indices().collect::<Set<_>>();
         let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
-        restricted.collect_dts_pointed()
+        restricted.collect_linked_list_determinsitic_pointed()
     }
 
     /// Compute the escape prefixes of a set of omega words on a transition system.
@@ -788,11 +806,11 @@ where
     Ts: Deterministic,
     F: Fn(Ts::StateColor) -> D,
 {
-    fn collect_dts(
+    fn collect_linked_list_deterministic(
         self,
     ) -> LinkedListDeterministic<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
         let (ts, f) = self.into_parts();
-        let (alphabet, states, edges) = ts.collect_dts().into_parts();
+        let (alphabet, states, edges) = ts.collect_linked_list_deterministic().into_parts();
         let states = states.into_iter().map(|q| q.recolor(&f)).collect();
         LinkedListDeterministic::from_parts(alphabet, states, edges)
     }
@@ -812,11 +830,11 @@ where
     Ts: Deterministic,
     F: Fn(Ts::EdgeColor) -> D,
 {
-    fn collect_dts(
+    fn collect_linked_list_deterministic(
         self,
     ) -> LinkedListDeterministic<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
         let (ts, f) = self.into_parts();
-        let (alphabet, states, edges) = ts.collect_dts().into_parts();
+        let (alphabet, states, edges) = ts.collect_linked_list_deterministic().into_parts();
         let edges = edges.into_iter().map(|e| e.recolor(&f)).collect();
         LinkedListDeterministic::from_parts(alphabet, states, edges)
     }

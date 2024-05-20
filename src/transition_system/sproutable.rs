@@ -11,10 +11,16 @@ use super::StateIndex;
 ///
 /// Usually, this will *not* be implemented by TS that have a [designated initial state](`Pointed`).
 /// For those, a dedicated method should be used.
-pub trait ForAlphabet<A: Alphabet> {
+pub trait ForAlphabet<A: Alphabet>: Sized {
     /// Creates an instance of `Self` for the given [`Alphabet`]. The resulting
     /// TS should be empty.
     fn for_alphabet(from: A) -> Self;
+
+    /// Creates an instance of `Self` for the given [`Alphabet`] and a hint for the size of the transition
+    /// system allowing for preallocation of memory. The resulting TS should be empty.
+    fn for_alphabet_size_hint(from: A, _size_hint: usize) -> Self {
+        Self::for_alphabet(from)
+    }
 }
 
 /// Marker trait for [`Alphabet`]s that can be indexed, i.e. where we can associate each
@@ -124,7 +130,7 @@ pub trait Sproutable: TransitionSystem {
     /// let source: DTS<CharAlphabet, usize, usize> = TSBuilder::default()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
     ///     .with_state_colors([0])
-    ///     .into_dts();
+    ///     .into_edge_lists_deterministic();
     ///
     /// let (without_edge_colors, map1): (DTS<CharAlphabet, usize, Void>, _) = DTS::sprout_from_ts(&source);
     /// let (without_state_colors, map2): (DTS<CharAlphabet, Void, usize>, _) = DTS::sprout_from_ts(&source);
@@ -179,7 +185,7 @@ pub trait Sproutable: TransitionSystem {
     /// let mut ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
-    ///     .into_dts();
+    ///     .into_linked_list_deterministic();
     /// assert!(!ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
     /// assert_eq!(ts.size(), 2);
@@ -194,7 +200,7 @@ pub trait Sproutable: TransitionSystem {
     /// let mut ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
-    ///     .into_dts();
+    ///     .into_linked_list_deterministic();
     /// assert!(ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
     /// assert_eq!(ts.size(), 1);

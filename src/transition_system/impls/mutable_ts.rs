@@ -62,6 +62,34 @@ impl<A: Alphabet, C: Clone + Hash + Eq, Q: Clone, const DET: bool> EdgeLists<A, 
         }
     }
 
+    pub fn into_deterministic(self) -> EdgeListsDeterministic<A, Q, C> {
+        recast(self)
+    }
+
+    pub fn is_deterministic(&self) -> bool {
+        for state in self.state_indices() {
+            for (l, r) in self
+                .edges_from(state)
+                .unwrap()
+                .zip(self.edges_from(state).unwrap().skip(1))
+            {
+                if self.alphabet().overlapping(l.expression(), r.expression()) {
+                    tracing::trace!(
+                        "found overlapping edges from {}: on {} to {} and on {} to {}",
+                        l.source(),
+                        l.expression().show(),
+                        l.target(),
+                        r.expression().show(),
+                        r.target(),
+                    );
+                    assert!(!DET, "found overlapping edges even though the type indicates this is deterministic");
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     pub fn extract_edge_tuples_for<F>(
         &mut self,
         state: impl Indexes<Self>,
@@ -157,7 +185,7 @@ impl<A: Alphabet, C: Clone + Hash + Eq, Q: Clone, const DET: bool> EdgeLists<A, 
     }
 }
 
-impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, const DET: bool>
+impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool>
     crate::transition_system::Shrinkable for EdgeLists<A, Q, C, DET>
 {
     fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Q> {
@@ -389,7 +417,9 @@ where
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for EdgeLists<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool> Sproutable
+    for EdgeLists<A, Q, C, DET>
+{
     /// Adds a state with given `color` to the transition system, returning the index of
     /// the new state.
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
@@ -403,6 +433,7 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for EdgeLists<A, Q,
     where
         E: IntoEdgeTuple<Self>,
     {
+        // TODO: verify that DET is correct and add edge differently
         let (q, a, c, p) = t.into_edge_tuple();
 
         assert!(
@@ -431,8 +462,8 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for EdgeLists<A, Q,
     }
 }
 
-impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq> ForAlphabet<A>
-    for EdgeLists<A, Q, C>
+impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool> ForAlphabet<A>
+    for EdgeLists<A, Q, C, DET>
 {
     fn for_alphabet(from: A) -> Self {
         Self {
@@ -654,4 +685,14 @@ where
     fn drop(&mut self) {
         debug!("Not really sure how to handle dropping of ExtractAllEdgeTuples. Basically all the drop method is called for each ExtractEdgeTuplesFrom, so we should probably be fine. Or not. Who knows.");
     }
+}
+
+fn recast<A: Alphabet, Q: Clone, C: Clone + Eq + Hash, const DET: bool, const OUT_DET: bool>(
+    ts: EdgeLists<A, Q, C, DET>,
+) -> EdgeLists<A, Q, C, OUT_DET> {
+    if !DET && OUT_DET && !ts.is_deterministic() {
+        panic!("cannot convert non-deterministic transition system to deterministic");
+    }
+    let EdgeLists { alphabet, states } = ts;
+    EdgeLists { alphabet, states }
 }

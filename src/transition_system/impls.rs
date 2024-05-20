@@ -48,6 +48,18 @@ impl From<Idx> for usize {
     }
 }
 
+impl std::borrow::Borrow<usize> for Idx {
+    fn borrow(&self) -> &usize {
+        &self.0
+    }
+}
+
+impl PartialEq<usize> for Idx {
+    fn eq(&self, other: &usize) -> bool {
+        &self.0 == other
+    }
+}
+
 pub(crate) mod mutable_ts;
 use std::{fmt::Display, ops::Deref};
 

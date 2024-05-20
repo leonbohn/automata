@@ -445,7 +445,7 @@ pub trait TransitionSystem: Sized {
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
-    ///     .into_dts_with_initial(0);
+    ///     .into_linked_list_deterministic_with_initial(0);
     /// let colored = ts.with_state_color(false);
     /// assert_eq!(colored.reached_state_color("a"), Some(false));
     /// assert_eq!(colored.with_state_color(true).reached_state_color("a"), Some(true));

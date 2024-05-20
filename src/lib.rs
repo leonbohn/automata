@@ -5,11 +5,28 @@
 /// The prelude is supposed to make using this package easier. Including everything, i.e.
 /// `use automata::prelude::*;` should be enough to use the package.
 pub mod prelude {
+    #[cfg(feature = "linked_list_ts")]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
+    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = LinkedListDeterministic<A, Q, C>;
+    #[cfg(feature = "linked_list_ts")]
+    /// Points to the default implementation of [`TransitionSystem`] in the case where it is
+    /// **now known to be** [`Deterministic`].
+    pub type NTS<A = CharAlphabet, Q = Void, C = Void> = LinkedListNondeterministic<A, Q, C>;
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
+    #[cfg(not(feature = "linked_list_ts"))]
     pub type DTS<A = CharAlphabet, Q = Void, C = Void> = EdgeListsDeterministic<A, Q, C>;
     /// Points to the default implementation of [`TransitionSystem`] in the case where it is
     /// **now known to be** [`Deterministic`].
+    #[cfg(not(feature = "linked_list_ts"))]
     pub type NTS<A = CharAlphabet, Q = Void, C = Void> = EdgeListsNondeterministic<A, Q, C>;
+
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case which
+    /// is mutable. Especially, this type implements [`Shrinkable`] and [`Sproutable`], which allows
+    /// removing and adding transitions.
+    pub type MutableTs<A = CharAlphabet, Q = Void, C = Void> = EdgeListsDeterministic<A, Q, C>;
+    /// The nondeterministic variant of [`MutableTs`].
+    pub type MutableTsNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
+        EdgeListsNondeterministic<A, Q, C>;
 
     pub use super::{
         alphabet,
