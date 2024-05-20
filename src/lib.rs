@@ -5,6 +5,12 @@
 /// The prelude is supposed to make using this package easier. Including everything, i.e.
 /// `use automata::prelude::*;` should be enough to use the package.
 pub mod prelude {
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
+    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = EdgeListsDeterministic<A, Q, C>;
+    /// Points to the default implementation of [`TransitionSystem`] in the case where it is
+    /// **now known to be** [`Deterministic`].
+    pub type NTS<A = CharAlphabet, Q = Void, C = Void> = EdgeListsNondeterministic<A, Q, C>;
+
     pub use super::{
         alphabet,
         alphabet::{CharAlphabet, Expression, Matcher, Symbol},
@@ -24,9 +30,10 @@ pub mod prelude {
             predecessors::PredecessorIterable,
             reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
-            Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, ForAlphabet,
-            IndexType, Indexes, IntoEdgeTuple, IsEdge, MutableTs, Path, Shrinkable, Sproutable,
-            StateColor, SymbolOf, TSBuilder, TransitionSystem, DTS, NTS,
+            Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
+            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, IndexType, Indexes,
+            IntoEdgeTuple, IsEdge, LinkedListDeterministic, LinkedListNondeterministic, Path,
+            Shrinkable, Sproutable, StateColor, SymbolOf, TSBuilder, TransitionSystem,
         },
         upw,
         word::{

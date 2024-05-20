@@ -118,7 +118,7 @@ impl<Sim: Deterministic + Pointed> Congruence for Sim {}
 /// transition system with a designated initial state.
 #[derive(Clone)]
 pub struct RightCongruence<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
-    ts: DTS<A, Q, C>,
+    ts: LinkedListDeterministic<A, Q, C>,
     initial: usize,
     minimal_representatives: Vec<Class<A::Symbol>>,
 }
@@ -127,13 +127,13 @@ impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
     /// Creates a new [`RightCongruence`] for the given [`Alphabet`]. Since there always has be an initial state,
     /// the method also expects a color for the initial state which it inserts.
     pub fn new_with_initial_color(alphabet: A, initial_color: Q) -> Self {
-        let mut ts = DTS::for_alphabet(alphabet);
+        let mut ts = LinkedListDeterministic::for_alphabet(alphabet);
         let initial = ts.add_state(initial_color);
         Self::from_ts(ts.with_initial(initial))
     }
 
     /// Returns a reference to the underlying transition system.
-    pub fn ts(&self) -> &DTS<A, Q, C> {
+    pub fn ts(&self) -> &LinkedListDeterministic<A, Q, C> {
         &self.ts
     }
 
@@ -240,7 +240,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for RightCongruence<A, Q,
     type StateIndex = usize;
     type EdgeColor = C;
     type StateColor = Q;
-    type EdgeRef<'this> = &'this crate::transition_system::impls::NTEdge<A::Expression, C> where Self: 'this;
+    type EdgeRef<'this> = &'this crate::transition_system::impls::LinkedListTransitionSystemEdge<A::Expression, C> where Self: 'this;
     type EdgesFromIter<'this> = crate::transition_system::impls::NTSEdgesFromIter<'this, A::Expression, C>
     where
         Self: 'this;
@@ -274,11 +274,11 @@ impl<A: Alphabet, Q: Clone, C: Clone> Pointed for RightCongruence<A, Q, C> {
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone> PredecessorIterable for RightCongruence<A, Q, C> {
-    type PreEdgeRef<'this> = &'this crate::transition_system::impls::NTEdge<A::Expression, C>
+    type PreEdgeRef<'this> = &'this crate::transition_system::impls::LinkedListTransitionSystemEdge<A::Expression, C>
 where
     Self: 'this;
 
-    type EdgesToIter<'this> = crate::transition_system::impls::NTSEdgesToIter<'this, A::Expression, C>
+    type EdgesToIter<'this> = crate::transition_system::impls::LinkedListTransitionSystemEdgesToIter<'this, A::Expression, C, true>
 where
     Self: 'this;
 

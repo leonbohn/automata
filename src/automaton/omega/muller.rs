@@ -13,7 +13,7 @@ use crate::prelude::*;
 /// that this means if a run is not accepting, then the set of colors it visits infinitely
 /// often is not contained in the [`MullerCondition`]. This allows for easy complementation
 /// of a [`DMA`] by simply taking the complement of the [`MullerCondition`].
-pub type DMA<A = CharAlphabet, Q = Void, C = usize, D = DTS<A, Q, C>> =
+pub type DMA<A = CharAlphabet, Q = Void, C = usize, D = LinkedListDeterministic<A, Q, C>> =
     InfiniteWordAutomaton<A, MullerCondition<C>, Q, C, D>;
 /// Helper type alias for casting a given transition system `T` into a [`DMA`].
 pub type IntoDMA<T> = DMA<<T as TransitionSystem>::Alphabet, StateColor<T>, EdgeColor<T>, T>;
@@ -95,7 +95,7 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 1),
             ])
-            .into_dts();
+            .into_linked_list_deterministic();
         let dra =
             DMA::from_parts_with_acceptance(ts, 0, MullerCondition::from_iter_iter([[0], [1]]));
         assert!(dra.accepts(upw!("a")));

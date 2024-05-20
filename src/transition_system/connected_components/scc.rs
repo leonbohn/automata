@@ -346,10 +346,10 @@ mod tests {
         ]
         .into_iter()
         .collect::<Set<_>>();
-        let ts = NTS::builder()
+        let ts = LinkedListNondeterministic::builder()
             .default_color(())
             .with_transitions(&transitions)
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(0);
         let sccs = ts.sccs();
         let first = sccs.first();

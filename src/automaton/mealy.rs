@@ -20,7 +20,7 @@ pub struct MealySemantics<C>(PhantomData<C>);
 /// Usually, we are interested in the output of the last state that is reached during a run
 /// on a word. In case of a deterministic Mealy machine, this is the only output that is
 /// produced.
-pub type MealyMachine<A = CharAlphabet, Q = Void, C = usize, D = DTS<A, Q, C>> =
+pub type MealyMachine<A = CharAlphabet, Q = Void, C = usize, D = LinkedListDeterministic<A, Q, C>> =
     FiniteWordAutomaton<A, MealySemantics<C>, Q, C, D>;
 
 /// Helper type that takes a pointed transition system and returns the corresponding
@@ -138,10 +138,10 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 0, 0),
             ])
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(0)
             .collect_mealy();
-        let mm2: MealyMachine = NTS::builder()
+        let mm2: MealyMachine = LinkedListNondeterministic::builder()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),
@@ -151,10 +151,10 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 1, 0),
             ])
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(0)
             .collect_mealy();
-        let _mm3: MealyMachine = NTS::builder()
+        let _mm3: MealyMachine = LinkedListNondeterministic::builder()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),
@@ -164,7 +164,7 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 0, 2),
             ])
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(0)
             .collect_mealy();
 

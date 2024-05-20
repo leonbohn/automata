@@ -16,18 +16,26 @@ use std::{
 
 use self::alphabet::Matcher;
 
+pub type EdgeListsDeterministic<A, Q, C> = EdgeLists<A, Q, C, true>;
+pub type EdgeListsNondeterministic<A, Q, C> = EdgeLists<A, Q, C, false>;
+
 /// An implementation of a transition system with states of type `Q` and colors of type `C`. It stores
 /// the states and edges in a vector, which allows for fast access and iteration. The states and edges
 /// are indexed by their position in the respective vector.
 #[derive(Clone, PartialEq, Eq)]
-pub struct MutableTs<A: Alphabet, Q = crate::Void, C: Hash + Eq = crate::Void> {
+pub struct EdgeLists<
+    A: Alphabet,
+    Q = crate::Void,
+    C: Hash + Eq = crate::Void,
+    const DET: bool = true,
+> {
     pub(crate) alphabet: A,
     pub(crate) states: BTreeMap<Idx, MutableTsState<A, Q, C>>,
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Indexes<MutableTs<A, Q, C>> for usize {
+impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Indexes<EdgeLists<A, Q, C>> for usize {
     #[inline(always)]
-    fn to_index(&self, ts: &MutableTs<A, Q, C>) -> Option<Idx> {
+    fn to_index(&self, ts: &EdgeLists<A, Q, C>) -> Option<Idx> {
         if *self < ts.states.len() {
             Some(Idx::from(*self))
         } else {
@@ -38,13 +46,14 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Indexes<MutableTs<A, Q, C>> fo
 
 /// Type alias that takes a [`TransitionSystem`] and gives the type of a corresponding [`MutableTs`], i.e. one
 /// with the same alphabet, edge and state colors.
-pub type IntoMutableTs<Ts> = MutableTs<
+pub type IntoEdgeListsDeterministic<Ts> = EdgeLists<
     <Ts as TransitionSystem>::Alphabet,
     <Ts as TransitionSystem>::StateColor,
     <Ts as TransitionSystem>::EdgeColor,
+    true,
 >;
 
-impl<A: Alphabet, C: Clone + Hash + Eq, Q: Clone> MutableTs<A, Q, C> {
+impl<A: Alphabet, C: Clone + Hash + Eq, Q: Clone, const DET: bool> EdgeLists<A, Q, C, DET> {
     /// Creates a new transition system with the given alphabet.
     pub fn new(alphabet: A) -> Self {
         Self {
@@ -148,8 +157,8 @@ impl<A: Alphabet, C: Clone + Hash + Eq, Q: Clone> MutableTs<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq> crate::transition_system::Shrinkable
-    for MutableTs<A, Q, C>
+impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq, const DET: bool>
+    crate::transition_system::Shrinkable for EdgeLists<A, Q, C, DET>
 {
     fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Q> {
         self.mutablets_remove_state(state.to_index(self)?)
@@ -198,7 +207,7 @@ impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq> crate::transition_
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> MutableTs<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool> EdgeLists<A, Q, C, DET> {
     /// Returns an iterator over the [`EdgeIndex`]es of the edges leaving the given state.
     pub(crate) fn mutablets_edges_from(
         &self,
@@ -308,7 +317,9 @@ impl<A: Alphabet, Q, C: Hash + Eq> MutableTsState<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> TransitionSystem for MutableTs<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool> TransitionSystem
+    for EdgeLists<A, Q, C, DET>
+{
     type StateColor = Q;
     type EdgeColor = C;
     type StateIndex = Idx;
@@ -359,7 +370,7 @@ impl<'ts, E, Idx: IndexType, C> Iterator for EdgesFrom<'ts, E, Idx, C> {
     }
 }
 
-impl<A, C, Q> std::fmt::Debug for MutableTs<A, Q, C>
+impl<A, C, Q> std::fmt::Debug for EdgeLists<A, Q, C>
 where
     A: Alphabet,
     C: Debug + Clone + Hash + Eq,
@@ -378,7 +389,7 @@ where
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for EdgeLists<A, Q, C> {
     /// Adds a state with given `color` to the transition system, returning the index of
     /// the new state.
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
@@ -421,7 +432,7 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq> Sproutable for MutableTs<A, Q,
 }
 
 impl<A: Alphabet, Q: Clone + Hash + Eq, C: Clone + Hash + Eq> ForAlphabet<A>
-    for MutableTs<A, Q, C>
+    for EdgeLists<A, Q, C>
 {
     fn for_alphabet(from: A) -> Self {
         Self {
@@ -561,7 +572,7 @@ impl<'a, A: Alphabet, Q, C: Eq + Hash, F> ExtractAllEdgeTuples<'a, A, Q, C, F>
 where
     F: FnMut(Idx, &MutableTsOutEdge<A, C>) -> bool,
 {
-    pub fn new(ts: &'a mut MutableTs<A, Q, C>, pred: F) -> Self {
+    pub fn new<const DET: bool>(ts: &'a mut EdgeLists<A, Q, C, DET>, pred: F) -> Self {
         let mut it = ts.states.values_mut();
         if let Some(state) = it.next() {
             let old_len = state.edges.len();

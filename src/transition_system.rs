@@ -23,7 +23,11 @@ pub mod operations;
 /// This offers a distinct advantage over [`DTS`] in that states and edges can
 /// be removed. This is useful for constructing transition systems programmatically.
 pub mod impls;
-pub use impls::{CollectDTS, DTSAndInitialState, IntoMutableTs, MutableTs, DTS, NTS};
+pub use impls::{
+    CollectLinkedListDeterministic, EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic,
+    IntoEdgeListsDeterministic, IntoLinkedListNondeterministic, LinkedListDeterministic,
+    LinkedListNondeterministic,
+};
 
 /// Contains implementations and definitions for dealing with paths through a transition system.
 pub mod path;

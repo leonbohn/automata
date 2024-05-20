@@ -51,12 +51,16 @@ impl From<Idx> for usize {
 pub(crate) mod mutable_ts;
 use std::{fmt::Display, ops::Deref};
 
-pub use mutable_ts::{IntoMutableTs, MutableTs, MutableTsState};
+pub use mutable_ts::{
+    EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, IntoEdgeListsDeterministic,
+    MutableTsState,
+};
 
-pub(crate) mod nts;
-pub use nts::{NTEdge, NTSEdgesFromIter, NTSEdgesToIter, NTSPartsFor, NTState, NTS};
-
-pub(crate) mod dts;
-pub use dts::{CollectDTS, DTSAndInitialState, DTS};
+pub(crate) mod linked;
+pub use linked::{
+    CollectLinkedListDeterministic, IntoLinkedListNondeterministic, LinkedListDeterministic,
+    LinkedListNondeterministic, LinkedListTransitionSystemEdge,
+    LinkedListTransitionSystemEdgesToIter, LinkedListTransitionSystemState, NTSEdgesFromIter,
+};
 
 use crate::Show;
