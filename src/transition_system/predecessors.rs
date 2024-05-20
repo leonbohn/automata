@@ -1,4 +1,3 @@
-use super::impls::Idx;
 use crate::prelude::*;
 
 use super::EdgeReference;
@@ -100,7 +99,7 @@ where
 }
 
 impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for EdgeLists<A, Q, C> {
-    type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, Idx, C> where Self: 'this;
+    type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, usize, C> where Self: 'this;
     type EdgesToIter<'this> = BTSPredecessors<'this, A, C>
     where
         Self: 'this;
@@ -112,12 +111,12 @@ impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for EdgeLists<A, Q, C>
 /// Iterator over the predecessors of a state in a BTS.
 #[derive(Clone)]
 pub struct BTSPredecessors<'a, A: Alphabet, C: Color> {
-    it: std::slice::Iter<'a, (Idx, A::Expression, C)>,
-    state: Idx,
+    it: std::slice::Iter<'a, (usize, A::Expression, C)>,
+    state: usize,
 }
 
 impl<'a, A: Alphabet, C: Color> Iterator for BTSPredecessors<'a, A, C> {
-    type Item = EdgeReference<'a, A::Expression, Idx, C>;
+    type Item = EdgeReference<'a, A::Expression, usize, C>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.it
@@ -128,7 +127,7 @@ impl<'a, A: Alphabet, C: Color> Iterator for BTSPredecessors<'a, A, C> {
 
 impl<'a, A: Alphabet, C: Color> BTSPredecessors<'a, A, C> {
     /// Creates a new instance from an iterator and a state.
-    pub fn new(it: std::slice::Iter<'a, (Idx, A::Expression, C)>, state: Idx) -> Self {
+    pub fn new(it: std::slice::Iter<'a, (usize, A::Expression, C)>, state: usize) -> Self {
         Self { it, state }
     }
 }

@@ -32,7 +32,7 @@ impl<C> FiniteSemantics<bool, C> for ReachabilityCondition {
 }
 
 /// A deterministic finite automaton (DFA) is a deterministic automaton with a simple acceptance condition. It accepts a finite word if it reaches an accepting state.
-pub type DFA<A = CharAlphabet, C = Void, D = LinkedListDeterministic<A, bool, C>> =
+pub type DFA<A = CharAlphabet, C = Void, D = LinkedListTransitionSystem<A, bool, C>> =
     FiniteWordAutomaton<A, ReachabilityCondition, bool, C, D>;
 
 /// Helper trait for creating a [`DFA`] from a given transition system.

@@ -14,7 +14,7 @@ pub mod prelude {
     pub type NTS<A = CharAlphabet, Q = Void, C = Void> = LinkedListNondeterministic<A, Q, C>;
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     #[cfg(not(feature = "linked_list_ts"))]
-    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = EdgeListsDeterministic<A, Q, C>;
+    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = EdgeLists<A, Q, C>;
     /// Points to the default implementation of [`TransitionSystem`] in the case where it is
     /// **now known to be** [`Deterministic`].
     #[cfg(not(feature = "linked_list_ts"))]
@@ -23,7 +23,7 @@ pub mod prelude {
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case which
     /// is mutable. Especially, this type implements [`Shrinkable`] and [`Sproutable`], which allows
     /// removing and adding transitions.
-    pub type MutableTs<A = CharAlphabet, Q = Void, C = Void> = EdgeListsDeterministic<A, Q, C>;
+    pub type MutableTs<A = CharAlphabet, Q = Void, C = Void> = EdgeLists<A, Q, C>;
     /// The nondeterministic variant of [`MutableTs`].
     pub type MutableTsNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
         EdgeListsNondeterministic<A, Q, C>;
@@ -48,9 +48,9 @@ pub mod prelude {
             reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
-            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, IndexType, Indexes,
-            IntoEdgeTuple, IsEdge, LinkedListDeterministic, LinkedListNondeterministic, Path,
-            Shrinkable, Sproutable, StateColor, SymbolOf, TSBuilder, TransitionSystem,
+            EdgeListsNondeterministic, ForAlphabet, IndexType, Indexes, IntoEdgeTuple, IsEdge,
+            LinkedListNondeterministic, LinkedListTransitionSystem, Path, Shrinkable, Sproutable,
+            StateColor, SymbolOf, TSBuilder, TransitionSystem,
         },
         upw,
         word::{

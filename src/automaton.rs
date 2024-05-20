@@ -459,7 +459,7 @@ mod tests {
         assert!(!dba.accepts(upw!("b")));
 
         assert!(!dba.is_empty());
-        println!("{:?}", dba.give_word());
+        // println!("{:?}", dba.give_word());
 
         println!("{:?}", &dba);
     }

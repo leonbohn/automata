@@ -53,7 +53,7 @@ pub trait Congruence: Deterministic + Pointed {
     {
         let (ts, initial) = self
             .erase_state_colors()
-            .collect_linked_list_determinsitic_pointed();
+            .collect_edge_lists_deterministic_pointed();
         DPA::from_parts(ts, initial)
     }
 
@@ -72,7 +72,7 @@ pub trait Congruence: Deterministic + Pointed {
     {
         let (ts, initial) = self
             .erase_state_colors()
-            .collect_linked_list_determinsitic_pointed();
+            .collect_edge_lists_deterministic_pointed();
         DBA::from_parts(ts, initial)
     }
 
@@ -126,7 +126,7 @@ impl<Sim: Deterministic + Pointed> Congruence for Sim {}
 /// transition system with a designated initial state.
 #[derive(Clone)]
 pub struct RightCongruence<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
-    ts: LinkedListDeterministic<A, Q, C>,
+    ts: LinkedListTransitionSystem<A, Q, C>,
     initial: usize,
     minimal_representatives: Vec<Class<A::Symbol>>,
 }
@@ -135,13 +135,13 @@ impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
     /// Creates a new [`RightCongruence`] for the given [`Alphabet`]. Since there always has be an initial state,
     /// the method also expects a color for the initial state which it inserts.
     pub fn new_with_initial_color(alphabet: A, initial_color: Q) -> Self {
-        let mut ts = LinkedListDeterministic::for_alphabet(alphabet);
+        let mut ts = LinkedListTransitionSystem::for_alphabet(alphabet);
         let initial = ts.add_state(initial_color);
         Self::from_ts(ts.with_initial(initial))
     }
 
     /// Returns a reference to the underlying transition system.
-    pub fn ts(&self) -> &LinkedListDeterministic<A, Q, C> {
+    pub fn ts(&self) -> &LinkedListTransitionSystem<A, Q, C> {
         &self.ts
     }
 

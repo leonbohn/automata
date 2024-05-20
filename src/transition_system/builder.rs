@@ -8,7 +8,7 @@ use crate::{
 
 use self::math::Set;
 
-use super::IntoEdgeTuple;
+use super::{impls::linked::LinkedListTransitionSystem, IntoEdgeTuple};
 
 /// Helper struct for the construction of non-deterministic transition systems. It stores a list of edges, a list of colors and a default color.
 /// This can also be used to construct deterministic transition systems, deterministic parity automata and Mealy machines.
@@ -171,12 +171,12 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     }
 
     /// Build a deterministic transition system from `self`. Panics if `self` is not deterministic.
-    pub fn into_linked_list_deterministic(self) -> LinkedListDeterministic<CharAlphabet, Q, C> {
+    pub fn into_linked_list_deterministic(self) -> LinkedListTransitionSystem<CharAlphabet, Q, C> {
         self.into_linked_list_nondeterministic()
             .into_deterministic()
     }
 
-    /// asdf
+    /// Creates an instance of a non-deterministic transition edge lists backed system from `self`.
     pub fn into_edge_lists_nondeterministic(self) -> EdgeListsNondeterministic<CharAlphabet, Q, C>
     where
         C: Hash + Eq,
@@ -213,13 +213,13 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
         assert_eq!(created_states_number, num_states);
 
         for (q, e, c, p) in self.edges {
-            ts.add_edge((q.into(), e, c, p.into()));
+            ts.add_edge((q, e, c, p));
         }
         ts
     }
 
-    /// asdf
-    pub fn into_edge_lists_deterministic(self) -> EdgeListsDeterministic<CharAlphabet, Q, C>
+    /// Creates an instance of a deterministic transition edge lists backed system from `self`.
+    pub fn into_edge_lists_deterministic(self) -> EdgeLists<CharAlphabet, Q, C>
     where
         C: Hash + Eq,
         Q: Hash + Eq,
@@ -232,7 +232,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     pub fn into_linked_list_deterministic_with_initial(
         self,
         initial: usize,
-    ) -> WithInitial<LinkedListDeterministic<CharAlphabet, Q, C>> {
+    ) -> WithInitial<LinkedListTransitionSystem<CharAlphabet, Q, C>> {
         self.into_linked_list_deterministic().with_initial(initial)
     }
 
@@ -263,7 +263,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
     pub fn with_transitions<
-        E: IntoEdgeTuple<LinkedListDeterministic<CharAlphabet, Q, C>>,
+        E: IntoEdgeTuple<LinkedListTransitionSystem<CharAlphabet, Q, C>>,
         T: IntoIterator<Item = E>,
     >(
         mut self,
@@ -301,7 +301,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
     pub fn with_edges<
-        E: IntoEdgeTuple<LinkedListDeterministic<CharAlphabet, Q, C>>,
+        E: IntoEdgeTuple<LinkedListTransitionSystem<CharAlphabet, Q, C>>,
         I: IntoIterator<Item = E>,
     >(
         mut self,

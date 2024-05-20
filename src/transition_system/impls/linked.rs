@@ -23,18 +23,16 @@ pub type IntoLinkedListNondeterministic<D> = (
 pub type LinkedListNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
     LinkedListTransitionSystem<A, Q, C, false>;
 
-pub type LinkedListDeterministic<A = CharAlphabet, Q = Void, C = Void> =
-    LinkedListTransitionSystem<A, Q, C, true>;
-
 /// Type alias to create a deterministic transition with the same alphabet, state and edge color
 /// as the given [`Ts`](`crate::prelude::TransitionSystem`).
-pub type CollectLinkedListDeterministic<Ts> = LinkedListDeterministic<
+pub type CollectLinkedList<Ts, const DET: bool = true> = LinkedListTransitionSystem<
     <Ts as TransitionSystem>::Alphabet,
     <Ts as TransitionSystem>::StateColor,
     <Ts as TransitionSystem>::EdgeColor,
+    DET,
 >;
 
-/// Represents a non-deterministic transition system. It stores an [`Alphabet`], a list of [`NTState`]s and a list of [`NTEdge`]s.
+/// Represents a non-deterministic transition system. It stores an [`Alphabet`], a list of [`LinkedListTransitionSystemState`]s and a list of [`LinkedListTransitionSystemEdge`]s.
 #[derive(Clone)]
 pub struct LinkedListTransitionSystem<
     A: Alphabet = CharAlphabet,
@@ -47,7 +45,7 @@ pub struct LinkedListTransitionSystem<
     edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> Deterministic for LinkedListDeterministic<A, Q, C> {}
+impl<A: Alphabet, Q: Clone, C: Clone> Deterministic for LinkedListTransitionSystem<A, Q, C> {}
 
 impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> Sproutable
     for LinkedListTransitionSystem<A, Q, C, DET>
@@ -294,7 +292,7 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> LinkedListTransitionSyste
     }
 
     /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
-    pub fn into_deterministic(self) -> LinkedListDeterministic<A, Q, C> {
+    pub fn into_deterministic(self) -> LinkedListTransitionSystem<A, Q, C> {
         recast(self)
     }
 
