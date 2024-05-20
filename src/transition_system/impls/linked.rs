@@ -22,6 +22,8 @@ pub type IntoLinkedListNondeterministic<D> = (
 
 pub type LinkedListNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
     LinkedListTransitionSystem<A, Q, C, false>;
+pub type LinkedListDeterministic<A = CharAlphabet, Q = Void, C = Void> =
+    LinkedListTransitionSystem<A, Q, C, true>;
 
 /// Type alias to create a deterministic transition with the same alphabet, state and edge color
 /// as the given [`Ts`](`crate::prelude::TransitionSystem`).

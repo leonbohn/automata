@@ -17,6 +17,7 @@ use std::{
 use self::alphabet::Matcher;
 
 pub type EdgeListsNondeterministic<A, Q, C> = EdgeLists<A, Q, C, false>;
+pub type EdgeListsDeterministic<A, Q, C> = EdgeLists<A, Q, C, true>;
 
 /// An implementation of a transition system with states of type `Q` and colors of type `C`. It stores
 /// the states and edges in a vector, which allows for fast access and iteration. The states and edges
@@ -224,6 +225,9 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool>
 
     fn remove_edges_to(&mut self, target: impl Indexes<Self>) -> Option<Vec<EdgeTuple<Self>>> {
         let p = target.to_index(self)?;
+        if !self.states.contains_key(&p) {
+            return None;
+        }
         Some(self.extract_edge_tuples(|_, (_, _, q)| *q == p))
     }
 }

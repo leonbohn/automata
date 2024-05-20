@@ -48,9 +48,10 @@ pub mod prelude {
             reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
-            EdgeListsNondeterministic, ForAlphabet, IndexType, Indexes, IntoEdgeTuple, IsEdge,
-            LinkedListNondeterministic, LinkedListTransitionSystem, Path, Shrinkable, Sproutable,
-            StateColor, SymbolOf, TSBuilder, TransitionSystem,
+            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, IndexType, Indexes,
+            IntoEdgeTuple, IsEdge, LinkedListDeterministic, LinkedListNondeterministic,
+            LinkedListTransitionSystem, Path, Shrinkable, Sproutable, StateColor, SymbolOf,
+            TSBuilder, TransitionSystem,
         },
         upw,
         word::{

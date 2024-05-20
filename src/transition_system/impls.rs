@@ -4,12 +4,14 @@
 pub(crate) mod edge_lists;
 use std::{fmt::Display, ops::Deref};
 
-pub use edge_lists::{EdgeLists, EdgeListsNondeterministic, IntoEdgeLists, MutableTsState};
+pub use edge_lists::{
+    EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, IntoEdgeLists, MutableTsState,
+};
 
 pub(crate) mod linked;
 pub use linked::{
-    CollectLinkedList, IntoLinkedListNondeterministic, LinkedListNondeterministic,
-    LinkedListTransitionSystem, LinkedListTransitionSystemEdge,
+    CollectLinkedList, IntoLinkedListNondeterministic, LinkedListDeterministic,
+    LinkedListNondeterministic, LinkedListTransitionSystem, LinkedListTransitionSystemEdge,
     LinkedListTransitionSystemEdgesToIter, LinkedListTransitionSystemState, NTSEdgesFromIter,
 };
 
