@@ -19,7 +19,7 @@ impl<Q> LinkedListTransitionSystemState<Q> {
         }
     }
 
-    /// Applies the given recoloring function to produce a new [`NTState`] with color `C`.
+    /// Applies the given recoloring function to produce a new [`LinkedListTransitionSystemState`] with color `C`.
     /// This method consumes `self`.
     pub fn recolor<C, F: Fn(Q) -> C>(self, f: F) -> LinkedListTransitionSystemState<C> {
         LinkedListTransitionSystemState {

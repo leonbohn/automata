@@ -32,7 +32,9 @@ pub trait Congruence: Deterministic + Pointed {
     where
         Self: Congruence<StateColor = bool>,
     {
-        let (dts, initial) = self.erase_edge_colors().collect_dts_pointed();
+        let (dts, initial) = self
+            .erase_edge_colors()
+            .collect_linked_list_determinsitic_pointed();
         DFA::from_parts(dts, initial)
     }
 
@@ -49,7 +51,9 @@ pub trait Congruence: Deterministic + Pointed {
     where
         Self: Congruence<EdgeColor = usize>,
     {
-        let (ts, initial) = self.erase_state_colors().collect_dts_pointed();
+        let (ts, initial) = self
+            .erase_state_colors()
+            .collect_linked_list_determinsitic_pointed();
         DPA::from_parts(ts, initial)
     }
 
@@ -66,7 +70,9 @@ pub trait Congruence: Deterministic + Pointed {
     where
         Self: Congruence<EdgeColor = bool>,
     {
-        let (ts, initial) = self.erase_state_colors().collect_dts_pointed();
+        let (ts, initial) = self
+            .erase_state_colors()
+            .collect_linked_list_determinsitic_pointed();
         DBA::from_parts(ts, initial)
     }
 
@@ -83,7 +89,9 @@ pub trait Congruence: Deterministic + Pointed {
     where
         StateColor<Self>: Color,
     {
-        let (ts, initial) = self.erase_edge_colors().collect_dts_pointed();
+        let (ts, initial) = self
+            .erase_edge_colors()
+            .collect_linked_list_determinsitic_pointed();
         MooreMachine::from_parts(ts, initial)
     }
 
@@ -99,7 +107,7 @@ pub trait Congruence: Deterministic + Pointed {
     where
         EdgeColor<Self>: Color,
     {
-        let (ts, initial) = self.collect_dts_pointed();
+        let (ts, initial) = self.collect_linked_list_determinsitic_pointed();
         MealyMachine::from_parts(ts, initial)
     }
 
@@ -220,7 +228,7 @@ impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
     /// Builds a [`RightCongruence`] from the given transition system. This first collects into a [`DTS`], obtains
     /// the correct initial state and then builds the list of minimal representatives.
     pub fn from_ts<Ts: Congruence<Alphabet = A, EdgeColor = C, StateColor = Q>>(ts: Ts) -> Self {
-        let (ts, initial) = ts.collect_dts_pointed();
+        let (ts, initial) = ts.collect_linked_list_determinsitic_pointed();
         let minimal_representatives = ts
             .minimal_representatives_from(initial)
             .sorted_by(|x, y| x.1.cmp(&y.1))

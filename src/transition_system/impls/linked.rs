@@ -285,6 +285,7 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> LinkedListTransitionSyste
                         r.expression().show(),
                         r.target(),
                     );
+                    assert!(!DET, "found overlapping edges even though the type indicates this is deterministic");
                     return false;
                 }
             }
@@ -294,11 +295,11 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> LinkedListTransitionSyste
 
     /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
     pub fn into_deterministic(self) -> LinkedListDeterministic<A, Q, C> {
-        copy_from(self)
+        recast(self)
     }
 
     pub fn into_nondeterministic(self) -> LinkedListNondeterministic<A, Q, C> {
-        copy_from(self)
+        recast(self)
     }
 
     fn first_edge(&self, idx: usize) -> Option<usize> {
@@ -400,6 +401,14 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> ForAlphabet<A>
             edges: vec![],
         }
     }
+
+    fn for_alphabet_size_hint(from: A, size_hint: usize) -> Self {
+        Self {
+            alphabet: from,
+            states: Vec::with_capacity(size_hint),
+            edges: vec![],
+        }
+    }
 }
 
 impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> PredecessorIterable
@@ -449,24 +458,6 @@ impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq, const DET: bool> Eq
 {
 }
 
-fn copy_from<A: Alphabet, Q: Clone, C: Clone, const DET: bool, const OUT_DET: bool>(
-    ts: LinkedListTransitionSystem<A, Q, C, DET>,
-) -> LinkedListTransitionSystem<A, Q, C, OUT_DET> {
-    if !DET && OUT_DET && !ts.is_deterministic() {
-        panic!("cannot convert non-deterministic transition system to deterministic");
-    }
-    let LinkedListTransitionSystem {
-        alphabet,
-        states,
-        edges,
-    } = ts;
-    LinkedListTransitionSystem {
-        alphabet,
-        states,
-        edges,
-    }
-}
-
 impl<
         A: Alphabet + std::fmt::Debug,
         Q: std::fmt::Debug + Clone,
@@ -483,6 +474,24 @@ impl<
             }
         }
         Ok(())
+    }
+}
+
+fn recast<A: Alphabet, Q: Clone, C: Clone, const DET: bool, const OUT_DET: bool>(
+    ts: LinkedListTransitionSystem<A, Q, C, DET>,
+) -> LinkedListTransitionSystem<A, Q, C, OUT_DET> {
+    if !DET && OUT_DET && !ts.is_deterministic() {
+        panic!("cannot convert non-deterministic transition system to deterministic");
+    }
+    let LinkedListTransitionSystem {
+        alphabet,
+        states,
+        edges,
+    } = ts;
+    LinkedListTransitionSystem {
+        alphabet,
+        states,
+        edges,
     }
 }
 

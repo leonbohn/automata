@@ -40,6 +40,7 @@ minimize = []
 hoa = ["dep:hoars", "biodivine-lib-bdd"]
 graphviz = ["dep:tempfile"]
 oai-bin = ["clap"]
+linked_list_ts = []
 
 [dev-dependencies]
 lazy_static = "1.4"

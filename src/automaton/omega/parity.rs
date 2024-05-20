@@ -376,8 +376,12 @@ where
     {
         let start = std::time::Instant::now();
 
-        let (mut ts, _initial) = self.with_initial(self.initial).collect_hash_ts_pointed();
-        let out = self.with_initial(self.initial).collect_dts_pointed();
+        let (mut ts, _initial) = self
+            .with_initial(self.initial)
+            .collect_edge_lists_deterministic_pointed();
+        let out = self
+            .with_initial(self.initial)
+            .collect_linked_list_determinsitic_pointed();
 
         let mut recoloring = Vec::new();
         let mut remove_states = Vec::new();

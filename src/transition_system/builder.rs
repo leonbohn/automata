@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use itertools::Itertools;
 
 use crate::{
@@ -148,7 +150,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     }
 
     /// By default, the only alphabet symbols in the transition system that is built
-    /// upon calling [`Self::into_nts()`] or [`Self::into_dts()`] are the ones that
+    /// upon creating a concrete transition system are the ones that
     /// appear on at least one transition/edge. This method can be used to force
     /// additional alphabet symbols to appear.
     pub fn with_alphabet_symbols<I>(mut self, symbols: I) -> Self
@@ -172,6 +174,57 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
     pub fn into_linked_list_deterministic(self) -> LinkedListDeterministic<CharAlphabet, Q, C> {
         self.into_linked_list_nondeterministic()
             .into_deterministic()
+    }
+
+    /// asdf
+    pub fn into_edge_lists_nondeterministic(self) -> EdgeListsNondeterministic<CharAlphabet, Q, C>
+    where
+        C: Hash + Eq,
+        Q: Hash + Eq,
+    {
+        let alphabet =
+            CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
+
+        let num_states = self
+            .edges
+            .iter()
+            .flat_map(|(q, _, _, p)| [*p, *q])
+            .unique()
+            .count();
+        let mut ts = EdgeListsNondeterministic::for_alphabet_size_hint(alphabet, num_states);
+
+        let mut created_states_number = 0;
+        for i in 0..num_states {
+            if self.colors.iter().all(|(q, _)| *q != i) && self.default.is_none() {
+                panic!(
+                    "Default is needed as some states (specifically {}) have no color",
+                    i.show()
+                );
+            }
+
+            ts.add_state(
+                self.colors
+                    .iter()
+                    .find_map(|(q, c)| if *q == i { Some(c.clone()) } else { None })
+                    .unwrap_or_else(|| self.default.clone().unwrap()),
+            );
+            created_states_number += 1;
+        }
+        assert_eq!(created_states_number, num_states);
+
+        for (q, e, c, p) in self.edges {
+            ts.add_edge((q.into(), e, c, p.into()));
+        }
+        ts
+    }
+
+    /// asdf
+    pub fn into_edge_lists_deterministic(self) -> EdgeListsDeterministic<CharAlphabet, Q, C>
+    where
+        C: Hash + Eq,
+        Q: Hash + Eq,
+    {
+        self.into_edge_lists_nondeterministic().into_deterministic()
     }
 
     /// Build a deterministic transition system from `self` and set the given `initial` state as the
@@ -276,7 +329,7 @@ impl<Q: Clone, C: Clone> TSBuilder<Q, C> {
             .flat_map(|(q, _, _, p)| [*p, *q])
             .unique()
             .count();
-        let mut ts = LinkedListNondeterministic::for_alphabet(alphabet);
+        let mut ts = LinkedListNondeterministic::for_alphabet_size_hint(alphabet, num_states);
         let colors_it = (0..num_states).map(|x| {
             if let Some(color) =
                 self.colors
