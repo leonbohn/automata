@@ -44,7 +44,7 @@ where
     /// produce a color less than or equal to i.
     pub fn decompose_dfa(&self) -> Vec<DFA<C::Alphabet>>
     where
-        StateColor<Self>: Color,
+        StateColor<Self>: Ord,
     {
         self.color_range()
             .into_iter()
@@ -56,7 +56,7 @@ where
     /// Builds a DFA that accepts all words which emit a color less than or equal to `color`.
     pub fn color_or_below_dfa(&self, color: C::StateColor) -> DFA<C::Alphabet>
     where
-        StateColor<Self>: Color,
+        StateColor<Self>: Ord,
     {
         self.map_state_colors(|o| o <= color)
             .erase_edge_colors()

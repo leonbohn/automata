@@ -202,7 +202,7 @@ where
         })
         // TODO: Should we not get rid of the edge colors entirely?
         .erase_edge_colors()
-        .collect_linked_list_deterministic_pointed();
+        .collect_dts_pointed();
     debug!(
         "Collecting into Moore machine took {} microseconds",
         start.elapsed().as_micros()

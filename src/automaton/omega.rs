@@ -147,7 +147,7 @@ impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutoma
                         .map(move |sym| (edge.source(), sym, edge.color(), edge.target()))
                 })
             }))
-            .into_linked_list_deterministic();
+            .into_dts();
         DeterministicOmegaAutomaton::new(ts, value.initial, value.acceptance)
     }
 }
@@ -160,9 +160,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
     type Error = String;
     fn try_from(value: DeterministicOmegaAutomaton<CharAlphabet>) -> Result<Self, Self::Error> {
         let size = value.size();
-        let mut ts = LinkedListTransitionSystem::for_alphabet(HoaAlphabet::try_from_char_alphabet(
-            value.alphabet(),
-        )?);
+        let mut ts = DTS::for_alphabet(HoaAlphabet::try_from_char_alphabet(value.alphabet())?);
 
         for q in value.state_indices() {
             assert!(q < size, "The state indices must be contiguous for this!");

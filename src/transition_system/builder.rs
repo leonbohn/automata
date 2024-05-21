@@ -1,4 +1,4 @@
-use std::{fmt::Debug, hash::Hash};
+use std::hash::Hash;
 
 use itertools::Itertools;
 
@@ -83,7 +83,7 @@ impl<Q, C, const DET: bool> Default for TSBuilder<Q, C, DET> {
     }
 }
 
-impl<Q: Clone + Debug, C: Clone + Debug, const DET: bool> TSBuilder<Q, C, DET> {
+impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     /// Sets the default color for states that have no color specified.
     pub fn default_color(mut self, color: Q) -> Self {
         self.default = Some(color);
@@ -267,7 +267,7 @@ impl<Q: Clone + Debug, C: Clone + Debug, const DET: bool> TSBuilder<Q, C, DET> {
     }
 }
 
-impl<Q: Clone + Debug, C: Clone + Debug> TSBuilder<Q, C, true> {
+impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     /// Builds an instance of [`DTS`] from `self`.
     #[cfg(feature = "linked_list_ts")]
     pub fn into_dts(self) -> DTS<CharAlphabet, Q, C> {
@@ -379,7 +379,7 @@ impl TSBuilder<usize, Void, true> {
     }
 }
 
-impl<Q: Clone + Debug, C: Clone + Debug> TSBuilder<Q, C, true> {
+impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     /// Turns `self` into a [`RightCongruence`] with the given initial state while also erasing all state and edge
     /// colors. Panics if `self` is not deterministic.
     pub fn into_right_congruence_bare(self, initial: usize) -> RightCongruence<CharAlphabet> {

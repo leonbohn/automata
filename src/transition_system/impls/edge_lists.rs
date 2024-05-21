@@ -23,12 +23,7 @@ pub type EdgeListsDeterministic<A, Q, C> = EdgeLists<A, Q, C, true>;
 /// the states and edges in a vector, which allows for fast access and iteration. The states and edges
 /// are indexed by their position in the respective vector.
 #[derive(Clone, PartialEq, Eq)]
-pub struct EdgeLists<
-    A: Alphabet,
-    Q = crate::Void,
-    C: Hash + Eq = crate::Void,
-    const DET: bool = true,
-> {
+pub struct EdgeLists<A: Alphabet, Q = crate::Void, C = crate::Void, const DET: bool = true> {
     pub(crate) alphabet: A,
     pub(crate) states: BTreeMap<usize, MutableTsState<A, Q, C>>,
 }
@@ -42,9 +37,7 @@ pub type IntoEdgeLists<Ts, const DET: bool = true> = EdgeLists<
     DET,
 >;
 
-impl<A: Alphabet, C: Clone + Debug + Hash + Eq, Q: Clone + Debug, const DET: bool>
-    EdgeLists<A, Q, C, DET>
-{
+impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
     /// Creates a new transition system with the given alphabet.
     pub fn new(alphabet: A) -> Self {
         Self {
@@ -75,33 +68,6 @@ impl<A: Alphabet, C: Clone + Debug + Hash + Eq, Q: Clone + Debug, const DET: boo
         } else {
             Err(self)
         }
-    }
-
-    pub fn is_deterministic(&self) -> bool {
-        for state in self.state_indices() {
-            for (l, r) in self
-                .edges_from(state)
-                .unwrap()
-                .zip(self.edges_from(state).unwrap().skip(1))
-            {
-                if self.alphabet().overlapping(l.expression(), r.expression()) {
-                    tracing::trace!(
-                        "found overlapping edges from {}: on {} to {} and on {} to {}",
-                        l.source(),
-                        l.expression().show(),
-                        l.target(),
-                        r.expression().show(),
-                        r.target(),
-                    );
-                    assert!(
-                        !DET,
-                        "Transition system is not deterministic even though the type suggests it."
-                    );
-                    return false;
-                }
-            }
-        }
-        true
     }
 
     pub fn extract_edge_tuples_for<F>(
@@ -204,8 +170,8 @@ impl<A: Alphabet, C: Clone + Debug + Hash + Eq, Q: Clone + Debug, const DET: boo
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug + Hash + Eq, const DET: bool>
-    crate::transition_system::Shrinkable for EdgeLists<A, Q, C, DET>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> crate::transition_system::Shrinkable
+    for EdgeLists<A, Q, C, DET>
 {
     fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Q> {
         self.mutablets_remove_state(state.to_index(self)?)
@@ -257,9 +223,7 @@ impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug + Hash + Eq, const DET: boo
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug + Hash + Eq, const DET: bool>
-    EdgeLists<A, Q, C, DET>
-{
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
     /// Returns an iterator over the [`EdgeIndex`]es of the edges leaving the given state.
     pub(crate) fn mutablets_edges_from(
         &self,
@@ -277,13 +241,13 @@ impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug + Hash + Eq, const DET: boo
 /// A state in a transition system. This stores the color of the state and the index of the
 /// first edge leaving the state.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct MutableTsState<A: Alphabet, Q, C: Hash + Eq> {
+pub struct MutableTsState<A: Alphabet, Q, C> {
     id: usize,
     color: Q,
     edges: Vec<(A::Expression, C, usize)>,
 }
 
-impl<A: Alphabet, Q, C: Hash + Eq> MutableTsState<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> MutableTsState<A, Q, C> {
     pub fn new_with_intial_id(color: Q) -> Self {
         Self {
             id: 0,
@@ -369,12 +333,8 @@ impl<A: Alphabet, Q, C: Hash + Eq> MutableTsState<A, Q, C> {
     }
 }
 
-impl<
-        A: Alphabet,
-        Q: Clone + std::fmt::Debug,
-        C: Clone + std::fmt::Debug + Hash + Eq,
-        const DET: bool,
-    > TransitionSystem for EdgeLists<A, Q, C, DET>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
+    for EdgeLists<A, Q, C, DET>
 {
     type StateColor = Q;
     type EdgeColor = C;
@@ -403,6 +363,31 @@ impl<
     type EdgesFromIter<'this> = EdgesFrom<'this, A::Expression, C> where Self: 'this;
 }
 
+impl<Q, C, const DET: bool> EdgeLists<CharAlphabet, Q, C, DET> {
+    /// Returns a transition system builder for a non-deterministic transition system. This should be the main method for the
+    /// construction of non-deterministic transition systems on the fly.
+    ///
+    /// # Example
+    ///
+    /// We want to create a DFA with two states 0 and 1 over the alphabet `['a', 'b']`. We want to add the following transitions:
+    /// - From state 0 to state 0 on symbol 'a'
+    /// - From state 0 to state 1 on symbol 'b'
+    /// - From state 1 to state 1 on symbol 'a'
+    /// - From state 1 to state 0 on symbol 'b'
+    /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let ts = TSBuilder::default()
+    ///     .with_state_colors([true, false]) // colors given in the order of the states
+    ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 0)])
+    ///     .into_dfa(0); // 0 is the initial state
+    /// ```
+    pub fn builder() -> TSBuilder<Q, C> {
+        TSBuilder::default()
+    }
+}
+
 /// Specialized iterator over the edges that leave a given state in a [`MutableTs`].
 pub struct EdgesFrom<'ts, E, C> {
     edges: std::slice::Iter<'ts, (E, C, usize)>,
@@ -429,8 +414,8 @@ impl<'ts, E, C> Iterator for EdgesFrom<'ts, E, C> {
 impl<A, C, Q, const DET: bool> std::fmt::Debug for EdgeLists<A, Q, C, DET>
 where
     A: Alphabet,
-    C: Debug + Clone + Hash + Eq,
-    Q: Debug + Clone,
+    C: Color,
+    Q: Color,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Alphabet: {:?}", self.alphabet())?;
@@ -450,9 +435,7 @@ where
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug + Hash + Eq, const DET: bool> Sproutable
-    for EdgeLists<A, Q, C, DET>
-{
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for EdgeLists<A, Q, C, DET> {
     /// Adds a state with given `color` to the transition system, returning the index of
     /// the new state.
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
@@ -503,9 +486,7 @@ impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug + Hash + Eq, const DET: boo
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug + Hash + Eq, const DET: bool> ForAlphabet<A>
-    for EdgeLists<A, Q, C, DET>
-{
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A> for EdgeLists<A, Q, C, DET> {
     fn for_alphabet(from: A) -> Self {
         Self {
             alphabet: from,
@@ -525,7 +506,7 @@ type MutableTsOutEdge<A, C> = (<A as Alphabet>::Expression, C, usize);
 /// See the [`MutableTs::extract_edge_tuples`] method for an example of usage.
 #[derive(Debug)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct ExtractEdgeTuplesFrom<'a, A: Alphabet, Q, C: Eq + Hash, F>
+pub struct ExtractEdgeTuplesFrom<'a, A: Alphabet, Q, C, F>
 where
     F: FnMut(&MutableTsOutEdge<A, C>) -> bool,
 {
@@ -540,7 +521,7 @@ where
     pub(super) pred: F,
 }
 
-impl<'a, A: Alphabet, Q, C: Eq + Hash, F> ExtractEdgeTuplesFrom<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F> ExtractEdgeTuplesFrom<'a, A, Q, C, F>
 where
     F: FnMut(&MutableTsOutEdge<A, C>) -> bool,
 {
@@ -559,7 +540,7 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C: Eq + Hash, F> Iterator for ExtractEdgeTuplesFrom<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F> Iterator for ExtractEdgeTuplesFrom<'a, A, Q, C, F>
 where
     F: FnMut(&MutableTsOutEdge<A, C>) -> bool,
 {
@@ -596,7 +577,7 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C: Eq + Hash, F> Drop for ExtractEdgeTuplesFrom<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F> Drop for ExtractEdgeTuplesFrom<'a, A, Q, C, F>
 where
     F: FnMut(&MutableTsOutEdge<A, C>) -> bool,
 {
@@ -624,7 +605,7 @@ where
 /// transition system that match a given predicate.
 #[derive(Debug)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct ExtractAllEdgeTuples<'a, A: Alphabet, Q, C: Eq + Hash, F>
+pub struct ExtractAllEdgeTuples<'a, A: Alphabet, Q, C, F>
 where
     F: FnMut(usize, &MutableTsOutEdge<A, C>) -> bool,
 {
@@ -641,7 +622,7 @@ where
         std::collections::btree_map::ValuesMut<'a, usize, MutableTsState<A, Q, C>>,
 }
 
-impl<'a, A: Alphabet, Q, C: Eq + Hash, F> ExtractAllEdgeTuples<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F> ExtractAllEdgeTuples<'a, A, Q, C, F>
 where
     F: FnMut(usize, &MutableTsOutEdge<A, C>) -> bool,
 {
@@ -670,7 +651,7 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C: Eq + Hash, F> Iterator for ExtractAllEdgeTuples<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F> Iterator for ExtractAllEdgeTuples<'a, A, Q, C, F>
 where
     F: FnMut(usize, &MutableTsOutEdge<A, C>) -> bool,
 {
@@ -720,7 +701,7 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C: Eq + Hash, F> Drop for ExtractAllEdgeTuples<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F> Drop for ExtractAllEdgeTuples<'a, A, Q, C, F>
 where
     F: FnMut(usize, &MutableTsOutEdge<A, C>) -> bool,
 {
@@ -729,13 +710,7 @@ where
     }
 }
 
-fn recast<
-    A: Alphabet,
-    Q: Clone + Debug,
-    C: Clone + Debug + Eq + Hash,
-    const DET: bool,
-    const OUT_DET: bool,
->(
+fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>(
     ts: EdgeLists<A, Q, C, DET>,
 ) -> EdgeLists<A, Q, C, OUT_DET> {
     if !DET && OUT_DET && !ts.is_deterministic() {

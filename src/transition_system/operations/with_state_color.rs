@@ -24,10 +24,16 @@ pub trait ProvidesStateColor<Idx> {
     fn state_color(&self, state: Idx) -> Self::Color;
 }
 
-impl<Idx, C: Color> ProvidesStateColor<Idx> for C {
+/// Provides a uniform color for all states of a [`TransitionSystem`]. The main use case for
+/// this struct is when calling [`TransitionSystem::with_state_color`] and providing a single
+/// color for all states.
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct UniformColor<C: Color>(pub C);
+
+impl<Idx, C: Color> ProvidesStateColor<Idx> for UniformColor<C> {
     type Color = C;
     fn state_color(&self, _state: Idx) -> Self::Color {
-        self.clone()
+        self.0.clone()
     }
 }
 

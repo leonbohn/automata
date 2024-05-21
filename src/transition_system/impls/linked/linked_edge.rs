@@ -16,7 +16,7 @@ pub struct LinkedListTransitionSystemEdge<E, C> {
     pub(super) next: Option<usize>,
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool>
     IntoEdgeTuple<LinkedListTransitionSystem<A, Q, C, DET>>
     for LinkedListTransitionSystemEdge<A::Expression, C>
 {

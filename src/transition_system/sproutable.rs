@@ -119,12 +119,8 @@ pub trait Sproutable: TransitionSystem {
     /// Creates a new transition system, by collecting all states and transitions present in `ts`.
     /// This is done by using a naive approach, which simply iterates through all states and adds
     /// them one by one. At the same time, a bijective mapping between old and new state indices is
-    /// created. Subequently, the transitions are inserted one by one. Finally, the newly created
+    /// created. Subsequently, the transitions are inserted one by one. Finally, the newly created
     /// transition system is returned together with the bijective state index mapping.
-    ///
-    /// Note, that this procedure allows a form of 'downcasting' of edge and state colors. If the
-    /// transition system that we want to collect into does not use any edge colors (i.e. the edges
-    /// are colored with type [`crate::Void`]) then we simply 'forget' the current colors.
     ///
     /// # Example
     /// ```
@@ -135,16 +131,20 @@ pub trait Sproutable: TransitionSystem {
     ///     .with_state_colors([0])
     ///     .into_dts();
     ///
-    /// let (without_edge_colors, map1): (DTS<CharAlphabet, usize, Void>, _) = DTS::sprout_from_ts(&source);
-    /// let (without_state_colors, map2): (DTS<CharAlphabet, Void, usize>, _) = DTS::sprout_from_ts(&source);
-    /// assert_eq!(map1.get_by_left(&0).unwrap(), map2.get_by_left(&0).unwrap());
+    /// let (dts, map) = DTS::sprout_from_ts_with_bijection(&source);
+    /// assert_eq!(source.size(), dts.size());
+    /// assert_eq!(map.get_by_left(&0), Some(&0));
     /// ```
-    fn sprout_from_ts<Ts>(ts: Ts) -> (Self, Bijection<Ts::StateIndex, StateIndex<Self>>)
+    fn sprout_from_ts_with_bijection<Ts>(
+        ts: Ts,
+    ) -> (Self, Bijection<Ts::StateIndex, StateIndex<Self>>)
     where
         Self: ForAlphabet<Ts::Alphabet>,
-        Ts: TransitionSystem<Alphabet = Self::Alphabet>,
-        StateColor<Ts>: Into<StateColor<Self>>,
-        EdgeColor<Ts>: Into<EdgeColor<Self>>,
+        Ts: TransitionSystem<
+            Alphabet = Self::Alphabet,
+            StateColor = StateColor<Self>,
+            EdgeColor = EdgeColor<Self>,
+        >,
     {
         let mut out: Self = Self::for_alphabet(ts.alphabet().clone());
         let mut map = Bijection::new();
@@ -153,8 +153,7 @@ pub trait Sproutable: TransitionSystem {
                 index,
                 out.add_state(
                     ts.state_color(index)
-                        .expect("We assume each state to be colored!")
-                        .into(),
+                        .expect("We assume each state to be colored!"),
                 ),
             );
         }
@@ -164,12 +163,44 @@ pub trait Sproutable: TransitionSystem {
                 out.add_edge((
                     source,
                     edge.expression().clone(),
-                    edge.color().into(),
+                    edge.color(),
                     *map.get_by_left(&edge.target()).unwrap(),
                 ));
             }
         }
         (out, map)
+    }
+
+    /// Builds a new transition system by collecting all states and transitions present in another.
+    ///
+    /// Creates a new transition system, by collecting all states and transitions present in `ts`.
+    /// This is done by using a naive approach, which simply iterates through all states and adds
+    /// them one by one. At the same time, a bijective mapping between old and new state indices is
+    /// created. Subsequently, the transitions are inserted one by one. Finally, the newly created
+    /// transition system is returned.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let source: DTS<CharAlphabet, usize, usize> = DTS::builder()
+    ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
+    ///     .with_state_colors([0])
+    ///     .into_dts();
+    ///
+    /// let dts = DTS::sprout_from_ts(&source);
+    /// assert_eq!(source.size(), dts.size());
+    /// ```
+    fn sprout_from_ts<Ts>(ts: Ts) -> Self
+    where
+        Self: ForAlphabet<Ts::Alphabet>,
+        Ts: TransitionSystem<
+            Alphabet = Self::Alphabet,
+            StateColor = StateColor<Self>,
+            EdgeColor = EdgeColor<Self>,
+        >,
+    {
+        Self::sprout_from_ts_with_bijection(ts).0
     }
 
     /// Turns the automaton into a complete one, by adding a sink state and adding transitions
