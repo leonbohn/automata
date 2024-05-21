@@ -13,7 +13,9 @@ impl<S: Show> Show for Class<S> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruence<A, Q, C>> for Class<A::Symbol> {
+impl<A: Alphabet, Q: Clone + std::fmt::Debug, C: Clone + std::fmt::Debug>
+    Indexes<RightCongruence<A, Q, C>> for Class<A::Symbol>
+{
     #[inline(always)]
     fn to_index(
         &self,
@@ -22,8 +24,8 @@ impl<A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruence<A, Q, C>> for Clas
         ts.class_to_index(self).or(ts.reached_state_index(self))
     }
 }
-impl<'a, A: Alphabet, Q: Clone, C: Clone> Indexes<RightCongruence<A, Q, C>>
-    for &'a Class<A::Symbol>
+impl<'a, A: Alphabet, Q: Clone + std::fmt::Debug, C: Clone + std::fmt::Debug>
+    Indexes<RightCongruence<A, Q, C>> for &'a Class<A::Symbol>
 {
     #[inline(always)]
     fn to_index(

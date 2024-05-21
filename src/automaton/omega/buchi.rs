@@ -34,7 +34,7 @@ impl<Q> OmegaSemantics<Q, bool> for BuchiCondition {
 /// In a certain sense, it is a special case of a deterministic parity automaton [`super::DPA`] with
 /// min even and priorities 0 and 1.
 pub type DBA<A = CharAlphabet, Q = Void, D = DTS<A, Q, bool>> =
-    InfiniteWordAutomaton<A, BuchiCondition, Q, bool, D>;
+    InfiniteWordAutomaton<A, BuchiCondition, Q, bool, true, D>;
 /// Helper trait for creating a [`DBA`] from a given transition system.
 pub type IntoDBA<T> = DBA<<T as TransitionSystem>::Alphabet, StateColor<T>, T>;
 

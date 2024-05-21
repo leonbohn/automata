@@ -42,7 +42,9 @@ pub type IntoEdgeLists<Ts, const DET: bool = true> = EdgeLists<
     DET,
 >;
 
-impl<A: Alphabet, C: Clone + Hash + Eq, Q: Clone, const DET: bool> EdgeLists<A, Q, C, DET> {
+impl<A: Alphabet, C: Clone + Debug + Hash + Eq, Q: Clone + Debug, const DET: bool>
+    EdgeLists<A, Q, C, DET>
+{
     /// Creates a new transition system with the given alphabet.
     pub fn new(alphabet: A) -> Self {
         Self {
@@ -51,8 +53,28 @@ impl<A: Alphabet, C: Clone + Hash + Eq, Q: Clone, const DET: bool> EdgeLists<A, 
         }
     }
 
-    pub fn into_deterministic(self) -> EdgeLists<A, Q, C> {
-        recast(self)
+    pub fn into_deterministic(self) -> EdgeListsDeterministic<A, Q, C> {
+        match self.try_into_deterministic() {
+            Ok(ts) => ts,
+            Err(ts) => {
+                tracing::error!("Tried to convert non-deterministic transition system to deterministic one\n{:?}", ts);
+                panic!("This transition system is not deterministic");
+            }
+        }
+    }
+
+    pub fn try_into_deterministic(self) -> Result<EdgeListsDeterministic<A, Q, C>, Self> {
+        if DET {
+            if !self.is_deterministic() {
+                tracing::error!("Tried to convert non-deterministic transition system to deterministic one\n{:?}", self);
+                panic!("This transition system is not deterministic");
+            }
+            Ok(recast(self))
+        } else if self.is_deterministic() {
+            Ok(recast(self))
+        } else {
+            Err(self)
+        }
     }
 
     pub fn is_deterministic(&self) -> bool {
@@ -71,7 +93,10 @@ impl<A: Alphabet, C: Clone + Hash + Eq, Q: Clone, const DET: bool> EdgeLists<A, 
                         r.expression().show(),
                         r.target(),
                     );
-                    assert!(!DET, "found overlapping edges even though the type indicates this is deterministic");
+                    assert!(
+                        !DET,
+                        "Transition system is not deterministic even though the type suggests it."
+                    );
                     return false;
                 }
             }
@@ -179,7 +204,7 @@ impl<A: Alphabet, C: Clone + Hash + Eq, Q: Clone, const DET: bool> EdgeLists<A, 
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool>
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug + Hash + Eq, const DET: bool>
     crate::transition_system::Shrinkable for EdgeLists<A, Q, C, DET>
 {
     fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Q> {
@@ -232,7 +257,9 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool>
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool> EdgeLists<A, Q, C, DET> {
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug + Hash + Eq, const DET: bool>
+    EdgeLists<A, Q, C, DET>
+{
     /// Returns an iterator over the [`EdgeIndex`]es of the edges leaving the given state.
     pub(crate) fn mutablets_edges_from(
         &self,
@@ -342,8 +369,12 @@ impl<A: Alphabet, Q, C: Hash + Eq> MutableTsState<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool> TransitionSystem
-    for EdgeLists<A, Q, C, DET>
+impl<
+        A: Alphabet,
+        Q: Clone + std::fmt::Debug,
+        C: Clone + std::fmt::Debug + Hash + Eq,
+        const DET: bool,
+    > TransitionSystem for EdgeLists<A, Q, C, DET>
 {
     type StateColor = Q;
     type EdgeColor = C;
@@ -395,11 +426,11 @@ impl<'ts, E, C> Iterator for EdgesFrom<'ts, E, C> {
     }
 }
 
-impl<A, C, Q> std::fmt::Debug for EdgeLists<A, Q, C>
+impl<A, C, Q, const DET: bool> std::fmt::Debug for EdgeLists<A, Q, C, DET>
 where
-    A: Alphabet + std::fmt::Debug,
+    A: Alphabet,
     C: Debug + Clone + Hash + Eq,
-    Q: Debug + Clone + Hash + Eq,
+    Q: Debug + Clone,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Alphabet: {:?}", self.alphabet())?;
@@ -419,7 +450,7 @@ where
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool> Sproutable
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug + Hash + Eq, const DET: bool> Sproutable
     for EdgeLists<A, Q, C, DET>
 {
     /// Adds a state with given `color` to the transition system, returning the index of
@@ -435,8 +466,16 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool> Sproutable
     where
         E: IntoEdgeTuple<Self>,
     {
-        // TODO: verify that DET is correct and add edge differently
         let (q, a, c, p) = t.into_edge_tuple();
+
+        if DET
+            && self
+                .edges_from(q)
+                .unwrap()
+                .any(|e| e.expression().overlaps(&a))
+        {
+            return None;
+        }
 
         assert!(
             self.contains_state(q) && self.contains_state(p),
@@ -464,7 +503,7 @@ impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool> Sproutable
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone + Hash + Eq, const DET: bool> ForAlphabet<A>
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug + Hash + Eq, const DET: bool> ForAlphabet<A>
     for EdgeLists<A, Q, C, DET>
 {
     fn for_alphabet(from: A) -> Self {
@@ -690,7 +729,13 @@ where
     }
 }
 
-fn recast<A: Alphabet, Q: Clone, C: Clone + Eq + Hash, const DET: bool, const OUT_DET: bool>(
+fn recast<
+    A: Alphabet,
+    Q: Clone + Debug,
+    C: Clone + Debug + Eq + Hash,
+    const DET: bool,
+    const OUT_DET: bool,
+>(
     ts: EdgeLists<A, Q, C, DET>,
 ) -> EdgeLists<A, Q, C, OUT_DET> {
     if !DET && OUT_DET && !ts.is_deterministic() {

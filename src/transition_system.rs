@@ -80,9 +80,9 @@ pub trait TransitionSystem: Sized {
     /// The type of the indices of the states of the transition system.
     type StateIndex: IndexType;
     /// The type of the colors of the states of the transition system.
-    type StateColor: Clone;
+    type StateColor: Clone + Debug;
     /// The type of the colors of the edges of the transition system.
-    type EdgeColor: Clone;
+    type EdgeColor: Clone + Debug;
     /// The type of the references to the transitions of the transition system.
     type EdgeRef<'this>: IsEdge<'this, EdgeExpression<Self>, Self::StateIndex, EdgeColor<Self>>
     where

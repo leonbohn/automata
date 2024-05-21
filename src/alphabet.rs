@@ -38,6 +38,11 @@ pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show + Matcher<Self> {
     /// Returns an iterator over the [`Symbol`]s that match this expression.
     fn symbols(&self) -> Self::SymbolsIter<'_>;
 
+    /// Verifies whether or not this expression overlaps with the given expression. For a [`CharAlphabet`]
+    /// alphabet, this just means that the two expressions are equal. For a propositional alphabet, this
+    /// means that the two expressions share a common satisfying valuation.
+    fn overlaps(&self, other: &Self) -> bool;
+
     /// Checks whether the given [`Symbol`] matches the expression `self`. For [`CharAlphabet`] alphabets, this just
     /// means that the expression equals the given symbol. For a propositional alphabet, this means that
     /// the expression is satisfied by the given symbol, an example of this is illustrated in propositional.
@@ -52,7 +57,7 @@ pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show + Matcher<Self> {
 }
 
 /// An alphabet abstracts a collection of [`Symbol`]s and complex [`Expression`]s over those.
-pub trait Alphabet: Clone {
+pub trait Alphabet: Clone + Debug {
     /// The type of symbols in this alphabet.
     type Symbol: Symbol + Matcher<Self::Expression>;
     /// The type of expressions in this alphabet.
@@ -229,6 +234,9 @@ impl Expression for char {
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         std::iter::once(*self)
     }
+    fn overlaps(&self, other: &Self) -> bool {
+        self == other
+    }
 
     fn for_each<F: Fn(char)>(&self, f: F) {
         (f)(*self)
@@ -299,6 +307,9 @@ impl Expression for usize {
 
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         std::iter::once(*self)
+    }
+    fn overlaps(&self, other: &Self) -> bool {
+        self == other
     }
 
     fn matched_by(&self, symbol: usize) -> bool {
@@ -389,6 +400,9 @@ impl Expression for InvertibleChar {
 
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         std::iter::once(*self)
+    }
+    fn overlaps(&self, other: &Self) -> bool {
+        self == other
     }
 
     fn matched_by(&self, symbol: InvertibleChar) -> bool {

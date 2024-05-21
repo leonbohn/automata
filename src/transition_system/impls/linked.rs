@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, hash::Hash};
+use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use crate::{math::Set, prelude::*, transition_system::Shrinkable, Void};
 use itertools::Itertools;
@@ -47,9 +47,12 @@ pub struct LinkedListTransitionSystem<
     edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> Deterministic for LinkedListTransitionSystem<A, Q, C> {}
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Deterministic
+    for LinkedListTransitionSystem<A, Q, C>
+{
+}
 
-impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> Sproutable
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool> Sproutable
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
@@ -82,6 +85,16 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> Sproutable
         E: IntoEdgeTuple<Self>,
     {
         let (q, a, c, p) = t.into_edge_tuple();
+
+        if DET
+            && self
+                .edges_from(q)
+                .unwrap()
+                .any(|e| e.expression().overlaps(&a))
+        {
+            return None;
+        }
+
         let mut edge = LinkedListTransitionSystemEdge::new(q, a, c, p);
         let edge_id = self.edges.len();
 
@@ -100,7 +113,7 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> Sproutable
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> Shrinkable
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool> Shrinkable
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn remove_edges_from_matching(
@@ -178,7 +191,9 @@ impl<Q, C, const DET: bool> LinkedListTransitionSystem<CharAlphabet, Q, C, DET> 
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> LinkedListTransitionSystem<A, Q, C, DET> {
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool>
+    LinkedListTransitionSystem<A, Q, C, DET>
+{
     pub(crate) fn nts_remove_edge(
         &mut self,
         from: usize,
@@ -285,7 +300,10 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> LinkedListTransitionSyste
                         r.expression().show(),
                         r.target(),
                     );
-                    assert!(!DET, "found overlapping edges even though the type indicates this is deterministic");
+                    assert!(
+                        !DET,
+                        "Transition system is not deterministic even though the type suggests it."
+                    );
                     return false;
                 }
             }
@@ -295,7 +313,28 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> LinkedListTransitionSyste
 
     /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
     pub fn into_deterministic(self) -> LinkedListTransitionSystem<A, Q, C> {
-        recast(self)
+        match self.try_into_deterministic() {
+            Ok(ts) => ts,
+            Err(ts) => {
+                tracing::error!("Tried to convert non-deterministic transition system to deterministic one\n{:?}", ts);
+                panic!("This transition system is not deterministic");
+            }
+        }
+    }
+
+    /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
+    pub fn try_into_deterministic(self) -> Result<LinkedListTransitionSystem<A, Q, C, true>, Self> {
+        if DET {
+            if !self.is_deterministic() {
+                tracing::error!("Tried to convert non-deterministic transition system to deterministic one\n{:?}", self);
+                panic!("This transition system is not deterministic");
+            }
+            Ok(recast(self))
+        } else if self.is_deterministic() {
+            Ok(recast(self))
+        } else {
+            Err(self)
+        }
     }
 
     pub fn into_nondeterministic(self) -> LinkedListNondeterministic<A, Q, C> {
@@ -340,8 +379,8 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> LinkedListTransitionSyste
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> TransitionSystem
-    for LinkedListTransitionSystem<A, Q, C, DET>
+impl<A: Alphabet, Q: Clone + std::fmt::Debug, C: Clone + std::fmt::Debug, const DET: bool>
+    TransitionSystem for LinkedListTransitionSystem<A, Q, C, DET>
 {
     type StateIndex = usize;
 
@@ -391,7 +430,7 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> TransitionSystem
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> ForAlphabet<A>
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool> ForAlphabet<A>
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn for_alphabet(alphabet: A) -> Self {
@@ -411,7 +450,7 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> ForAlphabet<A>
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> PredecessorIterable
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool> PredecessorIterable
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     type PreEdgeRef<'this> = &'this LinkedListTransitionSystemEdge<A::Expression, C>
@@ -430,7 +469,7 @@ impl<A: Alphabet, Q: Clone, C: Clone, const DET: bool> PredecessorIterable
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq, const DET: bool> PartialEq
+impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const DET: bool> PartialEq
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn eq(&self, other: &Self) -> bool {
@@ -453,7 +492,7 @@ impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq, const DET: bool> Parti
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq, const DET: bool> Eq
+impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const DET: bool> Eq
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
 }
@@ -477,7 +516,7 @@ impl<
     }
 }
 
-fn recast<A: Alphabet, Q: Clone, C: Clone, const DET: bool, const OUT_DET: bool>(
+fn recast<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool, const OUT_DET: bool>(
     ts: LinkedListTransitionSystem<A, Q, C, DET>,
 ) -> LinkedListTransitionSystem<A, Q, C, OUT_DET> {
     if !DET && OUT_DET && !ts.is_deterministic() {

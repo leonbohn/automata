@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use std::fmt::Debug;
 
 use super::{LinkedListTransitionSystem, LinkedListTransitionSystemEdge};
 

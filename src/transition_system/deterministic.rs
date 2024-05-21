@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::hash::Hash;
 
 use itertools::Itertools;
@@ -498,7 +499,6 @@ pub trait Deterministic: TransitionSystem {
     {
         self.finite_run_from(origin, word).ok().map(|p| p.reached())
     }
-
     /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     #[cfg(feature = "linked_list_ts")]
@@ -506,7 +506,7 @@ pub trait Deterministic: TransitionSystem {
     where
         Self: Sized,
     {
-        DTS::from_parts(self)
+        self.collect_linked_list_deterministic()
     }
     /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
@@ -517,6 +517,37 @@ pub trait Deterministic: TransitionSystem {
         EdgeColor<Self>: Hash + Eq,
     {
         self.collect_edge_lists_deterministic()
+    }
+    /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
+    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
+    #[cfg(feature = "linked_list_ts")]
+    #[allow(clippy::type_complexity)]
+    fn collect_dts_pointed(
+        self,
+    ) -> (
+        DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
+        usize,
+    )
+    where
+        Self: Sized + Pointed,
+    {
+        self.collect_linked_list_deterministic_pointed()
+    }
+    /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
+    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
+    #[cfg(not(feature = "linked_list_ts"))]
+    #[allow(clippy::type_complexity)]
+    fn collect_dts_pointed(
+        self,
+    ) -> (
+        DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
+        usize,
+    )
+    where
+        Self: Sized + Pointed,
+        EdgeColor<Self>: Hash + Eq,
+    {
+        self.collect_edge_lists_deterministic_pointed()
     }
 
     /// Collects `self` into a new [`LinkedListTransitionSystem`] over the same alphabet. This is used, for example, after a chain of
@@ -540,7 +571,7 @@ pub trait Deterministic: TransitionSystem {
     /// after the other and subsequently inserts all transitions, see
     /// [`Deterministic::collect_linked_list_deterministic`] for details.
     #[allow(clippy::type_complexity)]
-    fn collect_linked_list_determinsitic_pointed(
+    fn collect_linked_list_deterministic_pointed(
         self,
     ) -> (
         LinkedListTransitionSystem<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
@@ -622,7 +653,7 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
         Self::Alphabet: IndexedAlphabet,
     {
-        let (mut ts, initial) = self.collect_linked_list_determinsitic_pointed();
+        let (mut ts, initial) = self.collect_linked_list_deterministic_pointed();
         if !ts.is_complete() {
             let sink = ts.add_state(sink_state_color);
             for q in ts.state_indices() {
@@ -664,7 +695,7 @@ pub trait Deterministic: TransitionSystem {
     {
         let reachable_indices = self.reachable_state_indices().collect::<Set<_>>();
         let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
-        restricted.collect_linked_list_determinsitic_pointed()
+        restricted.collect_linked_list_deterministic_pointed()
     }
 
     /// Compute the escape prefixes of a set of omega words on a transition system.
@@ -746,7 +777,9 @@ impl<D: Deterministic> Deterministic for &mut D {
     }
 }
 
-impl<A: Alphabet, Q: Clone, C: Hash + Eq + Clone> Deterministic for EdgeLists<A, Q, C> {
+impl<A: Alphabet, Q: Clone + Debug, C: Hash + Debug + Eq + Clone> Deterministic
+    for EdgeLists<A, Q, C>
+{
     fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
@@ -801,7 +834,7 @@ where
 
 impl<D, Ts, F> Deterministic for MapStateColor<Ts, F>
 where
-    D: Clone,
+    D: Clone + Debug,
     Ts: Deterministic,
     F: Fn(Ts::StateColor) -> D,
 {
@@ -825,7 +858,7 @@ where
 
 impl<D, Ts, F> Deterministic for MapEdgeColor<Ts, F>
 where
-    D: Clone,
+    D: Clone + Debug,
     Ts: Deterministic,
     F: Fn(Ts::EdgeColor) -> D,
 {
@@ -889,7 +922,7 @@ where
 impl<Ts, D, F> Deterministic for MapEdges<Ts, F>
 where
     Ts: Deterministic,
-    D: Clone,
+    D: Clone + Debug,
     F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
     fn edge<Idx: Indexes<Self>>(

@@ -360,6 +360,10 @@ impl Expression for HoaExpression {
     type S = HoaSymbol;
     type SymbolsIter<'this> = HoaExpressionIter<'this> where Self: 'this;
 
+    fn overlaps(&self, other: &Self) -> bool {
+        self.bdd.and(&other.bdd).sat_valuations().next().is_some()
+    }
+
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         HoaExpressionIter::new(self)
     }
@@ -436,6 +440,12 @@ impl Alphabet for HoaAlphabet {
 
     fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
         hoa_symbol_to_hoa_expression(&symbol)
+    }
+}
+
+impl std::fmt::Debug for HoaAlphabet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Propositional[{}]", self.apnames().join(", "))
     }
 }
 
