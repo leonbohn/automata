@@ -6,7 +6,7 @@ use crate::{math::Map, math::Set, prelude::*};
 
 type InteriorEdgeSet<Ts> = Set<(
     <Ts as TransitionSystem>::StateIndex,
-    ExpressionOf<Ts>,
+    EdgeExpression<Ts>,
     <Ts as TransitionSystem>::EdgeColor,
     <Ts as TransitionSystem>::StateIndex,
 )>;
@@ -334,7 +334,7 @@ impl<'a, Ts: TransitionSystem> Debug for Scc<'a, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{prelude::*, Set};
+    use crate::{math::Set, prelude::*};
 
     #[test]
     fn interior_transitions() {
@@ -346,10 +346,10 @@ mod tests {
         ]
         .into_iter()
         .collect::<Set<_>>();
-        let ts = NTS::builder()
+        let ts = LinkedListNondeterministic::builder()
             .default_color(())
             .with_transitions(&transitions)
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(0);
         let sccs = ts.sccs();
         let first = sccs.first();

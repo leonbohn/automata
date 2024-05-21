@@ -1,7 +1,7 @@
 use std::{io::BufRead, ops::Deref};
 
 use crate::{
-    automaton::{AcceptanceMask, DeterministicOmegaAutomaton, WithInitial},
+    automaton::{AcceptanceMask, DeterministicOmegaAutomaton},
     hoa::HoaExpression,
     prelude::*,
 };
@@ -11,11 +11,11 @@ use tracing::{trace, warn};
 use super::{HoaAlphabet, HoaString};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct FilterDeterministicHoaAutomatonStream<R> {
-    base: HoaAutomatonStream<R>,
+pub struct FilterDeterministicHoaAutomatonStream<R, const DET: bool> {
+    base: HoaAutomatonStream<R, DET>,
 }
 
-impl<R> FilterDeterministicHoaAutomatonStream<R> {
+impl<R, const DET: bool> FilterDeterministicHoaAutomatonStream<R, DET> {
     pub fn new(read: R) -> Self {
         Self {
             base: HoaAutomatonStream::new(read),
@@ -23,7 +23,7 @@ impl<R> FilterDeterministicHoaAutomatonStream<R> {
     }
 }
 
-impl<R: BufRead> Iterator for FilterDeterministicHoaAutomatonStream<R> {
+impl<R: BufRead, const DET: bool> Iterator for FilterDeterministicHoaAutomatonStream<R, DET> {
     type Item = DeterministicOmegaAutomaton<HoaAlphabet>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -31,7 +31,7 @@ impl<R: BufRead> Iterator for FilterDeterministicHoaAutomatonStream<R> {
             match self.base.next() {
                 None => return None,
                 Some(aut) => {
-                    if let Some(det) = aut.into_deterministic() {
+                    if let Ok(det) = aut.try_into_deterministic() {
                         return Some(det);
                     } else {
                         warn!("Encountered automaton that is not deterministic, skipping...")
@@ -43,14 +43,14 @@ impl<R: BufRead> Iterator for FilterDeterministicHoaAutomatonStream<R> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct HoaAutomatonStream<R> {
+pub struct HoaAutomatonStream<R, const DET: bool> {
     read: R,
     buf: String,
     pos: usize,
 }
 
-impl<R: BufRead> Iterator for HoaAutomatonStream<R> {
-    type Item = OmegaAutomaton<HoaAlphabet>;
+impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
+    type Item = OmegaAutomaton<HoaAlphabet, DET>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -70,10 +70,25 @@ impl<R: BufRead> Iterator for HoaAutomatonStream<R> {
                             "encountered --END-- in stream, attempting to parse automaton \n{}",
                             &self.buf[..end]
                         );
-                        let aut = parse_omega_automaton_range(&self.buf, 0, end);
+                        let aut: Result<OmegaAutomaton<HoaAlphabet, DET>, _> =
+                            parse_omega_automaton_range(&self.buf, 0, end);
                         self.buf.clear();
                         self.pos = 0;
-                        return aut;
+
+                        match aut {
+                            Err(e) => {
+                                warn!(
+                                    "Encountered automaton that could not be parsed, skipping... {:?}", e
+                                );
+                            }
+                            Ok(aut) => {
+                                if DET && !aut.ts().is_deterministic() {
+                                    panic!("Encountered automaton that is not deterministic, even though the type indicates it\n{:?}", aut);
+                                } else {
+                                    return Some(aut);
+                                }
+                            }
+                        }
                     }
 
                     self.pos += read_bytes;
@@ -84,7 +99,7 @@ impl<R: BufRead> Iterator for HoaAutomatonStream<R> {
     }
 }
 
-impl<R> HoaAutomatonStream<R> {
+impl<R, const DET: bool> HoaAutomatonStream<R, DET> {
     pub fn new(read: R) -> Self {
         Self {
             read,
@@ -94,87 +109,105 @@ impl<R> HoaAutomatonStream<R> {
     }
 }
 
-fn parse_omega_automaton_range(
+fn parse_omega_automaton_range<const DET: bool>(
     hoa: &str,
     start: usize,
     end: usize,
-) -> Option<OmegaAutomaton<HoaAlphabet>> {
+) -> Result<OmegaAutomaton<HoaAlphabet, DET>, String> {
     match HoaAutomaton::try_from(&hoa[start..end]) {
         Ok(aut) => match OmegaAutomaton::try_from(aut) {
-            Ok(aut) => Some(aut),
-            Err(e) => {
-                tracing::warn!("Encountered processing error {}", e);
-                None
-            }
+            Ok(aut) => Ok(aut),
+            Err(e) => Err(format!(
+                "In range {}..{}, could not convert automaton into omega automaton: {}",
+                start, end, e
+            )),
         },
-        Err(e) => {
-            tracing::warn!("Encountered parsing error {}", e);
-            None
-        }
+        Err(e) => Err(format!(
+            "Could not parse automaton from range {}..{}: {}",
+            start, end, e
+        )),
     }
 }
 
 pub fn pop_deterministic_omega_automaton(
     hoa: HoaString,
 ) -> Option<(DeterministicOmegaAutomaton<HoaAlphabet>, HoaString)> {
-    let mut hoa = hoa;
-    while let Some((aut, rest)) = pop_omega_automaton(hoa) {
-        if let Some(det) = aut.into_deterministic() {
-            return Some((det, rest));
-        }
-        trace!("Automaton was not deterministic, skipping");
-        hoa = rest;
-    }
-    None
+    pop_omega_automaton(hoa)
 }
 
 /// Tries to `pop` the foremost valid HOA automaton from the given [`HoaString`].
 /// If no valid automaton is found before the end of the stream is reached, the
 /// function returns `None`.
-pub fn pop_omega_automaton(hoa: HoaString) -> Option<(OmegaAutomaton<HoaAlphabet>, HoaString)> {
+pub fn pop_omega_automaton<const DET: bool>(
+    hoa: HoaString,
+) -> Option<(OmegaAutomaton<HoaAlphabet, DET>, HoaString)> {
+    let mut hoa = hoa;
     const END_LEN: usize = "--END--".len();
     const ABORT_LEN: usize = "--ABORT--".len();
 
-    match (hoa.0.find("--ABORT--"), hoa.0.find("--END--")) {
-        (None, Some(pos)) => {
-            trace!("Returnting first automaton, going up to position {pos}");
-            let aut = parse_omega_automaton_range(&hoa.0, 0, pos + END_LEN)?;
-            Some((
-                aut,
-                HoaString(hoa.0[pos + END_LEN..].trim_start().to_string()),
-            ))
-        }
-        (Some(abort), None) => {
-            trace!("Found only one automaton --ABORT--ed at {abort}, but no subsequent --END-- of automaton to parse.");
-            None
-        }
-        (Some(abort), Some(end)) => {
-            if abort < end {
-                trace!("Found --ABORT-- before --END--, returning first automaton from {abort} to {end}");
-                let aut = parse_omega_automaton_range(&hoa.0, abort + ABORT_LEN, end + END_LEN)?;
-                Some((
-                    aut,
-                    HoaString(hoa.0[end + END_LEN..].trim_start().to_string()),
-                ))
-            } else {
-                trace!("Found --END--, returning first automaton up to {end}");
-                let aut = parse_omega_automaton_range(&hoa.0, 0, end + END_LEN)?;
-                Some((
-                    aut,
-                    HoaString(hoa.0[end + END_LEN..].trim_start().to_string()),
-                ))
+    loop {
+        match (hoa.0.find("--ABORT--"), hoa.0.find("--END--")) {
+            (None, Some(pos)) => {
+                trace!("Returnting first automaton, going up to position {pos}");
+                match parse_omega_automaton_range(&hoa.0, 0, pos + END_LEN) {
+                    Ok(aut) => {
+                        return Some((
+                            aut,
+                            HoaString(hoa.0[pos + END_LEN..].trim_start().to_string()),
+                        ))
+                    }
+                    Err(e) => {
+                        warn!("Could not parse automaton, skipping... {:?}", e);
+                        hoa = HoaString(hoa.0[pos + END_LEN..].trim_start().to_string());
+                    }
+                }
             }
-        }
-        (None, None) => {
-            trace!("No end of automaton found, there is no automaton to parse.");
-            None
+            (Some(abort), None) => {
+                trace!("Found only one automaton --ABORT--ed at {abort}, but no subsequent --END-- of automaton to parse.");
+                return None;
+            }
+            (Some(abort), Some(end)) => {
+                if abort < end {
+                    trace!("Found --ABORT-- before --END--, returning first automaton from {abort} to {end}");
+                    match parse_omega_automaton_range(&hoa.0, abort + ABORT_LEN, end + END_LEN) {
+                        Ok(aut) => {
+                            return Some((
+                                aut,
+                                HoaString(hoa.0[end + END_LEN..].trim_start().to_string()),
+                            ))
+                        }
+                        Err(e) => {
+                            warn!("Could not parse automaton, skipping... {:?}", e);
+                            hoa = HoaString(hoa.0[end + END_LEN..].trim_start().to_string());
+                        }
+                    }
+                } else {
+                    trace!("Found --END--, returning first automaton up to {end}");
+                    match parse_omega_automaton_range(&hoa.0, 0, end + END_LEN) {
+                        Ok(aut) => {
+                            return Some((
+                                aut,
+                                HoaString(hoa.0[end + END_LEN..].trim_start().to_string()),
+                            ))
+                        }
+                        Err(e) => {
+                            warn!("Could not parse automaton, skipping... {:?}", e);
+                            hoa = HoaString(hoa.0[end + END_LEN..].trim_start().to_string());
+                        }
+                    }
+                }
+            }
+            (None, None) => {
+                trace!("No end of automaton found, there is no automaton to parse.");
+                return None;
+            }
         }
     }
 }
 
 /// Considers the given HOA string as a single automaton and tries to parse it into an
 /// [`OmegaAutomaton`].
-pub fn hoa_to_ts(hoa: &str) -> Vec<OmegaAutomaton<HoaAlphabet>> {
+pub fn hoa_to_ts<const DET: bool>(hoa: &str) -> Vec<OmegaAutomaton<HoaAlphabet, DET>> {
     let mut out = vec![];
     for hoa_aut in hoars::parse_hoa_automata(hoa) {
         match hoa_aut.try_into() {
@@ -205,24 +238,23 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
     }
 }
 
-impl TryFrom<HoaAutomaton> for OmegaAutomaton<HoaAlphabet> {
+impl<const DET: bool> TryFrom<HoaAutomaton> for OmegaAutomaton<HoaAlphabet, DET> {
     type Error = String;
     fn try_from(value: HoaAutomaton) -> Result<Self, Self::Error> {
-        let acc = value.header().try_into()?;
-        let (ts, initial) = hoa_automaton_to_nts(value)?.decompose();
-        Ok(Self::new(ts, initial, acc))
+        hoa_automaton_to_ts(value)
     }
 }
 
 /// Converts a [`HoaAutomaton`] into a [`NTS`] with the same semantics. This creates the appropriate
 /// number of states and inserts transitions with the appropriate labels and colors.
-pub fn hoa_automaton_to_nts(
+pub fn hoa_automaton_to_ts<const DET: bool>(
     aut: HoaAutomaton,
-) -> Result<WithInitial<NTS<HoaAlphabet, usize, AcceptanceMask>>, String> {
+) -> Result<OmegaAutomaton<HoaAlphabet, DET>, String> {
     let aps = aut.num_aps();
     assert!(aps <= MAX_APS);
 
-    let mut ts = NTS::for_alphabet(HoaAlphabet::from_hoa_automaton(&aut));
+    let mut ts: TS<HoaAlphabet, usize, AcceptanceMask, DET> =
+        TS::for_alphabet(HoaAlphabet::from_hoa_automaton(&aut));
     for (id, state) in aut.body().iter().enumerate() {
         assert_eq!(id, state.id() as usize);
         assert_eq!(id, ts.add_state(state.id() as usize));
@@ -241,9 +273,18 @@ pub fn hoa_automaton_to_nts(
             let expr = HoaExpression::new(bdd, aps);
 
             let color: AcceptanceMask = edge.acceptance_signature().into();
-            ts.add_edge(state.id() as usize, expr, target, color);
+
+            if ts
+                .add_edge((state.id() as usize, expr, color, target))
+                .is_none()
+            {
+                // this thing is not deterministic, so we return
+                return Err("Automaton is not deterministic".to_string());
+            }
         }
     }
+
+    debug_assert!(!DET || ts.is_deterministic());
 
     let start = aut.start();
     assert_eq!(start.len(), 1);
@@ -251,7 +292,11 @@ pub fn hoa_automaton_to_nts(
         .get_singleton()
         .expect("Initial state must be a singleton") as usize;
 
-    Ok(ts.with_initial(initial))
+    let acceptance: OmegaAcceptanceCondition = aut.header().try_into()?;
+
+    Ok(OmegaAutomaton::from_parts_with_acceptance(
+        ts, initial, acceptance,
+    ))
 }
 
 #[cfg(test)]

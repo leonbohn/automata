@@ -296,13 +296,13 @@ where
     D: Deterministic,
     EdgeColor<D>: Ord,
 {
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         self.ts()
-            .transition(state.to_index(self)?, symbol)
+            .edge(state.to_index(self)?, matcher)
             .and_then(|t| {
                 if t.color() <= self.max && self.min <= t.color() {
                     Some(t)

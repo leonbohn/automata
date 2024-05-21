@@ -4,12 +4,14 @@ pub mod output;
 
 use std::cell::RefCell;
 
-use crate::{prelude::*, Set};
+use crate::prelude::*;
 use biodivine_lib_bdd::{
     Bdd, BddPartialValuation, BddSatisfyingValuations, BddValuation, BddVariable,
 };
 use hoars::HoaAutomaton;
 use itertools::Itertools;
+
+use self::alphabet::Matcher;
 
 pub static MAX_APS: usize = 6;
 
@@ -35,7 +37,7 @@ pub struct HoaAlphabet {
     variable_set: biodivine_lib_bdd::BddVariableSet,
     variables: Vec<BddVariable>,
     // TODO: introduce caching of Bdds
-    _expressions: RefCell<Set<HoaExpression>>,
+    _expressions: RefCell<math::Set<HoaExpression>>,
 }
 
 impl HoaAlphabet {
@@ -103,7 +105,7 @@ impl HoaAlphabet {
             apnames,
             variable_set: vs,
             variables: vars,
-            _expressions: RefCell::new(Set::default()),
+            _expressions: RefCell::new(math::Set::default()),
         }
     }
 
@@ -213,6 +215,12 @@ impl Show for HoaSymbol {
 pub struct HoaExpression {
     bdd: Bdd,
     aps: usize,
+}
+
+impl Matcher<HoaExpression> for HoaExpression {
+    fn matches(&self, _expression: &HoaExpression) -> bool {
+        todo!()
+    }
 }
 
 impl HoaExpression {
@@ -342,14 +350,25 @@ impl<'a> Iterator for HoaExpressionIter<'a> {
     }
 }
 
-impl Expression<HoaSymbol> for HoaExpression {
+impl Matcher<HoaExpression> for HoaSymbol {
+    fn matches(&self, expression: &HoaExpression) -> bool {
+        expression.matched_by(*self)
+    }
+}
+
+impl Expression for HoaExpression {
+    type S = HoaSymbol;
     type SymbolsIter<'this> = HoaExpressionIter<'this> where Self: 'this;
+
+    fn overlaps(&self, other: &Self) -> bool {
+        self.bdd.and(&other.bdd).sat_valuations().next().is_some()
+    }
 
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         HoaExpressionIter::new(self)
     }
 
-    fn matches(&self, symbol: HoaSymbol) -> bool {
+    fn matched_by(&self, symbol: HoaSymbol) -> bool {
         self.bdd.eval_in(&symbol.as_bdd_valuation())
     }
 }
@@ -419,12 +438,14 @@ impl Alphabet for HoaAlphabet {
         true
     }
 
-    fn matches(&self, expression: &Self::Expression, symbol: Self::Symbol) -> bool {
-        expression.matches(symbol)
-    }
-
     fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
         hoa_symbol_to_hoa_expression(&symbol)
+    }
+}
+
+impl std::fmt::Debug for HoaAlphabet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Propositional[{}]", self.apnames().join(", "))
     }
 }
 

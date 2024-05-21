@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::{prelude::*, Void};
 
-use super::Automaton;
+use super::FiniteWordAutomaton;
 
 /// Represents the semantics of a Moore machine, it produces the color of the
 /// state that is reached during a run on a word. If the input is empty, it
@@ -25,14 +25,15 @@ pub struct MooreSemantics<Q>(std::marker::PhantomData<Q>);
 /// consider the colors that are produced infinitely often and base acceptance around them. It
 /// is, however, prefered to use a [`MealyMachine`] for this purpose, as for infinite inputs
 /// switching to transition-based acceptance is preferable.
-pub type MooreMachine<A = CharAlphabet, Q = usize> =
-    Automaton<DTS<A, Q, Void>, MooreSemantics<Q>, false>;
+pub type MooreMachine<A = CharAlphabet, Q = usize, C = Void, D = DTS<A, Q, C>> =
+    FiniteWordAutomaton<A, MooreSemantics<Q>, Q, C, true, D>;
 
 /// Helper type that takes a pointed transition system and returns the corresponding
 /// [`MooreMachine`], which the ts can be converted into using [`Into::into`].
 /// For concrete automaton types such as [`DFA`], the [`IntoDFA`] type can be used to
 /// obtain the type of a [`DFA`] for the given ts.
-pub type IntoMooreMachine<D> = Automaton<D, MooreSemantics<StateColor<D>>, false>;
+pub type IntoMooreMachine<D> =
+    MooreMachine<<D as TransitionSystem>::Alphabet, StateColor<D>, EdgeColor<D>, D>;
 
 impl<C> IntoMooreMachine<C>
 where
@@ -43,7 +44,7 @@ where
     /// produce a color less than or equal to i.
     pub fn decompose_dfa(&self) -> Vec<DFA<C::Alphabet>>
     where
-        StateColor<Self>: Color,
+        StateColor<Self>: Ord,
     {
         self.color_range()
             .into_iter()
@@ -55,10 +56,11 @@ where
     /// Builds a DFA that accepts all words which emit a color less than or equal to `color`.
     pub fn color_or_below_dfa(&self, color: C::StateColor) -> DFA<C::Alphabet>
     where
-        StateColor<Self>: Color,
+        StateColor<Self>: Ord,
     {
         self.map_state_colors(|o| o <= color)
             .erase_edge_colors()
+            .with_initial(self.initial)
             .into_dfa()
             .minimize()
             .collect_dfa()
@@ -66,7 +68,9 @@ where
 
     /// Pushes the state colors onto the outgoing edges of `self` and collects the resulting
     /// transition system into a new [`MealyMachine`].
-    pub fn push_colors_to_outgoing_edges(&self) -> MealyMachine<C::Alphabet, C::StateColor>
+    pub fn push_colors_to_outgoing_edges(
+        &self,
+    ) -> MealyMachine<C::Alphabet, C::StateColor, C::StateColor>
     where
         C::StateColor: Clone,
     {
@@ -75,13 +79,14 @@ where
                 .expect("We know it is reachable and it must be colored")
                 .clone()
         })
+        .with_initial(self.initial)
         .collect_mealy()
     }
 
     /// Runs the given `input` word in self. If the run is successful, the color of the state that it reaches
     /// is emitted (wrapped in a `Some`). For unsuccessful runs, `None` is returned.
     pub fn map<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> Option<C::StateColor> {
-        self.reached_state_color(input)
+        self.reached_state_color_from(self.initial, input)
     }
 
     /// Obtains a vec containing the possible colors emitted by `self` (without duplicates).
@@ -89,7 +94,7 @@ where
     where
         StateColor<Self>: Color,
     {
-        self.reachable_state_indices()
+        self.reachable_state_indices_from(self.initial)
             .map(|o| {
                 self.state_color(o)
                     .expect("We know it is reachable and it must be colored")
@@ -117,8 +122,11 @@ where
         M: Congruence<Alphabet = C::Alphabet, StateColor = C::StateColor>,
         StateColor<Self>: Color,
     {
+        let other_initial = other.initial();
         let prod = self.ts_product(other);
-        for (mr, idx) in prod.minimal_representatives() {
+        for (mr, idx) in
+            prod.minimal_representatives_from(ProductIndex(self.initial, other_initial))
+        {
             let (c, d) = prod.state_color(idx).unwrap();
             if c != d {
                 return Some(mr);

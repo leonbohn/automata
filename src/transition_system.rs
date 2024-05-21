@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use tracing::trace;
 
 use crate::{math::Partition, prelude::*};
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
@@ -18,12 +19,16 @@ pub mod operations;
 /// efficient for large systems and this implementation is used by default. There is a variant
 /// [`DTS`] which is simply a thin wrapper around [`NTS`], indicating that the wrapped transition
 /// system is deterministic, i.e. it implements [`Deterministic`].
-/// - [`MutableTs`] is a (deterministic) transition system which is backed by a [`crate::Set`] of
+/// - [`MutableTs`] is a (deterministic) transition system which is backed by a [`math::Set`] of
 /// states and a [`crate::math::Map`] of edges. In other words, it uses a hash table internally.
 /// This offers a distinct advantage over [`DTS`] in that states and edges can
 /// be removed. This is useful for constructing transition systems programmatically.
 pub mod impls;
-pub use impls::{CollectDTS, DTSAndInitialState, IntoMutableTs, MutableTs, DTS, NTS};
+pub use impls::{
+    CollectLinkedList, EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, IntoEdgeLists,
+    IntoLinkedListNondeterministic, LinkedListDeterministic, LinkedListNondeterministic,
+    LinkedListTransitionSystem, LinkedListTransitionSystemEdge,
+};
 
 /// Contains implementations and definitions for dealing with paths through a transition system.
 pub mod path;
@@ -67,7 +72,7 @@ pub mod predecessors;
 /// Internally, a transition system is represented as a graph, where the states are the nodes and the
 /// transitions are the edges. However, the transitions are not the same as the edges.
 /// Both store the source and target vertex as well as the color, however an edge is labelled
-/// with an expression, while a transition is labelled with an actual symbol (that [`Alphabet::matches`]
+/// with an expression, while a transition is labelled with an actual symbol (that [`Matcher::matches`]
 /// the expression). So a transition is a concrete edge that is taken (usually by the run on a word), while
 /// an edge may represent any different number of transitions.
 pub trait TransitionSystem: Sized {
@@ -76,11 +81,11 @@ pub trait TransitionSystem: Sized {
     /// The type of the indices of the states of the transition system.
     type StateIndex: IndexType;
     /// The type of the colors of the states of the transition system.
-    type StateColor: Clone;
+    type StateColor: Color;
     /// The type of the colors of the edges of the transition system.
-    type EdgeColor: Clone;
+    type EdgeColor: Color;
     /// The type of the references to the transitions of the transition system.
-    type EdgeRef<'this>: IsEdge<'this, ExpressionOf<Self>, Self::StateIndex, EdgeColor<Self>>
+    type EdgeRef<'this>: IsEdge<'this, EdgeExpression<Self>, Self::StateIndex, EdgeColor<Self>>
     where
         Self: 'this;
     /// The type of the iterator over the transitions that start in a given state.
@@ -126,7 +131,7 @@ pub trait TransitionSystem: Sized {
 
     /// Helper function which creates an expression from the given symbol.
     /// This is a convenience function that simply calls [`Alphabet::make_expression`].
-    fn make_expression(&self, sym: SymbolOf<Self>) -> ExpressionOf<Self> {
+    fn make_expression(&self, sym: SymbolOf<Self>) -> EdgeExpression<Self> {
         self.alphabet().make_expression(sym)
     }
 
@@ -195,31 +200,43 @@ pub trait TransitionSystem: Sized {
 
     /// Returns an iterator over all transitions that start in the given `state` and whose expression
     /// matches the given `sym`. If the state does not exist, `None` is returned.
-    fn edges_matching<Idx: Indexes<Self>>(
+    fn edges_matching(
         &self,
-        state: Idx,
-        sym: SymbolOf<Self>,
-    ) -> Option<
-        impl Iterator<
-            Item = (
-                Self::StateIndex,
-                &ExpressionOf<Self>,
-                Self::EdgeColor,
-                Self::StateIndex,
-            ),
-        >,
-    >
+        state: impl Indexes<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<impl Iterator<Item = EdgeRef<'_, Self>>>
     where
         EdgeColor<Self>: Clone,
     {
-        let idx = state.to_index(self)?;
-        Some(self.edges_from(state)?.filter_map(move |t| {
-            if t.expression().matches(sym) {
-                Some((idx, t.expression(), t.color().clone(), t.target()))
-            } else {
-                None
+        Some(
+            self.edges_from(state)?
+                .filter(move |t| matcher.matches(t.expression())),
+        )
+    }
+
+    /// Returns true if the transition system is deterministic, i.e. if there are no two edges leaving
+    /// the same state with the same symbol.
+    fn is_deterministic(&self) -> bool {
+        for state in self.state_indices() {
+            for (l, r) in self
+                .edges_from(state)
+                .unwrap()
+                .zip(self.edges_from(state).unwrap().skip(1))
+            {
+                if self.alphabet().overlapping(l.expression(), r.expression()) {
+                    trace!(
+                        "found overlapping edges from {:?}: on {} to {:?} and on {} to {:?}",
+                        l.source(),
+                        l.expression().show(),
+                        l.target(),
+                        r.expression().show(),
+                        r.target(),
+                    );
+                    return false;
+                }
             }
-        }))
+        }
+        true
     }
 
     /// Checks whether `self` is complete, meaning every state has a transition for every symbol
@@ -260,7 +277,7 @@ pub trait TransitionSystem: Sized {
             return false;
         };
         if let Some(mut it) = self.edges_from(source) {
-            it.any(|t| t.target() == target && t.expression().matches(sym))
+            it.any(|t| t.target() == target && t.expression().matched_by(sym))
         } else {
             false
         }
@@ -402,7 +419,7 @@ pub trait TransitionSystem: Sized {
     /// the origin, target and expression of the respective edge.
     fn map_edge_colors_full<D, F>(self, f: F) -> operations::MapEdges<Self, F>
     where
-        F: Fn(Self::StateIndex, &ExpressionOf<Self>, Self::EdgeColor, Self::StateIndex) -> D,
+        F: Fn(Self::StateIndex, &EdgeExpression<Self>, Self::EdgeColor, Self::StateIndex) -> D,
         D: Clone,
         Self: Sized,
     {
@@ -454,10 +471,10 @@ pub trait TransitionSystem: Sized {
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
-    ///     .into_dts_with_initial(0);
-    /// let colored = ts.with_state_color(false);
+    ///     .into_linked_list_deterministic_with_initial(0);
+    /// let colored = ts.with_state_color(UniformColor(false));
     /// assert_eq!(colored.reached_state_color("a"), Some(false));
-    /// assert_eq!(colored.with_state_color(true).reached_state_color("a"), Some(true));
+    /// assert_eq!(colored.with_state_color(UniformColor(true)).reached_state_color("a"), Some(true));
     /// ```
     fn with_state_color<P: ProvidesStateColor<Self::StateIndex>>(
         self,
@@ -552,7 +569,7 @@ pub trait TransitionSystem: Sized {
         state: Jdx,
     ) -> bool
     where
-        Self: Sized + Pointed,
+        Self: Sized,
     {
         let Some(origin) = origin.to_index(self) else {
             tracing::error!("Origin state does not exist");
@@ -618,17 +635,11 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the given `state`.
-    fn reachable_state_indices_from<Idx: Indexes<Self>>(
-        &self,
-        state: Idx,
-    ) -> ReachableStateIndices<&Self>
+    fn reachable_state_indices_from(&self, state: Self::StateIndex) -> ReachableStateIndices<&Self>
     where
         Self: Sized,
     {
-        let origin = state
-            .to_index(self)
-            .expect("Can only run this from a state that exists");
-        ReachableStateIndices::new(self, origin)
+        ReachableStateIndices::new(self, state)
     }
 
     /// Returns an iterator over the states that are reachable from the given `state`.
@@ -736,15 +747,15 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 /// Implementors should be able to _uniquely_ identify a single state in a transition
 /// system of type `Ts`.
 pub trait Indexes<Ts: TransitionSystem>: Debug {
-    /// _Uniquely_ identifies a state in `ts` and return its index. If the state does
-    /// not exist, `None` is returned.
+    /// Uniquely dentifies a state in `ts` and return its index.
     fn to_index(&self, ts: &Ts) -> Option<Ts::StateIndex>;
 }
 
-impl<Ts: TransitionSystem> Indexes<Ts> for Ts::StateIndex {
+impl<T: TransitionSystem, I: std::borrow::Borrow<StateIndex<T>> + Debug> Indexes<T> for I {
     #[inline(always)]
-    fn to_index(&self, _ts: &Ts) -> Option<<Ts as TransitionSystem>::StateIndex> {
-        Some(*self)
+    fn to_index(&self, _ts: &T) -> Option<<T as TransitionSystem>::StateIndex> {
+        let q = *self.borrow();
+        Some(q)
     }
 }
 
@@ -755,49 +766,59 @@ impl<TY: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show> IndexType f
 
 /// Implementors of this trait can be transformed into a owned tuple representation of
 /// an edge in a [`TransitionSystem`].
-pub trait IntoEdge<Idx, E, C> {
+pub trait IntoEdgeTuple<Ts: TransitionSystem> {
     /// Consumes `self` and returns a tuple representing an edge in a [`TransitionSystem`].
     /// Owned edges in their tuple representation may simply be cloned, whereas if we have
     /// a tuple represetation of an edge with a borrowed expression, this operation may
     /// have to clone the expression.
-    fn into_edge(self) -> (Idx, E, C, Idx);
+    fn into_edge_tuple(self) -> EdgeTuple<Ts>;
 }
 
-impl<Idx, E, C: Color> IntoEdge<Idx, E, C> for (Idx, E, C, Idx) {
-    fn into_edge(self) -> (Idx, E, C, Idx) {
+impl<T: TransitionSystem> IntoEdgeTuple<T> for EdgeTuple<T> {
+    #[inline(always)]
+    fn into_edge_tuple(self) -> EdgeTuple<T> {
         self
     }
 }
 
-impl<Idx, E, C> IntoEdge<Idx, E, Void> for (Idx, E, C, Idx) {
-    fn into_edge(self) -> (Idx, E, Void, Idx) {
-        (self.0, self.1, Void, self.3)
-    }
-}
-
-impl<Idx, E> IntoEdge<Idx, E, Void> for (Idx, E, Idx) {
-    fn into_edge(self) -> (Idx, E, Void, Idx) {
+impl<T: TransitionSystem<EdgeColor = Void>> IntoEdgeTuple<T>
+    for (StateIndex<T>, EdgeExpression<T>, StateIndex<T>)
+{
+    #[inline(always)]
+    fn into_edge_tuple(self) -> EdgeTuple<T> {
         (self.0, self.1, Void, self.2)
     }
 }
 
-impl<Idx, E, C, X: IntoEdge<Idx, E, C>> IntoEdge<Idx, E, C> for &X
+impl<T: TransitionSystem, TT: IntoEdgeTuple<T>> IntoEdgeTuple<T> for &TT
 where
-    X: Clone,
+    TT: Clone,
 {
-    fn into_edge(self) -> (Idx, E, C, Idx) {
-        X::into_edge(self.clone())
+    #[inline(always)]
+    fn into_edge_tuple(self) -> EdgeTuple<T> {
+        self.clone().into_edge_tuple()
     }
 }
 
 /// Helper trait for extracting the [`crate::alphabet::Symbol`] type from an a transition system.
 pub type SymbolOf<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Symbol;
 /// Helper trait for extracting the [`Expression`] type from an a transition system.
-pub type ExpressionOf<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Expression;
+pub type EdgeExpression<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Expression;
 /// Type alias for extracting the state color in a [`TransitionSystem`].
 pub type StateColor<X> = <X as TransitionSystem>::StateColor;
 /// Type alias for extracting the edge color in a [`TransitionSystem`].
 pub type EdgeColor<X> = <X as TransitionSystem>::EdgeColor;
+/// Type alias for extracting the state index in a [`TransitionSystem`].
+pub type StateIndex<X> = <X as TransitionSystem>::StateIndex;
+/// Type alias for a tuple representing an edge in a [`TransitionSystem`].
+pub type EdgeTuple<Ts> = (
+    StateIndex<Ts>,
+    EdgeExpression<Ts>,
+    EdgeColor<Ts>,
+    StateIndex<Ts>,
+);
+/// Type alias to obtain the type of a reference to an edge in a given [`TransitionSystem`].
+pub type EdgeRef<'a, T> = <T as TransitionSystem>::EdgeRef<'a>;
 
 /// Implementors of this trait have a distinguished (initial) state.
 pub trait Pointed: TransitionSystem {

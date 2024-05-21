@@ -3,7 +3,7 @@ use automata::prelude::*;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use itertools::Itertools;
 
-fn bench_dts() -> WithInitial<DTS<CharAlphabet, usize, usize>> {
+fn bench_dts() -> WithInitial<LinkedListTransitionSystem<CharAlphabet, usize, usize>> {
     TSBuilder::default()
         .with_state_colors([1, 13, 72, 891, 3, 5])
         .with_transitions([
@@ -32,7 +32,7 @@ fn bench_dts() -> WithInitial<DTS<CharAlphabet, usize, usize>> {
             (5, 'c', 19, 3),
             (5, 'd', 18, 5),
         ])
-        .into_dts()
+        .into_linked_list_deterministic()
         .with_initial(0)
 }
 
@@ -56,9 +56,9 @@ fn benchings(c: &mut Criterion) {
             black_box(
                 ref_dts
                     .map_edge_colors(|i| i * 2 - 7)
-                    .collect_dts()
+                    .collect_linked_list_deterministic()
                     .map_state_colors(|j| j * 7 - 4)
-                    .collect_dts(),
+                    .collect_linked_list_deterministic(),
             );
         })
     });
@@ -68,7 +68,7 @@ fn benchings(c: &mut Criterion) {
                 ref_dts
                     .map_edge_colors(|i| i + 2 - 7)
                     .map_state_colors(|j| j * 7 - 4)
-                    .collect_dts(),
+                    .collect_linked_list_deterministic(),
             )
         })
     });

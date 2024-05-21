@@ -5,28 +5,62 @@
 /// The prelude is supposed to make using this package easier. Including everything, i.e.
 /// `use automata::prelude::*;` should be enough to use the package.
 pub mod prelude {
+    #[cfg(feature = "linked_list_ts")]
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
+    pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
+        LinkedListTransitionSystem<A, Q, C, DET>;
+    #[cfg(not(feature = "linked_list_ts"))]
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
+    pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
+        EdgeLists<A, Q, C, DET>;
+    #[cfg(feature = "linked_list_ts")]
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
+    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = LinkedListDeterministic<A, Q, C>;
+    #[cfg(feature = "linked_list_ts")]
+    /// Points to the default implementation of [`TransitionSystem`] in the case where it is
+    /// **now known to be** [`Deterministic`].
+    pub type NTS<A = CharAlphabet, Q = Void, C = Void> = LinkedListNondeterministic<A, Q, C>;
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
+    #[cfg(not(feature = "linked_list_ts"))]
+    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = EdgeLists<A, Q, C>;
+    /// Points to the default implementation of [`TransitionSystem`] in the case where it is
+    /// **now known to be** [`Deterministic`].
+    #[cfg(not(feature = "linked_list_ts"))]
+    pub type NTS<A = CharAlphabet, Q = Void, C = Void> = EdgeListsNondeterministic<A, Q, C>;
+
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case which
+    /// is mutable. Especially, this type implements [`Shrinkable`] and [`Sproutable`], which allows
+    /// removing and adding transitions.
+    pub type MutableTs<A = CharAlphabet, Q = Void, C = Void> = EdgeLists<A, Q, C>;
+    /// The nondeterministic variant of [`MutableTs`].
+    pub type MutableTsNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
+        EdgeListsNondeterministic<A, Q, C>;
+
     pub use super::{
         alphabet,
-        alphabet::{CharAlphabet, Expression, Symbol},
+        alphabet::{CharAlphabet, Expression, Matcher, Symbol},
         automaton::{
-            Automaton, BuchiCondition, FiniteSemantics, IntoDBA, IntoDFA, IntoDMA, IntoDPA,
-            IntoDRA, IntoMealyMachine, IntoMooreMachine, MealyMachine, MealySemantics,
-            MinEvenParityCondition, MooreMachine, MooreSemantics, MullerCondition,
+            Automaton, BuchiCondition, DeterministicOmegaAutomaton, FiniteSemantics,
+            FiniteWordAutomaton, IntoDBA, IntoDFA, IntoDMA, IntoDPA, IntoDRA, IntoMealyMachine,
+            IntoMooreMachine, MealyMachine, MealySemantics, MinEvenParityCondition, MooreMachine,
+            MooreSemantics, MullerCondition, NondeterministicOmegaAutomaton,
             OmegaAcceptanceCondition, OmegaAutomaton, OmegaSemantics, ReachabilityCondition,
             Semantics, WithInitial, DBA, DFA, DMA, DPA,
         },
-        congruence::{Congruence, RightCongruence},
+        congruence::{CollectRightCongruence, Congruence, IntoRightCongruence, RightCongruence},
         math,
         transition_system::operations,
         transition_system::{
             dot::Dottable,
-            operations::{Product, ProductIndex},
+            operations::{DefaultIfMissing, Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
             reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
-            Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, ExpressionOf, ForAlphabet,
-            IndexType, Indexes, IntoEdge, IsEdge, MutableTs, Path, Sproutable, StateColor,
-            SymbolOf, TSBuilder, TransitionSystem, DTS, NTS,
+            Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
+            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, IndexType, Indexes,
+            IntoEdgeTuple, IsEdge, LinkedListDeterministic, LinkedListNondeterministic,
+            LinkedListTransitionSystem, Path, Shrinkable, Sproutable, StateColor, StateIndex,
+            SymbolOf, TSBuilder, TransitionSystem,
         },
         upw,
         word::{
@@ -81,17 +115,17 @@ pub mod dag;
 use std::{fmt::Debug, hash::Hash};
 
 /// A color is simply a type that can be used to color states or transitions.
-pub trait Color: Clone + Eq + Ord + Hash + Show {
+pub trait Color: Clone + Eq + Hash + Debug {
     /// Reduces a sequence of colors (of type `Self`) to a single color of type `Self`.
     fn reduce<I: IntoIterator<Item = Self>>(iter: I) -> Self
     where
-        Self: Sized,
+        Self: Sized + Ord,
     {
         iter.into_iter().min().unwrap()
     }
 }
 
-impl<T: Eq + Ord + Clone + Hash + Show> Color for T {}
+impl<T: Eq + Clone + Hash + Debug> Color for T {}
 
 /// Represents the absence of a color. The idea is that this can be used when collecting
 /// a transitions system as it can always be constructed from a color by simply forgetting it.
@@ -100,12 +134,6 @@ impl<T: Eq + Ord + Clone + Hash + Show> Color for T {}
 /// colors may be kept and the edge colors are dropped.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Copy, Default)]
 pub struct Void;
-
-impl<C: Color> From<C> for Void {
-    fn from(_: C) -> Self {
-        Void
-    }
-}
 
 impl Debug for Void {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -274,11 +302,6 @@ impl<S: Show> Show for &S {
         S::show(*self)
     }
 }
-
-/// Type alias for sets, we use this to hide which type of `HashSet` we are actually using.
-pub type Set<S> = fxhash::FxHashSet<S>;
-/// Type alias for maps, we use this to hide which type of `HashMap` we are actually using.
-pub type Map<K, V> = fxhash::FxHashMap<K, V>;
 
 #[cfg(test)]
 mod tests {

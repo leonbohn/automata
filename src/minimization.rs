@@ -22,7 +22,7 @@ where
     EdgeColor<D>: Color,
 {
     /// Minimizes `self` using Hopcroft's partition refinement algorithm.
-    pub fn minimize(&self) -> MealyMachine<D::Alphabet, D::EdgeColor> {
+    pub fn minimize(&self) -> MealyMachine<D::Alphabet, Vec<StateColor<D>>, D::EdgeColor> {
         partition_refinement::mealy_partition_refinement(self)
     }
 }

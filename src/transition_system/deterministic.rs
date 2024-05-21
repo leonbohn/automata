@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::hash::Hash;
 
 use itertools::Itertools;
@@ -18,7 +19,7 @@ use super::operations::RestrictByStateIndex;
 use super::operations::StateIndexFilter;
 use super::path::Lasso;
 use super::sproutable::{IndexedAlphabet, Sproutable};
-use super::IntoMutableTs;
+use super::IntoEdgeLists;
 use super::Path;
 
 pub type FiniteRunResult<A, Idx, Q, C> = Result<Path<A, Idx, Q, C>, Path<A, Idx, Q, C>>;
@@ -31,44 +32,11 @@ pub type OmegaRunResult<A, Idx, Q, C> = Result<Lasso<A, Idx, Q, C>, Path<A, Idx,
 ///
 /// # Implementaiton
 /// This trait contains mostly convenience functions and provides default implementations. To ensure
-/// performance, the [`Self::collect_dts`] function and any other collectors for different types of
+/// performance, the [`Self::collect_linked_list_deterministic`] function and any other collectors for different types of
 /// transition system implementations should be overridden. By default, they simply insert states
 /// and edges one by one and are therefore horribly inefficient.
 pub trait Deterministic: TransitionSystem {
-    /// For a given `state`, returns the unique edge that matches the given `symbol`. Panics if multiple
-    /// edges match the symbol. If the state does not exist or no edge matches the symbol, `None` is returned.
-    ///
-    /// # Example
-    /// ```
-    /// use automata::prelude::*;
-    /// let ts = TSBuilder::without_state_colors()
-    ///     .with_transitions([(0, 'a', Void, 1), (1, 'a', Void, 2), (2, 'a', Void, 0)])
-    ///     .into_right_congruence_bare(0);
-    /// assert_eq!(ts.transition(0, 'a').unwrap().target(), 1);
-    /// assert_eq!(ts.transition(1, 'a').unwrap().target(), 2);
-    /// assert_eq!(ts.transition(2, 'a').unwrap().target(), 0);
-    /// assert_eq!(ts.transition(0, 'b'), None);
-    /// assert_eq!(ts.transition(3, 'a'), None);
-    /// ```
-    fn transition<Idx: Indexes<Self>>(
-        &self,
-        state: Idx,
-        symbol: SymbolOf<Self>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        let state = state.to_index(self)?;
-        let mut it = self
-            .edges_from(state)
-            .expect("We know this state exists")
-            .filter(|e| e.expression().matches(symbol));
-        let first = it.next()?;
-        debug_assert!(
-            it.next().is_none(),
-            "There should be only one edge with the given symbol"
-        );
-        Some(first)
-    }
-
-    /// Attempts to find the first edge that matches the given `expression` from the given `state`. If no
+    /// Attempts to find the first edge that matches the given `matcher` from the given `state`. If no
     /// suitable transition exists, `None` is returned. If more than one edge matches the expression, the
     /// method panics.
     ///
@@ -87,13 +55,11 @@ pub trait Deterministic: TransitionSystem {
     fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let state = state.to_index(self)?;
         let mut it = self
-            .edges_from(state)
-            .expect("We know this state exists")
-            .filter(|e| e.expression() == expression);
+            .edges_from(state)?
+            .filter(|e| matcher.matches(e.expression()));
 
         let first = it.next()?;
         debug_assert!(
@@ -122,8 +88,7 @@ pub trait Deterministic: TransitionSystem {
         state: Idx,
         symbol: SymbolOf<Self>,
     ) -> Option<Self::StateIndex> {
-        self.transition(state.to_index(self)?, symbol)
-            .map(|t| t.target())
+        self.edge(state.to_index(self)?, symbol).map(|t| t.target())
     }
 
     /// Returns the color of an edge starting in the given `state` and labeled with the given
@@ -131,7 +96,7 @@ pub trait Deterministic: TransitionSystem {
     fn edge_color<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
+        expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
         let mut symbols = expression.symbols();
         let sym = symbols.next().unwrap();
@@ -140,7 +105,7 @@ pub trait Deterministic: TransitionSystem {
             None,
             "There are multiple symbols for this expression"
         );
-        Some(self.transition(state.to_index(self)?, sym)?.color().clone())
+        Some(self.edge(state.to_index(self)?, sym)?.color().clone())
     }
 
     /// Attempts to find the minimal representative of the indexed `state`, which the the length-lexicographically
@@ -185,7 +150,7 @@ pub trait Deterministic: TransitionSystem {
     where
         Self: Pointed,
     {
-        self.finite_run_from(word, self.initial())
+        self.finite_run_from(self.initial(), word)
     }
 
     /// Runs the given `word` on the transition system, starting from `state`. The result is
@@ -196,8 +161,8 @@ pub trait Deterministic: TransitionSystem {
     #[allow(clippy::type_complexity)]
     fn finite_run_from<W, Idx>(
         &self,
-        word: W,
         origin: Idx,
+        word: W,
     ) -> FiniteRunResult<Self::Alphabet, Self::StateIndex, Self::StateColor, Self::EdgeColor>
     where
         Self: Sized,
@@ -221,11 +186,11 @@ pub trait Deterministic: TransitionSystem {
     /// of all states which appear infinitely often. For unsuccessful runs, `None` is returned.
     fn recurrent_state_indices_from<W: OmegaWord<SymbolOf<Self>>, Idx: Indexes<Self>>(
         &self,
-        word: W,
         origin: Idx,
+        word: W,
     ) -> Option<impl Iterator<Item = Self::StateIndex>> {
         Some(
-            self.omega_run_from(word, origin)
+            self.omega_run_from(origin, word)
                 .ok()?
                 .into_recurrent_state_indices(),
         )
@@ -240,18 +205,18 @@ pub trait Deterministic: TransitionSystem {
     where
         Self: Pointed,
     {
-        self.recurrent_state_indices_from(word, self.initial())
+        self.recurrent_state_indices_from(self.initial(), word)
     }
 
     /// Returns an iterator yielding the colors of states which are visited infinitely often when running the given `word`
     /// on the transition system, starting from the initial state. If the run is unsuccessful, `None` is returned.  
     fn recurrent_state_colors_from<W: OmegaWord<SymbolOf<Self>>, Idx: Indexes<Self>>(
         &self,
-        word: W,
         origin: Idx,
+        word: W,
     ) -> Option<impl Iterator<Item = Self::StateColor>> {
         Some(
-            self.omega_run_from(word, origin)
+            self.omega_run_from(origin, word)
                 .ok()?
                 .into_recurrent_state_colors(),
         )
@@ -266,21 +231,21 @@ pub trait Deterministic: TransitionSystem {
     where
         Self: Pointed,
     {
-        self.recurrent_state_colors_from(word, self.initial())
+        self.recurrent_state_colors_from(self.initial(), word)
     }
 
     /// Gives an iterator that emits the colors of edges which are taken infinitely often when running the given `word`
     /// on the transition system, starting from the initial state. If the run is unsuccessful, `None` is returned.
     fn recurrent_edge_colors_from<W, Idx>(
         &self,
-        word: W,
         origin: Idx,
+        word: W,
     ) -> Option<impl Iterator<Item = Self::EdgeColor>>
     where
         W: OmegaWord<SymbolOf<Self>>,
         Idx: Indexes<Self>,
     {
-        self.omega_run_from(word, origin)
+        self.omega_run_from(origin, word)
             .ok()
             .map(|p| p.into_recurrent_edge_colors())
     }
@@ -292,23 +257,22 @@ pub trait Deterministic: TransitionSystem {
         W: OmegaWord<SymbolOf<Self>>,
         Self: Pointed,
     {
-        self.recurrent_edge_colors_from(word, self.initial())
+        self.recurrent_edge_colors_from(self.initial(), word)
     }
 
     /// Returns a [`Vec`] containing the state indices that are visited when running the given `word`
     /// on the transition system, starting from the initial state. This may include states that are
     /// visited only finitely often. If the run is unsuccessful, `None` is returned.
-    // Todo: once RTTIT is stabilized (1.72), we should return an iterator.
     fn visited_state_sequence_from<W, Idx>(
         &self,
-        word: W,
         origin: Idx,
+        word: W,
     ) -> Option<Vec<Self::StateIndex>>
     where
         W: FiniteWord<SymbolOf<Self>>,
         Idx: Indexes<Self>,
     {
-        self.finite_run_from(word, origin)
+        self.finite_run_from(origin, word)
             .ok()
             .map(|p| p.state_sequence().collect())
     }
@@ -321,7 +285,7 @@ pub trait Deterministic: TransitionSystem {
         W: FiniteWord<SymbolOf<Self>>,
         Self: Pointed,
     {
-        self.visited_state_sequence_from(word, self.initial())
+        self.visited_state_sequence_from(self.initial(), word)
     }
 
     /// Returns a [`Vec`] containing the state colors that are visited when running the given `word`
@@ -329,14 +293,14 @@ pub trait Deterministic: TransitionSystem {
     /// visited only finitely often. If the run is unsuccessful, `None` is returned.
     fn visited_state_colors_from<W, Idx>(
         &self,
-        word: W,
         origin: Idx,
+        word: W,
     ) -> Option<Vec<Self::StateColor>>
     where
         W: FiniteWord<SymbolOf<Self>>,
         Idx: Indexes<Self>,
     {
-        self.finite_run_from(word, origin)
+        self.finite_run_from(origin, word)
             .ok()
             .map(|p| p.state_colors().cloned().collect())
     }
@@ -349,18 +313,18 @@ pub trait Deterministic: TransitionSystem {
         W: FiniteWord<SymbolOf<Self>>,
         Self: Pointed,
     {
-        self.visited_state_colors_from(word, self.initial())
+        self.visited_state_colors_from(self.initial(), word)
     }
 
     /// Returns a [`Vec`] containing the edge colors that are visited when running the given `word`
     /// on the transition system, starting from the initial state. This may include edges that are
     /// visited only finitely often. If the run is unsuccessful, `None` is returned.
-    fn visited_edge_colors_from<W, Idx>(&self, word: W, origin: Idx) -> Option<Vec<Self::EdgeColor>>
+    fn visited_edge_colors_from<W, Idx>(&self, origin: Idx, word: W) -> Option<Vec<Self::EdgeColor>>
     where
         W: FiniteWord<SymbolOf<Self>>,
         Idx: Indexes<Self>,
     {
-        self.finite_run_from(word, origin)
+        self.finite_run_from(origin, word)
             .ok()
             .map(|p| p.edge_colors().cloned().collect())
     }
@@ -373,17 +337,17 @@ pub trait Deterministic: TransitionSystem {
         W: FiniteWord<SymbolOf<Self>>,
         Self: Pointed,
     {
-        self.visited_edge_colors_from(word, self.initial())
+        self.visited_edge_colors_from(self.initial(), word)
     }
 
     /// Returns the color of the last edge that is taken when running the given `word` on the transition system,
     /// starting from the state indexed by `origin`. If the run is unsuccessful, `None` is returned.
-    fn last_edge_color_from<W, Idx>(&self, word: W, origin: Idx) -> Option<Self::EdgeColor>
+    fn last_edge_color_from<W, Idx>(&self, origin: Idx, word: W) -> Option<Self::EdgeColor>
     where
         Idx: Indexes<Self>,
         W: FiniteWord<SymbolOf<Self>>,
     {
-        self.finite_run_from(word, origin.to_index(self)?)
+        self.finite_run_from(origin.to_index(self)?, word)
             .ok()
             .and_then(|p| p.last_transition_color().cloned())
     }
@@ -395,7 +359,7 @@ pub trait Deterministic: TransitionSystem {
         W: FiniteWord<SymbolOf<Self>>,
         Self: Pointed,
     {
-        self.last_edge_color_from(word, self.initial())
+        self.last_edge_color_from(self.initial(), word)
     }
 
     /// Runs the given `word` on the transition system, starting in the initial state.
@@ -408,15 +372,15 @@ pub trait Deterministic: TransitionSystem {
         W: OmegaWord<SymbolOf<Self>>,
         Self: Pointed,
     {
-        self.omega_run_from(word, self.initial())
+        self.omega_run_from(self.initial(), word)
     }
 
     /// Runs the given `word` on the transition system, starting from `state`.
     #[allow(clippy::type_complexity)]
     fn omega_run_from<W, Idx>(
         &self,
-        word: W,
         origin: Idx,
+        word: W,
     ) -> OmegaRunResult<Self::Alphabet, Self::StateIndex, Self::StateColor, Self::EdgeColor>
     where
         Idx: Indexes<Self>,
@@ -426,7 +390,7 @@ pub trait Deterministic: TransitionSystem {
         let origin = origin
             .to_index(self)
             .expect("run must start in state that exists");
-        let mut path = self.finite_run_from(word.spoke(), origin)?;
+        let mut path = self.finite_run_from(origin, word.spoke())?;
         let mut position = path.len();
         let mut seen = Map::default();
 
@@ -435,7 +399,7 @@ pub trait Deterministic: TransitionSystem {
                 Some(p) => {
                     return Ok(path.loop_back_to(p));
                 }
-                None => match self.finite_run_from(word.cycle(), path.reached()) {
+                None => match self.finite_run_from(path.reached(), word.cycle()) {
                     Ok(p) => {
                         position += p.len();
                         path.extend_with(p);
@@ -474,7 +438,7 @@ pub trait Deterministic: TransitionSystem {
                 )
             )];
             for sym in self.alphabet().universe() {
-                if let Some(edge) = self.transition(id, sym) {
+                if let Some(edge) = self.edge(id, sym) {
                     row.push(edge_decorator(edge));
                 } else {
                     row.push("-".to_string());
@@ -491,12 +455,12 @@ pub trait Deterministic: TransitionSystem {
 
     /// Returns the color of the state that is reached when running `word` from the state indexed by `from`.
     /// If the run is unsuccessful, `None` is returned.
-    fn reached_state_color_from<W, Idx>(&self, word: W, from: Idx) -> Option<Self::StateColor>
+    fn reached_state_color_from<W, Idx>(&self, from: Idx, word: W) -> Option<Self::StateColor>
     where
         W: FiniteWord<SymbolOf<Self>>,
         Idx: Indexes<Self>,
     {
-        self.finite_run_from(word, from)
+        self.finite_run_from(from, word)
             .ok()
             .map(|p| p.reached_state_color())
     }
@@ -508,7 +472,7 @@ pub trait Deterministic: TransitionSystem {
         W: FiniteWord<SymbolOf<Self>>,
         Self: Pointed,
     {
-        self.reached_state_color_from(word, self.initial())
+        self.reached_state_color_from(self.initial(), word)
     }
 
     /// Returns the state that is reached by running the given `word` on the transition system,
@@ -518,40 +482,43 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
         W: FiniteWord<SymbolOf<Self>>,
     {
-        self.reached_state_index_from(word, self.initial())
+        self.reached_state_index_from(self.initial(), word)
     }
 
     /// Tries to run the given `word` starting in the state indexed by `origin`. If
     /// no state is indexed, then `None` is immediately returned. Otherwise, the
     /// word is run and the index of the reached state is returned. If the run is
     /// unsuccessful, the function returns `None`.
-    fn reached_state_index_from<I, W>(&self, word: W, origin: I) -> Option<Self::StateIndex>
+    fn reached_state_index_from<I, W>(&self, origin: I, word: W) -> Option<Self::StateIndex>
     where
         Self: Sized,
         I: Indexes<Self>,
         W: FiniteWord<SymbolOf<Self>>,
     {
-        self.finite_run_from(word, origin).ok().map(|p| p.reached())
+        self.finite_run_from(origin, word).ok().map(|p| p.reached())
     }
-
-    /// Collects `self` into a new [`DTS`] over the same alphabet. This is used, for example, after a chain of
+    /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
-    ///
-    /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
-        let (ts, _map) = DTS::collect_with_index_mapping(self);
-        ts
+    #[cfg(feature = "linked_list_ts")]
+    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>
+    where
+        Self: Sized,
+    {
+        self.collect_linked_list_deterministic()
     }
-
-    /// Collects `self` into a new [`DTS`] over the same alphabet, while also returning the
-    /// index of the state corresponding to the old initial state.
-    /// This is used, for example, after a chain of  manipulations on a transition system,
-    /// to obtain a condensed version that is then faster to work with.
-    ///
-    /// By default, the implementation is naive and slow, it simply inserts all states one
-    /// after the other and subsequently inserts all transitions, see
-    /// [`Deterministic::collect_dts`] for details.
+    /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
+    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
+    #[cfg(not(feature = "linked_list_ts"))]
+    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>
+    where
+        Self: Sized,
+        EdgeColor<Self>: Hash + Eq,
+    {
+        self.collect_edge_lists_deterministic()
+    }
+    /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
+    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
+    #[cfg(feature = "linked_list_ts")]
     #[allow(clippy::type_complexity)]
     fn collect_dts_pointed(
         self,
@@ -560,10 +527,59 @@ pub trait Deterministic: TransitionSystem {
         usize,
     )
     where
+        Self: Sized + Pointed,
+    {
+        self.collect_linked_list_deterministic_pointed()
+    }
+    /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
+    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
+    #[cfg(not(feature = "linked_list_ts"))]
+    #[allow(clippy::type_complexity)]
+    fn collect_dts_pointed(
+        self,
+    ) -> (
+        DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
+        usize,
+    )
+    where
+        Self: Sized + Pointed,
+        EdgeColor<Self>: Hash + Eq,
+    {
+        self.collect_edge_lists_deterministic_pointed()
+    }
+
+    /// Collects `self` into a new [`LinkedListTransitionSystem`] over the same alphabet. This is used, for example, after a chain of
+    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
+    ///
+    /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
+    /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
+    fn collect_linked_list_deterministic(
+        self,
+    ) -> LinkedListTransitionSystem<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
+        let (ts, _map) = LinkedListTransitionSystem::sprout_from_ts_with_bijection(self);
+        ts
+    }
+
+    /// Collects `self` into a new [`LinkedListTransitionSystem`] over the same alphabet, while also returning the
+    /// index of the state corresponding to the old initial state.
+    /// This is used, for example, after a chain of  manipulations on a transition system,
+    /// to obtain a condensed version that is then faster to work with.
+    ///
+    /// By default, the implementation is naive and slow, it simply inserts all states one
+    /// after the other and subsequently inserts all transitions, see
+    /// [`Deterministic::collect_linked_list_deterministic`] for details.
+    #[allow(clippy::type_complexity)]
+    fn collect_linked_list_deterministic_pointed(
+        self,
+    ) -> (
+        LinkedListTransitionSystem<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
+        usize,
+    )
+    where
         Self: Pointed,
     {
         let old_initial = self.initial();
-        let (ts, map) = DTS::collect_with_index_mapping(self);
+        let (ts, map) = LinkedListTransitionSystem::sprout_from_ts_with_bijection(self);
         (
             ts,
             *map.get_by_left(&old_initial)
@@ -571,20 +587,19 @@ pub trait Deterministic: TransitionSystem {
         )
     }
 
-    /// Collects `self` into a new [`MutableTs`] over the same alphabet. This is used, for example, after a chain of
+    /// Collects `self` into a new [`EdgeLists`] over the same alphabet. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     /// This method additionally also returns the initial state of the collected TS.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_hash_ts_pointed(self) -> (IntoMutableTs<Self>, usize)
+    /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
+    fn collect_edge_lists_deterministic_pointed(self) -> (IntoEdgeLists<Self>, usize)
     where
         EdgeColor<Self>: Hash + Eq,
-        StateColor<Self>: Hash + Eq,
         Self: Pointed,
     {
         let old_initial = self.initial();
-        let (ts, map) = MutableTs::collect_with_index_mapping(self);
+        let (ts, map) = EdgeLists::sprout_from_ts_with_bijection(self);
         (
             ts,
             *map.get_by_left(&old_initial)
@@ -592,17 +607,16 @@ pub trait Deterministic: TransitionSystem {
         )
     }
 
-    /// Collects `self` into a new [`MutableTs`] over the same alphabet. This is used, for example, after a chain of
+    /// Collects `self` into a new [`EdgeLists`] over the same alphabet. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_hash_ts(self) -> IntoMutableTs<Self>
+    /// subsequently inserts all transitions, see [`Deterministic::collect_edge_lists_deterministic`] for details.
+    fn collect_edge_lists_deterministic(self) -> IntoEdgeLists<Self>
     where
         EdgeColor<Self>: Hash + Eq,
-        StateColor<Self>: Hash + Eq,
     {
-        let (ts, _map) = MutableTs::collect_with_index_mapping(self);
+        let (ts, _map) = EdgeLists::sprout_from_ts_with_bijection(self);
         ts
     }
 
@@ -614,32 +628,36 @@ pub trait Deterministic: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let ts = TSBuilder::without_colors().with_edges([(0, 'a', 1), (1, 'b', 0)]).into_dts();
+    /// let ts = TSBuilder::without_colors().with_edges([(0, 'a', 1), (1, 'b', 0)]).into_linked_list_deterministic();
     /// let (collected, initial) = ts.with_initial(0).collect_complete_pointed(Void, Void);
     /// assert_eq!(collected.size(), 3);
     ///
-    /// assert_eq!(collected.reached_state_index_from("b", 0), collected.reached_state_index_from("aa", 0));
+    /// assert_eq!(collected.reached_state_index_from(0, "b"), collected.reached_state_index_from(0, "aa"));
     /// ```
+    #[allow(clippy::type_complexity)]
     fn collect_complete_pointed(
         &self,
         sink_state_color: Self::StateColor,
         sink_edge_color: Self::EdgeColor,
-    ) -> crate::transition_system::DTSAndInitialState<
-        Self::Alphabet,
-        Self::StateColor,
-        Self::EdgeColor,
-    >
+    ) -> (
+        crate::transition_system::LinkedListTransitionSystem<
+            Self::Alphabet,
+            Self::StateColor,
+            Self::EdgeColor,
+        >,
+        usize,
+    )
     where
         Self: Pointed,
         Self::Alphabet: IndexedAlphabet,
     {
-        let (mut ts, initial) = self.collect_dts_pointed();
+        let (mut ts, initial) = self.collect_linked_list_deterministic_pointed();
         if !ts.is_complete() {
             let sink = ts.add_state(sink_state_color);
             for q in ts.state_indices() {
                 for sym in self.alphabet().universe() {
-                    if ts.transition(q, sym).is_none() {
-                        ts.add_edge(q, ts.make_expression(sym), sink, sink_edge_color.clone());
+                    if ts.edge(q, sym).is_none() {
+                        ts.add_edge((q, ts.make_expression(sym), sink_edge_color.clone(), sink));
                     }
                 }
             }
@@ -659,19 +677,23 @@ pub trait Deterministic: TransitionSystem {
     /// Collects into a transition system of type `Ts`, but only considers states that
     /// are reachable from the initial state. Naturally, this means that `self` must
     /// be a pointed transition system.
+    #[allow(clippy::type_complexity)]
     fn trim_collect(
         &self,
-    ) -> crate::transition_system::DTSAndInitialState<
-        Self::Alphabet,
-        Self::StateColor,
-        Self::EdgeColor,
-    >
+    ) -> (
+        crate::transition_system::LinkedListTransitionSystem<
+            Self::Alphabet,
+            Self::StateColor,
+            Self::EdgeColor,
+        >,
+        usize,
+    )
     where
         Self: Pointed,
     {
         let reachable_indices = self.reachable_state_indices().collect::<Set<_>>();
         let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
-        restricted.collect_dts_pointed()
+        restricted.collect_linked_list_deterministic_pointed()
     }
 
     /// Compute the escape prefixes of a set of omega words on a transition system.
@@ -711,7 +733,7 @@ pub trait Deterministic: TransitionSystem {
     /// Consumes and turns `self` into a [`DBA`] while using the given `initial` state.
     fn into_dba_with_initial(self, initial: Self::StateIndex) -> IntoDBA<Self>
     where
-        Self: Deterministic<EdgeColor = usize>,
+        Self: Deterministic<EdgeColor = bool>,
     {
         Automaton::from_parts(self, initial)
     }
@@ -734,48 +756,39 @@ pub trait Deterministic: TransitionSystem {
 }
 
 impl<D: Deterministic> Deterministic for &D {
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        D::transition(self, state.to_index(self)?, symbol)
+        D::edge(self, state.to_index(self)?, matcher)
     }
 }
 
 impl<D: Deterministic> Deterministic for &mut D {
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        D::transition(self, state.to_index(self)?, symbol)
+        D::edge(self, state.to_index(self)?, matcher)
     }
 }
 
-impl<A: Alphabet, IdType: IndexType, Q: Clone, C: Hash + Eq + Clone> Deterministic
-    for MutableTs<A, Q, C, IdType>
-{
-    fn edge_color<Idx: Indexes<Self>>(
+impl<A: Alphabet, Q: Color, C: Hash + Debug + Eq + Clone> Deterministic for EdgeLists<A, Q, C> {
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
-    ) -> Option<EdgeColor<Self>> {
-        self.raw_state_map()
-            .get(&state.to_index(self)?)
-            .and_then(|o| o.edge_map().get(expression).map(|(_, c)| c.clone()))
-    }
-
-    fn transition<X: Indexes<Self>>(
-        &self,
-        state: X,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         let source = state.to_index(self)?;
-        self.raw_state_map()
-            .get(&source)
-            .and_then(|o| A::search_edge(o.edge_map(), symbol))
-            .map(|(e, (q, c))| crate::transition_system::EdgeReference::new(source, e, c, *q))
+        let mut it = self.edges_matching(source, matcher)?;
+        let out = Some(it.next()?);
+        debug_assert!(
+            it.next().is_none(),
+            "Not deterministic, {source} has mutliple edges on the same expression!"
+        );
+        out
     }
 }
 
@@ -789,7 +802,7 @@ where
     fn edge_color<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
+        expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
         let ProductIndex(l, r) = state.to_index(self)?;
         let left = self.0.edge_color(l, expression)?;
@@ -797,15 +810,15 @@ where
         Some((left, right))
     }
 
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         let ProductIndex(l, r) = state.to_index(self)?;
 
-        let ll = self.0.transition(l, symbol)?;
-        let rr = self.1.transition(r, symbol)?;
+        let ll = self.0.edge(l, &matcher)?;
+        let rr = self.1.edge(r, matcher)?;
         Some(ProductTransition::new(
             ProductIndex(l, r),
             ll.expression(),
@@ -817,56 +830,60 @@ where
 
 impl<D, Ts, F> Deterministic for MapStateColor<Ts, F>
 where
-    D: Clone,
+    D: Color,
     Ts: Deterministic,
     F: Fn(Ts::StateColor) -> D,
 {
-    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
+    fn collect_linked_list_deterministic(
+        self,
+    ) -> LinkedListTransitionSystem<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
         let (ts, f) = self.into_parts();
-        let (alphabet, states, edges) = ts.collect_dts().into_parts();
+        let (alphabet, states, edges) = ts.collect_linked_list_deterministic().into_parts();
         let states = states.into_iter().map(|q| q.recolor(&f)).collect();
-        DTS::from_parts(alphabet, states, edges)
+        LinkedListTransitionSystem::from_parts(alphabet, states, edges)
     }
 
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        self.ts().transition(state.to_index(self)?, symbol)
+        self.ts().edge(state.to_index(self)?, matcher)
     }
 }
 
 impl<D, Ts, F> Deterministic for MapEdgeColor<Ts, F>
 where
-    D: Clone,
+    D: Color,
     Ts: Deterministic,
     F: Fn(Ts::EdgeColor) -> D,
 {
-    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
+    fn collect_linked_list_deterministic(
+        self,
+    ) -> LinkedListTransitionSystem<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
         let (ts, f) = self.into_parts();
-        let (alphabet, states, edges) = ts.collect_dts().into_parts();
+        let (alphabet, states, edges) = ts.collect_linked_list_deterministic().into_parts();
         let edges = edges.into_iter().map(|e| e.recolor(&f)).collect();
-        DTS::from_parts(alphabet, states, edges)
+        LinkedListTransitionSystem::from_parts(alphabet, states, edges)
     }
 
     fn edge_color<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
+        expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
         self.ts()
             .edge_color(state.to_index(self)?, expression)
             .map(|c| (self.f())(c))
     }
 
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         Some(MappedTransition::new(
-            self.ts().transition(state.to_index(self)?, symbol)?,
+            self.ts().edge(state.to_index(self)?, matcher)?,
             self.f(),
         ))
     }
@@ -879,21 +896,21 @@ where
     fn edge_color<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        expression: &ExpressionOf<Self>,
+        expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
         let state = state.to_index(self)?;
         self.ts()
             .edge_color(state, expression)
             .filter(|_| (self.filter()).is_unmasked(state))
     }
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         let q = state.to_index(self)?;
         self.ts()
-            .transition(q, symbol)
+            .edge(q, matcher)
             .filter(|t| self.filter().is_unmasked(q) && self.filter().is_unmasked(t.target()))
     }
 }
@@ -901,16 +918,16 @@ where
 impl<Ts, D, F> Deterministic for MapEdges<Ts, F>
 where
     Ts: Deterministic,
-    D: Clone,
-    F: Fn(Ts::StateIndex, &ExpressionOf<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
+    D: Color,
+    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
-    fn transition<Idx: crate::transition_system::Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-        symbol: crate::prelude::SymbolOf<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         Some(MappedEdge::new(
-            self.ts().transition(state.to_index(self)?, symbol)?,
+            self.ts().edge(state.to_index(self)?, matcher)?,
             state.to_index(self)?,
             self.f(),
         ))
@@ -926,10 +943,10 @@ mod tests {
         let words = [upw!("a"), upw!("a", "b"), upw!("b"), upw!("aa", "b")];
 
         // build transition system
-        let ts = NTS::builder()
+        let ts = LinkedListNondeterministic::builder()
             .with_transitions([(0, 'a', Void, 1), (1, 'b', Void, 1)])
             .default_color(Void)
-            .into_dts()
+            .into_linked_list_deterministic()
             .with_initial(0);
 
         assert!(ts
