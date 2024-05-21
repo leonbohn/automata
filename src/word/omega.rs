@@ -127,7 +127,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
-    ///     .into_dts()
+    ///     .into_linked_list_deterministic()
     ///     .with_initial(0);
     /// let word = upw!("b", "a");
     /// let normalized = word.normalize_for(&ts).expect("must be normalizable");
@@ -147,7 +147,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
             match map.insert(cur, count) {
                 None => {
                     count += 1;
-                    cur = cong.reached_state_index_from(self.cycle(), cur)?;
+                    cur = cong.reached_state_index_from(cur, self.cycle())?;
                 }
                 Some(i) => {
                     // the spoke is the spoke of self plus `i` times the cycle, while the

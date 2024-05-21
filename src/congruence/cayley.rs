@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::{prelude::*, transition_system::EdgeReference};
 
 use self::alphabet::{Directional, InvertibleChar};
@@ -26,7 +28,7 @@ where
     Ts::StateColor: Accumulates,
 {
     alphabet: Directional,
-    expressions: crate::Map<SymbolOf<Self>, ExpressionOf<Self>>,
+    expressions: math::Map<SymbolOf<Self>, EdgeExpression<Self>>,
     m: TransitionMonoid<Ts>,
 }
 
@@ -34,7 +36,7 @@ where
 /// the transition profiles of the ts as nodes. See [`Cayley`] for more details.
 #[derive(Clone)]
 pub struct RightCayley<Ts: TransitionSystem + Pointed> {
-    expressions: crate::Map<SymbolOf<Ts>, ExpressionOf<Ts>>,
+    expressions: math::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
     m: TransitionMonoid<Ts>,
 }
 
@@ -95,22 +97,23 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
-        state: Idx,
-        symbol: SymbolOf<Self>,
+        _state: Idx,
+        _matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let idx = state.to_index(self)?;
-        let (_tp, string) = self.monoid().get_profile(idx)?;
-        let mut word = string.to_deque();
-        symbol.mul(&mut word);
-        let tp = self.monoid().profile_for(&word)?;
-        Some(EdgeReference::new(
-            idx,
-            self.expressions.get(&symbol).unwrap(),
-            &(),
-            tp,
-        ))
+        // let idx = state.to_index(self)?;
+        // let (_tp, string) = self.monoid().get_profile(idx)?;
+        // let mut word = string.to_deque();
+        // symbol.mul(&mut word);
+        // let tp = self.monoid().profile_for(&word)?;
+        // Some(EdgeReference::new(
+        //     idx,
+        //     self.expressions.get(&matcher).unwrap(),
+        //     &(),
+        //     tp,
+        // ))
+        todo!("First get expression from matcher, then get edge from expression.")
     }
 }
 
@@ -177,7 +180,7 @@ where
 
     type EdgeColor = ();
 
-    type EdgeRef<'this> = EdgeReference<'this, ExpressionOf<Ts>, usize, ()> where Self: 'this;
+    type EdgeRef<'this> = EdgeReference<'this, EdgeExpression<Ts>, usize, ()> where Self: 'this;
 
     type StateIndices<'this> = std::ops::Range<usize> where Self: 'this;
 
@@ -209,22 +212,23 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
-    fn transition<Idx: Indexes<Self>>(
+    fn edge<Idx: Indexes<Self>>(
         &self,
-        state: Idx,
-        symbol: SymbolOf<Self>,
+        _state: Idx,
+        _matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let idx = state.to_index(self)?;
-        let (_tp, string) = self.monoid().get_profile(idx)?;
-        let mut word = string.to_vec();
-        word.push(symbol);
-        let tp = self.monoid().profile_for(&word)?;
-        Some(EdgeReference::new(
-            idx,
-            self.expressions.get(&symbol).unwrap(),
-            &(),
-            tp,
-        ))
+        // let idx = state.to_index(self)?;
+        // let (_tp, string) = self.monoid().get_profile(idx)?;
+        // let mut word = string.to_vec();
+        // word.push(symbol);
+        // let tp = self.monoid().profile_for(&word)?;
+        // Some(EdgeReference::new(
+        //     idx,
+        //     self.expressions.get(&symbol).unwrap(),
+        //     &(),
+        //     tp,
+        // ))
+        todo!("same as other cayley")
     }
 }
 impl<Ts> RightCayley<Ts>

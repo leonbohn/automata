@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use crate::automaton::InfiniteWordAutomaton;
 use crate::math::Set;
 
 use crate::prelude::*;
@@ -12,9 +13,10 @@ use crate::prelude::*;
 /// that this means if a run is not accepting, then the set of colors it visits infinitely
 /// often is not contained in the [`MullerCondition`]. This allows for easy complementation
 /// of a [`DMA`] by simply taking the complement of the [`MullerCondition`].
-pub type DMA<A = CharAlphabet, C = usize> = Automaton<DTS<A, Void, C>, MullerCondition<C>, true>;
+pub type DMA<A = CharAlphabet, Q = Void, C = usize, D = DTS<A, Q, C>> =
+    InfiniteWordAutomaton<A, MullerCondition<C>, Q, C, true, D>;
 /// Helper type alias for casting a given transition system `T` into a [`DMA`].
-pub type IntoDMA<T> = Automaton<T, MullerCondition<EdgeColor<T>>, true>;
+pub type IntoDMA<T> = DMA<<T as TransitionSystem>::Alphabet, StateColor<T>, EdgeColor<T>, T>;
 
 /// A Muller condition over some [`Color`] `C` is a set of sets of elements of type `C`. It
 /// is satisfied by a set (usually the set of colors that appear infinitely often in a run),
@@ -22,7 +24,7 @@ pub type IntoDMA<T> = Automaton<T, MullerCondition<EdgeColor<T>>, true>;
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MullerCondition<C: Color>(Set<BTreeSet<C>>);
 
-impl<C: Color> MullerCondition<C> {
+impl<C: Color + Ord> MullerCondition<C> {
     /// Builds a new instance from an iterator that yields iterators that yield colors
     /// (or elements of type `C`).
     ///
@@ -61,11 +63,11 @@ impl<C: Color> MullerCondition<C> {
     }
 }
 
-impl<Q, C: Color> Semantics<Q, C> for MullerCondition<C> {
+impl<Q, C: Color + Ord> Semantics<Q, C> for MullerCondition<C> {
     type Output = bool;
 }
 
-impl<Q, C: Color> OmegaSemantics<Q, C> for MullerCondition<C> {
+impl<Q, C: Color + Ord> OmegaSemantics<Q, C> for MullerCondition<C> {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
         R: OmegaRun<StateColor = Q, EdgeColor = C>,
@@ -93,7 +95,7 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 1),
             ])
-            .into_dts();
+            .into_linked_list_deterministic();
         let dra =
             DMA::from_parts_with_acceptance(ts, 0, MullerCondition::from_iter_iter([[0], [1]]));
         assert!(dra.accepts(upw!("a")));

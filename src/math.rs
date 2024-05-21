@@ -1,9 +1,19 @@
-use std::{collections::BTreeSet, hash::Hash};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    hash::Hash,
+};
 
 /// Type alias for sets, we use this to hide which type of `HashSet` we are actually using.
 pub type Set<S> = fxhash::FxHashSet<S>;
+/// Type alias for sets containing elements that can be ordered, we use this to hide the type
+/// `BTreeSet` we are actually using.
+pub type OrderedSet<S> = BTreeSet<S>;
+
 /// Type alias for maps, we use this to hide which type of `HashMap` we are actually using.
 pub type Map<K, V> = fxhash::FxHashMap<K, V>;
+/// Type alias for maps containing elements that can be ordered, we use this to hide the type
+/// `BTreeMap` we are actually using.
+pub type OrderedMap<K, V> = BTreeMap<K, V>;
 
 /// Represents a bijective mapping between `L` and `R`, that is a mapping which associates
 /// each `L` with precisely one `R` and vice versa.

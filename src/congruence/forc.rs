@@ -1,19 +1,18 @@
-use crate::{prelude::*, Map};
-use std::{fmt::Debug, hash::Hash};
+use crate::prelude::*;
 
 /// A family of right congruences (FORC) consists of a *leading* right congruence and for each
 /// class of this congruence a *progress* right congruence.
 #[derive(Clone)]
-pub struct FORC<A: Alphabet, Q = Void, C = Void> {
+pub struct FORC<A: Alphabet, Q: Color = Void, C: Color = Void> {
     pub(crate) leading: RightCongruence<A>,
-    pub(crate) progress: Map<usize, RightCongruence<A, Q, C>>,
+    pub(crate) progress: math::Map<usize, RightCongruence<A, Q, C>>,
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> FORC<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> FORC<A, Q, C> {
     /// Creates a new FORC with the given leading congruence and progress congruences.
     pub fn new(
         leading: RightCongruence<A>,
-        progress: Map<usize, RightCongruence<A, Q, C>>,
+        progress: math::Map<usize, RightCongruence<A, Q, C>>,
     ) -> Self {
         Self { leading, progress }
     }
@@ -60,34 +59,29 @@ impl<A: Alphabet, Q: Clone, C: Clone> FORC<A, Q, C> {
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> PartialEq for FORC<A, Q, C> {
-    fn eq(&self, other: &Self) -> bool {
-        self.leading.eq(&other.leading)
-            && self.progress.len() == other.progress.len()
-            && self
-                .progress
-                .iter()
-                .zip(other.progress.iter())
-                .all(|(l, r)| l.eq(&r))
+impl<A: Alphabet + PartialEq, Q: Color + Eq, C: Color + Eq> PartialEq for FORC<A, Q, C> {
+    fn eq(&self, _other: &Self) -> bool {
+        todo!()
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> Eq for FORC<A, Q, C> {}
+impl<A: Alphabet + PartialEq, Q: Color + PartialEq, C: Color + PartialEq> Eq for FORC<A, Q, C> {}
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> std::fmt::Debug for FORC<A, Q, C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use owo_colors::OwoColorize;
-        write!(f, "{}\n{:?}", "LEADING".bold(), self.leading())?;
-        for (c, rc) in self.prc_iter() {
-            let class_name = self.leading.class_name(*c).unwrap();
-            write!(
-                f,
-                "{} \"{}\"\n{:?}",
-                "PRC FOR CLASS ".bold(),
-                &class_name,
-                rc
-            )?;
-        }
-        Ok(())
+impl<A: Alphabet, Q: Color, C: Color> std::fmt::Debug for FORC<A, Q, C> {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // use owo_colors::OwoColorize;
+        // write!(f, "{}\n{:?}", "LEADING".bold(), self.leading())?;
+        // for (c, rc) in self.prc_iter() {
+        //     let class_name = self.leading.class_name(*c).unwrap();
+        //     write!(
+        //         f,
+        //         "{} \"{}\"\n{:?}",
+        //         "PRC FOR CLASS ".bold(),
+        //         &class_name,
+        //         rc
+        //     )?;
+        // }
+        // Ok(())
+        todo!()
     }
 }

@@ -89,6 +89,23 @@ pub struct EdgeReference<'ts, E, Idx, C> {
     expression: &'ts E,
 }
 
+impl<'ts, E: Eq, Idx: IndexType, C: Clone + Eq> PartialEq<(Idx, E, C, Idx)>
+    for EdgeReference<'ts, E, Idx, C>
+{
+    fn eq(&self, other: &(Idx, E, C, Idx)) -> bool {
+        self.source == other.0
+            && self.target == other.3
+            && self.color == &other.2
+            && self.expression == &other.1
+    }
+}
+
+impl<'ts, E: Eq, Idx: IndexType> PartialEq<(Idx, E, Idx)> for EdgeReference<'ts, E, Idx, Void> {
+    fn eq(&self, other: &(Idx, E, Idx)) -> bool {
+        self.source == other.0 && self.target == other.2 && self.expression == &other.1
+    }
+}
+
 impl<'ts, E, Idx, C> EdgeReference<'ts, E, Idx, C> {
     /// Creates a new edge reference from the given components.
     pub fn new(source: Idx, expression: &'ts E, color: &'ts C, target: Idx) -> Self {

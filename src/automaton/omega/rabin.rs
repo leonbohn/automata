@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use crate::automaton::InfiniteWordAutomaton;
 use crate::math::Set;
 use crate::prelude::*;
 
@@ -9,14 +10,15 @@ use crate::prelude::*;
 /// if no color from `fin` is visited infinitely often and at least one color from `inf` is
 /// visited infinitely often. Overall, a Rabin condition is then satisfied if at least one of
 /// its constituent pairs is satisfied.
-pub type DRA<A = CharAlphabet, C = usize> = Automaton<DTS<A, Void, C>, RabinCondition<C>, true>;
+pub type DRA<A = CharAlphabet, Q = Void, C = usize, D = DTS<A, Q, C>> =
+    InfiniteWordAutomaton<A, RabinCondition<C>, Q, C, true, D>;
 /// Helper type alias for casting a given transition system `T` into a [`DRA`].
-pub type IntoDRA<T> = Automaton<T, RabinCondition<EdgeColor<T>>, true>;
+pub type IntoDRA<T> = DRA<<T as TransitionSystem>::Alphabet, StateColor<T>, EdgeColor<T>, T>;
 
 /// Represents a Rabin condition, which is a set of [`RabinPair`]s. Such a condition is satisfied
 /// if at least one of its pairs is satisfied.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct RabinCondition<C: Color>(Set<RabinPair<C>>);
+pub struct RabinCondition<C: Color + Ord>(Set<RabinPair<C>>);
 
 /// A Rabin pair over some [`Color`] `C` consists of a set `fin` and a set `inf` of elements of type `C`.
 /// A pair is satisfied by a set (usually the set of colors that appear infinitely often in a run),
@@ -29,7 +31,7 @@ pub struct RabinPair<C> {
 
 impl<C, I> From<I> for RabinCondition<C>
 where
-    C: Color,
+    C: Color + Ord,
     I: IntoIterator<Item = RabinPair<C>>,
 {
     fn from(value: I) -> Self {
@@ -37,7 +39,7 @@ where
     }
 }
 
-impl<C: Color> RabinPair<C> {
+impl<C: Color + Ord> RabinPair<C> {
     /// Creates a new pair from the given set of finite and infinite colors.
     pub fn new(fin: BTreeSet<C>, inf: BTreeSet<C>) -> Self {
         Self { fin, inf }
@@ -69,11 +71,11 @@ impl<C: Color> RabinPair<C> {
     }
 }
 
-impl<Q, C: Color> Semantics<Q, C> for RabinCondition<C> {
+impl<Q, C: Color + Ord> Semantics<Q, C> for RabinCondition<C> {
     type Output = bool;
 }
 
-impl<Q, C: Color> OmegaSemantics<Q, C> for RabinCondition<C> {
+impl<Q, C: Color + Ord> OmegaSemantics<Q, C> for RabinCondition<C> {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
         R: OmegaRun<StateColor = Q, EdgeColor = C>,
@@ -113,7 +115,7 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 1),
             ])
-            .into_dts();
+            .into_linked_list_deterministic();
         let dra = DRA::from_parts_with_acceptance(ts, 0, [RabinPair::from_iters([], [1])].into());
         assert!(dra.accepts(upw!("ba")));
         assert!(!dra.accepts(upw!("a")));

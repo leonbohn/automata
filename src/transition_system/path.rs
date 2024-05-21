@@ -132,7 +132,7 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
     where
         D: Deterministic<StateColor = Q, EdgeColor = C, StateIndex = Idx, Alphabet = A>,
     {
-        let transition = ts.transition(self.end, symbol)?;
+        let transition = ts.edge(self.end, symbol)?;
         self.transitions
             .push((self.end, symbol, transition.color().clone()));
         self.end = transition.target();
@@ -338,7 +338,7 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Lasso<A, Idx, Q, C> {
     }
 }
 
-impl<A: Alphabet, Idx: IndexType, Q: Color, C: Color> Show for Lasso<A, Idx, Q, C> {
+impl<A: Alphabet, Idx: IndexType, Q: Show, C: Show> Show for Lasso<A, Idx, Q, C> {
     fn show(&self) -> String {
         format!("{}({})", self.base.show(), self.cycle.show())
     }

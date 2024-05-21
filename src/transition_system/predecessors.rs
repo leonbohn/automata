@@ -1,11 +1,9 @@
 use crate::prelude::*;
 
-use super::EdgeReference;
-
 /// Implementors of this trait are [`TransitionSystem`]s which allow iterating over the predecessors of a state.
 pub trait PredecessorIterable: TransitionSystem {
     /// The type of pre-transition that the iterator yields.
-    type PreEdgeRef<'this>: IsEdge<'this, ExpressionOf<Self>, Self::StateIndex, EdgeColor<Self>>
+    type PreEdgeRef<'this>: IsEdge<'this, EdgeExpression<Self>, Self::StateIndex, EdgeColor<Self>>
     where
         Self: 'this;
 
@@ -14,7 +12,20 @@ pub trait PredecessorIterable: TransitionSystem {
     where
         Self: 'this;
 
-    /// Returns an iterator over the predecessors of the given `state`. Returns `None` if the state does not exist.
+    /// Returns an iterator over the predecessors of the given state. If the state is not in the transition system, this returns `None`.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let ts = TSBuilder::without_state_colors()
+    ///     .with_transitions([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (2, 'a', 0)])
+    ///     .into_dts();
+    /// assert_eq!(
+    ///     ts.predecessors(0).unwrap().collect::<Vec<_>>(),
+    ///     vec![(0, 'b', 0), (1, 'a', 0), (2, 'a', 0)]
+    /// );
+    /// ```
     fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>>;
 
     /// Reverses the directions of all transitions in the transition system. This consumes the transition system.
@@ -87,56 +98,29 @@ impl<L, R> PredecessorIterable for operations::MatchingProduct<L, R>
 where
     L: PredecessorIterable,
     R: PredecessorIterable,
-    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = ExpressionOf<L>>,
+    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = EdgeExpression<L>>,
     L::StateColor: Clone,
     R::StateColor: Clone,
 {
-    type PreEdgeRef<'this> = operations::ProductPreTransition<'this, L::StateIndex, R::StateIndex, ExpressionOf<L>, L::EdgeColor, R::EdgeColor> where Self: 'this;
+    type PreEdgeRef<'this> = operations::ProductPreTransition<'this, L::StateIndex, R::StateIndex, EdgeExpression<L>, L::EdgeColor, R::EdgeColor> where Self: 'this;
     type EdgesToIter<'this> = operations::ProductEdgesTo<'this, L, R> where Self: 'this;
     fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
         operations::ProductEdgesTo::new(&self.0, &self.1, state.to_index(self)?)
     }
 }
 
-impl<A: Alphabet, Id: IndexType, Q: Color, C: Color> PredecessorIterable
-    for MutableTs<A, Q, C, Id>
-{
-    type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, Id, C> where Self: 'this;
-    type EdgesToIter<'this> = BTSPredecessors<'this, A, C, Id>
-    where
-        Self: 'this;
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        let state = state.to_index(self)?;
-        Some(BTSPredecessors::new(
-            self.raw_state_map().get(&state)?.predecessors().iter(),
-            state,
-        ))
-    }
-}
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn predecessor_iterable() {
+        use crate::prelude::*;
 
-/// Iterator over the predecessors of a state in a BTS.
-#[derive(Clone)]
-pub struct BTSPredecessors<'a, A: Alphabet, C: Color, Idx: IndexType> {
-    it: std::collections::hash_set::Iter<'a, (Idx, A::Expression, C)>,
-    state: Idx,
-}
-
-impl<'a, A: Alphabet, C: Color, Idx: IndexType> Iterator for BTSPredecessors<'a, A, C, Idx> {
-    type Item = EdgeReference<'a, A::Expression, Idx, C>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.it
-            .next()
-            .map(|(s, e, c)| EdgeReference::new(*s, e, c, self.state))
-    }
-}
-
-impl<'a, A: Alphabet, C: Color, Idx: IndexType> BTSPredecessors<'a, A, C, Idx> {
-    /// Creates a new instance from an iterator and a state.
-    pub fn new(
-        it: std::collections::hash_set::Iter<'a, (Idx, A::Expression, C)>,
-        state: Idx,
-    ) -> Self {
-        Self { it, state }
+        let ts = TSBuilder::without_state_colors()
+            .with_transitions([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (2, 'a', 0)])
+            .into_dts();
+        assert_eq!(
+            ts.predecessors(0).unwrap().collect::<Vec<_>>(),
+            vec![(0, 'b', 0), (1, 'a', 0), (2, 'a', 0)]
+        );
     }
 }

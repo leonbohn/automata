@@ -1,7 +1,4 @@
-use std::{fmt::Debug, hash::Hash};
-
-use crate::{congruence::operations::DefaultIfMissing, prelude::*};
-use itertools::Itertools;
+use crate::prelude::*;
 
 mod class;
 pub use class::Class;
@@ -14,6 +11,9 @@ pub use transitionprofile::{Accumulates, RunProfile, RunSignature, TransitionMon
 
 mod cayley;
 pub use cayley::{Cayley, RightCayley};
+
+mod minimal_representative;
+pub use minimal_representative::{LazyMinimalRepresentatives, MinimalRepresentative};
 
 /// A congruence is a [`TransitionSystem`], which additionally has a distinguished initial state. On top
 /// of that, a congruence does not have any coloring on either states or symbols. This
@@ -32,7 +32,9 @@ pub trait Congruence: Deterministic + Pointed {
     where
         Self: Congruence<StateColor = bool>,
     {
-        let (dts, initial) = self.erase_edge_colors().collect_dts_pointed();
+        let (dts, initial) = self
+            .erase_edge_colors()
+            .collect_linked_list_deterministic_pointed();
         DFA::from_parts(dts, initial)
     }
 
@@ -95,57 +97,52 @@ pub trait Congruence: Deterministic + Pointed {
         Automaton::from_pointed(self)
     }
     /// Collects the transition system representing `self` and builds a new [`MealyMachine`].
-    fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, EdgeColor<Self>>
+    fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
     where
         EdgeColor<Self>: Color,
     {
-        let (ts, initial) = self.erase_state_colors().collect_dts_pointed();
+        let (ts, initial) = self.collect_dts_pointed();
         MealyMachine::from_parts(ts, initial)
     }
 
     /// Creates a new instance of a [`RightCongruence`] from the transition structure of `self`.
     /// Note, that this method might not preserve state indices!
-    fn right_congruence(self) -> RightCongruence<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
+    fn into_right_congruence(self) -> IntoRightCongruence<Self>
     where
         Self: Pointed,
     {
-        RightCongruence::from_ts(self)
+        RightCongruence::from_pointed(self)
+    }
+
+    /// Creates a new instance of a [`RightCongruence`] from the transition structure of `self`.
+    /// Note, that this method might not preserve state indices!
+    fn collect_right_congruence(self) -> CollectRightCongruence<Self>
+    where
+        Self: Pointed,
+    {
+        let (ts, initial) = self.collect_dts_pointed();
+        RightCongruence::from_parts(ts, initial)
     }
 }
-impl<Sim: Deterministic + Pointed> Congruence for Sim {}
+impl<C: Deterministic + Pointed> Congruence for C {}
 
 /// Represents a right congruence relation, which is in essence a trim, deterministic
 /// transition system with a designated initial state.
-#[derive(Clone)]
-pub struct RightCongruence<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
-    ts: DTS<A, Q, C>,
-    initial: usize,
-    minimal_representatives: Vec<Class<A::Symbol>>,
-}
+pub type RightCongruence<A = CharAlphabet, Q = Void, C = Void, D = DTS<A, Q, C>> =
+    FiniteWordAutomaton<A, LazyMinimalRepresentatives<A, StateIndex<D>>, Q, C, true, D>;
 
-impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
-    /// Creates a new [`RightCongruence`] for the given [`Alphabet`]. Since there always has be an initial state,
-    /// the method also expects a color for the initial state which it inserts.
-    pub fn new_with_initial_color(alphabet: A, initial_color: Q) -> Self {
-        let mut ts = DTS::for_alphabet(alphabet);
-        let initial = ts.add_state(initial_color);
-        Self::from_ts(ts.with_initial(initial))
-    }
+/// Type alias for a [`RightCongruence`] that is obtained by wrapping the given transition system.
+pub type IntoRightCongruence<D> =
+    RightCongruence<<D as TransitionSystem>::Alphabet, StateColor<D>, EdgeColor<D>, D>;
 
-    /// Returns a reference to the underlying transition system.
-    pub fn ts(&self) -> &DTS<A, Q, C> {
-        &self.ts
-    }
+/// Type alias for a [`RightCongruence`] that is by collecting the given transition system.
+pub type CollectRightCongruence<D> =
+    RightCongruence<<D as TransitionSystem>::Alphabet, StateColor<D>, EdgeColor<D>>;
 
-    /// Returns true if and only if
-    pub fn congruent<W, V>(&self, word: W, other: V) -> bool
-    where
-        W: FiniteWord<A::Symbol>,
-        V: FiniteWord<A::Symbol>,
-    {
-        self.reached_state_index(word).unwrap() == self.reached_state_index(other).unwrap()
-    }
-
+impl<A: Alphabet, Q: Color, C: Color, D> RightCongruence<A, Q, C, D>
+where
+    D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,
+{
     /// Computes a DFA that accepts precisely those finite words which loop on the given `class`. Formally,
     /// if `u` represents the given class, then the DFA accepts precisely those words `w` such that `uw`
     /// is congruent to `u`.
@@ -176,17 +173,22 @@ impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
             .collect_dfa()
     }
 
+    /// Returns a reference to the minimal representatives of the classes of the right congruence.
+    pub fn minimal_representatives(&self) -> &LazyMinimalRepresentatives<A, StateIndex<D>> {
+        self.acceptance()
+    }
+
     /// Verifies whether an element of `self` is  idempotent, i.e. if the mr of the indexed
     /// class is u, then it should be that uu ~ u.
     pub fn is_idempotent<I: Indexes<Self>>(&self, elem: I) -> bool {
         let Some(idx) = elem.to_index(self) else {
             panic!("is_idempotent called for non-existent index");
         };
-        let Some(mr) = self.class_name(idx) else {
-            panic!("The class {} is not labeled!", idx);
+        let Some(mr) = self.state_to_mr(idx) else {
+            panic!("The class {} is not labeled!", idx.show());
         };
         if let Some(q) = self.get(elem) {
-            self.reached_state_index_from(mr, q) == Some(q)
+            self.reached_state_index_from(q, mr) == Some(q)
         } else {
             false
         }
@@ -194,117 +196,30 @@ impl<A: Alphabet, Q: Clone, C: Clone> RightCongruence<A, Q, C> {
 
     /// Returns the [`Class`] that is referenced by `index`.
     #[inline(always)]
-    pub fn class_name<Idx: Indexes<Self>>(&self, index: Idx) -> Option<&Class<A::Symbol>> {
+    pub fn state_to_mr<Idx: Indexes<Self>>(
+        &self,
+        index: Idx,
+    ) -> Option<&MinimalRepresentative<A::Symbol>> {
         let idx = index.to_index(self)?;
-        self.minimal_representatives.get(idx)
+        self.minimal_representatives().get_by_left(&idx)
     }
 
     #[inline(always)]
     /// Returns the index of the class containing the given word.
-    pub fn class_to_index(&self, class: &Class<A::Symbol>) -> Option<usize> {
-        self.minimal_representatives
-            .iter()
-            .enumerate()
-            .find_map(|(idx, c)| if c == class { Some(idx) } else { None })
+    pub fn mr_to_state(
+        &self,
+        class: &MinimalRepresentative<A::Symbol>,
+    ) -> Option<StateIndex<Self>> {
+        self.minimal_representatives().get_by_right(class).cloned()
     }
 
     /// Returns an iterator which yields pairs `(c, idx)` consisting of a reference `c` to the class name together
     /// with the corresponding index of the class.
-    pub fn classes(&self) -> impl Iterator<Item = (&Class<A::Symbol>, usize)> + '_ {
-        self.minimal_representatives
+    pub fn classes(
+        &self,
+    ) -> impl Iterator<Item = (&MinimalRepresentative<A::Symbol>, StateIndex<Self>)> + '_ {
+        self.minimal_representatives()
             .iter()
-            .enumerate()
-            .map(|(idx, c)| (c, idx))
-    }
-
-    /// Builds a [`RightCongruence`] from the given transition system. This first collects into a [`DTS`], obtains
-    /// the correct initial state and then builds the list of minimal representatives.
-    pub fn from_ts<Ts: Congruence<Alphabet = A, EdgeColor = C, StateColor = Q>>(ts: Ts) -> Self {
-        let (ts, initial) = ts.collect_dts_pointed();
-        let minimal_representatives = ts
-            .minimal_representatives_from(initial)
-            .sorted_by(|x, y| x.1.cmp(&y.1))
-            .map(|(x, _)| x.into())
-            .collect();
-        Self {
-            ts,
-            initial,
-            minimal_representatives,
-        }
-    }
-}
-
-impl<A: Alphabet, Q: Clone, C: Clone> Deterministic for RightCongruence<A, Q, C> {}
-
-impl<A: Alphabet, Q: Clone, C: Clone> TransitionSystem for RightCongruence<A, Q, C> {
-    type StateIndex = usize;
-    type EdgeColor = C;
-    type StateColor = Q;
-    type EdgeRef<'this> = &'this crate::transition_system::impls::NTEdge<A::Expression, C> where Self: 'this;
-    type EdgesFromIter<'this> = crate::transition_system::impls::NTSEdgesFromIter<'this, A::Expression, C>
-    where
-        Self: 'this;
-    type StateIndices<'this> = std::ops::Range<usize> where Self: 'this;
-
-    type Alphabet = A;
-
-    fn alphabet(&self) -> &Self::Alphabet {
-        self.ts.alphabet()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts.state_indices()
-    }
-
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        let state = state.to_index(self)?;
-        self.ts.edges_from(state)
-    }
-
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
-        self.ts.state_color(state)
-    }
-}
-
-impl<A: Alphabet, Q: Clone, C: Clone> Pointed for RightCongruence<A, Q, C> {
-    fn initial(&self) -> Self::StateIndex {
-        self.initial
-    }
-}
-
-impl<A: Alphabet, Q: Clone, C: Clone> PredecessorIterable for RightCongruence<A, Q, C> {
-    type PreEdgeRef<'this> = &'this crate::transition_system::impls::NTEdge<A::Expression, C>
-where
-    Self: 'this;
-
-    type EdgesToIter<'this> = crate::transition_system::impls::NTSEdgesToIter<'this, A::Expression, C>
-where
-    Self: 'this;
-
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        let state = state.to_index(self)?;
-        self.ts.predecessors(state)
-    }
-}
-
-impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> PartialEq for RightCongruence<A, Q, C> {
-    fn eq(&self, other: &Self) -> bool {
-        self.initial == other.initial && self.ts.eq(&other.ts)
-    }
-}
-
-impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> Eq for RightCongruence<A, Q, C> {}
-
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Debug for RightCongruence<A, Q, C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.ts.build_transition_table(
-                |q, c| format!("{}|{:?}", q.show(), c),
-                |edge| edge.target().show()
-            )
-        )
+            .map(|(idx, mr)| (mr, *idx))
     }
 }

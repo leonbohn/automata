@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 use self::operations::DefaultIfMissing;
 
-use super::StatesWithColor;
+use super::{FiniteWordAutomaton, StatesWithColor};
 
 /// Defines the [`FiniteSemantics`] that are used by a deterministic finite automaton
 /// [`DFA`]. This leads to a [`FiniteWord`] being accepted if the state that it reaches
@@ -32,14 +32,15 @@ impl<C> FiniteSemantics<bool, C> for ReachabilityCondition {
 }
 
 /// A deterministic finite automaton (DFA) is a deterministic automaton with a simple acceptance condition. It accepts a finite word if it reaches an accepting state.
-pub type DFA<A = CharAlphabet> = Automaton<DTS<A, bool, Void>, ReachabilityCondition, false>;
+pub type DFA<A = CharAlphabet, C = Void, D = LinkedListTransitionSystem<A, bool, C>> =
+    FiniteWordAutomaton<A, ReachabilityCondition, bool, C, true, D>;
 
 /// Helper trait for creating a [`DFA`] from a given transition system.
-pub type IntoDFA<T> = Automaton<T, ReachabilityCondition, false>;
+pub type IntoDFA<T> = DFA<<T as TransitionSystem>::Alphabet, EdgeColor<T>, T>;
 
-impl<D> IntoDFA<D>
+impl<D> IntoDFA<operations::WithStateColor<D, operations::DefaultIfMissing<D::StateIndex, bool>>>
 where
-    D: Deterministic<StateColor = bool>,
+    D: Deterministic,
 {
     /// Creates a new [`DFA`] from the given transition system and iterator over accepting
     /// states.
@@ -50,17 +51,17 @@ where
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
-    ///     .into_dts_with_initial(0);
+    ///     .into_linked_list_deterministic_with_initial(0);
     /// assert!(DFA::from_ts(&ts, [0]).accepts(""));
     /// assert!(!DFA::from_ts(&ts, [1]).accepts("a"));
     /// assert!(!DFA::from_ts(ts, []).accepts("a"));
     /// ```
-    pub fn from_ts<C>(
-        ts: C,
-        accepting_states: impl IntoIterator<Item = C::StateIndex>,
-    ) -> IntoDFA<operations::WithStateColor<C, operations::DefaultIfMissing<C::StateIndex, bool>>>
+    pub fn from_ts(
+        ts: D,
+        accepting_states: impl IntoIterator<Item = D::StateIndex>,
+    ) -> IntoDFA<operations::WithStateColor<D, operations::DefaultIfMissing<D::StateIndex, bool>>>
     where
-        C: Congruence<Alphabet = D::Alphabet>,
+        D: Pointed,
     {
         let accepting: math::Map<_, bool> = accepting_states
             .into_iter()
@@ -75,7 +76,17 @@ where
         ts.with_state_color(DefaultIfMissing::new(accepting, false))
             .into_dfa()
     }
+}
 
+impl<A: Alphabet, C, D: TransitionSystem<StateColor = bool, EdgeColor = C, Alphabet = A>>
+    DFA<A, C, D>
+{
+}
+
+impl<D> IntoDFA<D>
+where
+    D: Deterministic<StateColor = bool>,
+{
     /// Returns the indices of all states that are accepting.
     pub fn accepting_states(&self) -> StatesWithColor<'_, Self> {
         StatesWithColor::new(self, true)
@@ -125,9 +136,11 @@ where
     where
         E: Congruence<Alphabet = D::Alphabet, StateColor = bool> + 'a,
     {
+        let other_initial = other.initial();
         self.ts_product(other)
             .map_state_colors(|(a, b)| a || b)
-            .into()
+            .with_initial(ProductIndex(self.initial, other_initial))
+            .into_dfa()
     }
 
     /// Computes the intersection of `self` with the given `other` object (that can be viewed as a DFA) through
@@ -139,16 +152,20 @@ where
     where
         E: Congruence<Alphabet = D::Alphabet, StateColor = bool> + 'a,
     {
+        let other_initial = other.initial();
         self.ts_product(other)
             .map_state_colors(|(a, b)| a && b)
-            .into()
+            .with_initial(ProductIndex(self.initial, other_initial))
+            .into_dfa()
     }
 
     /// Computes the negation of `self` by swapping accepting and non-accepting states.
     pub fn negation(
         &self,
     ) -> IntoDFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + '_> {
-        self.map_state_colors(|x| !x).into()
+        self.map_state_colors(|x| !x)
+            .with_initial(self.initial)
+            .into_dfa()
     }
 
     /// Attempts to separate the state `left` from the state `right` by finding a word that leads to different colors.
@@ -175,5 +192,21 @@ where
                     None
                 }
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn dfa_from_ts() {
+        use crate::prelude::*;
+
+        let ts = TSBuilder::without_colors()
+            .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
+            .into_linked_list_deterministic_with_initial(0);
+
+        assert!(DFA::from_ts(&ts, [0]).accepts(""));
+        assert!(!DFA::from_ts(&ts, [1]).accepts("a"));
+        assert!(!DFA::from_ts(ts, []).accepts("a"));
     }
 }

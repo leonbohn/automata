@@ -30,7 +30,7 @@ where
         for sym in mm.symbols() {
             let mut splitter = Map::default();
             for q in mm.state_indices() {
-                if let Some(t) = mm.transition(q, sym) {
+                if let Some(t) = mm.edge(q, sym) {
                     if set.contains(&t.target()) {
                         splitter
                             .entry(t.color())
@@ -77,7 +77,9 @@ where
 /// Partition refinement algorithm for deterministic finite automata that have outputs on the edges.
 /// Runs in O(n log n) time, where n is the number of states of the automaton and returns the unique
 /// minimal automaton that is bisimilar to the input.
-pub fn mealy_partition_refinement<D>(mm: D) -> MealyMachine<D::Alphabet, EdgeColor<D>>
+pub fn mealy_partition_refinement<D>(
+    mm: D,
+) -> MealyMachine<D::Alphabet, Vec<StateColor<D>>, EdgeColor<D>>
 where
     D: Congruence,
     EdgeColor<D>: Color,
@@ -99,7 +101,6 @@ where
             // assert!(c.iter().all_equal());
             c[0].clone()
         })
-        .erase_state_colors()
         .collect_mealy();
     info!(
         "Collecting into Mealy machine took {} microseconds",
@@ -133,7 +134,7 @@ where
             let x = mm
                 .state_indices()
                 .filter(|q| {
-                    mm.transition(*q, sym)
+                    mm.edge(*q, sym)
                         .map(|t| a.contains(&t.target()))
                         .unwrap_or(false)
                 })
@@ -226,7 +227,7 @@ mod tests {
 
     #[test_log::test]
     fn partition_refinement_mealy() {
-        let mm = NTS::builder()
+        let mm = LinkedListNondeterministic::builder()
             .with_transitions([
                 (0, 'a', 0, 1),
                 (0, 'b', 1, 0),

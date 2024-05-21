@@ -1,5 +1,5 @@
 # `automata`
-is a library concerned with [transition systems and automata](https://en.wikipedia.org/wiki/Finite-state_machine) for both finite and infinite words.
+This is a library concerned with [transition systems and automata](https://en.wikipedia.org/wiki/Finite-state_machine) for both finite and infinite words.
 Provides datastructures, operations (think product, subset, mapping of edge/state colors, restriction, ...) for transition systems, acceptance conditions, congruence relations as well as some reachability theoretic operations on transition systems in general.
 
 Guaranteed to be incomplete and very much work in progress.
@@ -223,16 +223,12 @@ Further traits that are of importance are
 - `Sproutable` enables growing a TS state by state and edge/transition by edge/transition. Naturally, this is only implemented for the basic building blocks, i.e. `BTS`, `DTS` and `NTS`.
 
 
+### Documentation
+
+The docs use LaTeX syntax in some places and [as outlined here](https://github.com/victe/rust-latex-doc-minimal-example), one can enable their rendering by making use of KaTeX.
+This is configured through the `.cargo/config.toml`, which ensures that the `.cargo/docs-header.html` file is used as header in the HTML documentation that cargo builds.
+In that file, we load KaTeX 0.16.10 and use it to render the included math, which is delimited with the usual `$ .. $` or `\\( .. \\)` for inline and `$$ .. $$` or `\[ .. \]` for display math (in a separate box).
+
 ### License 
 
-Thanks go out to the maintainers of [`spot`](https://spot.lre.epita.fr/) and [`petgraph`](https://github.com/petgraph/petgraph). Their ideas and their code have been immensely helpful so far. For all the rest:
-
-> Copyright (C) 2024 Leon Bohn
-> 
-> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-> 
-> The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-> 
-> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE X CONSORTIUM BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-> 
-> Except as contained in this notice, the name of Leon Bohn shall not be used in advertising or otherwise to promote the sale, use or other dealings in this Software without prior written authorization from Leon Bohn.
+Thanks go out to the maintainers of [`spot`](https://spot.lre.epita.fr/) and [`petgraph`](https://github.com/petgraph/petgraph). Their ideas and their code have been immensely helpful so far. For all the rest, see `LICENSE.md`.
