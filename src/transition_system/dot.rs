@@ -235,7 +235,7 @@ impl<A: Alphabet> Dottable for DFA<A> {
         ]
     }
 }
-impl<A: Alphabet, Q: Clone, C: Clone> Dottable for crate::RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Dottable for crate::RightCongruence<A, Q, C> {
     fn dot_name(&self) -> Option<String> {
         Some("Congruence".into())
     }

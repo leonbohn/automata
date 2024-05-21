@@ -34,7 +34,7 @@ hoars = { version = "0.2", optional = true }
 clap = { version = "4.5", optional = true }
 
 [features]
-default = ["hoa", "graphviz", "random", "minimize"]
+default = ["hoa", "graphviz", "random", "minimize", "linked_list_ts"]
 random = ["fastrand"]
 minimize = []
 hoa = ["dep:hoars", "biodivine-lib-bdd"]

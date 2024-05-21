@@ -14,7 +14,7 @@ use crate::prelude::*;
 /// often is not contained in the [`MullerCondition`]. This allows for easy complementation
 /// of a [`DMA`] by simply taking the complement of the [`MullerCondition`].
 pub type DMA<A = CharAlphabet, Q = Void, C = usize, D = DTS<A, Q, C>> =
-    InfiniteWordAutomaton<A, MullerCondition<C>, Q, C, D>;
+    InfiniteWordAutomaton<A, MullerCondition<C>, Q, C, true, D>;
 /// Helper type alias for casting a given transition system `T` into a [`DMA`].
 pub type IntoDMA<T> = DMA<<T as TransitionSystem>::Alphabet, StateColor<T>, EdgeColor<T>, T>;
 

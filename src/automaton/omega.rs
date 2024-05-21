@@ -15,6 +15,23 @@ pub use muller::*;
 #[allow(missing_docs)]
 mod acceptance_mask;
 pub use acceptance_mask::AcceptanceMask;
+use tracing::{error, trace};
+
+use super::InfiniteWordAutomaton;
+
+/// Type alias for an omega automaton (i.e. an [`InfiniteWordAutomaton`]) that is guaranteed to be
+/// [`Deterministic`].
+pub type DeterministicOmegaAutomaton<A> = OmegaAutomaton<A, true>;
+/// Type alias for an omega automaton (i.e. an [`InfiniteWordAutomaton`]) that is not necessarily
+/// [`Deterministic`].
+pub type NondeterministicOmegaAutomaton<A> = OmegaAutomaton<A, false>;
+
+/// Represents a generic omega automaton, i.e. an automaton over infinite words.
+/// This type is mainly used when the exact type of automaton is not known beforehand
+/// such as when parsing automata. One should prefer using specific types such as
+/// [`DPA`] whenever possible.
+pub type OmegaAutomaton<A, const DET: bool = true> =
+    InfiniteWordAutomaton<A, OmegaAcceptanceCondition, usize, AcceptanceMask, DET>;
 
 /// Disambiguates between the different types of acceptance conditions. This is only
 /// used in conjunction with [`OmegaAutomaton`]/[`DeterministicOmegaAutomaton`] when
@@ -49,58 +66,64 @@ impl OmegaAcceptanceCondition {
     }
 }
 
-/// Represents a generic omega automaton, i.e. an automaton over infinite words.
-/// This type is mainly used when the exact type of automaton is not known beforehand
-/// such as when parsing automata. One should prefer using specific types such as
-/// [`DPA`] whenever possible.
-pub struct OmegaAutomaton<A: Alphabet> {
-    pub(super) ts: LinkedListNondeterministic<A, usize, AcceptanceMask>,
-    pub(super) initial: usize,
-    pub(super) acc: OmegaAcceptanceCondition,
-}
-
-/// A deterministic variant of [`OmegaAutomaton`].
-pub struct DeterministicOmegaAutomaton<A: Alphabet> {
-    pub(super) ts: LinkedListTransitionSystem<A, usize, AcceptanceMask>,
-    pub(super) initial: usize,
-    pub(super) acc: OmegaAcceptanceCondition,
-}
-
-impl<A: Alphabet> OmegaAutomaton<A> {
+impl<A: Alphabet, const DET: bool> OmegaAutomaton<A, DET> {
     /// Creates a new instance from the given transition system, initial state and
     /// acceptance condition.
     pub fn new(
-        ts: LinkedListNondeterministic<A, usize, AcceptanceMask>,
+        ts: TS<A, usize, AcceptanceMask, DET>,
         initial: usize,
-        acc: OmegaAcceptanceCondition,
-    ) -> Self {
-        Self { ts, initial, acc }
+        acceptance: OmegaAcceptanceCondition,
+    ) -> OmegaAutomaton<A, DET> {
+        OmegaAutomaton {
+            ts,
+            initial,
+            acceptance,
+        }
     }
-
     /// Attempts to convert `self` into a [`DeterministicOmegaAutomaton`]. Returns
     /// `None` if this is not possible because the transition system underlying `self`
     /// is not deterministic.
-    pub fn into_deterministic(self) -> Option<DeterministicOmegaAutomaton<A>> {
-        self.try_into().ok()
+    pub fn into_deterministic(self) -> DeterministicOmegaAutomaton<A> {
+        match self.try_into_deterministic() {
+            Ok(dts) => {
+                trace!("Converted into deterministic: {:?}", dts);
+                dts
+            }
+            Err(nts) => {
+                error!(
+                    "Tried to convert non-deterministic omega automaton into deterministic: \n{:?}",
+                    nts
+                );
+                panic!("Automaton that we want to convert is not deterministic!")
+            }
+        }
+    }
+    /// Attempts to convert `self` into a [`DeterministicOmegaAutomaton`]. Returns
+    /// `None` if this is not possible because the transition system underlying `self`
+    /// is not deterministic.
+    pub fn try_into_deterministic(self) -> Result<DeterministicOmegaAutomaton<A>, Self> {
+        let OmegaAutomaton {
+            ts,
+            initial,
+            acceptance,
+        } = self;
+        match ts.try_into_deterministic() {
+            Ok(dts) => Ok(DeterministicOmegaAutomaton::new(dts, initial, acceptance)),
+            Err(ts) => Err(Self {
+                ts,
+                initial,
+                acceptance,
+            }),
+        }
     }
 }
 
 impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
-    /// Creates a new instance from the given *deterministic* transition system,
-    /// initial state and acceptance condition.
-    pub fn new(
-        ts: LinkedListTransitionSystem<A, usize, AcceptanceMask>,
-        initial: usize,
-        acc: OmegaAcceptanceCondition,
-    ) -> Self {
-        Self { ts, initial, acc }
-    }
-
     /// Consumes and converts `self` into a [`DPA`]. Since [`DPA`]s can capture the
     /// full class of omega-regular languages, this operation never fails.
     pub fn into_dpa(self) -> DPA<A> {
         assert!(
-            matches!(self.acc, OmegaAcceptanceCondition::Parity(_, _)),
+            matches!(self.acceptance, OmegaAcceptanceCondition::Parity(_, _)),
             "Can only turn DPA into DPA for now"
         );
 
@@ -125,7 +148,7 @@ impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutoma
                 })
             }))
             .into_linked_list_deterministic();
-        DeterministicOmegaAutomaton::new(ts, value.initial, value.acc)
+        DeterministicOmegaAutomaton::new(ts, value.initial, value.acceptance)
     }
 }
 
@@ -162,165 +185,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
         Ok(DeterministicOmegaAutomaton::new(
             ts,
             value.initial,
-            value.acc,
+            value.acceptance,
         ))
     }
-}
-
-impl<A: Alphabet> TryFrom<OmegaAutomaton<A>> for DeterministicOmegaAutomaton<A> {
-    /// The only way this can go wrong is if the given automaton is not deterministic.
-    type Error = ();
-
-    fn try_from(value: OmegaAutomaton<A>) -> Result<Self, Self::Error> {
-        if !value.ts.is_deterministic() {
-            return Err(());
-        }
-        let dts = value.ts.into_deterministic();
-        Ok(Self::new(dts, value.initial, value.acc))
-    }
-}
-
-impl<A: Alphabet> TryFrom<&OmegaAutomaton<A>> for DeterministicOmegaAutomaton<A> {
-    /// The only way this can go wrong is if the given automaton is not deterministic.
-    type Error = ();
-
-    fn try_from(value: &OmegaAutomaton<A>) -> Result<Self, Self::Error> {
-        if !value.ts.is_deterministic() {
-            return Err(());
-        }
-        let dts = value.ts.clone().into_deterministic();
-        Ok(Self::new(dts, value.initial, value.acc))
-    }
-}
-
-impl<A: Alphabet> Pointed for OmegaAutomaton<A> {
-    fn initial(&self) -> Self::StateIndex {
-        self.initial
-    }
-}
-
-impl<A: Alphabet> Pointed for DeterministicOmegaAutomaton<A> {
-    fn initial(&self) -> Self::StateIndex {
-        self.initial
-    }
-}
-
-impl<A: Alphabet> TransitionSystem for OmegaAutomaton<A> {
-    type StateIndex = usize;
-
-    type StateColor = usize;
-
-    type EdgeColor = AcceptanceMask;
-
-    type EdgeRef<'this> = <LinkedListTransitionSystem<A, usize, AcceptanceMask> as TransitionSystem>::EdgeRef<'this>
-    where
-        Self: 'this;
-
-    type EdgesFromIter<'this> = <LinkedListTransitionSystem<A, usize, AcceptanceMask> as TransitionSystem>::EdgesFromIter<'this>
-    where
-        Self: 'this;
-
-    type StateIndices<'this> = <LinkedListTransitionSystem<A, usize, AcceptanceMask> as TransitionSystem>::StateIndices<'this>
-    where
-        Self: 'this;
-
-    type Alphabet = A;
-
-    fn alphabet(&self) -> &Self::Alphabet {
-        self.ts.alphabet()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts.state_indices()
-    }
-
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        self.ts.edges_from(state.to_index(self)?)
-    }
-
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        self.ts.state_color(state.to_index(self)?)
-    }
-}
-
-impl<A: Alphabet> TransitionSystem for DeterministicOmegaAutomaton<A> {
-    type StateIndex = usize;
-
-    type StateColor = usize;
-
-    type EdgeColor = AcceptanceMask;
-
-    type EdgeRef<'this> = <LinkedListTransitionSystem<A, usize, AcceptanceMask> as TransitionSystem>::EdgeRef<'this>
-    where
-        Self: 'this;
-
-    type EdgesFromIter<'this> = <LinkedListTransitionSystem<A, usize, AcceptanceMask> as TransitionSystem>::EdgesFromIter<'this>
-    where
-        Self: 'this;
-
-    type StateIndices<'this> = <LinkedListTransitionSystem<A, usize, AcceptanceMask> as TransitionSystem>::StateIndices<'this>
-    where
-        Self: 'this;
-
-    type Alphabet = A;
-
-    fn alphabet(&self) -> &Self::Alphabet {
-        self.ts.alphabet()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts.state_indices()
-    }
-
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        self.ts.edges_from(state.to_index(self)?)
-    }
-
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        self.ts.state_color(state.to_index(self)?)
-    }
-}
-
-impl<A: Alphabet> PredecessorIterable for OmegaAutomaton<A> {
-    type PreEdgeRef<'this> = <LinkedListTransitionSystem<A, usize, AcceptanceMask> as PredecessorIterable>::PreEdgeRef<'this>
-    where
-        Self: 'this;
-
-    type EdgesToIter<'this> =  <LinkedListNondeterministic<A, usize, AcceptanceMask> as PredecessorIterable>::EdgesToIter<'this>
-    where
-        Self: 'this;
-
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        self.ts.predecessors(state.to_index(self)?)
-    }
-}
-
-impl<A: Alphabet> PredecessorIterable for DeterministicOmegaAutomaton<A> {
-    type PreEdgeRef<'this> = <LinkedListTransitionSystem<A, usize, AcceptanceMask> as PredecessorIterable>::PreEdgeRef<'this>
-    where
-        Self: 'this;
-
-    type EdgesToIter<'this> =  <LinkedListTransitionSystem<A, usize, AcceptanceMask> as PredecessorIterable>::EdgesToIter<'this>
-    where
-        Self: 'this;
-
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        self.ts.predecessors(state.to_index(self)?)
-    }
-}
-
-impl<A: Alphabet> Deterministic for DeterministicOmegaAutomaton<A> {
-    fn edge<Idx: Indexes<Self>>(
-        &self,
-        state: Idx,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        self.ts.edge(state.to_index(self)?, matcher)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn omega_acceptance_conditions() {}
 }

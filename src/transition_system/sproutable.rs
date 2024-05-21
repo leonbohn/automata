@@ -85,7 +85,8 @@ pub trait Sproutable: TransitionSystem {
     /// add any edges and the type can therefore not be inferred.
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex;
 
-    /// Adds a new edge to the transition system.
+    /// Adds a new edge to the transition system. Returns an [`TransitionSystem::EdgeRef`] pointing to the added
+    /// edge or `None` if the edge could not be added.
     ///
     /// The details of the edge are given as a type that implements [`IntoEdgeTuple`]. This allows
     /// for a more flexible way of adding edges, as the method can be called with a tuple, a struct
@@ -104,6 +105,8 @@ pub trait Sproutable: TransitionSystem {
     /// assert!(ts.edge(q0, 'a').is_none());
     /// assert!(ts.add_edge((q0, 'a', q1)).is_some());
     /// assert!(ts.edge(q0, 'a').is_some());
+    ///
+    /// assert!(ts.add_edge((q0, 'a', q0)).is_none(), "Cannot add overlapping edges as ts is deterministic");
     /// ```
     fn add_edge<E>(&mut self, t: E) -> Option<Self::EdgeRef<'_>>
     where
@@ -127,10 +130,10 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let source: DTS<CharAlphabet, usize, usize> = TSBuilder::default()
+    /// let source: DTS<CharAlphabet, usize, usize> = DTS::builder()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
     ///     .with_state_colors([0])
-    ///     .into_edge_lists_deterministic();
+    ///     .into_dts();
     ///
     /// let (without_edge_colors, map1): (DTS<CharAlphabet, usize, Void>, _) = DTS::sprout_from_ts(&source);
     /// let (without_state_colors, map2): (DTS<CharAlphabet, Void, usize>, _) = DTS::sprout_from_ts(&source);

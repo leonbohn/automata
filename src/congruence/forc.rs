@@ -60,7 +60,9 @@ impl<A: Alphabet, Q: Clone, C: Clone> FORC<A, Q, C> {
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> PartialEq for FORC<A, Q, C> {
+impl<A: Alphabet + PartialEq, Q: Hash + Eq + Debug, C: Hash + Eq + Debug> PartialEq
+    for FORC<A, Q, C>
+{
     fn eq(&self, other: &Self) -> bool {
         self.leading.eq(&other.leading)
             && self.progress.len() == other.progress.len()
@@ -68,11 +70,11 @@ impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> PartialEq for FORC<A, 
                 .progress
                 .iter()
                 .zip(other.progress.iter())
-                .all(|(l, r)| l.eq(&r))
+                .all(|((li, lts), (ri, rts))| li == ri && lts == rts)
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Eq, C: Hash + Eq> Eq for FORC<A, Q, C> {}
+impl<A: Alphabet + PartialEq, Q: Hash + Eq + Debug, C: Hash + Eq + Debug> Eq for FORC<A, Q, C> {}
 
 impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> std::fmt::Debug for FORC<A, Q, C> {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

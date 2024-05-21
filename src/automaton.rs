@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::prelude::*;
 
 mod acceptance_type;
@@ -18,8 +20,8 @@ mod omega;
 pub use omega::{
     AcceptanceMask, BuchiCondition, DeterministicOmegaAutomaton, IntoDBA, IntoDMA, IntoDPA,
     IntoDRA, MaxEvenParityCondition, MaxOddParityCondition, MinEvenParityCondition,
-    MinOddParityCondition, MullerCondition, OmegaAcceptanceCondition, OmegaAutomaton,
-    RabinCondition, RabinPair, DBA, DMA, DPA, DRA,
+    MinOddParityCondition, MullerCondition, NondeterministicOmegaAutomaton,
+    OmegaAcceptanceCondition, OmegaAutomaton, RabinCondition, RabinPair, DBA, DMA, DPA, DRA,
 };
 
 mod with_initial;
@@ -29,9 +31,11 @@ mod semantics;
 pub use semantics::{FiniteSemantics, OmegaSemantics, Semantics};
 
 /// Type alias for an omega word automaton, like [`DBA`], [`DMA`], [`DPA`] or [`DRA`].
-pub type InfiniteWordAutomaton<A, Z, Q, C, D = DTS<A, Q, C>> = Automaton<A, Z, Q, C, D, true>;
+pub type InfiniteWordAutomaton<A, Z, Q, C, const DET: bool = true, D = TS<A, Q, C, DET>> =
+    Automaton<A, Z, Q, C, D, true, DET>;
 /// Type alias for a finite word automaton such as a [`DFA`], [`MooreMachine`] or [`MealyMachine`].
-pub type FiniteWordAutomaton<A, Z, Q, C, D = DTS<A, Q, C>> = Automaton<A, Z, Q, C, D, false>;
+pub type FiniteWordAutomaton<A, Z, Q, C, const DET: bool = true, D = TS<A, Q, C, DET>> =
+    Automaton<A, Z, Q, C, D, false, DET>;
 
 /// An automaton consists of a transition system and an acceptance condition.
 /// There are many different types of automata, which can be instantiated from
@@ -63,7 +67,7 @@ pub struct Automaton<
     acceptance: Z,
 }
 
-impl<Z, Q: Clone, C: Clone + std::hash::Hash + Eq, const OMEGA: bool>
+impl<Z, Q: Clone + Debug, C: Clone + Debug + std::hash::Hash + Eq, const OMEGA: bool>
     Automaton<CharAlphabet, Z, Q, C, EdgeLists<CharAlphabet, Q, C>, OMEGA>
 {
     /// Instantiates a new [`TSBuilder`] for the edge and state color of `self`.
@@ -72,7 +76,7 @@ impl<Z, Q: Clone, C: Clone + std::hash::Hash + Eq, const OMEGA: bool>
     }
 }
 
-impl<A, Z, Q, C, D, const OMEGA: bool> Automaton<A, Z, Q, C, D, OMEGA>
+impl<A, Z, Q, C, D, const OMEGA: bool, const DET: bool> Automaton<A, Z, Q, C, D, OMEGA, DET>
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C>,
@@ -92,7 +96,10 @@ where
     /// dfa.add_edge((0, 'b', 0));
     /// assert!(!dfa.accepts("bbabababbabbba"));
     /// ```
-    pub fn new_with_initial_color(alphabet: A, initial_color: Q) -> Automaton<A, Z, Q, C, D, OMEGA>
+    pub fn new_with_initial_color(
+        alphabet: A,
+        initial_color: Q,
+    ) -> Automaton<A, Z, Q, C, D, OMEGA, DET>
     where
         D: ForAlphabet<A> + Sproutable,
         Z: Default,
@@ -141,8 +148,8 @@ where
     }
 
     /// Decomposes the automaton into its parts: the transition system and the acceptance condition.
-    pub fn into_parts(self) -> (D, Z) {
-        (self.ts, self.acceptance)
+    pub fn into_parts(self) -> (D, StateIndex<D>, Z) {
+        (self.ts, self.initial, self.acceptance)
     }
 
     /// Returns a reference to the underlying transition system.
@@ -161,13 +168,13 @@ where
     }
 }
 
-impl<A, Z, Q, C, D> Automaton<A, Z, Q, C, D, false>
+impl<A, Z, Q, C, D> Automaton<A, Z, Q, C, D, false, true>
 where
     A: Alphabet,
     D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,
     Z: FiniteSemantics<StateColor<D>, EdgeColor<D>>,
-    Q: Clone,
-    C: Clone,
+    Q: Clone + Debug,
+    C: Clone + Debug,
 {
     /// Returns whether the automaton accepts the given finite word.
     pub fn accepts<W: FiniteWord<SymbolOf<D>>>(&self, word: W) -> bool
@@ -185,13 +192,13 @@ where
     }
 }
 
-impl<A, Z, Q, C, D> Automaton<A, Z, Q, C, D, true>
+impl<A, Z, Q, C, D> Automaton<A, Z, Q, C, D, true, true>
 where
     A: Alphabet,
     D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,
     Z: OmegaSemantics<StateColor<D>, EdgeColor<D>>,
-    Q: Clone,
-    C: Clone,
+    Q: Clone + Debug,
+    C: Clone + Debug,
 {
     /// Returns whether the automaton accepts the given omega word.
     pub fn accepts<W: OmegaWord<SymbolOf<D>>>(&self, word: W) -> bool
@@ -215,8 +222,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> AsRef<Automaton<A, Z, Q, C, D, OMEGA>>
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    Q: Clone,
-    C: Clone,
+    Q: Clone + Debug,
+    C: Clone + Debug,
 {
     fn as_ref(&self) -> &Automaton<A, Z, Q, C, D, OMEGA> {
         self
@@ -227,8 +234,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> Deterministic for Automaton<A, Z, Q, C, D
 where
     A: Alphabet,
     D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    Q: Clone,
-    C: Clone,
+    Q: Clone + Debug,
+    C: Clone + Debug,
 {
 }
 
@@ -236,8 +243,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> PredecessorIterable for Automaton<A, Z, Q
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C> + PredecessorIterable,
-    Q: Clone,
-    C: Clone,
+    Q: Clone + Debug,
+    C: Clone + Debug,
 {
     type PreEdgeRef<'this> = D::PreEdgeRef<'this>
     where
@@ -256,8 +263,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> Pointed for Automaton<A, Z, Q, C, D, OMEG
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    Q: Clone,
-    C: Clone,
+    Q: Clone + Debug,
+    C: Clone + Debug,
 {
     fn initial(&self) -> Self::StateIndex {
         self.initial
@@ -268,8 +275,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> Sproutable for Automaton<A, Z, Q, C, D, O
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C> + Sproutable,
-    Q: Clone,
-    C: Clone,
+    Q: Clone + Debug,
+    C: Clone + Debug,
 {
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         self.ts.add_state(color)
@@ -299,8 +306,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> TransitionSystem for Automaton<A, Z, Q, C
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    Q: Clone,
-    C: Clone,
+    Q: Clone + std::fmt::Debug,
+    C: Clone + std::fmt::Debug,
 {
     type Alphabet = D::Alphabet;
 
@@ -339,7 +346,8 @@ where
     }
 }
 
-impl<A, Z, Q, C, D, const OMEGA: bool> std::fmt::Debug for Automaton<A, Z, Q, C, D, OMEGA>
+impl<A, Z, Q, C, D, const OMEGA: bool, const DET: bool> std::fmt::Debug
+    for Automaton<A, Z, Q, C, D, OMEGA, DET>
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C> + std::fmt::Debug,

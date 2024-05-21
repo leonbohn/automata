@@ -15,7 +15,7 @@ use crate::{automaton::InfiniteWordAutomaton, math::Partition, prelude::*};
 /// if the least color that appears infinitely often during
 /// a run is even.
 pub type DPA<A = CharAlphabet, Q = Void, Sem = MinEvenParityCondition, D = DTS<A, Q, usize>> =
-    InfiniteWordAutomaton<A, Sem, Q, usize, D>;
+    InfiniteWordAutomaton<A, Sem, Q, usize, true, D>;
 /// Helper type alias for converting a given transition system into a [`DPA`]
 /// with the given semantics.
 pub type IntoDPA<T, Sem = MinEvenParityCondition> =
@@ -377,7 +377,7 @@ where
             .collect_edge_lists_deterministic_pointed();
         let out = self
             .with_initial(self.initial)
-            .collect_linked_list_determinsitic_pointed();
+            .collect_linked_list_deterministic_pointed();
 
         let mut recoloring = Vec::new();
         let mut remove_states = Vec::new();

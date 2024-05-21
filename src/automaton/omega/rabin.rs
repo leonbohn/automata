@@ -11,7 +11,7 @@ use crate::prelude::*;
 /// visited infinitely often. Overall, a Rabin condition is then satisfied if at least one of
 /// its constituent pairs is satisfied.
 pub type DRA<A = CharAlphabet, Q = Void, C = usize, D = DTS<A, Q, C>> =
-    InfiniteWordAutomaton<A, RabinCondition<C>, Q, C, D>;
+    InfiniteWordAutomaton<A, RabinCondition<C>, Q, C, true, D>;
 /// Helper type alias for casting a given transition system `T` into a [`DRA`].
 pub type IntoDRA<T> = DRA<<T as TransitionSystem>::Alphabet, StateColor<T>, EdgeColor<T>, T>;
 

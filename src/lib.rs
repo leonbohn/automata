@@ -7,6 +7,14 @@
 pub mod prelude {
     #[cfg(feature = "linked_list_ts")]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
+    pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
+        LinkedListTransitionSystem<A, Q, C, DET>;
+    #[cfg(not(feature = "linked_list_ts"))]
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
+    pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
+        EdgeLists<A, Q, C, DET>;
+    #[cfg(feature = "linked_list_ts")]
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type DTS<A = CharAlphabet, Q = Void, C = Void> = LinkedListDeterministic<A, Q, C>;
     #[cfg(feature = "linked_list_ts")]
     /// Points to the default implementation of [`TransitionSystem`] in the case where it is
@@ -32,11 +40,11 @@ pub mod prelude {
         alphabet,
         alphabet::{CharAlphabet, Expression, Matcher, Symbol},
         automaton::{
-            Automaton, BuchiCondition, FiniteSemantics, IntoDBA, IntoDFA, IntoDMA, IntoDPA,
-            IntoDRA, IntoMealyMachine, IntoMooreMachine, MealyMachine, MealySemantics,
-            MinEvenParityCondition, MooreMachine, MooreSemantics, MullerCondition,
-            OmegaAcceptanceCondition, OmegaAutomaton, OmegaSemantics, ReachabilityCondition,
-            Semantics, WithInitial, DBA, DFA, DMA, DPA,
+            Automaton, BuchiCondition, DeterministicOmegaAutomaton, FiniteSemantics, IntoDBA,
+            IntoDFA, IntoDMA, IntoDPA, IntoDRA, IntoMealyMachine, IntoMooreMachine, MealyMachine,
+            MealySemantics, MinEvenParityCondition, MooreMachine, MooreSemantics, MullerCondition,
+            NondeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
+            OmegaSemantics, ReachabilityCondition, Semantics, WithInitial, DBA, DFA, DMA, DPA,
         },
         congruence::{Congruence, RightCongruence},
         math,
@@ -50,8 +58,8 @@ pub mod prelude {
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
             EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, IndexType, Indexes,
             IntoEdgeTuple, IsEdge, LinkedListDeterministic, LinkedListNondeterministic,
-            LinkedListTransitionSystem, Path, Shrinkable, Sproutable, StateColor, SymbolOf,
-            TSBuilder, TransitionSystem,
+            LinkedListTransitionSystem, Path, Shrinkable, Sproutable, StateColor, StateIndex,
+            SymbolOf, TSBuilder, TransitionSystem,
         },
         upw,
         word::{
@@ -106,7 +114,7 @@ pub mod dag;
 use std::{fmt::Debug, hash::Hash};
 
 /// A color is simply a type that can be used to color states or transitions.
-pub trait Color: Clone + Eq + Ord + Hash + Show {
+pub trait Color: Clone + Eq + Ord + Hash + Show + Debug {
     /// Reduces a sequence of colors (of type `Self`) to a single color of type `Self`.
     fn reduce<I: IntoIterator<Item = Self>>(iter: I) -> Self
     where
@@ -116,7 +124,7 @@ pub trait Color: Clone + Eq + Ord + Hash + Show {
     }
 }
 
-impl<T: Eq + Ord + Clone + Hash + Show> Color for T {}
+impl<T: Eq + Ord + Clone + Hash + Show + Debug> Color for T {}
 
 /// Represents the absence of a color. The idea is that this can be used when collecting
 /// a transitions system as it can always be constructed from a color by simply forgetting it.
