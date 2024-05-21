@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use crate::prelude::*;
 
 mod acceptance_type;
@@ -67,7 +65,7 @@ pub struct Automaton<
     acceptance: Z,
 }
 
-impl<Z, Q: Clone + Debug, C: Clone + Debug + std::hash::Hash + Eq, const OMEGA: bool>
+impl<Z, Q: Color, C: Color + std::hash::Hash + Eq, const OMEGA: bool>
     Automaton<CharAlphabet, Z, Q, C, EdgeLists<CharAlphabet, Q, C>, OMEGA>
 {
     /// Instantiates a new [`TSBuilder`] for the edge and state color of `self`.
@@ -173,8 +171,8 @@ where
     A: Alphabet,
     D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,
     Z: FiniteSemantics<StateColor<D>, EdgeColor<D>>,
-    Q: Clone + Debug,
-    C: Clone + Debug,
+    Q: Color,
+    C: Color,
 {
     /// Returns whether the automaton accepts the given finite word.
     pub fn accepts<W: FiniteWord<SymbolOf<D>>>(&self, word: W) -> bool
@@ -197,8 +195,8 @@ where
     A: Alphabet,
     D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,
     Z: OmegaSemantics<StateColor<D>, EdgeColor<D>>,
-    Q: Clone + Debug,
-    C: Clone + Debug,
+    Q: Color,
+    C: Color,
 {
     /// Returns whether the automaton accepts the given omega word.
     pub fn accepts<W: OmegaWord<SymbolOf<D>>>(&self, word: W) -> bool
@@ -222,8 +220,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> AsRef<Automaton<A, Z, Q, C, D, OMEGA>>
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    Q: Clone + Debug,
-    C: Clone + Debug,
+    Q: Color,
+    C: Color,
 {
     fn as_ref(&self) -> &Automaton<A, Z, Q, C, D, OMEGA> {
         self
@@ -234,8 +232,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> Deterministic for Automaton<A, Z, Q, C, D
 where
     A: Alphabet,
     D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    Q: Clone + Debug,
-    C: Clone + Debug,
+    Q: Color,
+    C: Color,
 {
 }
 
@@ -243,8 +241,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> PredecessorIterable for Automaton<A, Z, Q
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C> + PredecessorIterable,
-    Q: Clone + Debug,
-    C: Clone + Debug,
+    Q: Color,
+    C: Color,
 {
     type PreEdgeRef<'this> = D::PreEdgeRef<'this>
     where
@@ -263,8 +261,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> Pointed for Automaton<A, Z, Q, C, D, OMEG
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    Q: Clone + Debug,
-    C: Clone + Debug,
+    Q: Color,
+    C: Color,
 {
     fn initial(&self) -> Self::StateIndex {
         self.initial
@@ -275,8 +273,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> Sproutable for Automaton<A, Z, Q, C, D, O
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C> + Sproutable,
-    Q: Clone + Debug,
-    C: Clone + Debug,
+    Q: Color,
+    C: Color,
 {
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         self.ts.add_state(color)
@@ -306,8 +304,8 @@ impl<A, Z, Q, C, D, const OMEGA: bool> TransitionSystem for Automaton<A, Z, Q, C
 where
     A: Alphabet,
     D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    Q: Clone + std::fmt::Debug,
-    C: Clone + std::fmt::Debug,
+    Q: Color,
+    C: Color,
 {
     type Alphabet = D::Alphabet;
 

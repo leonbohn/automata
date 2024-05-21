@@ -51,7 +51,7 @@ pub mod prelude {
         transition_system::operations,
         transition_system::{
             dot::Dottable,
-            operations::{Product, ProductIndex},
+            operations::{Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
             reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
@@ -114,17 +114,17 @@ pub mod dag;
 use std::{fmt::Debug, hash::Hash};
 
 /// A color is simply a type that can be used to color states or transitions.
-pub trait Color: Clone + Eq + Ord + Hash + Show + Debug {
+pub trait Color: Clone + Eq + Hash + Debug {
     /// Reduces a sequence of colors (of type `Self`) to a single color of type `Self`.
     fn reduce<I: IntoIterator<Item = Self>>(iter: I) -> Self
     where
-        Self: Sized,
+        Self: Sized + Ord,
     {
         iter.into_iter().min().unwrap()
     }
 }
 
-impl<T: Eq + Ord + Clone + Hash + Show + Debug> Color for T {}
+impl<T: Eq + Clone + Hash + Debug> Color for T {}
 
 /// Represents the absence of a color. The idea is that this can be used when collecting
 /// a transitions system as it can always be constructed from a color by simply forgetting it.
@@ -133,12 +133,6 @@ impl<T: Eq + Ord + Clone + Hash + Show + Debug> Color for T {}
 /// colors may be kept and the edge colors are dropped.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Copy, Default)]
 pub struct Void;
-
-impl<C: Color> From<C> for Void {
-    fn from(_: C) -> Self {
-        Void
-    }
-}
 
 impl Debug for Void {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

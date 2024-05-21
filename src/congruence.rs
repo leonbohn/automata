@@ -85,9 +85,7 @@ pub trait Congruence: Deterministic + Pointed {
     where
         StateColor<Self>: Color,
     {
-        let (ts, initial) = self
-            .erase_edge_colors()
-            .collect_linked_list_deterministic_pointed();
+        let (ts, initial) = self.erase_edge_colors().collect_dts_pointed();
         MooreMachine::from_parts(ts, initial)
     }
 
@@ -127,7 +125,7 @@ pub struct RightCongruence<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
     minimal_representatives: Vec<Class<A::Symbol>>,
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> RightCongruence<A, Q, C> {
     /// Creates a new [`RightCongruence`] for the given [`Alphabet`]. Since there always has be an initial state,
     /// the method also expects a color for the initial state which it inserts.
     pub fn new_with_initial_color(alphabet: A, initial_color: Q) -> Self {
@@ -238,11 +236,9 @@ impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> RightCongruence<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Deterministic for RightCongruence<A, Q, C> {}
+impl<A: Alphabet, Q: Color, C: Color> Deterministic for RightCongruence<A, Q, C> {}
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> TransitionSystem
-    for RightCongruence<A, Q, C>
-{
+impl<A: Alphabet, Q: Color, C: Color> TransitionSystem for RightCongruence<A, Q, C> {
     type StateIndex = usize;
     type EdgeColor = C;
     type StateColor = Q;
@@ -273,15 +269,13 @@ impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> TransitionSystem
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Pointed for RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> Pointed for RightCongruence<A, Q, C> {
     fn initial(&self) -> Self::StateIndex {
         self.initial
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> PredecessorIterable
-    for RightCongruence<A, Q, C>
-{
+impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for RightCongruence<A, Q, C> {
     type PreEdgeRef<'this> = &'this crate::transition_system::impls::LinkedListTransitionSystemEdge<A::Expression, C>
 where
     Self: 'this;
@@ -309,7 +303,7 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq> Eq
 {
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Debug for RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> Debug for RightCongruence<A, Q, C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

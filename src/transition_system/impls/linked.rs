@@ -47,12 +47,9 @@ pub struct LinkedListTransitionSystem<
     edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Deterministic
-    for LinkedListTransitionSystem<A, Q, C>
-{
-}
+impl<A: Alphabet, Q: Color, C: Color> Deterministic for LinkedListTransitionSystem<A, Q, C> {}
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool> Sproutable
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
@@ -113,7 +110,7 @@ impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool> Sproutabl
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool> Shrinkable
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn remove_edges_from_matching(
@@ -191,9 +188,7 @@ impl<Q, C, const DET: bool> LinkedListTransitionSystem<CharAlphabet, Q, C, DET> 
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool>
-    LinkedListTransitionSystem<A, Q, C, DET>
-{
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSystem<A, Q, C, DET> {
     pub(crate) fn nts_remove_edge(
         &mut self,
         from: usize,
@@ -282,35 +277,6 @@ impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool>
         }
     }
 
-    /// Returns true if the transition system is deterministic, i.e. if there are no two edges leaving
-    /// the same state with the same symbol.
-    pub fn is_deterministic(&self) -> bool {
-        for state in self.state_indices() {
-            for (l, r) in self
-                .edges_from(state)
-                .unwrap()
-                .zip(self.edges_from(state).unwrap().skip(1))
-            {
-                if self.alphabet().overlapping(l.expression(), r.expression()) {
-                    trace!(
-                        "found overlapping edges from {}: on {} to {} and on {} to {}",
-                        l.source(),
-                        l.expression().show(),
-                        l.target(),
-                        r.expression().show(),
-                        r.target(),
-                    );
-                    assert!(
-                        !DET,
-                        "Transition system is not deterministic even though the type suggests it."
-                    );
-                    return false;
-                }
-            }
-        }
-        true
-    }
-
     /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
     pub fn into_deterministic(self) -> LinkedListTransitionSystem<A, Q, C> {
         match self.try_into_deterministic() {
@@ -379,8 +345,8 @@ impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool>
     }
 }
 
-impl<A: Alphabet, Q: Clone + std::fmt::Debug, C: Clone + std::fmt::Debug, const DET: bool>
-    TransitionSystem for LinkedListTransitionSystem<A, Q, C, DET>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
+    for LinkedListTransitionSystem<A, Q, C, DET>
 {
     type StateIndex = usize;
 
@@ -430,7 +396,7 @@ impl<A: Alphabet, Q: Clone + std::fmt::Debug, C: Clone + std::fmt::Debug, const 
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool> ForAlphabet<A>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A>
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn for_alphabet(alphabet: A) -> Self {
@@ -450,7 +416,7 @@ impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool> ForAlphab
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool> PredecessorIterable
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     type PreEdgeRef<'this> = &'this LinkedListTransitionSystemEdge<A::Expression, C>
@@ -497,12 +463,8 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const 
 {
 }
 
-impl<
-        A: Alphabet + std::fmt::Debug,
-        Q: std::fmt::Debug + Clone,
-        C: std::fmt::Debug + Clone,
-        const DET: bool,
-    > std::fmt::Debug for LinkedListTransitionSystem<A, Q, C, DET>
+impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color, const DET: bool> std::fmt::Debug
+    for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "alphabet: {:?}", self.alphabet)?;
@@ -516,7 +478,7 @@ impl<
     }
 }
 
-fn recast<A: Alphabet, Q: Clone + Debug, C: Clone + Debug, const DET: bool, const OUT_DET: bool>(
+fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>(
     ts: LinkedListTransitionSystem<A, Q, C, DET>,
 ) -> LinkedListTransitionSystem<A, Q, C, OUT_DET> {
     if !DET && OUT_DET && !ts.is_deterministic() {

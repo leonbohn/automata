@@ -338,7 +338,7 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Lasso<A, Idx, Q, C> {
     }
 }
 
-impl<A: Alphabet, Idx: IndexType, Q: Color, C: Color> Show for Lasso<A, Idx, Q, C> {
+impl<A: Alphabet, Idx: IndexType, Q: Show, C: Show> Show for Lasso<A, Idx, Q, C> {
     fn show(&self) -> String {
         format!("{}({})", self.base.show(), self.cycle.show())
     }

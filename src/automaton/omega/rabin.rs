@@ -18,7 +18,7 @@ pub type IntoDRA<T> = DRA<<T as TransitionSystem>::Alphabet, StateColor<T>, Edge
 /// Represents a Rabin condition, which is a set of [`RabinPair`]s. Such a condition is satisfied
 /// if at least one of its pairs is satisfied.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct RabinCondition<C: Color>(Set<RabinPair<C>>);
+pub struct RabinCondition<C: Color + Ord>(Set<RabinPair<C>>);
 
 /// A Rabin pair over some [`Color`] `C` consists of a set `fin` and a set `inf` of elements of type `C`.
 /// A pair is satisfied by a set (usually the set of colors that appear infinitely often in a run),
@@ -31,7 +31,7 @@ pub struct RabinPair<C> {
 
 impl<C, I> From<I> for RabinCondition<C>
 where
-    C: Color,
+    C: Color + Ord,
     I: IntoIterator<Item = RabinPair<C>>,
 {
     fn from(value: I) -> Self {
@@ -39,7 +39,7 @@ where
     }
 }
 
-impl<C: Color> RabinPair<C> {
+impl<C: Color + Ord> RabinPair<C> {
     /// Creates a new pair from the given set of finite and infinite colors.
     pub fn new(fin: BTreeSet<C>, inf: BTreeSet<C>) -> Self {
         Self { fin, inf }
@@ -71,11 +71,11 @@ impl<C: Color> RabinPair<C> {
     }
 }
 
-impl<Q, C: Color> Semantics<Q, C> for RabinCondition<C> {
+impl<Q, C: Color + Ord> Semantics<Q, C> for RabinCondition<C> {
     type Output = bool;
 }
 
-impl<Q, C: Color> OmegaSemantics<Q, C> for RabinCondition<C> {
+impl<Q, C: Color + Ord> OmegaSemantics<Q, C> for RabinCondition<C> {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
         R: OmegaRun<StateColor = Q, EdgeColor = C>,

@@ -558,7 +558,7 @@ pub trait Deterministic: TransitionSystem {
     fn collect_linked_list_deterministic(
         self,
     ) -> LinkedListTransitionSystem<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
-        let (ts, _map) = LinkedListTransitionSystem::sprout_from_ts(self);
+        let (ts, _map) = LinkedListTransitionSystem::sprout_from_ts_with_bijection(self);
         ts
     }
 
@@ -581,7 +581,7 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
     {
         let old_initial = self.initial();
-        let (ts, map) = LinkedListTransitionSystem::sprout_from_ts(self);
+        let (ts, map) = LinkedListTransitionSystem::sprout_from_ts_with_bijection(self);
         (
             ts,
             *map.get_by_left(&old_initial)
@@ -601,7 +601,7 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
     {
         let old_initial = self.initial();
-        let (ts, map) = EdgeLists::sprout_from_ts(self);
+        let (ts, map) = EdgeLists::sprout_from_ts_with_bijection(self);
         (
             ts,
             *map.get_by_left(&old_initial)
@@ -618,7 +618,7 @@ pub trait Deterministic: TransitionSystem {
     where
         EdgeColor<Self>: Hash + Eq,
     {
-        let (ts, _map) = EdgeLists::sprout_from_ts(self);
+        let (ts, _map) = EdgeLists::sprout_from_ts_with_bijection(self);
         ts
     }
 
@@ -777,9 +777,7 @@ impl<D: Deterministic> Deterministic for &mut D {
     }
 }
 
-impl<A: Alphabet, Q: Clone + Debug, C: Hash + Debug + Eq + Clone> Deterministic
-    for EdgeLists<A, Q, C>
-{
+impl<A: Alphabet, Q: Color, C: Hash + Debug + Eq + Clone> Deterministic for EdgeLists<A, Q, C> {
     fn edge<Idx: Indexes<Self>>(
         &self,
         state: Idx,
@@ -834,7 +832,7 @@ where
 
 impl<D, Ts, F> Deterministic for MapStateColor<Ts, F>
 where
-    D: Clone + Debug,
+    D: Color,
     Ts: Deterministic,
     F: Fn(Ts::StateColor) -> D,
 {
@@ -858,7 +856,7 @@ where
 
 impl<D, Ts, F> Deterministic for MapEdgeColor<Ts, F>
 where
-    D: Clone + Debug,
+    D: Color,
     Ts: Deterministic,
     F: Fn(Ts::EdgeColor) -> D,
 {
@@ -922,7 +920,7 @@ where
 impl<Ts, D, F> Deterministic for MapEdges<Ts, F>
 where
     Ts: Deterministic,
-    D: Clone + Debug,
+    D: Color,
     F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
     fn edge<Idx: Indexes<Self>>(

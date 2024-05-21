@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use tracing::trace;
 
 use crate::{math::Partition, prelude::*};
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
@@ -80,9 +81,9 @@ pub trait TransitionSystem: Sized {
     /// The type of the indices of the states of the transition system.
     type StateIndex: IndexType;
     /// The type of the colors of the states of the transition system.
-    type StateColor: Clone + Debug;
+    type StateColor: Color;
     /// The type of the colors of the edges of the transition system.
-    type EdgeColor: Clone + Debug;
+    type EdgeColor: Color;
     /// The type of the references to the transitions of the transition system.
     type EdgeRef<'this>: IsEdge<'this, EdgeExpression<Self>, Self::StateIndex, EdgeColor<Self>>
     where
@@ -211,6 +212,31 @@ pub trait TransitionSystem: Sized {
             self.edges_from(state)?
                 .filter(move |t| matcher.matches(t.expression())),
         )
+    }
+
+    /// Returns true if the transition system is deterministic, i.e. if there are no two edges leaving
+    /// the same state with the same symbol.
+    fn is_deterministic(&self) -> bool {
+        for state in self.state_indices() {
+            for (l, r) in self
+                .edges_from(state)
+                .unwrap()
+                .zip(self.edges_from(state).unwrap().skip(1))
+            {
+                if self.alphabet().overlapping(l.expression(), r.expression()) {
+                    trace!(
+                        "found overlapping edges from {:?}: on {} to {:?} and on {} to {:?}",
+                        l.source(),
+                        l.expression().show(),
+                        l.target(),
+                        r.expression().show(),
+                        r.target(),
+                    );
+                    return false;
+                }
+            }
+        }
+        true
     }
 
     /// Checks whether `self` is complete, meaning every state has a transition for every symbol
@@ -446,9 +472,9 @@ pub trait TransitionSystem: Sized {
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
     ///     .into_linked_list_deterministic_with_initial(0);
-    /// let colored = ts.with_state_color(false);
+    /// let colored = ts.with_state_color(UniformColor(false));
     /// assert_eq!(colored.reached_state_color("a"), Some(false));
-    /// assert_eq!(colored.with_state_color(true).reached_state_color("a"), Some(true));
+    /// assert_eq!(colored.with_state_color(UniformColor(true)).reached_state_color("a"), Some(true));
     /// ```
     fn with_state_color<P: ProvidesStateColor<Self::StateIndex>>(
         self,

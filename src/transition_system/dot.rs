@@ -235,7 +235,7 @@ impl<A: Alphabet> Dottable for DFA<A> {
         ]
     }
 }
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Dottable for crate::RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> Dottable for crate::RightCongruence<A, Q, C> {
     fn dot_name(&self) -> Option<String> {
         Some("Congruence".into())
     }
@@ -273,7 +273,7 @@ impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> Dottable for crate::RightC
 impl<M> Dottable for IntoMooreMachine<M>
 where
     M: Deterministic,
-    StateColor<M>: Color,
+    StateColor<M>: Show,
 {
     fn dot_name(&self) -> Option<String> {
         Some("DPA".into())

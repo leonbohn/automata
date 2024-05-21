@@ -24,7 +24,7 @@ pub type IntoDMA<T> = DMA<<T as TransitionSystem>::Alphabet, StateColor<T>, Edge
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MullerCondition<C: Color>(Set<BTreeSet<C>>);
 
-impl<C: Color> MullerCondition<C> {
+impl<C: Color + Ord> MullerCondition<C> {
     /// Builds a new instance from an iterator that yields iterators that yield colors
     /// (or elements of type `C`).
     ///
@@ -63,11 +63,11 @@ impl<C: Color> MullerCondition<C> {
     }
 }
 
-impl<Q, C: Color> Semantics<Q, C> for MullerCondition<C> {
+impl<Q, C: Color + Ord> Semantics<Q, C> for MullerCondition<C> {
     type Output = bool;
 }
 
-impl<Q, C: Color> OmegaSemantics<Q, C> for MullerCondition<C> {
+impl<Q, C: Color + Ord> OmegaSemantics<Q, C> for MullerCondition<C> {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
         R: OmegaRun<StateColor = Q, EdgeColor = C>,
