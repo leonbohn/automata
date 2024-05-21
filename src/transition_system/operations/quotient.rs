@@ -68,7 +68,9 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
     where
         Ts: Deterministic + Pointed,
     {
-        RightCongruence::from_ts(self.erase_edge_colors().erase_state_colors())
+        self.erase_edge_colors()
+            .erase_state_colors()
+            .collect_right_congruence()
     }
 
     /// Creates a new quotient of the given transition system by the give [`Partition`].

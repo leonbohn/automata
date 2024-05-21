@@ -635,17 +635,11 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the given `state`.
-    fn reachable_state_indices_from<Idx: Indexes<Self>>(
-        &self,
-        state: Idx,
-    ) -> ReachableStateIndices<&Self>
+    fn reachable_state_indices_from(&self, state: Self::StateIndex) -> ReachableStateIndices<&Self>
     where
         Self: Sized,
     {
-        let origin = state
-            .to_index(self)
-            .expect("Can only run this from a state that exists");
-        ReachableStateIndices::new(self, origin)
+        ReachableStateIndices::new(self, state)
     }
 
     /// Returns an iterator over the states that are reachable from the given `state`.
@@ -753,15 +747,15 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 /// Implementors should be able to _uniquely_ identify a single state in a transition
 /// system of type `Ts`.
 pub trait Indexes<Ts: TransitionSystem>: Debug {
-    /// _Uniquely_ identifies a state in `ts` and return its index. If the state does
-    /// not exist, `None` is returned.
+    /// Uniquely dentifies a state in `ts` and return its index.
     fn to_index(&self, ts: &Ts) -> Option<Ts::StateIndex>;
 }
 
-impl<Ts: TransitionSystem> Indexes<Ts> for Ts::StateIndex {
+impl<T: TransitionSystem, I: std::borrow::Borrow<StateIndex<T>> + Debug> Indexes<T> for I {
     #[inline(always)]
-    fn to_index(&self, _ts: &Ts) -> Option<<Ts as TransitionSystem>::StateIndex> {
-        Some(*self)
+    fn to_index(&self, _ts: &T) -> Option<<T as TransitionSystem>::StateIndex> {
+        let q = *self.borrow();
+        Some(q)
     }
 }
 

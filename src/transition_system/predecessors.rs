@@ -1,7 +1,5 @@
 use crate::prelude::*;
 
-use super::EdgeReference;
-
 /// Implementors of this trait are [`TransitionSystem`]s which allow iterating over the predecessors of a state.
 pub trait PredecessorIterable: TransitionSystem {
     /// The type of pre-transition that the iterator yields.
@@ -14,7 +12,20 @@ pub trait PredecessorIterable: TransitionSystem {
     where
         Self: 'this;
 
-    /// Returns an iterator over the predecessors of the given `state`. Returns `None` if the state does not exist.
+    /// Returns an iterator over the predecessors of the given state. If the state is not in the transition system, this returns `None`.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let ts = TSBuilder::without_state_colors()
+    ///     .with_transitions([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (2, 'a', 0)])
+    ///     .into_dts();
+    /// assert_eq!(
+    ///     ts.predecessors(0).unwrap().collect::<Vec<_>>(),
+    ///     vec![(0, 'b', 0), (1, 'a', 0), (2, 'a', 0)]
+    /// );
+    /// ```
     fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>>;
 
     /// Reverses the directions of all transitions in the transition system. This consumes the transition system.
@@ -98,36 +109,18 @@ where
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for EdgeLists<A, Q, C> {
-    type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, usize, C> where Self: 'this;
-    type EdgesToIter<'this> = BTSPredecessors<'this, A, C>
-    where
-        Self: 'this;
-    fn predecessors<Idx: Indexes<Self>>(&self, _state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        unimplemented!("Due to a recent change in the implementation of `MutableTs`, this method is not yet implemented.")
-    }
-}
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn predecessor_iterable() {
+        use crate::prelude::*;
 
-/// Iterator over the predecessors of a state in a BTS.
-#[derive(Clone)]
-pub struct BTSPredecessors<'a, A: Alphabet, C: Color> {
-    it: std::slice::Iter<'a, (usize, A::Expression, C)>,
-    state: usize,
-}
-
-impl<'a, A: Alphabet, C: Color> Iterator for BTSPredecessors<'a, A, C> {
-    type Item = EdgeReference<'a, A::Expression, usize, C>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.it
-            .next()
-            .map(|(s, e, c)| EdgeReference::new(*s, e, c, self.state))
-    }
-}
-
-impl<'a, A: Alphabet, C: Color> BTSPredecessors<'a, A, C> {
-    /// Creates a new instance from an iterator and a state.
-    pub fn new(it: std::slice::Iter<'a, (usize, A::Expression, C)>, state: usize) -> Self {
-        Self { it, state }
+        let ts = TSBuilder::without_state_colors()
+            .with_transitions([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (2, 'a', 0)])
+            .into_dts();
+        assert_eq!(
+            ts.predecessors(0).unwrap().collect::<Vec<_>>(),
+            vec![(0, 'b', 0), (1, 'a', 0), (2, 'a', 0)]
+        );
     }
 }

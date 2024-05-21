@@ -311,7 +311,9 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     }
     /// Turns `self` into a [`RightCongruence`] with the given initial state. Panics if `self` is not deterministic.
     pub fn into_right_congruence(self, initial: usize) -> RightCongruence<CharAlphabet, Q, C> {
-        RightCongruence::from_ts(self.into_linked_list_deterministic().with_initial(initial))
+        self.into_dts()
+            .with_initial(initial)
+            .collect_right_congruence()
     }
     /// Build a deterministic transition system from `self` and set the given `initial` state as the
     /// designated initial state of the output object. Panics if `self` is not deterministic.
@@ -383,11 +385,10 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     /// Turns `self` into a [`RightCongruence`] with the given initial state while also erasing all state and edge
     /// colors. Panics if `self` is not deterministic.
     pub fn into_right_congruence_bare(self, initial: usize) -> RightCongruence<CharAlphabet> {
-        RightCongruence::from_ts(
-            self.into_linked_list_deterministic()
-                .with_initial(initial)
-                .erase_state_colors()
-                .erase_edge_colors(),
-        )
+        self.into_linked_list_deterministic()
+            .with_initial(initial)
+            .erase_state_colors()
+            .erase_edge_colors()
+            .collect_right_congruence()
     }
 }

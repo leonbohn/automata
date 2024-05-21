@@ -13,27 +13,6 @@ impl<S: Show> Show for Class<S> {
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color> Indexes<RightCongruence<A, Q, C>> for Class<A::Symbol> {
-    #[inline(always)]
-    fn to_index(
-        &self,
-        ts: &RightCongruence<A, Q, C>,
-    ) -> Option<<RightCongruence<A, Q, C> as TransitionSystem>::StateIndex> {
-        ts.class_to_index(self).or(ts.reached_state_index(self))
-    }
-}
-impl<'a, A: Alphabet, Q: Color, C: Color> Indexes<RightCongruence<A, Q, C>>
-    for &'a Class<A::Symbol>
-{
-    #[inline(always)]
-    fn to_index(
-        &self,
-        ts: &RightCongruence<A, Q, C>,
-    ) -> Option<<RightCongruence<A, Q, C> as TransitionSystem>::StateIndex> {
-        Class::to_index(self, ts)
-    }
-}
-
 impl<S> Class<S> {
     /// Creates an instance of the empty class
     pub fn epsilon() -> Self {
