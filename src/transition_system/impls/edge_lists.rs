@@ -358,6 +358,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
 
     fn edges_from<X: Indexes<Self>>(&self, state: X) -> Option<Self::EdgesFromIter<'_>> {
         let q = state.to_index(self)?;
+        if !self.contains_state(q) {
+            return None;
+        }
         Some(EdgesFrom::new(q, self.states.get(&q).unwrap().edges.iter()))
     }
     type EdgesFromIter<'this> = EdgesFrom<'this, A::Expression, C> where Self: 'this;
@@ -707,6 +710,64 @@ where
 {
     fn drop(&mut self) {
         debug!("Not really sure how to handle dropping of ExtractAllEdgeTuples. Basically all the drop method is called for each ExtractEdgeTuplesFrom, so we should probably be fine. Or not. Who knows.");
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
+    for EdgeLists<A, Q, C, DET>
+{
+    type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, usize, C> where Self: 'this;
+    type EdgesToIter<'this> = EdgeListsPredecessors<'this, A, Q, C, DET>
+    where
+        Self: 'this;
+    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
+        let target = state.to_index(self)?;
+        let mut it = self.states.keys();
+        Some(EdgeListsPredecessors {
+            idx: it.next().cloned(),
+            inner_pos: 0,
+            target,
+            it,
+            elp: self,
+        })
+    }
+}
+
+/// Iterator over the predecessors of a state in a BTS.
+#[derive(Clone)]
+pub struct EdgeListsPredecessors<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> {
+    idx: Option<usize>,
+    inner_pos: usize,
+    target: usize,
+    it: std::collections::btree_map::Keys<'a, usize, MutableTsState<A, Q, C>>,
+    elp: &'a EdgeLists<A, Q, C, DET>,
+}
+
+impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> Iterator
+    for EdgeListsPredecessors<'a, A, Q, C, DET>
+{
+    type Item = EdgeReference<'a, A::Expression, usize, C>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        'outer: loop {
+            let q = self.idx?;
+            let Some(state) = self.elp.states.get(&q) else {
+                panic!("State with index {} does not exist", q);
+            };
+
+            loop {
+                let Some((e, c, p)) = state.edges.get(self.inner_pos) else {
+                    self.inner_pos = 0;
+                    self.idx = self.it.next().cloned();
+                    continue 'outer;
+                };
+
+                self.inner_pos += 1;
+                if *p == self.target {
+                    return Some(EdgeReference::new(q, e, c, *p));
+                }
+            }
+        }
     }
 }
 

@@ -28,6 +28,8 @@ pub use with_initial::{WithInitial, WithoutCondition};
 mod semantics;
 pub use semantics::{FiniteSemantics, OmegaSemantics, Semantics};
 
+mod deterministic;
+
 /// Type alias for an omega word automaton, like [`DBA`], [`DMA`], [`DPA`] or [`DRA`].
 pub type InfiniteWordAutomaton<A, Z, Q, C, const DET: bool = true, D = TS<A, Q, C, DET>> =
     Automaton<A, Z, Q, C, D, true, DET>;

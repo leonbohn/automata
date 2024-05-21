@@ -1,15 +1,14 @@
 use crate::prelude::*;
-use std::{fmt::Debug, hash::Hash};
 
 /// A family of right congruences (FORC) consists of a *leading* right congruence and for each
 /// class of this congruence a *progress* right congruence.
 #[derive(Clone)]
-pub struct FORC<A: Alphabet, Q = Void, C = Void> {
+pub struct FORC<A: Alphabet, Q: Color = Void, C: Color = Void> {
     pub(crate) leading: RightCongruence<A>,
     pub(crate) progress: math::Map<usize, RightCongruence<A, Q, C>>,
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone> FORC<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> FORC<A, Q, C> {
     /// Creates a new FORC with the given leading congruence and progress congruences.
     pub fn new(
         leading: RightCongruence<A>,
@@ -60,23 +59,15 @@ impl<A: Alphabet, Q: Clone, C: Clone> FORC<A, Q, C> {
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Eq + Debug, C: Hash + Eq + Debug> PartialEq
-    for FORC<A, Q, C>
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.leading.eq(&other.leading)
-            && self.progress.len() == other.progress.len()
-            && self
-                .progress
-                .iter()
-                .zip(other.progress.iter())
-                .all(|((li, lts), (ri, rts))| li == ri && lts == rts)
+impl<A: Alphabet + PartialEq, Q: Color + Eq, C: Color + Eq> PartialEq for FORC<A, Q, C> {
+    fn eq(&self, _other: &Self) -> bool {
+        todo!()
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Eq + Debug, C: Hash + Eq + Debug> Eq for FORC<A, Q, C> {}
+impl<A: Alphabet + PartialEq, Q: Color + PartialEq, C: Color + PartialEq> Eq for FORC<A, Q, C> {}
 
-impl<A: Alphabet, Q: Clone + Debug, C: Clone + Debug> std::fmt::Debug for FORC<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> std::fmt::Debug for FORC<A, Q, C> {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // use owo_colors::OwoColorize;
         // write!(f, "{}\n{:?}", "LEADING".bold(), self.leading())?;
