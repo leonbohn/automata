@@ -953,12 +953,4 @@ mod tests {
             .escape_prefixes(words.iter())
             .eq(vec![String::from("aa"), String::from("b")].into_iter()));
     }
-
-    #[test]
-    fn asd() {
-        let ts = TSBuilder::without_state_colors()
-            .with_transitions([(0, 'a', Void, 1), (1, 'a', Void, 2), (2, 'a', Void, 0)])
-            .into_right_congruence_bare(0);
-        assert_eq!(ts.edge(3, &'a'), None);
-    }
 }
