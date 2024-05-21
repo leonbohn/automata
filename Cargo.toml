@@ -16,6 +16,9 @@ readme = "README.md"
 version = "0.1.0"
 edition = "2021"
 
+[package.metadata.docs.rs]
+rustdoc-args = ["--html-in-header", "./docs-header.html"]
+
 [dependencies]
 tracing = "0.1"
 tracing-subscriber = "0.3"
