@@ -20,24 +20,40 @@ edition = "2021"
 rustdoc-args = ["--html-in-header", "./docs-header.html"]
 
 [dependencies]
+# this is basis for implementation of transition system
+petgraph = { version = "0.6.5", optional = true }
+# map/set that have ordered elements
+indexmap = "2.2"
+# for representing a bijection/renaming
+bimap = "0.6"
+# logging messages
 tracing = "0.1"
 tracing-subscriber = "0.3"
-fxhash = "0.2"
+# iterator convenience methods
 itertools = "0.13.0"
+# creating ascii tables
 tabled = { version = "0.15", features = ["ansi"] }
+# coloring for terminal
 owo-colors = "4.0"
-test-log = { version = "0.2", features = ["trace"] }
+# feature graphviz
 tempfile = { version = "3.10", optional = true }
-paste = "1.0"
+# feature hoa | BDD representation of propositional hoa expressions
 biodivine-lib-bdd = { version = "0.5", optional = true }
-bit-set = "0.5"
-bimap = "0.6"
-fastrand = { version = "2", optional = true }
+# feature hoa | representation of acceptance mask
+# feature hoa | parsing of HOA files
 hoars = { version = "0.2", optional = true }
+bit-set = "0.5"
+# feature random | generation of random automata
+fastrand = { version = "2", optional = true }
+# argument parser for binary
 clap = { version = "4.5", optional = true }
+# TODO: decide if we want macro goodness or not and then implement it or remove dependency
+paste = "1.0"
+
 
 [features]
-default = ["hoa", "graphviz", "random", "minimize"]
+default = ["hoa", "graphviz", "random", "minimize", "petgraph"]
+petgraph = ["dep:petgraph"]
 random = ["fastrand"]
 minimize = []
 hoa = ["dep:hoars", "biodivine-lib-bdd"]
@@ -46,6 +62,8 @@ oai-bin = ["clap"]
 linked_list_ts = []
 
 [dev-dependencies]
+# for test_log macro that initialises logger in tests 
+test-log = { version = "0.2", features = ["trace"] }
 lazy_static = "1.4"
 criterion = { version = "0.5", features = ["html_reports"] }
 # iai = { git = "https://github.com/sigaloid/iai", rev = "6c83e942" }
