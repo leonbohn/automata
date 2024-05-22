@@ -80,14 +80,12 @@ where
         self.monoid().profile_indices()
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        Some(DeterministicEdgesFrom::new(self, state.to_index(self)?))
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        Some(DeterministicEdgesFrom::new(self, state))
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        self.monoid()
-            .get_profile(state.to_index(self)?)
-            .map(|p| p.0.clone())
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        self.monoid().get_profile(state).map(|p| p.0.clone())
     }
 }
 
@@ -97,10 +95,10 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
-    fn edge<Idx: Indexes<Self>>(
+    fn edge(
         &self,
-        _state: Idx,
-        _matcher: impl Matcher<EdgeExpression<Self>>,
+        state: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         // let idx = state.to_index(self)?;
         // let (_tp, string) = self.monoid().get_profile(idx)?;
@@ -195,14 +193,13 @@ where
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.monoid().profile_indices()
     }
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        Some(DeterministicEdgesFrom::new(self, state.to_index(self)?))
+
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        Some(DeterministicEdgesFrom::new(self, state))
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        self.monoid()
-            .get_profile(state.to_index(self)?)
-            .map(|p| p.0.clone())
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        self.monoid().get_profile(state).map(|p| p.0.clone())
     }
 }
 
@@ -212,10 +209,10 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
-    fn edge<Idx: Indexes<Self>>(
+    fn edge(
         &self,
-        _state: Idx,
-        _matcher: impl Matcher<EdgeExpression<Self>>,
+        state: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         // let idx = state.to_index(self)?;
         // let (_tp, string) = self.monoid().get_profile(idx)?;

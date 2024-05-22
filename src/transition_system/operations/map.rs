@@ -100,11 +100,10 @@ where
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        let index = state.to_index(self)?;
+    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
         Some(MappedEdgesToIter::new(
-            self.ts().predecessors(index).unwrap(),
-            index,
+            self.ts().predecessors(state).unwrap(),
+            state,
             self.f(),
         ))
     }
@@ -215,18 +214,14 @@ where
         self.ts().state_indices()
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         self.ts().state_color(state)
     }
 
-    fn edges_from<Idx: crate::transition_system::Indexes<Self>>(
-        &self,
-        state: Idx,
-    ) -> Option<Self::EdgesFromIter<'_>> {
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         Some(MapEdgesSuccessorsIter {
-            it: self.ts().edges_from(state.to_index(self)?)?,
-            source: state.to_index(self)?,
+            it: self.ts().edges_from(state)?,
+            source: state,
             f: self.f(),
             _old_color: PhantomData,
         })
@@ -310,14 +305,13 @@ where
         self.ts().state_indices()
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         self.ts().state_color(state)
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         Some(MappedEdgesFromIter::new(
-            self.ts().edges_from(state.to_index(self)?)?,
+            self.ts().edges_from(state)?,
             self.f(),
         ))
     }
@@ -526,15 +520,13 @@ where
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.ts().state_indices()
     }
-
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         let color = self.ts().state_color(state)?;
         Some((self.f())(color))
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        self.ts().edges_from(state.to_index(self)?)
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        self.ts().edges_from(state)
     }
 
     fn maybe_initial_state(&self) -> Option<Self::StateIndex> {

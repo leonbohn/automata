@@ -21,7 +21,7 @@ pub trait Shrinkable: TransitionSystem {
     /// assert_eq!(ts.remove_state(q1), Some(true));
     /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
     /// ```
-    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor>;
+    fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor>;
 
     /// Removes all transitions originating in and a given state whose expression is matched by the given [`Matcher`].
     /// Returns a [`Vec`] of [`EdgeTuple`]s that were removed, if the state exists and `None` otherwise.
@@ -41,7 +41,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     fn remove_edges_from_matching(
         &mut self,
-        source: impl Indexes<Self>,
+        source: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<EdgeTuple<Self>>>;
 
@@ -67,8 +67,8 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     fn remove_edges_between_matching(
         &mut self,
-        source: impl Indexes<Self>,
-        target: impl Indexes<Self>,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<EdgeTuple<Self>>>;
 
@@ -93,8 +93,8 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     fn remove_edges_between(
         &mut self,
-        source: impl Indexes<Self>,
-        target: impl Indexes<Self>,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
     ) -> Option<Vec<EdgeTuple<Self>>>;
 
     /// Removes all edges originating in a given state. Returns a [`Vec`] of [`EdgeTuple`]s that were removed,
@@ -118,7 +118,7 @@ pub trait Shrinkable: TransitionSystem {
     /// assert_eq!(ts.reached_state_index_from(q0, "b"), None);
     /// assert_eq!(ts.reached_state_index_from(q1, "a"), Some(q0));
     /// ```
-    fn remove_edges_from(&mut self, source: impl Indexes<Self>) -> Option<Vec<EdgeTuple<Self>>>;
+    fn remove_edges_from(&mut self, source: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>>;
 
     /// Removes all edges going into a state. Returns a [`Vec`] of [`EdgeTuple`]s that were removed,
     /// if the state exists and `None` otherwise.
@@ -139,5 +139,5 @@ pub trait Shrinkable: TransitionSystem {
     /// assert_eq!(ts.remove_edges_to(q0).unwrap().len(), 0);
     /// assert_eq!(ts.remove_edges_to(2), None);
     /// ```
-    fn remove_edges_to(&mut self, target: impl Indexes<Self>) -> Option<Vec<EdgeTuple<Self>>>;
+    fn remove_edges_to(&mut self, target: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>>;
 }

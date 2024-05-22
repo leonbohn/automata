@@ -130,14 +130,12 @@ impl<Ts: TransitionSystem, P: ProvidesStateColor<Ts::StateIndex>> TransitionSyst
         self.ts.state_indices()
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        let state = state.to_index(self)?;
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         self.ts.edges_from(state)
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let idx = state.to_index(self)?;
-        Some(self.provider.state_color(idx))
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        Some(self.provider.state_color(state))
     }
 }
 

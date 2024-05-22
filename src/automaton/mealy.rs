@@ -142,7 +142,7 @@ mod tests {
             .into_linked_list_deterministic()
             .with_initial(0)
             .collect_mealy();
-        let mm2: MealyMachine = LinkedListNondeterministic::builder()
+        let mm2: MealyMachine = TSBuilder::without_state_colors()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),
@@ -155,7 +155,7 @@ mod tests {
             .into_linked_list_deterministic()
             .with_initial(0)
             .collect_mealy();
-        let _mm3: MealyMachine = LinkedListNondeterministic::builder()
+        let _mm3: MealyMachine = TSBuilder::without_state_colors()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),

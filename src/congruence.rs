@@ -162,12 +162,11 @@ where
     ///
     /// assert!(dfa.equivalent(ts.looping_words(0)));
     /// ```
-    pub fn looping_words<Idx: Indexes<Self>>(&self, class: Idx) -> DFA<A> {
-        let idx = class.to_index(self).unwrap();
+    pub fn looping_words(&self, state: StateIndex<Self>) -> DFA<A> {
         self.ts()
-            .with_initial(idx)
+            .with_initial(state)
             .with_state_color(DefaultIfMissing::new(
-                [(idx, true)].into_iter().collect(),
+                [(state, true)].into_iter().collect(),
                 false,
             ))
             .collect_dfa()
@@ -180,28 +179,21 @@ where
 
     /// Verifies whether an element of `self` is  idempotent, i.e. if the mr of the indexed
     /// class is u, then it should be that uu ~ u.
-    pub fn is_idempotent<I: Indexes<Self>>(&self, elem: I) -> bool {
-        let Some(idx) = elem.to_index(self) else {
-            panic!("is_idempotent called for non-existent index");
+    pub fn is_idempotent(&self, state: StateIndex<Self>) -> bool {
+        assert!(self.contains_state_index(state));
+        let Some(mr) = self.state_to_mr(state) else {
+            panic!("The class {} is not labeled!", state);
         };
-        let Some(mr) = self.state_to_mr(idx) else {
-            panic!("The class {} is not labeled!", idx.show());
-        };
-        if let Some(q) = self.get(elem) {
-            self.reached_state_index_from(q, mr) == Some(q)
-        } else {
-            false
-        }
+        self.reached_state_index_from(state, mr) == Some(state)
     }
 
     /// Returns the [`Class`] that is referenced by `index`.
     #[inline(always)]
-    pub fn state_to_mr<Idx: Indexes<Self>>(
+    pub fn state_to_mr(
         &self,
-        index: Idx,
+        state: StateIndex<Self>,
     ) -> Option<&MinimalRepresentative<A::Symbol>> {
-        let idx = index.to_index(self)?;
-        self.minimal_representatives().get_by_left(&idx)
+        self.minimal_representatives().get_by_left(&state)
     }
 
     #[inline(always)]

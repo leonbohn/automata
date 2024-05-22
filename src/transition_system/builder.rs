@@ -2,13 +2,11 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::{
-    congruence::RightCongruence, prelude::*, transition_system::LinkedListNondeterministic, Void,
-};
+use crate::{congruence::RightCongruence, prelude::*, Void};
 
 use self::math::Set;
 
-use super::{impls::linked::LinkedListTransitionSystem, IntoEdgeTuple};
+use super::IntoEdgeTuple;
 
 /// Helper struct for the construction of non-deterministic transition systems. It stores a list of edges, a list of colors and a default color.
 /// This can also be used to construct deterministic transition systems, deterministic parity automata and Mealy machines.
@@ -111,47 +109,6 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
             .fold(self, |acc, (i, x)| acc.color(i, x))
     }
 
-    /// Creates an instance of a non-deterministic transition edge lists backed system from `self`.
-    pub fn into_edge_lists_nondeterministic(self) -> EdgeListsNondeterministic<CharAlphabet, Q, C>
-    where
-        C: Hash + Eq,
-    {
-        let alphabet =
-            CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
-
-        let num_states = self
-            .edges
-            .iter()
-            .flat_map(|(q, _, _, p)| [*p, *q])
-            .unique()
-            .count();
-        let mut ts = EdgeListsNondeterministic::for_alphabet_size_hint(alphabet, (num_states, 0));
-
-        let mut created_states_number = 0;
-        for i in 0..num_states {
-            if self.colors.iter().all(|(q, _)| *q != i) && self.default.is_none() {
-                panic!(
-                    "Default is needed as some states (specifically {}) have no color",
-                    i.show()
-                );
-            }
-
-            ts.add_state(
-                self.colors
-                    .iter()
-                    .find_map(|(q, c)| if *q == i { Some(c.clone()) } else { None })
-                    .unwrap_or_else(|| self.default.clone().unwrap()),
-            );
-            created_states_number += 1;
-        }
-        assert_eq!(created_states_number, num_states);
-
-        for (q, e, c, p) in self.edges {
-            ts.add_edge((q, e, c, p));
-        }
-        ts
-    }
-
     /// Assigns the given `color` to the state with the given index `idx`.
     pub fn color(mut self, idx: usize, color: Q) -> Self {
         assert!(self.colors.iter().all(|(q, _c)| q != &idx));
@@ -179,7 +136,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
     pub fn with_transitions<
-        E: IntoEdgeTuple<LinkedListTransitionSystem<CharAlphabet, Q, C>>,
+        E: IntoEdgeTuple<TS<CharAlphabet, Q, C, DET>>,
         T: IntoIterator<Item = E>,
     >(
         mut self,
@@ -216,10 +173,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     ///     .with_edges([(1, 'b', 0)]) // We can also skip the `Void` entry at position 3
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
-    pub fn with_edges<
-        E: IntoEdgeTuple<LinkedListTransitionSystem<CharAlphabet, Q, C>>,
-        I: IntoIterator<Item = E>,
-    >(
+    pub fn with_edges<E: IntoEdgeTuple<TS<CharAlphabet, Q, C, DET>>, I: IntoIterator<Item = E>>(
         mut self,
         iter: I,
     ) -> Self {
@@ -228,42 +182,8 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         self
     }
 
-    /// Collects self into a non-deterministic transition system.
-    pub fn into_linked_list_nondeterministic(
-        self,
-    ) -> LinkedListNondeterministic<CharAlphabet, Q, C> {
-        let alphabet =
-            CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
-        let num_states = self
-            .edges
-            .iter()
-            .flat_map(|(q, _, _, p)| [*p, *q])
-            .unique()
-            .count();
-        let mut ts = LinkedListNondeterministic::for_alphabet_size_hint(alphabet, (num_states, 0));
-        let colors_it = (0..num_states).map(|x| {
-            if let Some(color) =
-                self.colors
-                    .iter()
-                    .find_map(|(q, c)| if *q == x { Some(c.clone()) } else { None })
-            {
-                color
-            } else {
-                self.default.clone().unwrap_or_else(|| {
-                    panic!(
-                        "Default is needed as some states (specifically {}) have no color",
-                        x.show()
-                    )
-                })
-            }
-        });
-        let created_states_number = ts.extend_states(colors_it).count();
-        assert_eq!(created_states_number, num_states);
-
-        for edge in self.edges {
-            ts.add_edge(edge);
-        }
-        ts
+    fn into_ts(self) -> TS<CharAlphabet, Q, C, DET> {
+        todo!()
     }
 }
 
@@ -298,16 +218,9 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     }
 
     /// Build a deterministic transition system from `self`. Panics if `self` is not deterministic.
-    pub fn into_linked_list_deterministic(self) -> LinkedListTransitionSystem<CharAlphabet, Q, C> {
+    pub fn into_dts(self) -> DTS<CharAlphabet, Q, C> {
         self.into_linked_list_nondeterministic()
             .into_deterministic()
-    }
-    /// Creates an instance of a deterministic transition edge lists backed system from `self`.
-    pub fn into_edge_lists_deterministic(self) -> EdgeLists<CharAlphabet, Q, C>
-    where
-        C: Hash + Eq,
-    {
-        self.into_edge_lists_nondeterministic().into_deterministic()
     }
     /// Turns `self` into a [`RightCongruence`] with the given initial state. Panics if `self` is not deterministic.
     pub fn into_right_congruence(self, initial: usize) -> RightCongruence<CharAlphabet, Q, C> {
@@ -317,21 +230,8 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     }
     /// Build a deterministic transition system from `self` and set the given `initial` state as the
     /// designated initial state of the output object. Panics if `self` is not deterministic.
-    pub fn into_linked_list_deterministic_with_initial(
-        self,
-        initial: usize,
-    ) -> WithInitial<LinkedListTransitionSystem<CharAlphabet, Q, C>> {
+    pub fn into_dts_with_initial(self, initial: usize) -> WithInitial<DTS<CharAlphabet, Q, C>> {
         self.into_linked_list_deterministic().with_initial(initial)
-    }
-    /// Creates an instance of a deterministic transition edge lists backed system from `self`.
-    pub fn into_edge_lists_deterministic_with_initial(
-        self,
-        initial: usize,
-    ) -> WithInitial<EdgeListsDeterministic<CharAlphabet, Q, C>>
-    where
-        C: Hash + Eq,
-    {
-        self.into_edge_lists_deterministic().with_initial(initial)
     }
 }
 

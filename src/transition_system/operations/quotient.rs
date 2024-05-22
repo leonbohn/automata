@@ -186,34 +186,30 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
     fn state_indices(&self) -> Self::StateIndices<'_> {
         0..self.partition.len()
     }
-
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         let it = self.class_iter_by_id(state)?;
         it.map(|o| self.ts.state_color(o)).collect()
     }
-
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        if self.partition.len() <= state.to_index(self)? {
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        if self.partition.len() <= state {
             None
         } else {
             Some(QuotientEdgesFrom::new(
                 self,
                 self.alphabet().universe(),
-                state.to_index(self)?,
+                state,
             ))
         }
     }
 }
 impl<D: Deterministic> Deterministic for Quotient<D> {
-    fn edge<Idx: Indexes<Self>>(
+    fn edge(
         &self,
-        state: Idx,
+        state: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let origin = state.to_index(self)?;
         let (states, colors): (math::Set<_>, Vec<_>) = self
-            .class_iter_by_id(origin)?
+            .class_iter_by_id(state)?
             .filter_map(|q| {
                 self.ts.edge(q, &matcher).map(|tt| {
                     (
@@ -239,7 +235,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
                     })
                     .unwrap();
                 Some(QuotientTransition {
-                    source: origin,
+                    source: state,
                     expression,
                     colors,
                     target: states.into_iter().next().unwrap(),
@@ -250,7 +246,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
                     "{{{}}}",
                     states.iter().map(|idx| idx.to_string()).join(", ")
                 );
-                panic!("From {origin}|{} with matcher {:?}, we reach {} while precisely one state should be reached!", self.class_iter_by_id(origin).unwrap().map(|c| c.show()).join(", "), matcher, string)
+                panic!("From {state}|{} with matcher {:?}, we reach {} while precisely one state should be reached!", self.class_iter_by_id(state).unwrap().map(|c| c.show()).join(", "), matcher, string)
             }
         }
     }

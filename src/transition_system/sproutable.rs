@@ -299,15 +299,11 @@ pub trait Sproutable: TransitionSystem {
     /// Sets the color of the state with the given index. If the state does not exist, the method
     /// should panic. Usually, we would like to avoid recoloring states individually, and instead
     /// use the [`TransitionSystem::map_state_colors`] method.
-    fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
-        &mut self,
-        index: Idx,
-        color: X,
-    );
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>);
 
     /// Sets the state color of the initial state. This method is only available for a ts if it
     /// is [`Pointed`] and it simply obtains the initial state and subsequetly [sets its color](`Self::set_state_color`).
-    fn set_initial_color<X: Into<StateColor<Self>>>(&mut self, color: X)
+    fn set_initial_color(&mut self, color: StateColor<Self>)
     where
         Self: Pointed,
     {
@@ -317,11 +313,11 @@ pub trait Sproutable: TransitionSystem {
 
 #[cfg(test)]
 mod tests {
-    use crate::{prelude::*, transition_system::LinkedListNondeterministic};
+    use crate::prelude::*;
 
     #[test]
     fn for_alphabet_inference() {
-        let mut ts = LinkedListTransitionSystem::for_alphabet(CharAlphabet::of_size(3));
+        let mut ts = DTS::for_alphabet(CharAlphabet::of_size(3));
         assert_eq!(ts.alphabet().size(), 3);
 
         let q0 = ts.add_state(false);
@@ -333,7 +329,7 @@ mod tests {
 
     #[test]
     fn sprout_after_creating() {
-        let mut ts = LinkedListTransitionSystem::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+        let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
         let q0 = ts.add_state(false);
         let q1 = ts.add_state(true);
         assert_eq!(ts.edge(q0, 'a'), None);
@@ -343,7 +339,7 @@ mod tests {
 
     #[test]
     fn complete_ts() {
-        let mut partial = LinkedListNondeterministic::builder()
+        let mut partial = TS::builder()
             .default_color(())
             .with_transitions([
                 (0, 'a', 0, 0),

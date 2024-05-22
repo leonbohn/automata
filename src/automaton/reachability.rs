@@ -32,7 +32,7 @@ impl<C> FiniteSemantics<bool, C> for ReachabilityCondition {
 }
 
 /// A deterministic finite automaton (DFA) is a deterministic automaton with a simple acceptance condition. It accepts a finite word if it reaches an accepting state.
-pub type DFA<A = CharAlphabet, C = Void, D = LinkedListTransitionSystem<A, bool, C>> =
+pub type DFA<A = CharAlphabet, C = Void, D = DTS<A, bool, C>> =
     FiniteWordAutomaton<A, ReachabilityCondition, bool, C, true, D>;
 
 /// Helper trait for creating a [`DFA`] from a given transition system.
@@ -171,19 +171,20 @@ where
     /// Attempts to separate the state `left` from the state `right` by finding a word that leads to different colors.
     /// For a [`DFA`], this means that the returned word is in the symmetric difference of
     /// the languages accepted by the two states.
-    pub fn separate<X, Y>(&self, left: X, right: Y) -> Option<Vec<SymbolOf<Self>>>
-    where
-        X: Indexes<Self>,
-        Y: Indexes<Self>,
-    {
-        let q = left.to_index(self)?;
-        let p = right.to_index(self)?;
-        if p == q {
+    pub fn separate(
+        &self,
+        left: StateIndex<Self>,
+        right: StateIndex<Self>,
+    ) -> Option<Vec<SymbolOf<Self>>> {
+        if left == right {
+            return None;
+        }
+        if !self.contains_state_index(left) || !self.contains_state_index(right) {
             return None;
         }
 
-        self.with_initial(q)
-            .ts_product(self.with_initial(p))
+        self.with_initial(left)
+            .ts_product(self.with_initial(right))
             .minimal_representatives()
             .find_map(|(rep, ProductIndex(l, r))| {
                 if self.state_color(l).unwrap() != self.state_color(r).unwrap() {

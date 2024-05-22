@@ -151,21 +151,18 @@ where
     /// Gives a witness for the fact that `left` and `right` are not language-equivalent. This is
     /// done by finding a separating word, i.e. a word that is accepted from one of the two states
     /// but not by the other.
-    pub fn separate<X, Y>(&self, left: X, right: Y) -> Option<ReducedOmegaWord<SymbolOf<Self>>>
-    where
-        X: Indexes<Self>,
-        Y: Indexes<Self>,
-    {
-        let p = left.to_index(self)?;
-        let q = right.to_index(self)?;
-
-        if p == q {
+    pub fn separate(
+        &self,
+        left: StateIndex<Self>,
+        right: StateIndex<Self>,
+    ) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
+        if left == right {
             return None;
         }
 
-        self.with_initial(p)
+        self.with_initial(left)
             .into_dpa()
-            .witness_inequivalence(&self.with_initial(q).into_dpa())
+            .witness_inequivalence(&self.with_initial(right).into_dpa())
     }
 
     /// Computes a [`Partition`] of the state indices of `self` such that any two states in the
@@ -372,12 +369,8 @@ where
     {
         let start = std::time::Instant::now();
 
-        let (mut ts, _initial) = self
-            .with_initial(self.initial)
-            .collect_edge_lists_deterministic_pointed();
-        let out = self
-            .with_initial(self.initial)
-            .collect_linked_list_deterministic_pointed();
+        let (mut ts, _initial) = self.with_initial(self.initial).collect_dts_pointed();
+        let (out, initial) = self.with_initial(self.initial).collect_dts_pointed();
 
         let mut recoloring = Vec::new();
         let mut remove_states = Vec::new();
@@ -413,10 +406,10 @@ where
                         for edge in ts.edges_from(*state).unwrap() {
                             trace!(
                                 "recolouring and removing {} --{}|{}--> {} with priority {}",
-                                state.show(),
+                                state,
                                 edge.expression().show(),
                                 edge.color().show(),
-                                edge.target().show(),
+                                edge.target(),
                                 priority
                             );
                             recoloring.push(((*state, edge.expression().clone()), priority));
@@ -447,10 +440,10 @@ where
                 {
                     trace!(
                         "recolouring and removing {} --{}|{}--> {} with priority {}",
-                        q.show(),
+                        q,
                         a.show(),
                         c.show(),
-                        p.show(),
+                        p,
                         priority
                     );
                     recoloring.push(((*q, a.clone()), priority));
@@ -464,7 +457,6 @@ where
         }
 
         let ret = out
-            .0
             .map_edge_colors_full(|q, e, _, _| {
                 let Some(c) = recoloring
                     .iter()
@@ -475,7 +467,7 @@ where
                 };
                 c
             })
-            .with_initial(out.1)
+            .with_initial(initial)
             .collect_dpa();
 
         info!("normalizing DPA took {} μs", start.elapsed().as_micros());
@@ -492,7 +484,7 @@ mod tests {
 
     #[test_log::test]
     fn normalize_dpa() {
-        let dpa = LinkedListNondeterministic::builder()
+        let dpa = TS::builder()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 2, 0),
@@ -514,7 +506,7 @@ mod tests {
     }
 
     fn example_dpa() -> DPA {
-        LinkedListNondeterministic::builder()
+        TS::builder()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 0, 0),
@@ -545,7 +537,7 @@ mod tests {
     #[test_log::test]
     fn dpa_equivalences() {
         let good = [
-            LinkedListNondeterministic::builder()
+            TS::builder()
                 .default_color(())
                 .with_transitions([
                     (0, 'a', 0, 1),
@@ -556,7 +548,7 @@ mod tests {
                 .into_linked_list_deterministic()
                 .with_initial(0)
                 .collect_dpa(),
-            LinkedListNondeterministic::builder()
+            TS::builder()
                 .default_color(())
                 .with_transitions([
                     (0, 'a', 5, 1),
@@ -571,19 +563,19 @@ mod tests {
                 .collect_dpa(),
         ];
         let bad = [
-            LinkedListNondeterministic::builder()
+            TS::builder()
                 .default_color(())
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 0, 0)])
                 .into_linked_list_deterministic()
                 .with_initial(0)
                 .collect_dpa(),
-            LinkedListNondeterministic::builder()
+            TS::builder()
                 .default_color(())
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 2, 0)])
                 .into_linked_list_deterministic()
                 .with_initial(0)
                 .collect_dpa(),
-            LinkedListNondeterministic::builder()
+            TS::builder()
                 .default_color(())
                 .with_transitions([
                     (0, 'a', 4, 1),
@@ -612,7 +604,7 @@ mod tests {
 
     #[test]
     fn dpa_run() {
-        let dpa = LinkedListNondeterministic::builder()
+        let dpa = TS::builder()
             .with_transitions([
                 (0, 'a', 1, 1),
                 (0, 'b', 1, 0),
@@ -628,13 +620,13 @@ mod tests {
 
     #[test]
     fn dpa_inclusion() {
-        let univ = LinkedListNondeterministic::builder()
+        let univ = TS::builder()
             .default_color(())
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 2, 0)])
             .into_linked_list_deterministic()
             .with_initial(0)
             .collect_dpa();
-        let aomega = LinkedListNondeterministic::builder()
+        let aomega = TS::builder()
             .default_color(())
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
             .into_linked_list_deterministic()
@@ -646,7 +638,7 @@ mod tests {
 
     #[test_log::test]
     fn dpa_equivalence_clases() {
-        let dpa = LinkedListNondeterministic::builder()
+        let dpa = TS::builder()
             .with_transitions([
                 (0, 'a', 0, 1),
                 (0, 'b', 1, 0),
@@ -663,7 +655,7 @@ mod tests {
         assert!(cong.congruent("", "aa"));
         assert!(cong.congruent("ab", "baaba"));
 
-        let dpa = LinkedListNondeterministic::builder()
+        let dpa = TS::builder()
             .with_transitions([
                 (0, 'a', 0, 0),
                 (0, 'b', 0, 1),

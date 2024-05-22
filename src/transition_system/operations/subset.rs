@@ -58,16 +58,15 @@ pub struct SubsetConstruction<Ts: TransitionSystem> {
 }
 
 impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
-    fn edge<Idx: Indexes<Self>>(
+    fn edge(
         &self,
-        state: Idx,
+        state: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let source = state.to_index(self)?;
         let (colorset, stateset): (Vec<Ts::EdgeColor>, StateSet<Ts>) = self
             .states
             .borrow()
-            .get(source)?
+            .get(state)?
             .iter()
             .flat_map(|q| {
                 self.ts.edges_from(*q).unwrap().filter_map(|tt| {
@@ -86,12 +85,12 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
             .unwrap();
 
         if let Some(pos) = self.states.borrow().iter().position(|s| stateset.eq(s)) {
-            return Some(TransitionOwnedColor::new(source, expression, colorset, pos));
+            return Some(TransitionOwnedColor::new(state, expression, colorset, pos));
         }
 
         self.states.borrow_mut().push(stateset);
         Some(TransitionOwnedColor::new(
-            source,
+            state,
             expression,
             colorset,
             self.states.borrow().len(),
@@ -134,12 +133,11 @@ impl<Ts: TransitionSystem> TransitionSystem for SubsetConstruction<Ts> {
         self.reachable_state_indices_from(self.initial())
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         Some(DeterministicEdgesFrom::new(self, state.to_index(self)?))
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         let Some(color) = self.states.borrow().get(state).map(|q| {
             q.iter()
                 .map(|idx| {
@@ -208,7 +206,7 @@ mod tests {
 
     #[test]
     fn subset_construction() {
-        let nts = LinkedListNondeterministic::builder()
+        let nts = NTS::builder()
             .default_color(false)
             .with_transitions([
                 (0, 'a', 0),

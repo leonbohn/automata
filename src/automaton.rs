@@ -67,8 +67,8 @@ pub struct Automaton<
     acceptance: Z,
 }
 
-impl<Z, Q: Color, C: Color + std::hash::Hash + Eq, const OMEGA: bool>
-    Automaton<CharAlphabet, Z, Q, C, EdgeLists<CharAlphabet, Q, C>, OMEGA>
+impl<Z, Q: Color, C: Color + std::hash::Hash + Eq, const OMEGA: bool, const DET: bool>
+    Automaton<CharAlphabet, Z, Q, C, TS<CharAlphabet, Q, C, DET>, OMEGA, DET>
 {
     /// Instantiates a new [`TSBuilder`] for the edge and state color of `self`.
     pub fn builder() -> TSBuilder<Q, C> {
@@ -254,8 +254,8 @@ where
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        self.ts.predecessors(state.to_index(self)?)
+    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
+        self.ts.predecessors(state)
     }
 }
 
@@ -281,17 +281,9 @@ where
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         self.ts.add_state(color)
     }
-    fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
-        &mut self,
-        index: Idx,
-        color: X,
-    ) {
-        self.ts.set_state_color(
-            index
-                .to_index(self)
-                .expect("cannot set color of state that does not exist"),
-            color,
-        )
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
+        assert!(self.ts.contains_state_index(index));
+        self.ts.set_state_color(index, color)
     }
 
     fn add_edge<E>(&mut self, t: E) -> Option<Self::EdgeRef<'_>>
@@ -337,12 +329,12 @@ where
         self.ts.state_indices()
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        self.ts.edges_from(state.to_index(self)?)
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        self.ts.edges_from(state)
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        self.ts.state_color(state.to_index(self)?)
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        self.ts.state_color(state)
     }
 }
 

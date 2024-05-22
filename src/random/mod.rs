@@ -12,9 +12,9 @@ use crate::prelude::*;
 ///   add a back edge that state.
 /// 3. If no back edge to some state was added, we insert an edge to a new state.
 /// 4. Repeat until all states and symbols have been treated.
-pub fn generate_random_ts(symbols: usize, probability: f64) -> (LinkedListTransitionSystem, usize) {
+pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, usize) {
     let alphabet = CharAlphabet::of_size(symbols);
-    let mut dts = LinkedListTransitionSystem::for_alphabet(alphabet.clone());
+    let mut dts = DTS::for_alphabet(alphabet.clone());
 
     let mut current = dts.add_state(Void);
     let mut symbol_position = 0;

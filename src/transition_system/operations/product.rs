@@ -86,16 +86,15 @@ where
         ProductStatesIter::new(&self.0, &self.1)
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         let ProductIndex(l, r) = state;
         let left = self.0.state_color(l)?;
         let right = self.1.state_color(r)?;
         Some((left, right))
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        ProductEdgesFrom::new(&self.0, &self.1, state.to_index(self)?)
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        ProductEdgesFrom::new(&self.0, &self.1, state)
     }
 
     fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
@@ -406,11 +405,11 @@ mod tests {
 
     #[test]
     fn product_subalphabet() {
-        let l: MealyMachine = LinkedListNondeterministic::builder()
+        let l: MealyMachine = DTS::builder()
             .default_color(Void)
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
             .into_mealy(0);
-        let r: MealyMachine = LinkedListNondeterministic::builder()
+        let r: MealyMachine = DTS::builder()
             .default_color(Void)
             .with_transitions([(0, 'a', 0, 0)])
             .into_mealy(0);

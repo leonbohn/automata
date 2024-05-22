@@ -1,23 +1,37 @@
 #![allow(unused)]
 #![allow(missing_docs)]
 use crate::prelude::*;
-
-pub(crate) mod edge_lists;
 use std::{
     fmt::{Debug, Display},
     ops::Deref,
 };
 
-pub use edge_lists::{
-    EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, IntoEdgeLists, MutableTsState,
-};
+pub type DefaultId = u32;
 
-pub(crate) mod linked;
-pub use linked::{
-    CollectLinkedList, IntoLinkedListNondeterministic, LinkedListDeterministic,
-    LinkedListNondeterministic, LinkedListTransitionSystem, LinkedListTransitionSystemEdge,
-    LinkedListTransitionSystemEdgesToIter, LinkedListTransitionSystemState, NTSEdgesFromIter,
-};
+#[derive(Clone, Debug, Eq, PartialEq, Copy, Ord, PartialOrd, Hash)]
+pub struct Id<Idx: IndexType = DefaultId>(Idx);
+
+impl From<Id> for u32 {
+    fn from(idx: Id) -> Self {
+        idx.0
+    }
+}
+impl<Idx: IndexType> std::fmt::Display for Id<Idx> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "q{}", self.0)
+    }
+}
+
+impl From<u32> for Id {
+    fn from(idx: u32) -> Self {
+        Id(idx)
+    }
+}
+impl From<usize> for Id {
+    fn from(idx: usize) -> Self {
+        Id(idx as u32)
+    }
+}
 
 #[cfg(feature = "petgraph")]
 mod petgraph;
@@ -81,45 +95,45 @@ pub trait CreateNew {
     }
 }
 
-pub struct EdgeListsImpl;
+// pub struct EdgeListsImpl;
 
-impl CreateNew for EdgeListsImpl {
-    type Indeterminate<A: Alphabet, Q: Color, C: Color, const DET: bool> = EdgeLists<A, Q, C, DET>;
+// impl CreateNew for EdgeListsImpl {
+//     type Indeterminate<A: Alphabet, Q: Color, C: Color, const DET: bool> = EdgeLists<A, Q, C, DET>;
 
-    fn new_deterministic<A: Alphabet, Q: Color, C: Color>(
-        alphabet: A,
-    ) -> Self::Indeterminate<A, Q, C, true>
-    where
-        Self::Indeterminate<A, Q, C, true>: Deterministic,
-    {
-        EdgeLists::for_alphabet(alphabet)
-    }
+//     fn new_deterministic<A: Alphabet, Q: Color, C: Color>(
+//         alphabet: A,
+//     ) -> Self::Indeterminate<A, Q, C, true>
+//     where
+//         Self::Indeterminate<A, Q, C, true>: Deterministic,
+//     {
+//         EdgeLists::for_alphabet(alphabet)
+//     }
 
-    fn new_for_alphabet<A: Alphabet, Q: Color, C: Color, const DET: bool>(
-        alphabet: A,
-    ) -> Self::Indeterminate<A, Q, C, DET> {
-        EdgeLists::for_alphabet(alphabet)
-    }
-}
+//     fn new_for_alphabet<A: Alphabet, Q: Color, C: Color, const DET: bool>(
+//         alphabet: A,
+//     ) -> Self::Indeterminate<A, Q, C, DET> {
+//         EdgeLists::for_alphabet(alphabet)
+//     }
+// }
 
-pub struct LinkedListImpl;
+// pub struct LinkedListImpl;
 
-impl CreateNew for LinkedListImpl {
-    type Indeterminate<A: Alphabet, Q: Color, C: Color, const DET: bool> =
-        LinkedListTransitionSystem<A, Q, C, DET>;
+// impl CreateNew for LinkedListImpl {
+//     type Indeterminate<A: Alphabet, Q: Color, C: Color, const DET: bool> =
+//         LinkedListTransitionSystem<A, Q, C, DET>;
 
-    fn new_deterministic<A: Alphabet, Q: Color, C: Color>(
-        alphabet: A,
-    ) -> Self::Indeterminate<A, Q, C, true>
-    where
-        Self::Indeterminate<A, Q, C, true>: Deterministic,
-    {
-        LinkedListTransitionSystem::for_alphabet(alphabet)
-    }
+//     fn new_deterministic<A: Alphabet, Q: Color, C: Color>(
+//         alphabet: A,
+//     ) -> Self::Indeterminate<A, Q, C, true>
+//     where
+//         Self::Indeterminate<A, Q, C, true>: Deterministic,
+//     {
+//         LinkedListTransitionSystem::for_alphabet(alphabet)
+//     }
 
-    fn new_for_alphabet<A: Alphabet, Q: Color, C: Color, const DET: bool>(
-        alphabet: A,
-    ) -> Self::Indeterminate<A, Q, C, DET> {
-        LinkedListTransitionSystem::for_alphabet(alphabet)
-    }
-}
+//     fn new_for_alphabet<A: Alphabet, Q: Color, C: Color, const DET: bool>(
+//         alphabet: A,
+//     ) -> Self::Indeterminate<A, Q, C, DET> {
+//         LinkedListTransitionSystem::for_alphabet(alphabet)
+//     }
+// }

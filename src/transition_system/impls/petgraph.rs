@@ -3,17 +3,29 @@ use std::fmt::Debug;
 use crate::prelude::*;
 use petgraph::{
     data::Build,
-    graph::{EdgeIndex, EdgeReference, EdgeReferences, NodeIndex},
+    graph::{EdgeIndex, EdgeReference, EdgeReferences, Node, NodeIndex},
     prelude as pg,
     visit::{EdgeRef, IntoEdgesDirected, IntoNeighborsDirected},
     Directed,
     Direction::{Incoming, Outgoing},
 };
 
-pub type Graph<Q, E> = pg::DiGraph<Q, E>;
+use super::{DefaultId, Id};
+
+pub type Graph<Q, E> = pg::DiGraph<Q, E, DefaultId>;
 
 pub type EdgeLabel<T> = (EdgeExpression<T>, EdgeColor<T>);
 
+impl From<petgraph::graph::NodeIndex> for Id {
+    fn from(idx: NodeIndex) -> Self {
+        idx.index().into()
+    }
+}
+impl Id {
+    pub fn into_node_index(self) -> NodeIndex {
+        NodeIndex::new(self.0 as usize)
+    }
+}
 pub struct GraphTs<
     A: Alphabet = CharAlphabet,
     Q: Color = Void,
@@ -22,6 +34,51 @@ pub struct GraphTs<
 > {
     alphabet: A,
     graph: Graph<Q, (A::Expression, C)>,
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A, Q, C, DET> {
+    fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        let q = state.into();
+    }
+
+    fn remove_edges_from_matching(
+        &mut self,
+        source: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
+    }
+
+    fn remove_edges_between_matching(
+        &mut self,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
+    }
+
+    fn remove_edges_between(
+        &mut self,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
+    }
+
+    fn remove_edges_from(
+        &mut self,
+        source: StateIndex<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
+    }
+
+    fn remove_edges_to(
+        &mut self,
+        target: StateIndex<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        todo!()
+    }
 }
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> GraphTs<A, Q, C, DET> {
@@ -59,7 +116,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Debug for GraphTs<A, Q, C
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for GraphTs<A, Q, C, DET> {
     type Alphabet = A;
 
-    type StateIndex = pg::NodeIndex;
+    type StateIndex = Id;
 
     type StateColor = Q;
 
@@ -73,7 +130,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
     where
         Self: 'this;
 
-    type StateIndices<'this> = petgraph::graph::NodeIndices<>
+    type StateIndices<'this> = std::iter::Map<petgraph::graph::NodeIndices<>, fn(NodeIndex) -> Id>
     where
         Self: 'this;
 
@@ -85,8 +142,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
         todo!()
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        let q = state.to_index(self)?;
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        if !self.contains_state_index(state) {
+            return None;
+        }
+        let q = state.into_node_index();
         Some(
             self.graph
                 .edges_directed(q, Outgoing)
@@ -94,8 +154,12 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
         )
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        todo!()
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        if !self.contains_state_index(state) {
+            return None;
+        }
+        let q = state.into_node_index();
+        Some(self.graph[q].clone())
     }
 }
 
@@ -120,7 +184,7 @@ impl Show for NodeIndex {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GraphTsEdgeRef<'a, A: Alphabet, C: Color> {
     pub source: NodeIndex,
     pub target: NodeIndex,
@@ -143,11 +207,11 @@ impl<'a, A: Alphabet, C: Color> From<EdgeReference<'a, (A::Expression, C)>>
     }
 }
 
-impl<'a, A: Alphabet, C: Color> IsEdge<'a, <A as alphabet::Alphabet>::Expression, NodeIndex, C>
+impl<'a, A: Alphabet, C: Color> IsEdge<'a, <A as alphabet::Alphabet>::Expression, Id, C>
     for GraphTsEdgeRef<'a, A, C>
 {
-    fn target(&self) -> NodeIndex {
-        self.target
+    fn target(&self) -> Id {
+        self.target.into()
     }
 
     fn color(&self) -> C {
@@ -158,8 +222,8 @@ impl<'a, A: Alphabet, C: Color> IsEdge<'a, <A as alphabet::Alphabet>::Expression
         &self.expression
     }
 
-    fn source(&self) -> NodeIndex {
-        self.target
+    fn source(&self) -> Id {
+        Id(self.source.index() as u32)
     }
 }
 
@@ -174,8 +238,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        let q = state.to_index(self)?;
+    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
+        let q = state.into_node_index();
+        if !self.graph.contains_node(q) {
+            return None;
+        }
         Some(
             self.graph
                 .edges_directed(q, Incoming)
@@ -207,13 +274,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for GraphTs<A,
         })
     }
 
-    fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
-        &mut self,
-        index: Idx,
-        color: X,
-    ) {
-        let q = index.to_index(self).unwrap();
-        self.graph[q] = color.into();
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
+        let q = index.into_node_index();
+        assert!(self.graph.contains_node(q));
+        self.graph[q] = color;
     }
 }
 
