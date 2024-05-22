@@ -7,7 +7,6 @@ use crate::{
     transition_system::{EdgeReference, EdgeTuple},
 };
 use std::{
-    collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display},
     hash::Hash,
     mem::ManuallyDrop,
@@ -25,7 +24,7 @@ pub type EdgeListsDeterministic<A, Q, C> = EdgeLists<A, Q, C, true>;
 #[derive(Clone, PartialEq, Eq)]
 pub struct EdgeLists<A: Alphabet, Q = crate::Void, C = crate::Void, const DET: bool = true> {
     pub(crate) alphabet: A,
-    pub(crate) states: BTreeMap<usize, MutableTsState<A, Q, C>>,
+    pub(crate) states: Map<usize, MutableTsState<A, Q, C>>,
 }
 
 /// Type alias that takes a [`TransitionSystem`] and gives the type of a corresponding [`MutableTs`], i.e. one
@@ -42,7 +41,14 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
     pub fn new(alphabet: A) -> Self {
         Self {
             alphabet,
-            states: BTreeMap::default(),
+            states: Map::default(),
+        }
+    }
+    /// Creates a new transition system with the given alphabet.
+    pub fn size_hint(alphabet: A, size: usize) -> Self {
+        Self {
+            alphabet,
+            states: Map::with_capacity(size),
         }
     }
 
@@ -90,7 +96,7 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
     }
 
     pub(crate) fn mutablets_remove_state(&mut self, usize: usize) -> Option<Q> {
-        let state = self.states.remove(&usize)?;
+        let state = self.states.swap_remove(&usize)?;
         self.states
             .iter_mut()
             .for_each(|(_, s)| s.remove_outgoing_edges_to(usize));
@@ -98,38 +104,21 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
     }
 
     /// Creates a `MutableTs` from the given alphabet and states.
-    pub(crate) fn from_parts(
-        alphabet: A,
-        states: BTreeMap<usize, MutableTsState<A, Q, C>>,
-    ) -> Self {
+    pub(crate) fn from_parts(alphabet: A, states: Map<usize, MutableTsState<A, Q, C>>) -> Self {
         Self { alphabet, states }
     }
 
     /// Decomposes the `MutableTs` into its constituent parts.
     #[allow(clippy::type_complexity)]
-    pub(crate) fn into_parts(self) -> (A, BTreeMap<usize, MutableTsState<A, Q, C>>) {
+    pub(crate) fn into_parts(self) -> (A, Map<usize, MutableTsState<A, Q, C>>) {
         (self.alphabet, self.states)
     }
 
     /// Creates an empty `MutableTs` ensuring the given capacity.
-    pub fn with_capacity(alphabet: A, states: usize) -> Self
-    where
-        StateColor<Self>: Default,
-        usize: From<usize> + IndexType,
-    {
+    pub fn with_capacity(alphabet: A, states: usize) -> Self {
         Self {
             alphabet,
-            states:
-                (0..states)
-                    .map(|i| {
-                        (
-                            i,
-                            MutableTsState::new_with_intial_id(
-                                <StateColor<Self> as Default>::default(),
-                            ),
-                        )
-                    })
-                    .collect(),
+            states: Map::with_capacity(states),
         }
     }
 
@@ -139,7 +128,7 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
     }
 
     /// Returns a reference to the underlying statemap.
-    pub fn raw_state_map(&self) -> &BTreeMap<usize, MutableTsState<A, Q, C>> {
+    pub fn raw_state_map(&self) -> &Map<usize, MutableTsState<A, Q, C>> {
         &self.states
     }
 
@@ -340,7 +329,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     type EdgeColor = C;
     type StateIndex = usize;
     type EdgeRef<'this> = EdgeReference<'this, A::Expression, usize, C> where Self: 'this;
-    type StateIndices<'this> = std::iter::Cloned<std::collections::btree_map::Keys<'this, usize, MutableTsState<A, Q, C>>> where Self: 'this;
+    type StateIndices<'this> = std::iter::Cloned<indexmap::map::Keys<'this, usize, MutableTsState<A, Q, C>>> where Self: 'this;
 
     type Alphabet = A;
 
@@ -489,15 +478,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for EdgeLists<
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A> for EdgeLists<A, Q, C, DET> {
-    fn for_alphabet(from: A) -> Self {
-        Self {
-            alphabet: from,
-            states: BTreeMap::default(),
-        }
-    }
-}
-
 type MutableTsOutEdge<A, C> = (<A as Alphabet>::Expression, C, usize);
 
 /// An iterator which uses a closure to determine if an element should be removed.
@@ -621,8 +601,7 @@ where
     pub(super) old_len: usize,
     /// The filter test predicate.
     pub(super) pred: F,
-    pub(super) remaining:
-        std::collections::btree_map::ValuesMut<'a, usize, MutableTsState<A, Q, C>>,
+    pub(super) remaining: indexmap::map::ValuesMut<'a, usize, MutableTsState<A, Q, C>>,
 }
 
 impl<'a, A: Alphabet, Q, C, F> ExtractAllEdgeTuples<'a, A, Q, C, F>
@@ -739,7 +718,7 @@ pub struct EdgeListsPredecessors<'a, A: Alphabet, Q: Color, C: Color, const DET:
     idx: Option<usize>,
     inner_pos: usize,
     target: usize,
-    it: std::collections::btree_map::Keys<'a, usize, MutableTsState<A, Q, C>>,
+    it: indexmap::map::Keys<'a, usize, MutableTsState<A, Q, C>>,
     elp: &'a EdgeLists<A, Q, C, DET>,
 }
 
@@ -779,4 +758,13 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
     }
     let EdgeLists { alphabet, states } = ts;
     EdgeLists { alphabet, states }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A> for EdgeLists<A, Q, C, DET> {
+    fn for_alphabet(from: A) -> Self {
+        Self::new(from)
+    }
+    fn for_alphabet_size_hint(from: A, _size_hint: (usize, usize)) -> Self {
+        Self::size_hint(from, _size_hint.0)
+    }
 }

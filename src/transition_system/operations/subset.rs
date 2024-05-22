@@ -25,7 +25,7 @@ impl<Ts: TransitionSystem> Default for StateSet<Ts> {
 }
 
 impl<Ts: TransitionSystem> IntoIterator for StateSet<Ts> {
-    type IntoIter = std::collections::hash_set::IntoIter<Ts::StateIndex>;
+    type IntoIter = math::SetIntoIter<StateIndex<Ts>>;
     type Item = Ts::StateIndex;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()

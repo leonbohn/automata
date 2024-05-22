@@ -1,5 +1,6 @@
-use std::collections::{hash_map::Entry, BTreeSet, VecDeque};
+use std::collections::{BTreeSet, VecDeque};
 
+use indexmap::map::Entry;
 use itertools::Itertools;
 use tracing::trace;
 
@@ -295,7 +296,8 @@ where
                 while on_stack.contains(&q) {
                     let top = stack.pop().unwrap();
                     low.insert(top, low_q);
-                    on_stack.remove(&top);
+                    // TODO: evaluate performance of this?
+                    on_stack.shift_remove(&top);
                     scc.push(top);
                 }
                 let scc = Scc::new(ts, scc.into_iter());

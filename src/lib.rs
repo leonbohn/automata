@@ -12,7 +12,7 @@ pub mod prelude {
     #[cfg(not(feature = "linked_list_ts"))]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
-        EdgeLists<A, Q, C, DET>;
+        crate::transition_system::impls::GraphTs<A, Q, C, DET>;
     #[cfg(feature = "linked_list_ts")]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type DTS<A = CharAlphabet, Q = Void, C = Void> = LinkedListDeterministic<A, Q, C>;
@@ -22,11 +22,11 @@ pub mod prelude {
     pub type NTS<A = CharAlphabet, Q = Void, C = Void> = LinkedListNondeterministic<A, Q, C>;
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     #[cfg(not(feature = "linked_list_ts"))]
-    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = EdgeLists<A, Q, C>;
+    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, true>;
     /// Points to the default implementation of [`TransitionSystem`] in the case where it is
     /// **now known to be** [`Deterministic`].
     #[cfg(not(feature = "linked_list_ts"))]
-    pub type NTS<A = CharAlphabet, Q = Void, C = Void> = EdgeListsNondeterministic<A, Q, C>;
+    pub type NTS<A = CharAlphabet, Q = Void, C = Void> = EdgeLists<A, Q, C, false>;
 
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case which
     /// is mutable. Especially, this type implements [`Shrinkable`] and [`Sproutable`], which allows

@@ -7,6 +7,7 @@ mod parity;
 pub use parity::*;
 
 mod rabin;
+use petgraph::graph::NodeIndex;
 pub use rabin::*;
 
 mod muller;
@@ -71,7 +72,7 @@ impl<A: Alphabet, const DET: bool> OmegaAutomaton<A, DET> {
     /// acceptance condition.
     pub fn new(
         ts: TS<A, usize, AcceptanceMask, DET>,
-        initial: usize,
+        initial: NodeIndex,
         acceptance: OmegaAcceptanceCondition,
     ) -> OmegaAutomaton<A, DET> {
         OmegaAutomaton {
@@ -140,11 +141,16 @@ impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutoma
         let ts = TSBuilder::default()
             .with_state_colors((0..size).map(|i| value.state_color(i).unwrap()))
             .with_transitions(value.state_indices().flat_map(|q| {
-                assert!(q < size);
+                assert!(q.index() < size);
                 value.edges_from(q).unwrap().flat_map(|edge| {
-                    edge.expression()
-                        .chars_iter()
-                        .map(move |sym| (edge.source(), sym, edge.color(), edge.target()))
+                    edge.expression().chars_iter().map(move |sym| {
+                        (
+                            edge.source().index(),
+                            sym,
+                            edge.color(),
+                            edge.target().index(),
+                        )
+                    })
                 })
             }))
             .into_dts();
@@ -163,7 +169,10 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
         let mut ts = DTS::for_alphabet(HoaAlphabet::try_from_char_alphabet(value.alphabet())?);
 
         for q in value.state_indices() {
-            assert!(q < size, "The state indices must be contiguous for this!");
+            assert!(
+                q.index() < size,
+                "The state indices must be contiguous for this!"
+            );
             ts.add_state(value.state_color(q).unwrap());
         }
 
@@ -179,7 +188,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
             }
         }
 
-        assert!(value.initial() < size);
+        assert!(value.initial().index() < size);
         Ok(DeterministicOmegaAutomaton::new(
             ts,
             value.initial,

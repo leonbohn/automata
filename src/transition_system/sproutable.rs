@@ -18,7 +18,7 @@ pub trait ForAlphabet<A: Alphabet>: Sized {
 
     /// Creates an instance of `Self` for the given [`Alphabet`] and a hint for the size of the transition
     /// system allowing for preallocation of memory. The resulting TS should be empty.
-    fn for_alphabet_size_hint(from: A, _size_hint: usize) -> Self {
+    fn for_alphabet_size_hint(from: A, _size_hint: (usize, usize)) -> Self {
         Self::for_alphabet(from)
     }
 }

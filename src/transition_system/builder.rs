@@ -125,7 +125,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
             .flat_map(|(q, _, _, p)| [*p, *q])
             .unique()
             .count();
-        let mut ts = EdgeListsNondeterministic::for_alphabet_size_hint(alphabet, num_states);
+        let mut ts = EdgeListsNondeterministic::for_alphabet_size_hint(alphabet, (num_states, 0));
 
         let mut created_states_number = 0;
         for i in 0..num_states {
@@ -240,7 +240,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
             .flat_map(|(q, _, _, p)| [*p, *q])
             .unique()
             .count();
-        let mut ts = LinkedListNondeterministic::for_alphabet_size_hint(alphabet, num_states);
+        let mut ts = LinkedListNondeterministic::for_alphabet_size_hint(alphabet, (num_states, 0));
         let colors_it = (0..num_states).map(|x| {
             if let Some(color) =
                 self.colors

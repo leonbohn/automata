@@ -268,6 +268,14 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         &self.edges[idx]
     }
 
+    pub fn new(alphabet: A) -> Self {
+        Self {
+            alphabet,
+            states: vec![],
+            edges: vec![],
+        }
+    }
+
     /// Builds a new non-deterministic transition system for the given alphabet with a specified capacity.
     pub fn with_capacity(alphabet: A, cap: usize) -> Self {
         Self {
@@ -407,10 +415,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A>
         }
     }
 
-    fn for_alphabet_size_hint(from: A, size_hint: usize) -> Self {
+    fn for_alphabet_size_hint(from: A, size_hint: (usize, usize)) -> Self {
         Self {
             alphabet: from,
-            states: Vec::with_capacity(size_hint),
+            states: Vec::with_capacity(size_hint.0),
             edges: vec![],
         }
     }
