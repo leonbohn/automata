@@ -3,7 +3,7 @@ use crate::transition_system::EdgeReference;
 pub use petgraph::prelude::*;
 pub use petgraph::stable_graph as sg;
 
-pub struct GraphTs<A: Alphabet, Q: Color, C: Color, const DET: bool> {
+pub struct GraphTs<A: Alphabet, Q: Color, C: Color, const DET: bool = true> {
     alphabet: A,
     graph: StableDiGraph<Q, (A::Expression, C), DefaultIdType>,
 }
@@ -207,7 +207,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = PgEdgesIter<'this, A, Q, C, DET>
+    type EdgesFromIter<'this> = std::iter::Map<sg::Edges<'this, (A::Expression, C), Directed, StateIndex<Self>>, fn(sg::EdgeReference<'this, (A::Expression, C), StateIndex<Self>>) -> Self::EdgeRef<'this>>
     where
         Self: 'this;
 
@@ -225,15 +225,19 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
 
     fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
         let q = state.to_index(self)?;
-        let walker = self
-            .graph
-            .neighbors_directed(node_index(q), Direction::Outgoing)
-            .detach();
-        Some(PgEdgesIter {
-            graph: &self.graph,
-            walker,
-            target: q,
-        })
+        Some(
+            self.graph
+                .edges_directed(node_index(q), Direction::Outgoing)
+                .map(|edge| {
+                    let (expression, color) = edge.weight();
+                    EdgeReference::new(
+                        state_index(edge.source()),
+                        expression,
+                        color,
+                        state_index(edge.target()),
+                    )
+                }),
+        )
     }
 
     fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
@@ -304,5 +308,45 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A> for GraphT
             alphabet: from,
             graph: StableDiGraph::with_capacity(size_hint, 0),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::GraphTs;
+    use crate::prelude::*;
+
+    #[test]
+    fn petgraph_impl() {
+        let mut pgts: GraphTs<CharAlphabet, bool, Void> =
+            GraphTs::for_alphabet(CharAlphabet::of_size(2));
+        let q0 = pgts.add_state(true);
+        let q1 = pgts.add_state(false);
+        let q2 = pgts.add_state(false);
+
+        pgts.add_edge((q0, 'a', q0));
+        pgts.add_edge((q0, 'b', q1));
+        pgts.add_edge((q1, 'a', q1));
+        pgts.add_edge((q1, 'b', q2));
+        pgts.add_edge((q2, 'a', q2));
+        pgts.add_edge((q2, 'b', q0));
+
+        println!("{:?}", pgts.graph);
+
+        let mut dfa = pgts.into_dfa_with_initial(0);
+
+        for pos in ["", "bbb", "abababa", "a"] {
+            assert!(dfa.accepts(pos))
+        }
+        for neg in ["ab", "aba", "bbbab"] {
+            assert!(!dfa.accepts(neg))
+        }
+
+        assert_eq!(dfa.remove_edges_between(q2, q0).unwrap().len(), 1);
+        assert_eq!(dfa.reached_state_index("abbab"), None);
+        assert_eq!(dfa.reached_state_index("abaab"), Some(q2));
+
+        dfa.remove_state(q2);
+        assert_eq!(dfa.reached_state_index("abab"), None);
     }
 }

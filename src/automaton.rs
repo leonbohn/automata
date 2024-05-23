@@ -302,6 +302,66 @@ where
     }
 }
 
+impl<A, Z, Q, C, D, const OMEGA: bool> Shrinkable for Automaton<A, Z, Q, C, D, OMEGA>
+where
+    A: Alphabet,
+    D: Shrinkable<Alphabet = A, StateColor = Q, EdgeColor = C>,
+    Q: Color,
+    C: Color,
+{
+    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor> {
+        let q = state.to_index(self)?;
+        self.ts_mut().remove_state(q)
+    }
+
+    fn remove_edges_from_matching(
+        &mut self,
+        source: impl Indexes<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        let source = source.to_index(self)?;
+        self.ts_mut().remove_edges_from_matching(source, matcher)
+    }
+
+    fn remove_edges_between_matching(
+        &mut self,
+        source: impl Indexes<Self>,
+        target: impl Indexes<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        let source = source.to_index(self)?;
+        let target = target.to_index(self)?;
+        self.ts_mut()
+            .remove_edges_between_matching(source, target, matcher)
+    }
+
+    fn remove_edges_between(
+        &mut self,
+        source: impl Indexes<Self>,
+        target: impl Indexes<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        let source = source.to_index(self)?;
+        let target = target.to_index(self)?;
+        self.ts_mut().remove_edges_between(source, target)
+    }
+
+    fn remove_edges_from(
+        &mut self,
+        source: impl Indexes<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        let source = source.to_index(self)?;
+        self.ts_mut().remove_edges_from(source)
+    }
+
+    fn remove_edges_to(
+        &mut self,
+        target: impl Indexes<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        let target = target.to_index(self)?;
+        self.ts_mut().remove_edges_to(target)
+    }
+}
+
 impl<A, Z, Q, C, D, const OMEGA: bool> TransitionSystem for Automaton<A, Z, Q, C, D, OMEGA>
 where
     A: Alphabet,
