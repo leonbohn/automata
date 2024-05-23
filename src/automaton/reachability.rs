@@ -32,7 +32,7 @@ impl<C> FiniteSemantics<bool, C> for ReachabilityCondition {
 }
 
 /// A deterministic finite automaton (DFA) is a deterministic automaton with a simple acceptance condition. It accepts a finite word if it reaches an accepting state.
-pub type DFA<A = CharAlphabet, C = Void, D = LinkedListTransitionSystem<A, bool, C>> =
+pub type DFA<A = CharAlphabet, C = Void, D = DTS<A, bool, C>> =
     FiniteWordAutomaton<A, ReachabilityCondition, bool, C, true, D>;
 
 /// Helper trait for creating a [`DFA`] from a given transition system.
@@ -115,7 +115,7 @@ where
                 .state_color(index)
                 .expect("Every state must be colored")
             {
-                Some(mr)
+                Some(mr.into_inner())
             } else {
                 None
             }
@@ -187,7 +187,7 @@ where
             .minimal_representatives()
             .find_map(|(rep, ProductIndex(l, r))| {
                 if self.state_color(l).unwrap() != self.state_color(r).unwrap() {
-                    Some(rep)
+                    Some(rep.into_inner())
                 } else {
                     None
                 }

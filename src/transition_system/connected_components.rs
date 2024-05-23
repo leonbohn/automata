@@ -13,7 +13,7 @@ mod tarjan_dag;
 pub use tarjan_dag::TarjanDAG;
 
 /// Represents a decomposition of a transition system into strongly connected components.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Hash)]
 pub struct SccDecomposition<'a, Ts: TransitionSystem>(&'a Ts, Vec<Scc<'a, Ts>>);
 
 impl<'a, Ts: TransitionSystem> std::ops::Deref for SccDecomposition<'a, Ts> {
@@ -74,6 +74,12 @@ impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
                 .map(|scc| format!("[{}]", scc.iter().map(|q| q.show()).join(", ")))
                 .join(", "),
         )
+    }
+}
+
+impl<'a, Ts: TransitionSystem> PartialEq for SccDecomposition<'a, Ts> {
+    fn eq(&self, other: &Self) -> bool {
+        self.1 == other.1
     }
 }
 

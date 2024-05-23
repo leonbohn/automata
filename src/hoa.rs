@@ -218,8 +218,8 @@ pub struct HoaExpression {
 }
 
 impl Matcher<HoaExpression> for HoaExpression {
-    fn matches(&self, _expression: &HoaExpression) -> bool {
-        todo!()
+    fn matches(&self, expression: &HoaExpression) -> bool {
+        self.overlaps(expression)
     }
 }
 

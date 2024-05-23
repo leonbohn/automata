@@ -82,10 +82,12 @@ pub trait TransitionSystemImplementation {
     }
 }
 
-pub struct EdgeListsImpl;
-pub struct LinkedListImpl;
+pub struct EdgeListsBased;
+pub struct LinkedListBased;
 
-impl TransitionSystemImplementation for EdgeListsImpl {
+pub struct PetgraphBased;
+
+impl TransitionSystemImplementation for EdgeListsBased {
     type Indeterminate<A: Alphabet, Q: Color, C: Color, const DET: bool> = EdgeLists<A, Q, C, DET>;
 
     fn new_deterministic<A: Alphabet, Q: Color, C: Color>(
@@ -103,8 +105,7 @@ impl TransitionSystemImplementation for EdgeListsImpl {
         EdgeLists::for_alphabet(alphabet)
     }
 }
-
-impl TransitionSystemImplementation for LinkedListImpl {
+impl TransitionSystemImplementation for LinkedListBased {
     type Indeterminate<A: Alphabet, Q: Color, C: Color, const DET: bool> =
         LinkedListTransitionSystem<A, Q, C, DET>;
 

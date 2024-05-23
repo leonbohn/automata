@@ -34,7 +34,7 @@ impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Skip<'a, S, W> {
 impl<'a, S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Skip<'a, S, W> {
     type Symbols<'this> = std::iter::Skip<W::Symbols<'this>> where Self: 'this;
 
-    fn to_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<S> {
         (self.offset..self.sequence.len())
             .map(|position| self.sequence.nth(position).unwrap())
             .collect()
@@ -99,7 +99,7 @@ impl<S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Rotated<W> {
         RotatedIter::new(self, self.1)
     }
 
-    fn to_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<S> {
         self.symbols().collect()
     }
 
@@ -183,7 +183,7 @@ impl<'a, S: Symbol, W: LinearWord<S>> FiniteWord<S> for Infix<'a, S, W> {
         ConsumingInfixIterator::new(self.sequence, self.offset, self.offset + self.length)
     }
 
-    fn to_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<S> {
         (self.offset..(self.offset + self.length))
             .map(|position| self.sequence.nth(position).unwrap())
             .collect()
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn finite_word_infix() {
         let fw = "abcde".to_string();
-        assert_eq!(fw.infix(1, 3).to_vec(), vec!['b', 'c', 'd']);
+        assert_eq!(fw.infix(1, 3).collect_vec(), vec!['b', 'c', 'd']);
         assert_eq!(fw.infix(1, 3).as_string(), "bcd".to_string());
     }
 
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(pref.symbols().collect_vec(), vec!['a', 'b']);
 
         let word = upw!("ab", "ac");
-        assert_eq!(word.skip(3).prefix(4).to_vec(), vec!['c', 'a', 'c', 'a']);
+        assert_eq!(word.skip(3).prefix(4).collect_vec(), vec!['c', 'a', 'c', 'a']);
         assert_eq!(
             word.skip(1)
                 .skip(1)
@@ -226,12 +226,12 @@ mod tests {
                 .skip(1)
                 .skip(4)
                 .prefix(2)
-                .to_vec(),
+                .collect_vec(),
             vec!['a', 'c']
         );
         let w = word.skip(3);
         assert!(w.spoke().is_empty());
-        assert_eq!(w.cycle().to_vec(), vec!['c', 'a']);
+        assert_eq!(w.cycle().collect_vec(), vec!['c', 'a']);
 
         let offset_normalized = upw!("abba").skip(1).skip(20).reduced();
         assert!(offset_normalized.spoke().is_empty());

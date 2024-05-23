@@ -4,9 +4,35 @@ pub use petgraph;
 pub use petgraph::prelude::*;
 pub use petgraph::stable_graph as sg;
 
-pub struct GraphTs<A: Alphabet, Q: Color, C: Color, const DET: bool = true> {
+#[derive(Debug, Clone)]
+pub struct GraphTs<
+    A: Alphabet = CharAlphabet,
+    Q: Color = Void,
+    C: Color = Void,
+    const DET: bool = true,
+> {
     alphabet: A,
     graph: StableDiGraph<Q, (A::Expression, C), DefaultIdType>,
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> GraphTs<A, Q, C, DET> {
+    pub(crate) fn try_into_deterministic(self) -> Result<GraphTs<A, Q, C, true>, Self> {
+        if DET {
+            assert!(self.is_deterministic());
+        } else if !self.is_deterministic() {
+            return Err(self);
+        }
+        Ok(GraphTs {
+            alphabet: self.alphabet,
+            graph: self.graph,
+        })
+    }
+}
+
+impl<Q: Color, C: Color, const DET: bool> GraphTs<CharAlphabet, Q, C, DET> {
+    pub fn builder() -> TSBuilder<Q, C, DET> {
+        TSBuilder::default()
+    }
 }
 
 pub fn node_index(id: DefaultIdType) -> sg::NodeIndex {
@@ -31,6 +57,14 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for GraphTs<A,
         E: IntoEdgeTuple<Self>,
     {
         let (source, expression, color, target) = t.into_edge_tuple();
+
+        if DET
+            && (self.edges_matching(source, &expression)?.next().is_some()
+                || !self.contains_state_index(target))
+        {
+            return None;
+        }
+
         let edge = self
             .graph
             .add_edge(node_index(source), node_index(target), (expression, color));
@@ -320,19 +354,23 @@ mod tests {
     #[test]
     fn petgraph_impl() {
         let mut pgts: GraphTs<CharAlphabet, bool, Void> =
-            GraphTs::for_alphabet(CharAlphabet::of_size(2));
+            GraphTs::for_alphabet(CharAlphabet::of_size(3));
         let q0 = pgts.add_state(true);
         let q1 = pgts.add_state(false);
         let q2 = pgts.add_state(false);
+        let q3 = pgts.add_state(false);
 
         pgts.add_edge((q0, 'a', q0));
         pgts.add_edge((q0, 'b', q1));
+        pgts.add_edge((q0, 'c', q3));
         pgts.add_edge((q1, 'a', q1));
         pgts.add_edge((q1, 'b', q2));
         pgts.add_edge((q2, 'a', q2));
         pgts.add_edge((q2, 'b', q0));
 
-        println!("{:?}", pgts.graph);
+        // test iteration direction
+        let succs: Vec<_> = pgts.reachable_state_indices_from(q0).collect();
+        assert_eq!(succs, vec![q0, q1, q3, q2]);
 
         let mut dfa = pgts.into_dfa_with_initial(0);
 
