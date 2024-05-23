@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use crate::transition_system::EdgeReference;
+pub use petgraph;
 pub use petgraph::prelude::*;
 pub use petgraph::stable_graph as sg;
 
@@ -220,7 +221,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
     }
 
     fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.graph.node_indices().map(|idx| state_index(idx))
+        self.graph.node_indices().map(state_index)
     }
 
     fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
