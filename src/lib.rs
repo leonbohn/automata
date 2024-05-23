@@ -11,8 +11,13 @@ pub mod prelude {
         LinkedListTransitionSystem<A, Q, C, DET>;
     #[cfg(not(feature = "linked_list_ts"))]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
-    pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
-        EdgeLists<A, Q, C, DET>;
+    pub type TS<
+        A = CharAlphabet,
+        Q = Void,
+        C = Void,
+        const DET: bool = true,
+        IdType: IndexType = DefaultIdType,
+    > = EdgeLists<A, Q, C, DET, IdType>;
     #[cfg(feature = "linked_list_ts")]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type DTS<A = CharAlphabet, Q = Void, C = Void> = LinkedListDeterministic<A, Q, C>;
@@ -52,22 +57,23 @@ pub mod prelude {
         transition_system::operations,
         transition_system::{
             dot::Dottable,
+            impls::DefaultIdType,
             operations::{DefaultIfMissing, Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
             reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
-            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, IndexType, Indexes,
+            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, Id, IndexType, Indexes,
             IntoEdgeTuple, IsEdge, LinkedListDeterministic, LinkedListNondeterministic,
-            LinkedListTransitionSystem, Path, Shrinkable, Sproutable, StateColor, StateIndex,
-            SymbolOf, TSBuilder, TransitionSystem,
+            LinkedListTransitionSystem, Path, ScalarIndexType, Shrinkable, Sproutable, StateColor,
+            StateIndex, SymbolOf, TSBuilder, TransitionSystem,
         },
         upw,
         word::{
             FiniteWord, LinearWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord,
             ReducedOmegaWord, ReducedParseError,
         },
-        Alphabet, Class, Color, Pointed, Show, Void,
+        Alphabet, Class, Color, Int, Pointed, Show, Void,
     };
 }
 
@@ -126,6 +132,14 @@ pub trait Color: Clone + Eq + Hash + Debug {
 }
 
 impl<T: Eq + Clone + Hash + Debug> Color for T {}
+
+impl Show for u8 {
+    fn show(&self) -> String {
+        self.to_string()
+    }
+}
+
+pub type Int = u8;
 
 /// Represents the absence of a color. The idea is that this can be used when collecting
 /// a transitions system as it can always be constructed from a color by simply forgetting it.

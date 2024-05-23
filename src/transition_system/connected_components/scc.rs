@@ -349,8 +349,7 @@ mod tests {
         let ts = LinkedListNondeterministic::builder()
             .default_color(())
             .with_transitions(&transitions)
-            .into_linked_list_deterministic()
-            .with_initial(0);
+            .into_dts_with_initial(0);
         let sccs = ts.sccs();
         let first = sccs.first();
         println!("{:?}", first);

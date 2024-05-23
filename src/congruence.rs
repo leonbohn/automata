@@ -41,7 +41,7 @@ pub trait Congruence: Deterministic + Pointed {
     /// Takes ownership of `self` and builds a new [`DPA`] from it.
     fn into_dpa(self) -> IntoDPA<Self>
     where
-        Self: Congruence<EdgeColor = usize>,
+        Self: Congruence<EdgeColor = Int>,
     {
         Automaton::from_pointed(self)
     }
@@ -49,7 +49,7 @@ pub trait Congruence: Deterministic + Pointed {
     /// Collects the transition system representing `self` and builds a new [`DPA`].
     fn collect_dpa(&self) -> DPA<Self::Alphabet>
     where
-        Self: Congruence<EdgeColor = usize>,
+        Self: Congruence<EdgeColor = Int>,
     {
         let (ts, initial) = self.erase_state_colors().collect_dts_pointed();
         DPA::from_parts(ts, initial)

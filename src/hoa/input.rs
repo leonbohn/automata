@@ -231,7 +231,7 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
             hoars::AcceptanceName::Buchi => Ok(OmegaAcceptanceCondition::Buchi),
             hoars::AcceptanceName::Parity => Ok(OmegaAcceptanceCondition::Parity(
                 0,
-                acceptance_sets.unwrap() as usize,
+                acceptance_sets.unwrap() as Int,
             )),
             _ => Err("Unsupported acceptance condition".to_string()),
         }
@@ -253,19 +253,18 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
     let aps = aut.num_aps();
     assert!(aps <= MAX_APS);
 
-    let mut ts: TS<HoaAlphabet, usize, AcceptanceMask, DET> =
+    let mut ts: TS<HoaAlphabet, Int, AcceptanceMask, DET> =
         TS::for_alphabet(HoaAlphabet::from_hoa_automaton(&aut));
     for (id, state) in aut.body().iter().enumerate() {
         assert_eq!(id, state.id() as usize);
-        assert_eq!(id, ts.add_state(state.id() as usize));
+        assert_eq!(id, ts.add_state(state.id() as Int) as usize);
     }
     for state in aut.body().iter() {
         for edge in state.edges() {
             let target = edge
                 .state_conjunction()
                 .get_singleton()
-                .expect("Cannot yet deal with conjunctions of target states")
-                as usize;
+                .expect("Cannot yet deal with conjunctions of target states");
             let label = edge.label().deref().clone();
 
             let bdd = label.try_into_bdd(&ts.alphabet().variable_set, &ts.alphabet().variables)?;
@@ -274,10 +273,7 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
 
             let color: AcceptanceMask = edge.acceptance_signature().into();
 
-            if ts
-                .add_edge((state.id() as usize, expr, color, target))
-                .is_none()
-            {
+            if ts.add_edge((state.id(), expr, color, target)).is_none() {
                 // this thing is not deterministic, so we return
                 return Err("Automaton is not deterministic".to_string());
             }
@@ -290,7 +286,7 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
     assert_eq!(start.len(), 1);
     let initial = start[0]
         .get_singleton()
-        .expect("Initial state must be a singleton") as usize;
+        .expect("Initial state must be a singleton");
 
     let acceptance: OmegaAcceptanceCondition = aut.header().try_into()?;
 
