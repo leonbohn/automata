@@ -524,7 +524,7 @@ pub trait Deterministic: TransitionSystem {
         self,
     ) -> (
         DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
-        usize,
+        StateIndex<Self>,
     )
     where
         Self: Sized + Pointed,
@@ -539,7 +539,7 @@ pub trait Deterministic: TransitionSystem {
         self,
     ) -> (
         DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
-        usize,
+        DefaultIdType,
     )
     where
         Self: Sized + Pointed,
@@ -593,7 +593,7 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
-    fn collect_edge_lists_deterministic_pointed(self) -> (IntoEdgeLists<Self>, usize)
+    fn collect_edge_lists_deterministic_pointed(self) -> (IntoEdgeLists<Self>, DefaultIdType)
     where
         EdgeColor<Self>: Hash + Eq,
         Self: Pointed,
@@ -637,24 +637,21 @@ pub trait Deterministic: TransitionSystem {
     #[allow(clippy::type_complexity)]
     fn collect_complete_pointed(
         &self,
-        sink_state_color: Self::StateColor,
+        sink_state_color: StateColor<Self>,
         sink_edge_color: Self::EdgeColor,
     ) -> (
-        crate::transition_system::LinkedListTransitionSystem<
-            Self::Alphabet,
-            Self::StateColor,
-            Self::EdgeColor,
-        >,
-        usize,
+        DTS<Self::Alphabet, StateColor<Self>, Self::EdgeColor>,
+        DefaultIdType,
     )
     where
         Self: Pointed,
         Self::Alphabet: IndexedAlphabet,
     {
-        let (mut ts, initial) = self.collect_linked_list_deterministic_pointed();
+        let (mut ts, initial) = self.collect_dts_pointed();
         if !ts.is_complete() {
             let sink = ts.add_state(sink_state_color);
-            for q in ts.state_indices() {
+            for q in 0..ts.size() {
+                let q = DefaultIdType::from_usize(q);
                 for sym in self.alphabet().universe() {
                     if ts.edge(q, sym).is_none() {
                         ts.add_edge((q, ts.make_expression(sym), sink_edge_color.clone(), sink));
@@ -681,19 +678,15 @@ pub trait Deterministic: TransitionSystem {
     fn trim_collect(
         &self,
     ) -> (
-        crate::transition_system::LinkedListTransitionSystem<
-            Self::Alphabet,
-            Self::StateColor,
-            Self::EdgeColor,
-        >,
-        usize,
+        crate::transition_system::DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
+        DefaultIdType,
     )
     where
         Self: Pointed,
     {
         let reachable_indices = self.reachable_state_indices().collect::<Set<_>>();
         let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
-        restricted.collect_linked_list_deterministic_pointed()
+        restricted.collect_dts_pointed()
     }
 
     /// Compute the escape prefixes of a set of omega words on a transition system.
@@ -725,7 +718,7 @@ pub trait Deterministic: TransitionSystem {
     /// Consumes and turns `self` into a [`DPA`] while using the given `initial` state.
     fn into_dpa_with_initial(self, initial: Self::StateIndex) -> IntoDPA<Self>
     where
-        Self: Deterministic<EdgeColor = usize>,
+        Self: Deterministic<EdgeColor = Int>,
     {
         Automaton::from_parts(self, initial)
     }

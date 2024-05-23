@@ -2,25 +2,25 @@ use bit_set::BitSet;
 use itertools::Itertools;
 use tracing::error;
 
-use crate::Show;
+use crate::prelude::*;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AcceptanceMask(BitSet);
 
 impl AcceptanceMask {
-    pub fn max(&self) -> Option<usize> {
+    pub fn max(&self) -> Option<Int> {
         self.iter().max()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = usize> + '_ {
-        self.0.iter()
+    pub fn iter(&self) -> impl Iterator<Item = Int> + '_ {
+        self.0.iter().map(|x| x as Int)
     }
 
-    pub fn min(&self) -> Option<usize> {
+    pub fn min(&self) -> Option<Int> {
         self.iter().min()
     }
 
-    pub fn as_priority(&self) -> usize {
+    pub fn as_priority(&self) -> Int {
         let mut it = self.iter();
         let Some(priority) = it.next() else {
             error!(
