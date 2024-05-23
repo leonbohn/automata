@@ -761,10 +761,13 @@ impl<T: TransitionSystem, B: Borrow<StateIndex<T>> + Debug> Indexes<T> for B {
 pub trait IndexType: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show {}
 impl<TY: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show> IndexType for TY {}
 
+/// Marker trait for [`IndexType`]s that are scalar, i.e. they can be converted to and from `usize`.
 pub trait ScalarIndexType:
     IndexType + std::ops::Add<Output = Self> + std::ops::Sub<Output = Self>
 {
+    /// Converts a `usize` to the implementing type.
     fn from_usize(n: usize) -> Self;
+    /// Converts the implementing type to a `usize`.
     fn into_usize(self) -> usize;
 }
 impl ScalarIndexType for usize {

@@ -16,7 +16,7 @@ pub mod prelude {
         Q = Void,
         C = Void,
         const DET: bool = true,
-        IdType: IndexType = DefaultIdType,
+        IdType = DefaultIdType,
     > = EdgeLists<A, Q, C, DET, IdType>;
     #[cfg(feature = "linked_list_ts")]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
@@ -139,6 +139,7 @@ impl Show for u8 {
     }
 }
 
+/// Alias for the default integer type that is used for coloring edges and states.
 pub type Int = u8;
 
 /// Represents the absence of a color. The idea is that this can be used when collecting

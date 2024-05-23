@@ -40,14 +40,13 @@ pub struct EdgeLists<
 
 /// type alias that takes a [`TransitionSystem`] and gives the type of a corresponding [`MutableTs`], i.e. one
 /// with the same alphabet, edge and state colors.
-pub type IntoEdgeLists<Ts, const DET: bool = true, IdType: ScalarIndexType = DefaultIdType> =
-    EdgeLists<
-        <Ts as TransitionSystem>::Alphabet,
-        <Ts as TransitionSystem>::StateColor,
-        <Ts as TransitionSystem>::EdgeColor,
-        DET,
-        IdType,
-    >;
+pub type IntoEdgeLists<Ts, const DET: bool = true, IdType = DefaultIdType> = EdgeLists<
+    <Ts as TransitionSystem>::Alphabet,
+    <Ts as TransitionSystem>::StateColor,
+    <Ts as TransitionSystem>::EdgeColor,
+    DET,
+    IdType,
+>;
 
 impl<A: Alphabet, C: Color, Q: Color, const DET: bool, IdType: ScalarIndexType>
     EdgeLists<A, Q, C, DET, IdType>
@@ -104,7 +103,7 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool, IdType: ScalarIndexType>
     }
 
     pub(crate) fn mutablets_remove_state(&mut self, q: IdType) -> Option<Q> {
-        let state = self.states.remove(&q)?;
+        let state = self.states.swap_remove(&q)?;
         self.states
             .iter_mut()
             .for_each(|(_, s)| s.remove_outgoing_edges_to(q));
