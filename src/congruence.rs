@@ -32,9 +32,7 @@ pub trait Congruence: Deterministic + Pointed {
     where
         Self: Congruence<StateColor = bool>,
     {
-        let (dts, initial) = self
-            .erase_edge_colors()
-            .collect_linked_list_deterministic_pointed();
+        let (dts, initial) = self.erase_edge_colors().collect_dts();
         DFA::from_parts(dts, initial)
     }
 
@@ -129,7 +127,7 @@ impl<C: Deterministic + Pointed> Congruence for C {}
 /// Represents a right congruence relation, which is in essence a trim, deterministic
 /// transition system with a designated initial state.
 pub type RightCongruence<A = CharAlphabet, Q = Void, C = Void, D = DTS<A, Q, C>> =
-    FiniteWordAutomaton<A, LazyMinimalRepresentatives<A, StateIndex<D>>, Q, C, true, D>;
+    FiniteWordAutomaton<A, LazyMinimalRepresentatives<D>, Q, C, true, D>;
 
 /// Type alias for a [`RightCongruence`] that is obtained by wrapping the given transition system.
 pub type IntoRightCongruence<D> =

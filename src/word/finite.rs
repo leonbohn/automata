@@ -43,14 +43,21 @@ pub trait FiniteWord<S>: LinearWord<S> {
         Concat(prefix, self)
     }
 
+    fn into_vec(self) -> Vec<S>
+    where
+        Self: Sized,
+    {
+        self.collect_vec()
+    }
+
     /// Collects the symbols making up `self` into a vector.
-    fn to_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<S> {
         self.symbols().collect()
     }
 
     /// Collects the symbols making up `self` into a [`VecDeque`].
-    fn to_deque(&self) -> VecDeque<S> {
-        VecDeque::from(self.to_vec())
+    fn collect_deque(&self) -> VecDeque<S> {
+        VecDeque::from(self.collect_vec())
     }
 
     /// Builds the [`PeriodicOmegaWord`] word that is the omega power of this word, i.e. if
@@ -126,6 +133,16 @@ impl<S: Symbol, const N: usize> FiniteWord<S> for [S; N] {
     where
         Self: 'this;
 
+    fn into_vec(self) -> Vec<S> {
+        unsafe {
+            let ptr = self.as_ptr();
+            let length = self.len();
+            let capacity = self.len();
+            std::mem::forget(self);
+            Vec::from_raw_parts(ptr as *mut S, length, capacity)
+        }
+    }
+
     fn symbols(&self) -> Self::Symbols<'_> {
         self.iter().cloned()
     }
@@ -147,8 +164,8 @@ impl<S: Symbol, Fw: FiniteWord<S> + ?Sized> FiniteWord<S> for &Fw {
     fn len(&self) -> usize {
         (*self).len()
     }
-    fn to_vec(&self) -> Vec<S> {
-        (*self).to_vec()
+    fn collect_vec(&self) -> Vec<S> {
+        (*self).collect_vec()
     }
 }
 
@@ -166,6 +183,10 @@ impl<S: Symbol> FiniteWord<S> for VecDeque<S> {
     type Symbols<'this> = std::iter::Cloned<std::collections::vec_deque::Iter<'this, S>>
     where
         Self: 'this;
+
+    fn into_vec(self) -> Vec<S> {
+        self.into()
+    }
 
     fn symbols(&self) -> Self::Symbols<'_> {
         self.iter().cloned()
@@ -188,7 +209,7 @@ impl FiniteWord<char> for str {
     fn len(&self) -> usize {
         self.len()
     }
-    fn to_vec(&self) -> Vec<char> {
+    fn collect_vec(&self) -> Vec<char> {
         self.chars().collect()
     }
 }
@@ -200,7 +221,7 @@ impl LinearWord<char> for String {
 }
 
 impl FiniteWord<char> for String {
-    fn to_vec(&self) -> Vec<char> {
+    fn collect_vec(&self) -> Vec<char> {
         self.chars().collect()
     }
 
@@ -214,6 +235,10 @@ impl FiniteWord<char> for String {
 
     fn symbols(&self) -> Self::Symbols<'_> {
         self.chars()
+    }
+
+    fn into_vec(self) -> Vec<char> {
+        self.chars().collect()
     }
 }
 
@@ -235,8 +260,11 @@ impl<S: Symbol> FiniteWord<S> for Vec<S> {
         self.iter().cloned()
     }
 
-    fn to_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<S> {
         self.clone()
+    }
+    fn into_vec(self) -> Vec<S> {
+        self
     }
 
     fn len(&self) -> usize {
@@ -262,7 +290,7 @@ impl<S: Symbol> FiniteWord<S> for [S] {
         self.iter().cloned()
     }
 
-    fn to_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<S> {
         self.to_vec()
     }
 

@@ -77,7 +77,7 @@ where
     >(
         &self,
         other: &IntoMealyMachine<O>,
-    ) -> Option<Vec<SymbolOf<C>>> {
+    ) -> Option<MinimalRepresentative<SymbolOf<C>>> {
         let prod = self.ts_product(other);
         for (mut rep, ProductIndex(l, r)) in
             prod.minimal_representatives_from(ProductIndex(self.initial, other.initial))
@@ -115,6 +115,7 @@ where
     ) -> Option<Vec<SymbolOf<C>>> {
         self.witness_restricted_inequivalence(other)
             .or(other.witness_restricted_inequivalence(self))
+            .map(MinimalRepresentative::into_inner)
     }
 }
 

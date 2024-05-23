@@ -128,7 +128,7 @@ pub trait Deterministic: TransitionSystem {
         self.minimal_representatives()
             .flat_map(|(rep, _)| {
                 self.symbols()
-                    .map(move |a| crate::word::Concat(&rep, [a]).to_vec())
+                    .map(move |a| crate::word::Concat(&rep, [a]).collect_vec())
             })
             .unique()
     }
@@ -514,7 +514,7 @@ pub trait Deterministic: TransitionSystem {
         Self: Sized,
         EdgeColor<Self>: Hash + Eq,
     {
-        self.collect_edge_lists_deterministic()
+        self.collect_graphts_deterministic()
     }
     /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
@@ -545,7 +545,7 @@ pub trait Deterministic: TransitionSystem {
         Self: Sized + Pointed,
         EdgeColor<Self>: Hash + Eq,
     {
-        self.collect_edge_lists_deterministic_pointed()
+        self.collect_graphts_deterministic_pointed()
     }
 
     /// Collects `self` into a new [`LinkedListTransitionSystem`] over the same alphabet. This is used, for example, after a chain of
@@ -600,6 +600,45 @@ pub trait Deterministic: TransitionSystem {
     {
         let old_initial = self.initial();
         let (ts, map) = EdgeLists::sprout_from_ts_with_bijection(self);
+        (
+            ts,
+            *map.get_by_left(&old_initial)
+                .expect("Initial state did not get collected"),
+        )
+    }
+
+    /// Collects `self` into a new [`GraphTs`] over the same alphabet. This is used, for example, after a chain of
+    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
+    ///
+    /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
+    /// subsequently inserts all transitions, see [`Deterministic::collect_edge_lists_deterministic`] for details.
+    #[cfg(feature = "petgraph")]
+    fn collect_graphts_deterministic(
+        self,
+    ) -> GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true> {
+        let (ts, _map) = GraphTs::sprout_from_ts_with_bijection(self);
+        ts
+    }
+
+    /// Collects `self` into a new [`GraphTs`] over the same alphabet. This is used, for example, after a chain of
+    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
+    /// This method additionally also returns the initial state of the collected TS.
+    ///
+    /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
+    /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
+    #[cfg(feature = "petgraph")]
+    #[allow(clippy::type_complexity)]
+    fn collect_graphts_deterministic_pointed(
+        self,
+    ) -> (
+        GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true>,
+        StateIndex<GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true>>,
+    )
+    where
+        Self: Pointed,
+    {
+        let old_initial = self.initial();
+        let (ts, map) = GraphTs::sprout_from_ts_with_bijection(self);
         (
             ts,
             *map.get_by_left(&old_initial)

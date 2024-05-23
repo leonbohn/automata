@@ -40,7 +40,10 @@ pub mod prelude {
             OmegaAcceptanceCondition, OmegaAutomaton, OmegaSemantics, ReachabilityCondition,
             Semantics, WithInitial, DBA, DFA, DMA, DPA,
         },
-        congruence::{CollectRightCongruence, Congruence, IntoRightCongruence, RightCongruence},
+        congruence::{
+            CollectRightCongruence, Congruence, IntoRightCongruence, MinimalRepresentative,
+            RightCongruence,
+        },
         math,
         transition_system::operations,
         transition_system::{
@@ -48,7 +51,6 @@ pub mod prelude {
             impls::DefaultIdType,
             operations::{DefaultIfMissing, Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
-            reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
             EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, Id, IndexType, Indexes,

@@ -120,7 +120,7 @@ mod tests {
             .into_dts();
         assert_eq!(
             ts.predecessors(0).unwrap().collect::<Vec<_>>(),
-            vec![(0, 'b', 0), (1, 'a', 0), (2, 'a', 0)]
+            vec![(2, 'a', 0), (1, 'a', 0), (0, 'b', 0)]
         );
     }
 }

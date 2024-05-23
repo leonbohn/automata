@@ -28,8 +28,8 @@ impl<S: Symbol, X: FiniteWord<S>, Y: FiniteWord<S>> FiniteWord<S> for Concat<X, 
         self.0.symbols().chain(self.1.symbols())
     }
 
-    fn to_vec(&self) -> Vec<S> {
-        let mut repr = self.0.to_vec();
+    fn collect_vec(&self) -> Vec<S> {
+        let mut repr = self.0.collect_vec();
         repr.extend(self.1.symbols());
         repr
     }
@@ -70,6 +70,6 @@ mod tests {
         let prefix = "abc";
         let suffix = "def";
         let combined = prefix.append(suffix);
-        assert_eq!(combined.to_vec(), vec!['a', 'b', 'c', 'd', 'e', 'f']);
+        assert_eq!(combined.collect_vec(), vec!['a', 'b', 'c', 'd', 'e', 'f']);
     }
 }

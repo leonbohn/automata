@@ -1,88 +1,85 @@
-use std::{cell::OnceCell, ops::Deref};
+use std::{cell::OnceCell, hash::Hash};
 
 use bimap::BiBTreeMap;
 use itertools::Itertools;
 
 use crate::prelude::*;
 
-/// Gives lazy acceess to the minimal representatives of a [`RightCongruence`]. This is used
-/// to avoid recomputing the minimal representatives of a congruence multiple times.
+/// Represents the minimal representative of a state in a deterministic [`TransitionSystem`], which is the length-lexicographically
+/// minimal string with which the state can be reached from the [`Pointed::initial`] state.
+///
+/// As a transition system is equivalent to a right congruence, this type an also be seen as the minimal
+/// representative of a congruence class.
 #[derive(Debug, Clone)]
-pub struct LazyMinimalRepresentatives<A: Alphabet, Idx: IndexType = usize>(
-    OnceCell<BiBTreeMap<Idx, MinimalRepresentative<A::Symbol>>>,
-);
+pub struct MinimalRepresentative<T: Deterministic>(Vec<SymbolOf<T>>, StateIndex<T>);
 
-impl<A: Alphabet, Idx: IndexType> LazyMinimalRepresentatives<A, Idx> {
-    /// Tries to get access to the underlying minimal representatives. If the cache
-    /// has not been initialized yet, this will return `None`.
-    pub fn try_get(&self) -> Option<&BiBTreeMap<Idx, MinimalRepresentative<A::Symbol>>> {
-        self.0.get()
+impl<T: Deterministic> MinimalRepresentative<T> {
+    /// Returns the state index of the state that this minimal representative represents.
+    pub fn state_index(&self) -> StateIndex<T> {
+        self.1
     }
 
-    /// Gets access to the underlying minimal representatives. If the cache has not been
-    /// initialized yet, this will panic.
-    pub fn get(&self) -> &BiBTreeMap<Idx, MinimalRepresentative<A::Symbol>> {
-        self.0.get().expect("Cache not initialized")
+    pub fn decompose(self) -> (Vec<SymbolOf<T>>, StateIndex<T>) {
+        (self.0, self.1)
     }
-
-    /// Ensures that the minimal representatives are computed and stored in the cache.
-    pub fn ensure<T>(&self, ts: T)
-    where
-        T: Congruence<Alphabet = A, StateIndex = Idx>,
-    {
-        self.0.get_or_init(|| {
-            let mut map = BiBTreeMap::new();
-            for (mr, idx) in ts.minimal_representatives() {
-                map.insert(idx, MinimalRepresentative(mr));
-            }
-
-            map
-        });
+}
+impl<T: Deterministic> PartialEq for MinimalRepresentative<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0 && self.1 == other.1
+    }
+}
+impl<T: Deterministic> PartialOrd for MinimalRepresentative<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(&other))
+    }
+}
+impl<T: Deterministic> Ord for MinimalRepresentative<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.0.cmp(&other.0) {
+            std::cmp::Ordering::Equal => self.1.cmp(&other.1),
+            ord => ord,
+        }
+    }
+}
+impl<T: Deterministic> Eq for MinimalRepresentative<T> {}
+impl<T: Deterministic> Hash for MinimalRepresentative<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+        self.1.hash(state);
     }
 }
 
-impl<A: Alphabet, Idx: IndexType> Deref for LazyMinimalRepresentatives<A, Idx> {
-    type Target = BiBTreeMap<Idx, MinimalRepresentative<A::Symbol>>;
+impl<T: Deterministic> std::ops::Deref for MinimalRepresentative<T> {
+    type Target = Vec<SymbolOf<T>>;
 
     fn deref(&self) -> &Self::Target {
-        self.get()
+        &self.0
     }
 }
 
-impl<A: Alphabet, Idx: IndexType> Default for LazyMinimalRepresentatives<A, Idx> {
-    fn default() -> Self {
-        Self(OnceCell::new())
+impl<T: Deterministic> std::ops::DerefMut for MinimalRepresentative<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
-impl<A: Alphabet, Idx: IndexType> PartialEq for LazyMinimalRepresentatives<A, Idx> {
-    fn eq(&self, _other: &Self) -> bool {
-        true
+impl<T: Deterministic> MinimalRepresentative<T> {
+    pub fn into_inner(self) -> Vec<SymbolOf<T>> {
+        self.0
     }
-}
-impl<A: Alphabet, Idx: IndexType> Eq for LazyMinimalRepresentatives<A, Idx> {}
-
-/// Represents a minimal representative of a class in a [`RightCongruence`]. For a state
-/// `q` in a congruence, the minimal representative of the class of `q` is the length-lexicographically
-/// smallest word that reaches `q`/that is equivalent to `q` under the congruence.
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct MinimalRepresentative<S: Symbol>(Vec<S>);
-
-impl<S: Symbol> MinimalRepresentative<S> {
-    /// Creates an instance of the empty class
-    pub fn epsilon() -> Self {
-        Self(vec![])
+    pub fn new(inner: Vec<SymbolOf<T>>, id: StateIndex<T>) -> Self {
+        Self(inner, id)
     }
 }
 
-impl<S: Symbol> LinearWord<S> for MinimalRepresentative<S> {
-    fn nth(&self, position: usize) -> Option<S> {
+impl<T: Deterministic> LinearWord<SymbolOf<T>> for MinimalRepresentative<T> {
+    fn nth(&self, position: usize) -> Option<SymbolOf<T>> {
         self.0.get(position).copied()
     }
 }
 
-impl<S: Symbol> FiniteWord<S> for MinimalRepresentative<S> {
-    type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, S>>
+impl<T: Deterministic> FiniteWord<SymbolOf<T>> for MinimalRepresentative<T> {
+    type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, SymbolOf<T>>>
     where
         Self: 'this;
 
@@ -91,7 +88,7 @@ impl<S: Symbol> FiniteWord<S> for MinimalRepresentative<S> {
     }
 }
 
-impl<S: Symbol + Show> Show for MinimalRepresentative<S> {
+impl<T: Deterministic + Show> Show for MinimalRepresentative<T> {
     fn show(&self) -> String {
         if self.is_empty() {
             "ε".to_string()
@@ -101,16 +98,59 @@ impl<S: Symbol + Show> Show for MinimalRepresentative<S> {
     }
 }
 
-impl<S: Symbol> Deref for MinimalRepresentative<S> {
-    type Target = Vec<S>;
+/// Gives lazy acceess to the minimal representatives of a [`RightCongruence`]. This is used
+/// to avoid recomputing the minimal representatives of a congruence multiple times.
+#[derive(Clone)]
+pub struct LazyMinimalRepresentatives<T: Deterministic>(
+    OnceCell<BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>>,
+);
+
+impl<T: Deterministic> LazyMinimalRepresentatives<T> {
+    /// Tries to get access to the underlying minimal representatives. If the cache
+    /// has not been initialized yet, this will return `None`.
+    pub fn try_get(&self) -> Option<&BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>> {
+        self.0.get()
+    }
+
+    /// Gets access to the underlying minimal representatives. If the cache has not been
+    /// initialized yet, this will panic.
+    pub fn get(&self) -> &BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>> {
+        self.0.get().expect("Cache not initialized")
+    }
+
+    /// Ensures that the minimal representatives are computed and stored in the cache.
+    pub fn ensure(&self, ts: T)
+    where
+        T: Pointed,
+    {
+        self.0.get_or_init(|| {
+            let mut map = BiBTreeMap::new();
+            for mr in ts.minimal_representatives() {
+                map.insert(mr.state_index(), mr);
+            }
+
+            map
+        });
+    }
+}
+
+impl<T: Deterministic> std::ops::Deref for LazyMinimalRepresentatives<T> {
+    type Target = BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.get()
     }
 }
 
-impl<S: Symbol> FromIterator<S> for MinimalRepresentative<S> {
-    fn from_iter<T: IntoIterator<Item = S>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+impl<T: Deterministic> Default for LazyMinimalRepresentatives<T> {
+    fn default() -> Self {
+        Self(OnceCell::new())
     }
 }
+
+impl<T: Deterministic> PartialEq for LazyMinimalRepresentatives<T> {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+impl<T: Deterministic> Eq for LazyMinimalRepresentatives<T> {}
