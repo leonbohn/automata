@@ -295,7 +295,7 @@ where
                 while on_stack.contains(&q) {
                     let top = stack.pop().unwrap();
                     low.insert(top, low_q);
-                    on_stack.remove(&top);
+                    on_stack.swap_remove(&top);
                     scc.push(top);
                 }
                 let scc = Scc::new(ts, scc.into_iter());

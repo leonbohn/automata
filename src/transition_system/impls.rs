@@ -19,6 +19,9 @@ pub use linked::{
     LinkedListTransitionSystemEdgesToIter, LinkedListTransitionSystemState, NTSEdgesFromIter,
 };
 
+#[cfg(feature = "petgraph")]
+pub(crate) mod pg;
+
 use super::ScalarIndexType;
 
 pub type DefaultIdType = u32;

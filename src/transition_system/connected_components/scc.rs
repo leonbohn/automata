@@ -237,7 +237,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         while !queue.is_empty() {
             if queue.contains_key(&current) {
                 if queue.get(&current).unwrap().is_empty() {
-                    queue.remove(&current);
+                    queue.swap_remove(&current);
                     continue;
                 } else {
                     let (symbol, target) = *queue
@@ -248,7 +248,10 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                         .expect("We know this is non-empty");
                     debug_assert!(ts.has_transition(current, symbol, target));
 
-                    queue.get_mut(&current).unwrap().remove(&(symbol, target));
+                    queue
+                        .get_mut(&current)
+                        .unwrap()
+                        .swap_remove(&(symbol, target));
                     word.push(symbol);
                     current = target;
                 }
@@ -268,7 +271,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                     .unwrap_or_else(|| *queue.keys().next().unwrap());
                 debug_assert!(queue.contains_key(&q));
                 if queue.get(&q).unwrap().is_empty() {
-                    queue.remove(&q);
+                    queue.swap_remove(&q);
                     continue;
                 }
 
