@@ -48,7 +48,7 @@ pub use builder::TSBuilder;
 
 /// Deals with analysing reachability in transition systems.
 pub mod reachable;
-pub use reachable::{LengthLexicographicMinimalRepresentatives, Reachable, ReachableStateIndices};
+pub use reachable::{LengthLexicographicMinimalRepresentatives, Reachable};
 
 /// Contains implementations for SCC decompositions and the corresponding/associated types.
 pub mod connected_components;
@@ -328,14 +328,13 @@ pub trait TransitionSystem: Sized {
         let from = from.to_index(self)?;
         let to = to.to_index(self)?;
 
-        self.minimal_representatives_from(from)
-            .find_map(|(word, state)| {
-                if state == to {
-                    Some(word.decompose().0)
-                } else {
-                    None
-                }
-            })
+        self.minimal_representatives_from(from).find_map(|rep| {
+            if rep.state_index() == to {
+                Some(rep.decompose().0)
+            } else {
+                None
+            }
+        })
     }
 
     /// Gives the size of `self`, which is obtained simply by counting the number of elements yielded by [`Self::state_indices()`].
@@ -606,11 +605,12 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns an iterator over all state colors that are reachable from the initial state. May yield the same color multiple times.
-    fn reachable_state_colors(&self) -> impl Iterator<Item = Self::StateColor>
+    fn reachable_state_colors(&self) -> impl Iterator<Item = Self::StateColor> + '_
     where
         Self: Sized + Pointed,
     {
-        self.reachable_states().map(|q| c)
+        self.reachable_states()
+            .map(|q| self.state_color(q).unwrap())
     }
 
     /// Returns an iterator over the minimal representatives (i.e. length-lexicographically minimal
@@ -618,10 +618,7 @@ pub trait TransitionSystem: Sized {
     fn minimal_representatives_from<Idx: Indexes<Self>>(
         &self,
         state: Idx,
-    ) -> LengthLexicographicMinimalRepresentatives<&Self>
-    where
-        Self: Sized,
-    {
+    ) -> LengthLexicographicMinimalRepresentatives<'_, Self> {
         LengthLexicographicMinimalRepresentatives::new(
             self,
             state
@@ -631,7 +628,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the initial state.
-    fn reachable_state_indices(&self) -> ReachableStateIndices<&Self>
+    fn reachable_state_indices(&self) -> Reachable<'_, Self, false>
     where
         Self: Sized + Pointed,
     {
@@ -639,15 +636,15 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the given `state`.
-    fn reachable_state_indices_from(&self, state: Self::StateIndex) -> ReachableStateIndices<&Self>
+    fn reachable_state_indices_from(&self, state: Self::StateIndex) -> Reachable<'_, Self, false>
     where
         Self: Sized,
     {
-        ReachableStateIndices::new(self, state)
+        Reachable::state_indices(self, state)
     }
 
     /// Returns an iterator over the states that are reachable from the given `state`.
-    fn reachable_states_from<Idx: Indexes<Self>>(&self, state: Idx) -> Reachable<&Self>
+    fn reachable_states_from<Idx: Indexes<Self>>(&self, state: Idx) -> Reachable<'_, Self>
     where
         Self: Sized,
     {

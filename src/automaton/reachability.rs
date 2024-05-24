@@ -110,12 +110,12 @@ where
     /// Tries to construct a (finite) word witnessing that the accepted language is empty. If such a word exists,
     /// the function returns it, otherwise `None`.
     pub fn give_word(&self) -> Option<Vec<SymbolOf<Self>>> {
-        self.minimal_representatives().find_map(|(mr, index)| {
+        self.minimal_representatives().find_map(|rep| {
             if self
-                .state_color(index)
+                .state_color(rep.state_index())
                 .expect("Every state must be colored")
             {
-                Some(mr.into_inner())
+                Some(rep.decompose().0)
             } else {
                 None
             }
@@ -185,7 +185,8 @@ where
         self.with_initial(q)
             .ts_product(self.with_initial(p))
             .minimal_representatives()
-            .find_map(|(rep, ProductIndex(l, r))| {
+            .find_map(|rep| {
+                let ProductIndex(l, r) = rep.state_index();
                 if self.state_color(l).unwrap() != self.state_color(r).unwrap() {
                     Some(rep.into_inner())
                 } else {

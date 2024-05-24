@@ -77,11 +77,10 @@ where
     >(
         &self,
         other: &IntoMealyMachine<O>,
-    ) -> Option<MinimalRepresentative<SymbolOf<C>>> {
+    ) -> Option<Vec<SymbolOf<C>>> {
         let prod = self.ts_product(other);
-        for (mut rep, ProductIndex(l, r)) in
-            prod.minimal_representatives_from(ProductIndex(self.initial, other.initial))
-        {
+        for rep in prod.minimal_representatives_from(ProductIndex(self.initial, other.initial)) {
+            let (mut rep, ProductIndex(l, r)) = rep.decompose();
             'edges: for edge in self.edges_from(l).unwrap() {
                 let Some(sym) = edge.expression().symbols().next() else {
                     continue 'edges;
@@ -115,7 +114,6 @@ where
     ) -> Option<Vec<SymbolOf<C>>> {
         self.witness_restricted_inequivalence(other)
             .or(other.witness_restricted_inequivalence(self))
-            .map(MinimalRepresentative::into_inner)
     }
 }
 

@@ -32,7 +32,7 @@ pub trait Congruence: Deterministic + Pointed {
     where
         Self: Congruence<StateColor = bool>,
     {
-        let (dts, initial) = self.erase_edge_colors().collect_dts();
+        let (dts, initial) = self.erase_edge_colors().collect_dts_pointed();
         DFA::from_parts(dts, initial)
     }
 
@@ -172,7 +172,7 @@ where
     }
 
     /// Returns a reference to the minimal representatives of the classes of the right congruence.
-    pub fn minimal_representatives(&self) -> &LazyMinimalRepresentatives<A, StateIndex<D>> {
+    pub fn minimal_representatives(&self) -> &LazyMinimalRepresentatives<D> {
         self.acceptance()
     }
 
@@ -194,20 +194,14 @@ where
 
     /// Returns the [`Class`] that is referenced by `index`.
     #[inline(always)]
-    pub fn state_to_mr<Idx: Indexes<Self>>(
-        &self,
-        index: Idx,
-    ) -> Option<&MinimalRepresentative<A::Symbol>> {
+    pub fn state_to_mr<Idx: Indexes<Self>>(&self, index: Idx) -> Option<&MinimalRepresentative<D>> {
         let idx = index.to_index(self)?;
         self.minimal_representatives().get_by_left(&idx)
     }
 
     #[inline(always)]
     /// Returns the index of the class containing the given word.
-    pub fn mr_to_state(
-        &self,
-        class: &MinimalRepresentative<A::Symbol>,
-    ) -> Option<StateIndex<Self>> {
+    pub fn mr_to_state(&self, class: &MinimalRepresentative<D>) -> Option<StateIndex<Self>> {
         self.minimal_representatives().get_by_right(class).cloned()
     }
 
@@ -215,7 +209,7 @@ where
     /// with the corresponding index of the class.
     pub fn classes(
         &self,
-    ) -> impl Iterator<Item = (&MinimalRepresentative<A::Symbol>, StateIndex<Self>)> + '_ {
+    ) -> impl Iterator<Item = (&MinimalRepresentative<D>, StateIndex<Self>)> + '_ {
         self.minimal_representatives()
             .iter()
             .map(|(idx, mr)| (mr, *idx))

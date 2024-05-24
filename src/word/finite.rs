@@ -134,13 +134,7 @@ impl<S: Symbol, const N: usize> FiniteWord<S> for [S; N] {
         Self: 'this;
 
     fn into_vec(self) -> Vec<S> {
-        unsafe {
-            let ptr = self.as_ptr();
-            let length = self.len();
-            let capacity = self.len();
-            std::mem::forget(self);
-            Vec::from_raw_parts(ptr as *mut S, length, capacity)
-        }
+        self.collect_vec()
     }
 
     fn symbols(&self) -> Self::Symbols<'_> {

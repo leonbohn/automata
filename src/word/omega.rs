@@ -90,7 +90,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     /// Returns a vector consisting of the symbols making up the cycle of `self`. This simply collects
     /// whatever symbols make up [`OmegaWord::cycle()`];
     fn cycle_vec(&self) -> Vec<S> {
-        self.cycle().to_vec()
+        self.cycle().into_vec()
     }
 
     /// Returns a vector consisting of the symbols making up the spoke of `self`. This simply collects
