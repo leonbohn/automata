@@ -140,4 +140,51 @@ pub trait Shrinkable: TransitionSystem {
     /// assert_eq!(ts.remove_edges_to(2), None);
     /// ```
     fn remove_edges_to(&mut self, target: impl Indexes<Self>) -> Option<Vec<EdgeTuple<Self>>>;
+
+    /// Removes all states that are not reachable from the given state.
+    /// Returns the set of all removed state indices with their associated color.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let mut ts = EdgeListsDeterministic::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let q0 = ts.add_state(true);
+    /// let q1 = ts.add_state(false);
+    /// let q2 = ts.add_state(false);
+    ///
+    /// ts.add_edge((q0, 'a', q1));
+    /// ts.add_edge((q0, 'b', q1));
+    /// ts.add_edge((q1, 'a', q1));
+    ///
+    /// assert_eq!(ts.trim_from(q0), vec![(q2, false)]);
+    /// ```
+    fn trim_from(
+        &mut self,
+        source: impl Indexes<Self>,
+    ) -> Vec<(StateIndex<Self>, StateColor<Self>)> {
+        let Some(source) = source.to_index(self) else {
+            panic!("Cannot trim from {:?}", source);
+        };
+        let reachable = self
+            .reachable_state_indices_from(source)
+            .collect::<Vec<_>>();
+        let mut out = Vec::new();
+        for q in self.state_indices_vec() {
+            if !reachable.contains(&q) {
+                let c = self.remove_state(q).expect("We know this exists");
+                out.push((q, c));
+            }
+        }
+        out
+    }
+
+    /// Removes all states that are not reachable from the initial state and returns the set of
+    /// all removed state indices with their associated color. See [`Self::trim_from`] for an example.
+    fn trim(&mut self) -> Vec<(StateIndex<Self>, StateColor<Self>)>
+    where
+        Self: Pointed,
+    {
+        self.trim_from(self.initial())
+    }
 }

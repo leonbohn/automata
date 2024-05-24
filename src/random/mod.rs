@@ -86,12 +86,8 @@ pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, usize) {
 pub fn generate_random_dba(symbols: usize, size: usize) -> DBA {
     // draw random transition system
     let (mut dts, initial) = generate_random_ts_sized(symbols, size);
-    // remove unreachable states (`remove_state()` is not yet implemented)
-    // for q in dts.state_indices() {
-    //     if !dts.is_reachable_from(initial, q) {
-    //         dts.remove_state(q);
-    //     }
-    // }
+    // remove unreachable states
+    dts.trim_from(initial);
     // draw acceptance condition
     dts.map_edge_colors(|_| fastrand::bool())
         .with_initial(initial)
@@ -104,12 +100,8 @@ pub fn generate_random_dba(symbols: usize, size: usize) -> DBA {
 pub fn generate_random_dpa(symbols: usize, size: usize, priorities: usize) -> DPA {
     // draw random transition system
     let (mut dts, initial) = generate_random_ts_sized(symbols, size);
-    // remove unreachable states (`remove_state()` is not yet implemented)
-    // for q in dts.state_indices() {
-    //     if !dts.is_reachable_from(initial, q) {
-    //         dts.remove_state(q);
-    //     }
-    // }
+    // remove unreachable states
+    dts.trim_from(initial);
     // draw acceptance condition
     dts.map_edge_colors(|_| fastrand::usize(..priorities))
         .with_initial(initial)
