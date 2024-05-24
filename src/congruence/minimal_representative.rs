@@ -11,9 +11,9 @@ use crate::prelude::*;
 /// As a transition system is equivalent to a right congruence, this type an also be seen as the minimal
 /// representative of a congruence class.
 #[derive(Debug, Clone)]
-pub struct MinimalRepresentative<T: Deterministic>(Vec<SymbolOf<T>>, StateIndex<T>);
+pub struct MinimalRepresentative<T: TransitionSystem>(Vec<SymbolOf<T>>, StateIndex<T>);
 
-impl<T: Deterministic> MinimalRepresentative<T> {
+impl<T: TransitionSystem> MinimalRepresentative<T> {
     /// Returns the state index of the state that this minimal representative represents.
     pub fn state_index(&self) -> StateIndex<T> {
         self.1
@@ -23,17 +23,17 @@ impl<T: Deterministic> MinimalRepresentative<T> {
         (self.0, self.1)
     }
 }
-impl<T: Deterministic> PartialEq for MinimalRepresentative<T> {
+impl<T: TransitionSystem> PartialEq for MinimalRepresentative<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0 && self.1 == other.1
     }
 }
-impl<T: Deterministic> PartialOrd for MinimalRepresentative<T> {
+impl<T: TransitionSystem> PartialOrd for MinimalRepresentative<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(&other))
     }
 }
-impl<T: Deterministic> Ord for MinimalRepresentative<T> {
+impl<T: TransitionSystem> Ord for MinimalRepresentative<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match self.0.cmp(&other.0) {
             std::cmp::Ordering::Equal => self.1.cmp(&other.1),
@@ -41,15 +41,15 @@ impl<T: Deterministic> Ord for MinimalRepresentative<T> {
         }
     }
 }
-impl<T: Deterministic> Eq for MinimalRepresentative<T> {}
-impl<T: Deterministic> Hash for MinimalRepresentative<T> {
+impl<T: TransitionSystem> Eq for MinimalRepresentative<T> {}
+impl<T: TransitionSystem> Hash for MinimalRepresentative<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
         self.1.hash(state);
     }
 }
 
-impl<T: Deterministic> std::ops::Deref for MinimalRepresentative<T> {
+impl<T: TransitionSystem> std::ops::Deref for MinimalRepresentative<T> {
     type Target = Vec<SymbolOf<T>>;
 
     fn deref(&self) -> &Self::Target {
@@ -57,13 +57,13 @@ impl<T: Deterministic> std::ops::Deref for MinimalRepresentative<T> {
     }
 }
 
-impl<T: Deterministic> std::ops::DerefMut for MinimalRepresentative<T> {
+impl<T: TransitionSystem> std::ops::DerefMut for MinimalRepresentative<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T: Deterministic> MinimalRepresentative<T> {
+impl<T: TransitionSystem> MinimalRepresentative<T> {
     pub fn into_inner(self) -> Vec<SymbolOf<T>> {
         self.0
     }
@@ -72,13 +72,13 @@ impl<T: Deterministic> MinimalRepresentative<T> {
     }
 }
 
-impl<T: Deterministic> LinearWord<SymbolOf<T>> for MinimalRepresentative<T> {
+impl<T: TransitionSystem> LinearWord<SymbolOf<T>> for MinimalRepresentative<T> {
     fn nth(&self, position: usize) -> Option<SymbolOf<T>> {
         self.0.get(position).copied()
     }
 }
 
-impl<T: Deterministic> FiniteWord<SymbolOf<T>> for MinimalRepresentative<T> {
+impl<T: TransitionSystem> FiniteWord<SymbolOf<T>> for MinimalRepresentative<T> {
     type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, SymbolOf<T>>>
     where
         Self: 'this;
@@ -88,7 +88,7 @@ impl<T: Deterministic> FiniteWord<SymbolOf<T>> for MinimalRepresentative<T> {
     }
 }
 
-impl<T: Deterministic + Show> Show for MinimalRepresentative<T> {
+impl<T: TransitionSystem + Show> Show for MinimalRepresentative<T> {
     fn show(&self) -> String {
         if self.is_empty() {
             "ε".to_string()
@@ -101,11 +101,11 @@ impl<T: Deterministic + Show> Show for MinimalRepresentative<T> {
 /// Gives lazy acceess to the minimal representatives of a [`RightCongruence`]. This is used
 /// to avoid recomputing the minimal representatives of a congruence multiple times.
 #[derive(Clone)]
-pub struct LazyMinimalRepresentatives<T: Deterministic>(
+pub struct LazyMinimalRepresentatives<T: TransitionSystem>(
     OnceCell<BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>>,
 );
 
-impl<T: Deterministic> LazyMinimalRepresentatives<T> {
+impl<T: TransitionSystem> LazyMinimalRepresentatives<T> {
     /// Tries to get access to the underlying minimal representatives. If the cache
     /// has not been initialized yet, this will return `None`.
     pub fn try_get(&self) -> Option<&BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>> {
@@ -125,7 +125,7 @@ impl<T: Deterministic> LazyMinimalRepresentatives<T> {
     {
         self.0.get_or_init(|| {
             let mut map = BiBTreeMap::new();
-            for mr in ts.minimal_representatives() {
+            for mr in ts.minimal_representatives_from(ts.initial()) {
                 map.insert(mr.state_index(), mr);
             }
 
@@ -134,7 +134,7 @@ impl<T: Deterministic> LazyMinimalRepresentatives<T> {
     }
 }
 
-impl<T: Deterministic> std::ops::Deref for LazyMinimalRepresentatives<T> {
+impl<T: TransitionSystem> std::ops::Deref for LazyMinimalRepresentatives<T> {
     type Target = BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>;
 
     fn deref(&self) -> &Self::Target {
@@ -142,15 +142,15 @@ impl<T: Deterministic> std::ops::Deref for LazyMinimalRepresentatives<T> {
     }
 }
 
-impl<T: Deterministic> Default for LazyMinimalRepresentatives<T> {
+impl<T: TransitionSystem> Default for LazyMinimalRepresentatives<T> {
     fn default() -> Self {
         Self(OnceCell::new())
     }
 }
 
-impl<T: Deterministic> PartialEq for LazyMinimalRepresentatives<T> {
+impl<T: TransitionSystem> PartialEq for LazyMinimalRepresentatives<T> {
     fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
-impl<T: Deterministic> Eq for LazyMinimalRepresentatives<T> {}
+impl<T: TransitionSystem> Eq for LazyMinimalRepresentatives<T> {}

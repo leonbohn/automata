@@ -241,14 +241,17 @@ where
                 continue;
             }
             if scc.interior_edge_colors().contains(&color) {
-                let (q, rep) = scc
+                let rep = scc
                     .minimal_representative()
                     .as_ref()
                     .expect("We know this is reachable");
                 let cycle = scc
-                    .maximal_loop_from(*rep)
+                    .maximal_loop_from(rep.state_index())
                     .expect("This thing is non-transient");
-                return Some(ReducedOmegaWord::ultimately_periodic(q, cycle));
+                return Some(ReducedOmegaWord::ultimately_periodic(
+                    rep.collect_vec(),
+                    cycle,
+                ));
             }
         }
         None
@@ -279,13 +282,13 @@ where
                 .min()
                 .expect("we know this is not transient");
             if *a == k && *b == l {
-                let Some((mr, spoke)) = scc.minimal_representative() else {
+                let Some(rep) = scc.minimal_representative() else {
                     continue;
                 };
                 let cycle = scc
-                    .maximal_loop_from(*spoke)
+                    .maximal_loop_from(rep.state_index())
                     .expect("This thing is non-transient");
-                return Some(ReducedOmegaWord::ultimately_periodic(mr, cycle));
+                return Some(ReducedOmegaWord::ultimately_periodic(rep.into_vec(), cycle));
             }
         }
         None

@@ -124,12 +124,10 @@ where
     {
         let other_initial = other.initial();
         let prod = self.ts_product(other);
-        for (mr, idx) in
-            prod.minimal_representatives_from(ProductIndex(self.initial, other_initial))
-        {
-            let (c, d) = prod.state_color(idx).unwrap();
+        for mr in prod.minimal_representatives_from(ProductIndex(self.initial, other_initial)) {
+            let (c, d) = prod.state_color(mr.state_index()).unwrap();
             if c != d {
-                return Some(mr);
+                return Some(mr.decompose().0);
             }
         }
         None

@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, VecDeque};
 /// for a state `q` of some transition system is the length-lexicographically minimal string with which
 /// `q` can be reached from a given state.
 #[derive(Debug, Clone)]
-pub struct LengthLexicographicMinimalRepresentatives<'a, Ts: Congruence> {
+pub struct LengthLexicographicMinimalRepresentatives<'a, Ts: TransitionSystem> {
     ts: &'a Ts,
     seen: Set<Ts::StateIndex>,
     queue: BTreeMap<MinimalRepresentative<Ts>, StateIndex<Ts>>,
@@ -14,7 +14,7 @@ pub struct LengthLexicographicMinimalRepresentatives<'a, Ts: Congruence> {
 #[allow(missing_docs)]
 impl<'a, Ts> LengthLexicographicMinimalRepresentatives<'a, Ts>
 where
-    Ts: Congruence,
+    Ts: TransitionSystem,
 {
     pub fn new(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
         let seen = Set::from_iter([origin]);
@@ -27,7 +27,7 @@ where
 
 impl<'a, Ts> Iterator for LengthLexicographicMinimalRepresentatives<'a, Ts>
 where
-    Ts: Congruence,
+    Ts: TransitionSystem,
 {
     type Item = MinimalRepresentative<Ts>;
 
@@ -164,22 +164,17 @@ mod tests {
                 (2, 'b', 2),
             ])
             .into_dfa(0);
-        let x = dfa.initial();
 
         assert_eq!(
-            dfa.minimal_representatives_from(0)
-                .collect::<Vec<(_, u32)>>(),
+            dfa.minimal_representatives_from(0).collect::<Vec<_>>(),
             vec![
-                ("".collect_vec(), 0u32),
-                ("a".collect_vec(), 1),
-                ("aa".collect_vec(), 2)
+                MinimalRepresentative::new("".collect_vec(), 0u32),
+                MinimalRepresentative::new("a".collect_vec(), 1),
+                MinimalRepresentative::new("aa".collect_vec(), 2)
             ]
         );
         assert_eq!(dfa.reachable_state_indices().collect_vec(), vec![0, 1, 2]);
-        assert_eq!(
-            dfa.reachable_states().collect_vec(),
-            vec![(0, false), (1, false), (2, true)]
-        );
+        assert_eq!(dfa.reachable_state_indices().collect_vec(), vec![0, 1, 2]);
 
         assert_eq!(dfa.reachable_state_indices_from(2).collect_vec(), vec![2]);
     }

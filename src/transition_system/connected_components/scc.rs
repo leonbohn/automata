@@ -163,9 +163,9 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         Ts: Pointed,
     {
         self.minimal_representative.get_or_init(|| {
-            self.ts.minimal_representatives().find_map(|(access, q)| {
-                if self.states.contains(&q) {
-                    Some((access, q))
+            self.ts.minimal_representatives().find_map(|rep| {
+                if self.states.contains(&rep.state_index()) {
+                    Some(rep)
                 } else {
                     None
                 }

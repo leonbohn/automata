@@ -110,13 +110,21 @@ pub trait Deterministic: TransitionSystem {
 
     /// Attempts to find the minimal representative of the indexed `state`, which the the length-lexicographically
     /// minimal word that can be used to reach `state`. If `state` is not reachable, `None` is returned.
-    fn minimal_representative<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Vec<SymbolOf<Self>>>
+    fn minimal_representative<Idx: Indexes<Self>>(
+        &self,
+        state: Idx,
+    ) -> Option<MinimalRepresentative<Self>>
     where
         Self: Pointed,
     {
         let q = state.to_index(self)?;
-        self.minimal_representatives()
-            .find_map(|(rep, p)| if p == q { Some(rep) } else { None })
+        self.minimal_representatives().find_map(|rep| {
+            if rep.state_index() == q {
+                Some(rep)
+            } else {
+                None
+            }
+        })
     }
 
     /// Gives an iterator over the minimal transition representatives, which are the length-lexicographically
@@ -126,7 +134,7 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
     {
         self.minimal_representatives()
-            .flat_map(|(rep, _)| {
+            .flat_map(|rep| {
                 self.symbols()
                     .map(move |a| crate::word::Concat(&rep, [a]).collect_vec())
             })

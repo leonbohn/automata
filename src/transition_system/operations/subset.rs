@@ -121,7 +121,7 @@ impl<Ts: TransitionSystem> TransitionSystem for SubsetConstruction<Ts> {
     where
         Self: 'this;
 
-    type StateIndices<'this> = crate::transition_system::reachable::ReachableStateIndices<&'this Self>
+    type StateIndices<'this> = crate::transition_system::reachable::Reachable<'this, Self, false>
     where
         Self: 'this;
 
