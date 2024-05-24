@@ -140,7 +140,7 @@ pub fn generate_random_word(alphabet: &CharAlphabet, min_len: usize, max_len: us
     random_word
 }
 
-/// Generate a set of `number` random Strings over the universe of the `alphabet`
+/// Generate a set of `number` random `String`s over the universe of the `alphabet`.
 /// The length for each sampled word is drawn uniformly from the range `min_len..=max_len`.
 pub fn generate_random_words(
     alphabet: &CharAlphabet,
@@ -148,11 +148,61 @@ pub fn generate_random_words(
     max_len: usize,
     number: usize,
 ) -> Set<String> {
-    let charset: Vec<char> = alphabet.universe().collect();
     let mut word_set = Set::with_capacity_and_hasher(number, FxBuildHasher::default());
 
     while word_set.len() < number {
         let random_word = generate_random_word(alphabet, min_len, max_len);
+        word_set.insert(random_word);
+    }
+
+    word_set
+}
+
+/// Generate a random `ReducedOmegaWord` over the universe of the `alphabet`.
+/// The length of the spoke is drawn uniformly from the range `min_len_spoke..=max_len_spoke`.
+/// The length of the cycle is drawn uniformly from the range `min_len_cycle..=max_len_cycle`.
+/// Panics if the length of the cycle can be 0.
+pub fn generate_random_omega_word(
+    alphabet: &CharAlphabet,
+    min_len_spoke: usize,
+    max_len_spoke: usize,
+    min_len_cycle: usize,
+    max_len_cycle: usize,
+) -> ReducedOmegaWord<char> {
+    let charset: Vec<char> = alphabet.universe().collect();
+
+    assert!(min_len_spoke <= max_len_spoke);
+    assert!(min_len_cycle <= max_len_cycle);
+    assert!(min_len_cycle > 0);
+
+    let spoke = generate_random_word(alphabet, min_len_spoke, max_len_spoke);
+    let cycle = generate_random_word(alphabet, min_len_cycle, max_len_cycle);
+
+    upw!(spoke, cycle)
+}
+
+/// Generate a set of `number` random `ReducedOmegaWord`s over the universe of the `alphabet`.
+/// The length for each spoke is drawn uniformly from the range `min_len_spoke..=max_len_spoke`.
+/// The length for each cycle is drawn uniformly from the range `min_len_cycle..=max_len_cycle`.
+/// Panics if the length of the cycle can be 0.
+pub fn generate_random_omega_words(
+    alphabet: &CharAlphabet,
+    min_len_spoke: usize,
+    max_len_spoke: usize,
+    min_len_cycle: usize,
+    max_len_cycle: usize,
+    number: usize,
+) -> Set<ReducedOmegaWord<char>> {
+    let mut word_set = Set::with_capacity_and_hasher(number, FxBuildHasher::default());
+
+    while word_set.len() < number {
+        let random_word = generate_random_omega_word(
+            alphabet,
+            min_len_spoke,
+            max_len_spoke,
+            min_len_cycle,
+            max_len_cycle,
+        );
         word_set.insert(random_word);
     }
 
@@ -258,13 +308,12 @@ pub(crate) fn print_random_ts_benchmark(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        random::{generate_random_dba, generate_random_dpa, generate_random_words, CharAlphabet},
-        transition_system::Dottable,
-        word, TransitionSystem,
-    };
+    use crate::{random::CharAlphabet, transition_system::Dottable, word, TransitionSystem};
 
-    use super::{generate_random_dfa, generate_random_ts_sized, print_random_ts_benchmark};
+    use super::{
+        generate_random_dba, generate_random_dfa, generate_random_dpa, generate_random_omega_words,
+        generate_random_ts_sized, generate_random_words, print_random_ts_benchmark,
+    };
 
     #[test_log::test]
     #[ignore]
@@ -298,7 +347,8 @@ mod tests {
     fn random_words() {
         let alphabet = CharAlphabet::of_size(2);
         let word_set = generate_random_words(&alphabet, 1, 10, 20);
-        for w in word_set.iter() {
+        let omega_word_set = generate_random_omega_words(&alphabet, 0, 5, 1, 5, 20);
+        for w in omega_word_set.iter() {
             println!("{:?}", w);
         }
 
