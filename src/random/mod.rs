@@ -1,8 +1,6 @@
 #![allow(unused)]
-
-use tracing::{debug, info};
-
 use crate::prelude::*;
+use tracing::{debug, info};
 
 /// Uses sprout-like algorithm to generate a random transition system. `symbols` determines the
 /// number of distinct symbols in the [`CharAlphabet`]. `probability` determines the probability
@@ -12,9 +10,9 @@ use crate::prelude::*;
 ///   add a back edge that state.
 /// 3. If no back edge to some state was added, we insert an edge to a new state.
 /// 4. Repeat until all states and symbols have been treated.
-pub fn generate_random_ts(symbols: usize, probability: f64) -> (LinkedListTransitionSystem, usize) {
+pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, usize) {
     let alphabet = CharAlphabet::of_size(symbols);
-    let mut dts = LinkedListTransitionSystem::for_alphabet(alphabet.clone());
+    let mut dts = DTS::for_alphabet(alphabet.clone());
 
     let mut current = dts.add_state(Void);
     let mut symbol_position = 0;
@@ -57,6 +55,142 @@ pub fn generate_random_dfa(symbols: usize, probability: f64) -> DFA {
     ts.map_state_colors(|_| fastrand::bool())
         .with_initial(initial)
         .collect_dfa()
+}
+
+/// Generate a random deterministic transition system of size `size` by randomly drawing transitions.
+/// `symbols` determines the number of distinct symbols in the [`CharAlphabet`].
+/// The algorithm is as follows:
+/// 1. Start with `size` states and no transitions.
+/// 2. For each state, for each symbol draw a target state and add the corresponding edge
+/// Note that depending on which state is chosen as the initial state, there may be unreachable states.
+pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, usize) {
+    let alphabet = CharAlphabet::of_size(symbols);
+    let mut dts = DTS::for_alphabet(alphabet.clone());
+    // add states
+    for i in 0..size {
+        dts.add_state(Void);
+    }
+    // add edges
+    for q in dts.state_indices_vec() {
+        for sym in alphabet.universe() {
+            let target = fastrand::usize(..dts.size());
+            dts.add_edge((q, sym, target));
+        }
+    }
+
+    (dts, 0)
+}
+
+/// Works as [`generate_random_ts_sized`], but returns a [`DBA`] instead by randomly coloring the edges.
+/// Removes unreachable states, that means the resulting DBA may be smaller than `size`.
+pub fn generate_random_dba(symbols: usize, size: usize) -> DBA {
+    // draw random transition system
+    let (mut dts, initial) = generate_random_ts_sized(symbols, size);
+    // remove unreachable states
+    dts.trim_from(initial);
+    // draw acceptance condition
+    dts.map_edge_colors(|_| fastrand::bool())
+        .with_initial(initial)
+        .collect_dba()
+}
+
+/// Works as [`generate_random_ts_sized`], but returns a [`DPA`] instead by randomly
+/// assigning priorities in the range `0..priorities` to each edge.
+/// Removes unreachable states, that means the resulting DPA may be smaller than `size`.
+pub fn generate_random_dpa(symbols: usize, size: usize, priorities: usize) -> DPA {
+    // draw random transition system
+    let (mut dts, initial) = generate_random_ts_sized(symbols, size);
+    // remove unreachable states
+    dts.trim_from(initial);
+    // draw acceptance condition
+    dts.map_edge_colors(|_| fastrand::usize(..priorities))
+        .with_initial(initial)
+        .collect_dpa()
+}
+
+/// Generate a random `String` over the universe of the `alphabet`
+/// The length of the `String` is drawn uniformly from the range `min_len..=max_len`.
+pub fn generate_random_word(alphabet: &CharAlphabet, min_len: usize, max_len: usize) -> String {
+    let charset: Vec<char> = alphabet.universe().collect();
+
+    let length = fastrand::usize(min_len..=max_len);
+    let random_word: String = (0..length)
+        .map(|_| {
+            let idx = fastrand::usize(..charset.len());
+            charset[idx] as char
+        })
+        .collect();
+
+    random_word
+}
+
+/// Generate a set of `number` random `String`s over the universe of the `alphabet`.
+/// The length for each sampled word is drawn uniformly from the range `min_len..=max_len`.
+pub fn generate_random_words(
+    alphabet: &CharAlphabet,
+    min_len: usize,
+    max_len: usize,
+    number: usize,
+) -> math::Set<String> {
+    let mut word_set = math::Set::with_capacity(number);
+
+    while word_set.len() < number {
+        let random_word = generate_random_word(alphabet, min_len, max_len);
+        word_set.insert(random_word);
+    }
+
+    word_set
+}
+
+/// Generate a random `ReducedOmegaWord` over the universe of the `alphabet`.
+/// The length of the spoke is drawn uniformly from the range `min_len_spoke..=max_len_spoke`.
+/// The length of the cycle is drawn uniformly from the range `min_len_cycle..=max_len_cycle`.
+/// Panics if the length of the cycle can be 0.
+pub fn generate_random_omega_word(
+    alphabet: &CharAlphabet,
+    min_len_spoke: usize,
+    max_len_spoke: usize,
+    min_len_cycle: usize,
+    max_len_cycle: usize,
+) -> ReducedOmegaWord<char> {
+    let charset: Vec<char> = alphabet.universe().collect();
+
+    assert!(min_len_spoke <= max_len_spoke);
+    assert!(min_len_cycle <= max_len_cycle);
+    assert!(min_len_cycle > 0);
+
+    let spoke = generate_random_word(alphabet, min_len_spoke, max_len_spoke);
+    let cycle = generate_random_word(alphabet, min_len_cycle, max_len_cycle);
+
+    upw!(spoke, cycle)
+}
+
+/// Generate a set of `number` random `ReducedOmegaWord`s over the universe of the `alphabet`.
+/// The length for each spoke is drawn uniformly from the range `min_len_spoke..=max_len_spoke`.
+/// The length for each cycle is drawn uniformly from the range `min_len_cycle..=max_len_cycle`.
+/// Panics if the length of the cycle can be 0.
+pub fn generate_random_omega_words(
+    alphabet: &CharAlphabet,
+    min_len_spoke: usize,
+    max_len_spoke: usize,
+    min_len_cycle: usize,
+    max_len_cycle: usize,
+    number: usize,
+) -> math::Set<ReducedOmegaWord<char>> {
+    let mut word_set = math::Set::with_capacity(number);
+
+    while word_set.len() < number {
+        let random_word = generate_random_omega_word(
+            alphabet,
+            min_len_spoke,
+            max_len_spoke,
+            min_len_cycle,
+            max_len_cycle,
+        );
+        word_set.insert(random_word);
+    }
+
+    word_set
 }
 
 struct BenchmarkAverages {
@@ -158,14 +292,44 @@ pub(crate) fn print_random_ts_benchmark(
 
 #[cfg(test)]
 mod tests {
-    use crate::transition_system::Dottable;
+    use crate::{random::CharAlphabet, transition_system::Dottable, word, TransitionSystem};
 
-    use super::{generate_random_dfa, print_random_ts_benchmark};
+    use super::{
+        generate_random_dba, generate_random_dfa, generate_random_dpa, generate_random_omega_words,
+        generate_random_ts_sized, generate_random_words, print_random_ts_benchmark,
+    };
 
     #[test_log::test]
     #[ignore]
     fn bench_random_ts() {
         let recips_of_2: Vec<_> = (1..=6).map(|i| 2usize.saturating_pow(i)).collect();
         print_random_ts_benchmark(&[2, 4, 6], &[2, 4, 8, 16, 32, 320], 100);
+    }
+
+    #[test]
+    fn random_ts_sized() {
+        let (dts, initial) = generate_random_ts_sized(2, 4);
+        assert_eq!(dts.size(), 4);
+    }
+
+    #[test]
+    fn random_dba_sized() {
+        let dba = generate_random_dba(2, 10);
+        assert!(dba.size() <= 10);
+    }
+
+    #[test]
+    fn random_dpa_sized() {
+        let dpa = generate_random_dpa(2, 10, 3);
+        assert!(dpa.size() <= 10);
+    }
+
+    #[test]
+    fn random_words() {
+        let alphabet = CharAlphabet::of_size(2);
+        let word_set = generate_random_words(&alphabet, 1, 10, 20);
+        let omega_word_set = generate_random_omega_words(&alphabet, 0, 5, 1, 5, 20);
+
+        assert_eq!(word_set.len(), 20);
     }
 }
