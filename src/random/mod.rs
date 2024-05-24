@@ -1,11 +1,6 @@
 #![allow(unused)]
-
-use fxhash::FxBuildHasher;
-use tracing::{debug, info};
-
 use crate::prelude::*;
-
-use self::math::Set;
+use tracing::{debug, info};
 
 /// Uses sprout-like algorithm to generate a random transition system. `symbols` determines the
 /// number of distinct symbols in the [`CharAlphabet`]. `probability` determines the probability
@@ -15,9 +10,9 @@ use self::math::Set;
 ///   add a back edge that state.
 /// 3. If no back edge to some state was added, we insert an edge to a new state.
 /// 4. Repeat until all states and symbols have been treated.
-pub fn generate_random_ts(symbols: usize, probability: f64) -> (LinkedListTransitionSystem, usize) {
+pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, usize) {
     let alphabet = CharAlphabet::of_size(symbols);
-    let mut dts = LinkedListTransitionSystem::for_alphabet(alphabet.clone());
+    let mut dts = DTS::for_alphabet(alphabet.clone());
 
     let mut current = dts.add_state(Void);
     let mut symbol_position = 0;
@@ -68,18 +63,15 @@ pub fn generate_random_dfa(symbols: usize, probability: f64) -> DFA {
 /// 1. Start with `size` states and no transitions.
 /// 2. For each state, for each symbol draw a target state and add the corresponding edge
 /// Note that depending on which state is chosen as the initial state, there may be unreachable states.
-pub fn generate_random_ts_sized(
-    symbols: usize,
-    size: usize,
-) -> (LinkedListTransitionSystem, usize) {
+pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, usize) {
     let alphabet = CharAlphabet::of_size(symbols);
-    let mut dts = LinkedListTransitionSystem::for_alphabet(alphabet.clone());
+    let mut dts = DTS::for_alphabet(alphabet.clone());
     // add states
     for i in 0..size {
         dts.add_state(Void);
     }
     // add edges
-    for q in dts.state_indices() {
+    for q in dts.state_indices_vec() {
         for sym in alphabet.universe() {
             let target = fastrand::usize(..dts.size());
             dts.add_edge((q, sym, target));
@@ -147,8 +139,8 @@ pub fn generate_random_words(
     min_len: usize,
     max_len: usize,
     number: usize,
-) -> Set<String> {
-    let mut word_set = Set::with_capacity_and_hasher(number, FxBuildHasher::default());
+) -> math::Set<String> {
+    let mut word_set = math::Set::with_capacity(number);
 
     while word_set.len() < number {
         let random_word = generate_random_word(alphabet, min_len, max_len);
@@ -192,8 +184,8 @@ pub fn generate_random_omega_words(
     min_len_cycle: usize,
     max_len_cycle: usize,
     number: usize,
-) -> Set<ReducedOmegaWord<char>> {
-    let mut word_set = Set::with_capacity_and_hasher(number, FxBuildHasher::default());
+) -> math::Set<ReducedOmegaWord<char>> {
+    let mut word_set = math::Set::with_capacity(number);
 
     while word_set.len() < number {
         let random_word = generate_random_omega_word(
@@ -325,21 +317,18 @@ mod tests {
     #[test]
     fn random_ts_sized() {
         let (dts, initial) = generate_random_ts_sized(2, 4);
-        println!("{:?}", dts);
         assert_eq!(dts.size(), 4);
     }
 
     #[test]
     fn random_dba_sized() {
         let dba = generate_random_dba(2, 10);
-        println!("{:?}", dba);
         assert!(dba.size() <= 10);
     }
 
     #[test]
     fn random_dpa_sized() {
         let dpa = generate_random_dpa(2, 10, 3);
-        println!("{:?}", dpa);
         assert!(dpa.size() <= 10);
     }
 
@@ -348,9 +337,6 @@ mod tests {
         let alphabet = CharAlphabet::of_size(2);
         let word_set = generate_random_words(&alphabet, 1, 10, 20);
         let omega_word_set = generate_random_omega_words(&alphabet, 0, 5, 1, 5, 20);
-        for w in omega_word_set.iter() {
-            println!("{:?}", w);
-        }
 
         assert_eq!(word_set.len(), 20);
     }

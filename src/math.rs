@@ -4,13 +4,13 @@ use std::{
 };
 
 /// Type alias for sets, we use this to hide which type of `HashSet` we are actually using.
-pub type Set<S> = fxhash::FxHashSet<S>;
+pub type Set<S> = std::collections::HashSet<S>;
 /// Type alias for sets containing elements that can be ordered, we use this to hide the type
 /// `BTreeSet` we are actually using.
 pub type OrderedSet<S> = BTreeSet<S>;
 
 /// Type alias for maps, we use this to hide which type of `HashMap` we are actually using.
-pub type Map<K, V> = fxhash::FxHashMap<K, V>;
+pub type Map<K, V> = std::collections::HashMap<K, V>;
 /// Type alias for maps containing elements that can be ordered, we use this to hide the type
 /// `BTreeMap` we are actually using.
 pub type OrderedMap<K, V> = BTreeMap<K, V>;
