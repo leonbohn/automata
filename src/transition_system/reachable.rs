@@ -66,9 +66,9 @@ where
 {
     /// Creates a new iterator that will yield the reachable states of the transition system starting
     pub fn new(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
-        let mut seen = Set::with_capacity(ts.size());
+        let mut seen = Set::with_capacity(ts.hint_size().0);
         seen.insert(origin);
-        let mut queue = VecDeque::with_capacity(ts.size());
+        let mut queue = VecDeque::with_capacity(ts.hint_size().0);
         queue.push_front(origin);
         Self {
             seen,
@@ -99,7 +99,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let q = self.queue.pop_front()?;
-        let Some(mut it) = self.ts.edges_from(q) else {
+        let Some(it) = self.ts.edges_from(q) else {
             panic!("state does not exist");
         };
         for edge in it {
@@ -107,7 +107,7 @@ where
                 self.queue.push_back(edge.target());
             }
         }
-        return Some(q);
+        Some(q)
     }
 }
 

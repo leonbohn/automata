@@ -16,6 +16,15 @@ pub struct GraphTs<
 }
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> GraphTs<A, Q, C, DET> {
+    pub(crate) fn try_recast<const ND: bool>(self) -> Result<GraphTs<A, Q, C, ND>, Self> {
+        if DET {
+            assert!(self.is_deterministic());
+        }
+        Ok(GraphTs {
+            alphabet: self.alphabet,
+            graph: self.graph,
+        })
+    }
     pub(crate) fn try_into_deterministic(self) -> Result<GraphTs<A, Q, C, true>, Self> {
         if DET {
             assert!(self.is_deterministic());
@@ -369,8 +378,8 @@ mod tests {
         pgts.add_edge((q2, 'b', q0));
 
         // test iteration direction
-        let succs: Vec<_> = pgts.reachable_state_indices_from(q0).collect();
-        assert_eq!(succs, vec![q0, q1, q3, q2]);
+        let succs: math::Set<_> = pgts.reachable_state_indices_from(q0).collect();
+        assert_eq!(succs, math::Set::from_iter([q0, q1, q3, q2]));
 
         let mut dfa = pgts.into_dfa_with_initial(0);
 
