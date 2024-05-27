@@ -39,7 +39,7 @@ impl<T: TransitionSystem> PartialEq for MinimalRepresentative<T> {
 }
 impl<T: TransitionSystem> PartialOrd for MinimalRepresentative<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 impl<T: TransitionSystem> Ord for MinimalRepresentative<T> {

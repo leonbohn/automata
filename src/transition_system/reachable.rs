@@ -98,18 +98,16 @@ where
     type Item = Ts::StateIndex;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let q = self.queue.pop_front()?;
-            let Some(mut it) = self.ts.edges_from(q) else {
-                panic!("state does not exist");
-            };
-            while let Some(edge) = it.next() {
-                if self.seen.insert(edge.target()) {
-                    self.queue.push_back(edge.target());
-                }
+        let q = self.queue.pop_front()?;
+        let Some(mut it) = self.ts.edges_from(q) else {
+            panic!("state does not exist");
+        };
+        for edge in it {
+            if self.seen.insert(edge.target()) {
+                self.queue.push_back(edge.target());
             }
-            return Some(q);
         }
+        return Some(q);
     }
 }
 
