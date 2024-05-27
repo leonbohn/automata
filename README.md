@@ -223,12 +223,6 @@ Further traits that are of importance are
 - `Sproutable` enables growing a TS state by state and edge/transition by edge/transition. Naturally, this is only implemented for the basic building blocks, i.e. `BTS`, `DTS` and `NTS`.
 
 
-### Documentation
-
-The docs use LaTeX syntax in some places and [as outlined here](https://github.com/victe/rust-latex-doc-minimal-example), one can enable their rendering by making use of KaTeX.
-This is configured through the `.cargo/config.toml`, which ensures that the `.cargo/docs-header.html` file is used as header in the HTML documentation that cargo builds.
-In that file, we load KaTeX 0.16.10 and use it to render the included math, which is delimited with the usual `$ .. $` or `\\( .. \\)` for inline and `$$ .. $$` or `\[ .. \]` for display math (in a separate box).
-
 ### License 
 
 Thanks go out to the maintainers of [`spot`](https://spot.lre.epita.fr/) and [`petgraph`](https://github.com/petgraph/petgraph). Their ideas and their code have been immensely helpful so far. For all the rest, see `LICENSE.md`.
