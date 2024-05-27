@@ -13,8 +13,12 @@ pub mod prelude {
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
         GraphTs<A, Q, C, DET>;
+
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type DTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, true>;
+    /// Gives an instantiation of [`DTS`] that uses the same types as `T`.
+    pub type IntoDTS<T> = DTS<<T as TransitionSystem>::Alphabet, StateColor<T>, EdgeColor<T>>;
+
     /// Points to the default implementation of [`TransitionSystem`] in the case where it is
     /// **now known to be** [`Deterministic`].
     pub type NTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, false>;

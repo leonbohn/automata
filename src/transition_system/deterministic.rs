@@ -10,7 +10,6 @@ use crate::prelude::*;
 
 use super::operations::MapEdgeColor;
 use super::operations::MapEdges;
-use super::operations::MapStateColor;
 use super::operations::MatchingProduct;
 use super::operations::ProductTransition;
 use super::operations::RestrictByStateIndex;
@@ -414,7 +413,7 @@ pub trait Deterministic: TransitionSystem {
         edge_decorator: ED,
     ) -> String
     where
-        SD: Fn(Self::StateIndex, StateColor<Self>) -> String,
+        SD: Fn(Self::StateIndex, &StateColor<Self>) -> String,
         ED: Fn(Self::EdgeRef<'a>) -> String,
     {
         let mut builder = tabled::builder::Builder::default();
@@ -833,21 +832,6 @@ where
             (ll.color(), rr.color()),
             ProductIndex(ll.target(), rr.target()),
         ))
-    }
-}
-
-impl<D, Ts, F> Deterministic for MapStateColor<Ts, F>
-where
-    D: Color,
-    Ts: Deterministic,
-    F: Fn(Ts::StateColor) -> D,
-{
-    fn edge(
-        &self,
-        state: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        self.ts().edge(state, matcher)
     }
 }
 

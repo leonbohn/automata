@@ -90,12 +90,8 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     }
 
     /// Returns an iterator over the state colors of the states in the SCC.
-    pub fn state_colors(&self) -> impl Iterator<Item = Ts::StateColor> + '_ {
-        self.iter().map(|q| {
-            self.ts
-                .state_color(*q)
-                .expect("State is in SCC but not in Ts")
-        })
+    pub fn state_colors(&self) -> impl Iterator<Item = &Ts::StateColor> + '_ {
+        self.iter().map(|q| self.ts.state_color(*q).unwrap())
     }
 
     /// Returns the size, i.e. the number of states in the SCC.
@@ -188,7 +184,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     }
 
     /// Returns a vector of the colors of the states in the SCC.
-    pub fn colors(&self) -> Option<Vec<Ts::StateColor>> {
+    pub fn colors(&self) -> Option<Vec<&Ts::StateColor>> {
         debug_assert!(!self.is_empty());
         Some(
             self.states

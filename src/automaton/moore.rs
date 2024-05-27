@@ -58,7 +58,7 @@ where
     where
         StateColor<Self>: Ord,
     {
-        self.map_state_colors(|o| o <= color)
+        self.map_state_colors(|o| o <= &color)
             .erase_edge_colors()
             .with_initial(self.initial)
             .into_dfa()
@@ -100,6 +100,7 @@ where
                     .expect("We know it is reachable and it must be colored")
             })
             .unique()
+            .cloned()
             .collect()
     }
 

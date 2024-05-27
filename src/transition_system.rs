@@ -122,9 +122,9 @@ pub trait TransitionSystem: Sized {
     /// Returns an iterator over pairs consisting of a state index and the corresponding state color.
     fn state_indices_with_color(
         &self,
-    ) -> impl Iterator<Item = (Self::StateIndex, Self::StateColor)> {
+    ) -> impl Iterator<Item = (Self::StateIndex, &Self::StateColor)> {
         self.state_indices()
-            .map(|q| (q, self.state_color(q).expect("Every state must be colored")))
+            .map(|q| (q, self.state_color(q).unwrap()))
     }
 
     /// Helper function which creates an expression from the given symbol.
@@ -302,7 +302,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns the color of the given `state`, if it exists. Otherwise, `None` is returned.
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor>;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<&Self::StateColor>;
 
     /// Attempts to find a word which leads from the state `from` to state `to`. If no such
     /// word exists, `None` is returned.
@@ -354,7 +354,7 @@ pub trait TransitionSystem: Sized {
         StateColor<Self>: Eq,
     {
         self.state_indices()
-            .find(|index| self.state_color(*index).as_ref() == Some(color))
+            .find(|index| self.state_color(*index) == Some(color))
     }
 
     /// Returns true if and only if a state with the given `color` exists.
@@ -425,11 +425,11 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Completely removes the state coloring.
-    fn erase_state_colors(self) -> operations::MapStateColor<Self, fn(Self::StateColor) -> Void>
+    fn erase_state_colors(self) -> operations::WithStateColor<Self, UniformColor<Void>>
     where
         Self: Sized,
     {
-        self.map_state_colors(|_| Void)
+        self.with_state_color(UniformColor(Void))
     }
 
     /// Map the edge colors of `self` with the given function `f`.
@@ -465,22 +465,26 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Map the state colors of `self` with the given function.
-    fn map_state_colors<D: Clone, F: Fn(Self::StateColor) -> D>(
+    fn map_state_colors<D: Color, F: Fn(&Self::StateColor) -> D>(
         self,
         f: F,
-    ) -> operations::MapStateColor<Self, F>
+    ) -> operations::WithStateColor<Self, math::Map<StateIndex<Self>, D>>
     where
         Self: Sized,
     {
-        operations::MapStateColor::new(self, f)
+        let provider = self
+            .state_indices()
+            .map(|q| (q, f(self.state_color(q).unwrap())))
+            .collect();
+        operations::WithStateColor::new(self, provider)
     }
 
     /// Turns `self` into a DFA that accepts all words, i.e. all states are accepting.
-    fn all_accepting_dfa(self) -> operations::MapStateColor<Self, fn(Self::StateColor) -> bool>
+    fn all_accepting_dfa(self) -> operations::WithStateColor<Self, UniformColor<bool>>
     where
         Self: Sized,
     {
-        self.map_state_colors(|_| true)
+        self.with_state_color(operations::UniformColor(true))
     }
 
     /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly
@@ -570,7 +574,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns an iterator over all state colors that are reachable from the initial state. May yield the same color multiple times.
-    fn reachable_state_colors(&self) -> impl Iterator<Item = Self::StateColor> + '_
+    fn reachable_state_colors(&self) -> impl Iterator<Item = &Self::StateColor> + '_
     where
         Self: Sized + Pointed,
     {
@@ -656,7 +660,7 @@ impl<Ts: TransitionSystem> TransitionSystem for &Ts {
         Ts::edges_from(self, state)
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<&Self::StateColor> {
         Ts::state_color(self, state)
     }
 }
@@ -694,7 +698,7 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
         Ts::edges_from(self, state)
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<&Self::StateColor> {
         Ts::state_color(self, state)
     }
 }
@@ -791,9 +795,11 @@ pub trait Pointed: TransitionSystem {
     fn initial(&self) -> Self::StateIndex;
 
     /// Returns the color of the initial state.
-    fn initial_color(&self) -> Self::StateColor {
-        self.state_color(self.initial())
-            .expect("Initial state must exist and be colored!")
+    fn initial_color(&self) -> Option<&Self::StateColor> {
+        Some(
+            self.state_color(self.initial())
+                .expect("Initial state must exist and be colored!"),
+        )
     }
 }
 

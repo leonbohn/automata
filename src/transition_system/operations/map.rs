@@ -214,7 +214,7 @@ where
         self.ts().state_indices()
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<&Self::StateColor> {
         self.ts().state_color(state)
     }
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -304,7 +304,7 @@ where
         self.ts().state_indices()
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<&Self::StateColor> {
         self.ts().state_color(state)
     }
 
@@ -469,75 +469,5 @@ impl<'a, I, F, C> MappedTransitionsToIter<'a, I, F, C> {
             f,
             _old_color: PhantomData,
         }
-    }
-}
-
-/// A transition system that maps the state colors of a given transition system to a new type.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MapStateColor<Ts, F> {
-    ts: Ts,
-    f: F,
-}
-
-#[allow(missing_docs)]
-impl<Ts, F> MapStateColor<Ts, F> {
-    pub fn new(ts: Ts, f: F) -> Self {
-        Self { ts, f }
-    }
-
-    pub fn ts(&self) -> &Ts {
-        &self.ts
-    }
-
-    pub fn into_parts(self) -> (Ts, F) {
-        (self.ts, self.f)
-    }
-
-    pub fn f(&self) -> &F {
-        &self.f
-    }
-}
-
-impl<D, Ts, F> TransitionSystem for MapStateColor<Ts, F>
-where
-    D: Color,
-    Ts: TransitionSystem,
-    F: Fn(Ts::StateColor) -> D,
-{
-    type StateIndex = Ts::StateIndex;
-    type EdgeColor = Ts::EdgeColor;
-    type StateColor = D;
-    type EdgeRef<'this> = Ts::EdgeRef<'this> where Self: 'this;
-    type EdgesFromIter<'this> = Ts::EdgesFromIter<'this> where Self: 'this;
-    type StateIndices<'this> = Ts::StateIndices<'this> where Self: 'this;
-
-    type Alphabet = Ts::Alphabet;
-
-    fn alphabet(&self) -> &Self::Alphabet {
-        self.ts().alphabet()
-    }
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts().state_indices()
-    }
-
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        let color = self.ts().state_color(state)?;
-        Some((self.f())(color))
-    }
-
-    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        self.ts().edges_from(state)
-    }
-
-    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
-        self.ts().maybe_initial_state()
-    }
-}
-
-impl<D: Color, Ts: TransitionSystem + Pointed, F: Fn(Ts::StateColor) -> D> Pointed
-    for MapStateColor<Ts, F>
-{
-    fn initial(&self) -> Self::StateIndex {
-        self.ts.initial()
     }
 }

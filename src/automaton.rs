@@ -383,7 +383,7 @@ where
         self.ts.edges_from(state)
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<&Self::StateColor> {
         self.ts.state_color(state)
     }
 }
@@ -444,7 +444,7 @@ impl<'a, Ts: TransitionSystem<StateColor = bool>> Iterator for StatesWithColor<'
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
-            .find(|&index| self.ts.state_color(index).unwrap() == self.color)
+            .find(|&index| self.ts.state_color(index).unwrap() == &self.color)
     }
 }
 

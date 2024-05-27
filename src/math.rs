@@ -5,6 +5,7 @@ pub use indexmap::set;
 
 /// Type alias for sets, we use this to hide which type of `HashSet` we are actually using.
 pub type Set<S> = indexmap::IndexSet<S>;
+pub type OrderedSet<K> = std::collections::BTreeSet<K>;
 
 /// Type alias for maps, we use this to hide which type of `HashMap` we are actually using.
 pub type Map<K, V> = indexmap::IndexMap<K, V>;

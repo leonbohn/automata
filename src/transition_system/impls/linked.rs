@@ -369,7 +369,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
         Some(NTSEdgesFromIter::new(&self.edges, self.first_edge(state)))
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<&Self::StateColor> {
         if state >= self.states.len() {
             panic!(
                 "index {state} is out of bounds, there are only {} states",
@@ -377,7 +377,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
             );
         }
         assert!(state < self.states.len());
-        self.states.get(state).map(|x| x.color.clone())
+        self.states.get(state).map(|x| &x.color)
     }
 }
 

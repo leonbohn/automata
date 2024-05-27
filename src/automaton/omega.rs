@@ -138,7 +138,7 @@ impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutoma
     fn from(value: DeterministicOmegaAutomaton<HoaAlphabet>) -> Self {
         let size = q(value.size());
         let ts = TSBuilder::default()
-            .with_state_colors((0..size).map(|i| value.state_color(i).unwrap()))
+            .with_state_colors((0..size).map(|i| value.state_color(i).unwrap().clone()))
             .with_transitions(value.state_indices().flat_map(|q| {
                 assert!(q < size);
                 value.edges_from(q).unwrap().flat_map(|edge| {
@@ -167,7 +167,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
                 q.into_usize() < size,
                 "The state indices must be contiguous for this!"
             );
-            ts.add_state(value.state_color(q).unwrap());
+            ts.add_state(value.state_color(q).unwrap().clone());
         }
 
         for q in value.state_indices() {

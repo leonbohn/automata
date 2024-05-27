@@ -3,6 +3,8 @@ use crate::transition_system::EdgeReference;
 pub use petgraph;
 pub use petgraph::prelude::*;
 pub use petgraph::stable_graph as sg;
+use petgraph::visit::IntoNodeReferences;
+use petgraph::visit::NodeRef;
 
 #[derive(Debug, Clone)]
 pub struct GraphTs<
@@ -263,9 +265,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
                 }),
         )
     }
-
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        self.graph.node_weight(node_index(state)).cloned()
+    fn state_color(&self, state: StateIndex<Self>) -> Option<&Self::StateColor> {
+        self.graph.node_weight(node_index(state))
     }
 }
 

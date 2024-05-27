@@ -73,7 +73,7 @@ impl<'a, Ts: TransitionSystem> TarjanDAG<'a, Ts> {
     pub fn fold_state_colors<F, D>(&self, init: D, f: F) -> Dag<D>
     where
         D: Clone,
-        F: FnMut(D, Ts::StateColor) -> D + Copy,
+        F: FnMut(D, &Ts::StateColor) -> D + Copy,
     {
         self.dag.reduce(|x| x.state_colors().fold(init.clone(), f))
     }

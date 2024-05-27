@@ -81,19 +81,6 @@ where
     }
 }
 
-impl<D, Ts, F> PredecessorIterable for operations::MapStateColor<Ts, F>
-where
-    D: Color,
-    Ts: PredecessorIterable,
-    F: Fn(Ts::StateColor) -> D,
-{
-    type EdgesToIter<'this> = Ts::EdgesToIter<'this> where Self: 'this;
-    type PreEdgeRef<'this> = Ts::PreEdgeRef<'this> where Self: 'this;
-    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
-        self.ts().predecessors(state)
-    }
-}
-
 impl<L, R> PredecessorIterable for operations::MatchingProduct<L, R>
 where
     L: PredecessorIterable,

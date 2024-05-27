@@ -1,217 +1,73 @@
-use std::{cell::RefCell, fmt::Debug};
+use std::{collections::VecDeque, hash::Hash};
 
-use crate::{math::Set, prelude::*, transition_system::edge::TransitionOwnedColor};
 use itertools::Itertools;
 
-#[derive(Clone, Eq)]
-pub struct StateSet<Ts: TransitionSystem>(Set<Ts::StateIndex>);
+use crate::prelude::*;
 
-impl<Ts: TransitionSystem> Extend<Ts::StateIndex> for StateSet<Ts> {
-    fn extend<T: IntoIterator<Item = Ts::StateIndex>>(&mut self, iter: T) {
-        self.0.extend(iter)
-    }
+pub struct StateSet<T: TransitionSystem> {
+    states: math::OrderedSet<StateIndex<T>>,
+    colors: Vec<StateColor<T>>,
 }
 
-impl<Ts: TransitionSystem> PartialEq for StateSet<Ts> {
+impl<T: TransitionSystem> Eq for StateSet<T> {}
+
+impl<T: TransitionSystem> PartialEq for StateSet<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        self.states == other.states && self.colors == other.colors
     }
 }
 
-impl<Ts: TransitionSystem> Default for StateSet<Ts> {
-    fn default() -> Self {
-        Self(Set::default())
-    }
-}
-
-impl<Ts: TransitionSystem> IntoIterator for StateSet<Ts> {
-    type IntoIter = math::set::IntoIter<Ts::StateIndex>;
-    type Item = Ts::StateIndex;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl<Ts: TransitionSystem> FromIterator<Ts::StateIndex> for StateSet<Ts> {
-    fn from_iter<T: IntoIterator<Item = Ts::StateIndex>>(iter: T) -> Self {
-        Self(Set::from_iter(iter))
-    }
-}
-
-impl<Ts: TransitionSystem> StateSet<Ts> {
-    pub fn singleton(q: Ts::StateIndex) -> Self {
-        Self(Set::from_iter([q]))
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &'_ Ts::StateIndex> + '_ {
-        self.0.iter()
-    }
-}
-
-impl<Ts: TransitionSystem> std::fmt::Debug for StateSet<Ts> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.0.is_empty() {
-            write!(f, "∅")
-        } else {
-            write!(f, "{{{}}}", self.iter().map(|q| q.show()).join(", "))
-        }
-    }
-}
-
-/// Represents the subset construction applied to a transition system. This is a deterministic
-/// transition system, which resolves the non-determinism by operating on sets of states.
-#[derive(Clone)]
-pub struct SubsetConstruction<Ts: TransitionSystem> {
-    ts: Ts,
-    states: RefCell<Vec<StateSet<Ts>>>,
-    expressions: math::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
-}
-
-impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
-    fn edge(
-        &self,
-        source: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        tracing::trace!(
-            "Computing successor of state {source} for matcher {:?}",
-            matcher
-        );
-        let (colorset, stateset): (Vec<Ts::EdgeColor>, StateSet<Ts>) = self
-            .states
-            .borrow()
-            .get(source)?
-            .iter()
-            .flat_map(|q| {
-                self.ts.edges_from(*q).unwrap().filter_map(|tt| {
-                    if matcher.matches(tt.expression()) {
-                        Some((tt.color(), tt.target()))
-                    } else {
-                        None
-                    }
-                })
-            })
-            .unzip();
-        tracing::trace!("Found stateset {stateset:?} with colorset {colorset:?}",);
-        let expression = self
-            .expressions
-            .values()
-            .find(|e| matcher.matches(e))
-            .unwrap();
-
-        if let Some(pos) = self.states.borrow().iter().position(|s| stateset.eq(s)) {
-            return Some(TransitionOwnedColor::new(source, expression, colorset, pos));
-        }
-
-        self.states.borrow_mut().push(stateset);
-        Some(TransitionOwnedColor::new(
-            source,
-            expression,
-            colorset,
-            self.states.borrow().len(),
-        ))
-    }
-}
-
-impl<Ts: TransitionSystem> Pointed for SubsetConstruction<Ts> {
-    fn initial(&self) -> Self::StateIndex {
-        0
-    }
-}
-
-impl<Ts: TransitionSystem> TransitionSystem for SubsetConstruction<Ts> {
-    type StateIndex = usize;
-
-    type StateColor = Vec<Ts::StateColor>;
-
-    type EdgeColor = Vec<Ts::EdgeColor>;
-
-    type EdgeRef<'this> = TransitionOwnedColor<'this, EdgeExpression<Ts>, usize, Self::EdgeColor>
-    where
-        Self: 'this;
-
-    type EdgesFromIter<'this> = DeterministicEdgesFrom<'this, Self>
-    where
-        Self: 'this;
-
-    type StateIndices<'this> = crate::transition_system::reachable::Reachable<'this, Self, false>
-    where
-        Self: 'this;
-
-    type Alphabet = Ts::Alphabet;
-
-    fn alphabet(&self) -> &Self::Alphabet {
-        self.ts.alphabet()
-    }
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.reachable_state_indices_from(self.initial())
-    }
-
-    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        Some(DeterministicEdgesFrom::new(self, state))
-    }
-
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        let Some(color) = self.states.borrow().get(state).map(|q| {
-            q.iter()
-                .map(|idx| {
-                    let Some(color) = self.ts.state_color(*idx) else {
-                        panic!("Could not find state {}", state);
-                    };
-                    color
-                })
-                .collect()
-        }) else {
-            panic!("Could not find state {}", state);
-        };
-        Some(color)
-    }
-}
-
-impl<Ts: TransitionSystem> Debug for SubsetConstruction<Ts>
-where
-    EdgeColor<Ts>: Debug,
-{
+impl<T: TransitionSystem> std::fmt::Debug for StateSet<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Subset construction\n{}",
-            self.build_transition_table(
-                |idx, _| format!(
-                    "{{{}}}",
-                    self.states
-                        .borrow()
-                        .get(idx)
-                        .unwrap()
-                        .iter()
-                        .map(|q| q.show())
-                        .join(", ")
-                ),
-                |edge| edge.target().to_string()
-            )
+            "{{{}}}[{}]",
+            self.states.iter().map(|q| q.show()).join(", "),
+            self.colors.iter().map(|c| format!("{:?}", c)).join(", ")
         )
     }
 }
 
-impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
-    /// Creates a new subset construction from the given transition system starting from the given index.
-    pub fn new_from(ts: Ts, idx: Ts::StateIndex) -> Self {
+impl<T: TransitionSystem> Clone for StateSet<T> {
+    fn clone(&self) -> Self {
         Self {
-            expressions: ts.alphabet().expression_map(),
-            states: vec![StateSet::singleton(idx)].into(),
-            ts,
+            states: self.states.clone(),
+            colors: self.colors.clone(),
         }
     }
+}
 
-    /// Creates a new subset construction from the given transition system starting from the given
-    /// indices.
-    pub fn new<I: IntoIterator<Item = Ts::StateIndex>>(ts: Ts, iter: I) -> Self {
-        Self {
-            expressions: ts.alphabet().expression_map(),
-            states: vec![StateSet::from_iter(iter)].into(),
-            ts,
-        }
+impl<T: TransitionSystem> Hash for StateSet<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.states.hash(state);
+        self.colors.hash(state);
     }
+}
+
+impl<T: TransitionSystem> StateSet<T> {
+    pub fn new<I: IntoIterator<Item = StateIndex<T>>>(states: I, ts: &T) -> Self {
+        let states = states.into_iter().collect::<math::OrderedSet<_>>();
+        let colors = states
+            .iter()
+            .map(|&state| ts.state_color(state).unwrap())
+            .cloned()
+            .collect();
+        Self { states, colors }
+    }
+}
+
+pub fn subset_construction_from<T: TransitionSystem, I: IntoIterator<Item = StateIndex<T>>>(
+    ts: T,
+    initial_states: I,
+) -> DTS<T::Alphabet, StateSet<T>, Vec<EdgeColor<T>>> {
+    let mut dts = DTS::for_alphabet(ts.alphabet().clone());
+    let mut queue = VecDeque::with_capacity(ts.hint_size().0);
+
+    let initial_state = StateSet::new(initial_states, &ts);
+    let initial_id = dts.add_state(initial_state);
+    queue.push_back(initial_id);
+
+    todo!()
 }
 
 #[cfg(test)]

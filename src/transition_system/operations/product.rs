@@ -23,7 +23,11 @@ impl<Lts: TransitionSystem + Sized> Product for Lts {
         self,
         other: Ts,
     ) -> Self::Output<Ts> {
-        MatchingProduct(self, other)
+        MatchingProduct {
+            left: self,
+            right: other,
+            colors: math::Map::default().into(),
+        }
     }
 }
 
@@ -60,8 +64,19 @@ impl<L: std::fmt::Display, R: std::fmt::Display> std::fmt::Display for ProductIn
 
 /// A product of two transition systems, which only permits transitions on matching symbols, while
 /// ignoring all others.
-#[derive(Copy, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct MatchingProduct<L, R>(pub L, pub R);
+#[derive(Debug, Clone)]
+pub struct MatchingProduct<L, R>
+where
+    L: TransitionSystem,
+    R: TransitionSystem,
+    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = EdgeExpression<L>>,
+    L::StateColor: Clone,
+    R::StateColor: Clone,
+{
+    pub left: L,
+    pub right: R,
+    pub colors: std::cell::RefCell<math::Map<StateIndex<Self>, StateColor<Self>>>,
+}
 
 impl<L, R> TransitionSystem for MatchingProduct<L, R>
 where
@@ -79,28 +94,34 @@ where
     type StateIndices<'this> = ProductStatesIter<'this, L, R> where Self: 'this;
     type Alphabet = L::Alphabet;
     fn alphabet(&self) -> &Self::Alphabet {
-        self.0.alphabet()
+        self.left.alphabet()
     }
 
     fn state_indices(&self) -> Self::StateIndices<'_> {
-        ProductStatesIter::new(&self.0, &self.1)
+        ProductStatesIter::new(&self.left, &self.right)
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        let ProductIndex(l, r) = state;
-        let left = self.0.state_color(l)?;
-        let right = self.1.state_color(r)?;
-        Some((left, right))
+    fn state_color(&self, state: StateIndex<Self>) -> Option<&Self::StateColor> {
+        self.colors
+            .borrow_mut()
+            .entry(state)
+            .or_insert_with_key(|ProductIndex(l, r)| {
+                (
+                    self.left.state_color(*l).unwrap().clone(),
+                    self.right.state_color(*r).unwrap().clone(),
+                )
+            });
+        self.colors.borrow().get(index).as_ref()
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        ProductEdgesFrom::new(&self.0, &self.1, state)
+        ProductEdgesFrom::new(&self.left, &self.right, state)
     }
 
     fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
         Some(ProductIndex(
-            self.0.maybe_initial_state()?,
-            self.1.maybe_initial_state()?,
+            self.left.maybe_initial_state()?,
+            self.right.maybe_initial_state()?,
         ))
     }
 }
@@ -111,7 +132,7 @@ where
     R: Pointed<Alphabet = L::Alphabet>,
 {
     fn initial(&self) -> Self::StateIndex {
-        ProductIndex(self.0.initial(), self.1.initial())
+        ProductIndex(self.left.initial(), self.right.initial())
     }
 }
 

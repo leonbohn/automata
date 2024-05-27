@@ -224,7 +224,7 @@ impl<A: Alphabet> Dottable for DFA<A> {
     where
         (String, StateColor<Self>): Show,
     {
-        let shape = if self.state_color(idx).unwrap() {
+        let shape = if *self.state_color(idx).unwrap() {
             "doublecircle"
         } else {
             "circle"
@@ -265,7 +265,11 @@ impl<A: Alphabet, Q: Color, C: Color> Dottable for crate::RightCongruence<A, Q, 
         (String, StateColor<Self>): Show,
     {
         vec![DotStateAttribute::Label(
-            (self.dot_state_ident(idx), self.state_color(idx).unwrap()).show(),
+            (
+                self.dot_state_ident(idx),
+                self.state_color(idx).unwrap().clone(),
+            )
+                .show(),
         )]
     }
 }

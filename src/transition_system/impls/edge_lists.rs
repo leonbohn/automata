@@ -348,8 +348,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> 
         self.states.keys().cloned()
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        self.raw_state_map().get(&state).map(|s| s.color().clone())
+    fn state_color(&self, state: StateIndex<Self>) -> Option<&Self::StateColor> {
+        self.raw_state_map().get(&state).map(|s| s.color())
     }
 
     fn edges_from(&self, q: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {

@@ -105,7 +105,7 @@ where
     /// the function returns it, otherwise `None`.
     pub fn give_word(&self) -> Option<Vec<SymbolOf<Self>>> {
         self.minimal_representatives().find_map(|rep| {
-            if self
+            if *self
                 .state_color(rep.state_index())
                 .expect("Every state must be colored")
             {
@@ -132,7 +132,7 @@ where
     {
         let other_initial = other.initial();
         self.ts_product(other)
-            .map_state_colors(|(a, b)| a || b)
+            .map_state_colors(|(a, b)| *a || *b)
             .with_initial(ProductIndex(self.initial, other_initial))
             .into_dfa()
     }
@@ -148,7 +148,7 @@ where
     {
         let other_initial = other.initial();
         self.ts_product(other)
-            .map_state_colors(|(a, b)| a && b)
+            .map_state_colors(|(a, b)| *a && *b)
             .with_initial(ProductIndex(self.initial, other_initial))
             .into_dfa()
     }
