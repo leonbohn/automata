@@ -53,7 +53,7 @@ pub mod prelude {
             predecessors::PredecessorIterable,
             run::{FiniteRun, OmegaRun},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
-            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, Id, IndexType, Indexes,
+            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, Id, IndexType,
             IntoEdgeTuple, IsEdge, LinkedListDeterministic, LinkedListNondeterministic,
             LinkedListTransitionSystem, Path, ScalarIndexType, Shrinkable, Sproutable, StateColor,
             StateIndex, SymbolOf, TSBuilder, TransitionSystem,

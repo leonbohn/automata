@@ -80,30 +80,21 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for GraphTs<A,
         let (e, c) = self.graph.edge_weight(edge)?;
         Some(EdgeReference::new(source, e, c, target))
     }
-
-    fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
-        &mut self,
-        index: Idx,
-        color: X,
-    ) {
-        let q = index.to_index(self).unwrap();
-        self.graph[node_index(q)] = color.into();
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
+        self.graph[node_index(index)] = color;
     }
 }
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A, Q, C, DET> {
-    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor> {
-        let q = state.to_index(self)?;
-        let color = self.graph.remove_node(node_index(q))?;
+    fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        let color = self.graph.remove_node(node_index(state))?;
         Some(color)
     }
-
     fn remove_edges_from_matching(
         &mut self,
-        source: impl Indexes<Self>,
+        source: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let source = source.to_index(self)?;
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
@@ -127,15 +118,12 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         });
         Some(removed)
     }
-
     fn remove_edges_between_matching(
         &mut self,
-        source: impl Indexes<Self>,
-        target: impl Indexes<Self>,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let source = source.to_index(self)?;
-        let target = target.to_index(self)?;
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
@@ -159,14 +147,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         });
         Some(removed)
     }
-
     fn remove_edges_between(
         &mut self,
-        source: impl Indexes<Self>,
-        target: impl Indexes<Self>,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let source = source.to_index(self)?;
-        let target = target.to_index(self)?;
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
@@ -186,13 +171,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         });
         Some(removed)
     }
-
     fn remove_edges_from(
         &mut self,
-        source: impl Indexes<Self>,
+        source: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
         let mut removed = Vec::new();
-        let source = source.to_index(self)?;
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
                 .map(|(s, t)| s == node_index(source))
@@ -211,13 +194,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         });
         Some(removed)
     }
-
     fn remove_edges_to(
         &mut self,
-        target: impl Indexes<Self>,
+        target: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
         let mut removed = Vec::new();
-        let target = target.to_index(self)?;
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
                 .map(|(s, t)| t == node_index(target))
@@ -267,11 +248,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
         self.graph.node_indices().map(state_index)
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        let q = state.to_index(self)?;
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         Some(
             self.graph
-                .edges_directed(node_index(q), Direction::Outgoing)
+                .edges_directed(node_index(state), Direction::Outgoing)
                 .map(|edge| {
                     let (expression, color) = edge.weight();
                     EdgeReference::new(
@@ -284,9 +264,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
         )
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let q = state.to_index(self)?;
-        self.graph.node_weight(node_index(q)).cloned()
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        self.graph.node_weight(node_index(state)).cloned()
     }
 }
 
@@ -301,16 +280,15 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        let q = state.to_index(self)?;
+    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
         let walker = self
             .graph
-            .neighbors_directed(node_index(q), Direction::Incoming)
+            .neighbors_directed(node_index(state), Direction::Incoming)
             .detach();
         Some(PgEdgesIter {
             graph: &self.graph,
             walker,
-            target: q,
+            target: state,
         })
     }
 }

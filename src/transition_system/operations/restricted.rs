@@ -76,18 +76,17 @@ where
         self.ts().state_indices()
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         assert!((self.filter()).is_unmasked(state));
         self.ts().state_color(state)
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        if !(self.filter()).is_unmasked(state.to_index(self)?) {
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        if !(self.filter()).is_unmasked(state) {
             return None;
         }
         self.ts()
-            .edges_from(state.to_index(self)?)
+            .edges_from(state)
             .map(|iter| RestrictedEdgesFromIter::new(iter, self.filter()))
     }
 
@@ -255,19 +254,18 @@ where
         self.ts().state_indices()
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         let min = self.min.clone();
         let max = self.max.clone();
         Some(ColorRestrictedEdgesFrom {
             min,
             max,
             _phantom: PhantomData,
-            it: self.ts().edges_from(state.to_index(self)?)?,
+            it: self.ts().edges_from(state)?,
         })
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         self.ts().state_color(state)
     }
 }
@@ -281,8 +279,7 @@ impl<D: PredecessorIterable<EdgeColor = usize>> PredecessorIterable for ColorRes
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        let state = state.to_index(self)?;
+    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
         Some(ColorRestrictedEdgesTo::new(
             self.ts().predecessors(state)?,
             self.min,
@@ -296,20 +293,18 @@ where
     D: Deterministic,
     EdgeColor<D>: Ord,
 {
-    fn edge<Idx: Indexes<Self>>(
+    fn edge(
         &self,
-        state: Idx,
+        state: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        self.ts()
-            .edge(state.to_index(self)?, matcher)
-            .and_then(|t| {
-                if t.color() <= self.max && self.min <= t.color() {
-                    Some(t)
-                } else {
-                    None
-                }
-            })
+        self.ts().edge(state, matcher).and_then(|t| {
+            if t.color() <= self.max && self.min <= t.color() {
+                Some(t)
+            } else {
+                None
+            }
+        })
     }
 }
 

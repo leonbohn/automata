@@ -151,14 +151,11 @@ where
     /// Gives a witness for the fact that `left` and `right` are not language-equivalent. This is
     /// done by finding a separating word, i.e. a word that is accepted from one of the two states
     /// but not by the other.
-    pub fn separate<X, Y>(&self, left: X, right: Y) -> Option<ReducedOmegaWord<SymbolOf<Self>>>
-    where
-        X: Indexes<Self>,
-        Y: Indexes<Self>,
-    {
-        let p = left.to_index(self)?;
-        let q = right.to_index(self)?;
-
+    pub fn separate(
+        &self,
+        p: StateIndex<Self>,
+        q: StateIndex<Self>,
+    ) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         if p == q {
             return None;
         }

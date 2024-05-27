@@ -97,14 +97,9 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
         ts: D,
         state: Idx,
     ) -> Self {
-        let origin = state
-            .to_index(&ts)
-            .expect("Path must start in state that exists");
         Self {
-            state_colors: vec![ts
-                .state_color(origin)
-                .expect("Origin state must be colored")],
-            end: origin,
+            state_colors: vec![ts.state_color(state).expect("Origin state must be colored")],
+            end: state,
             transitions: Vec::new(),
         }
     }
@@ -114,14 +109,9 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
     where
         D: Deterministic<StateColor = Q, EdgeColor = C, StateIndex = Idx, Alphabet = A>,
     {
-        let origin = state
-            .to_index(&ts)
-            .expect("Path must start in state that exists");
         Self {
-            state_colors: vec![ts
-                .state_color(origin)
-                .expect("Origin state must be colored")],
-            end: origin,
+            state_colors: vec![ts.state_color(state).expect("Origin state must be colored")],
+            end: state,
             transitions: Vec::with_capacity(capacity),
         }
     }

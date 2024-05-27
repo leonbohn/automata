@@ -65,13 +65,7 @@ where
     {
         let accepting: math::Map<_, bool> = accepting_states
             .into_iter()
-            .map(|idx| {
-                (
-                    idx.to_index(&ts)
-                        .expect("supposed accepting state does not exist!"),
-                    true,
-                )
-            })
+            .map(|idx| (idx, true))
             .collect();
         ts.with_state_color(DefaultIfMissing::new(accepting, false))
             .into_dfa()
@@ -171,19 +165,17 @@ where
     /// Attempts to separate the state `left` from the state `right` by finding a word that leads to different colors.
     /// For a [`DFA`], this means that the returned word is in the symmetric difference of
     /// the languages accepted by the two states.
-    pub fn separate<X, Y>(&self, left: X, right: Y) -> Option<Vec<SymbolOf<Self>>>
-    where
-        X: Indexes<Self>,
-        Y: Indexes<Self>,
-    {
-        let q = left.to_index(self)?;
-        let p = right.to_index(self)?;
-        if p == q {
+    pub fn separate(
+        &self,
+        left: StateIndex<Self>,
+        right: StateIndex<Self>,
+    ) -> Option<Vec<SymbolOf<Self>>> {
+        if right == left {
             return None;
         }
 
-        self.with_initial(q)
-            .ts_product(self.with_initial(p))
+        self.with_initial(left)
+            .ts_product(self.with_initial(right))
             .minimal_representatives()
             .find_map(|rep| {
                 let ProductIndex(l, r) = rep.state_index();

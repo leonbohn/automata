@@ -68,12 +68,11 @@ pub struct SubsetConstruction<Ts: TransitionSystem> {
 }
 
 impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
-    fn edge<Idx: Indexes<Self>>(
+    fn edge(
         &self,
-        state: Idx,
+        source: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let source = state.to_index(self)?;
         tracing::trace!(
             "Computing successor of state {source} for matcher {:?}",
             matcher
@@ -148,12 +147,11 @@ impl<Ts: TransitionSystem> TransitionSystem for SubsetConstruction<Ts> {
         self.reachable_state_indices_from(self.initial())
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        Some(DeterministicEdgesFrom::new(self, state.to_index(self)?))
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        Some(DeterministicEdgesFrom::new(self, state))
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         let Some(color) = self.states.borrow().get(state).map(|q| {
             q.iter()
                 .map(|idx| {

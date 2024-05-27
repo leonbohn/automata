@@ -54,12 +54,11 @@ where
         self.0.state_indices()
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        Some(self.0.predecessors(state.to_index(self)?)?.map(Reversed))
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        Some(self.0.predecessors(state)?.map(Reversed))
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         self.0.state_color(state)
     }
 }
@@ -76,7 +75,7 @@ where
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        Some(self.0.edges_from(state.to_index(self)?)?.map(Reversed))
+    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
+        Some(self.0.edges_from(state)?.map(Reversed))
     }
 }
