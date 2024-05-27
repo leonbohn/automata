@@ -218,7 +218,10 @@ mod tests {
         assert_eq!(pref.symbols().collect_vec(), vec!['a', 'b']);
 
         let word = upw!("ab", "ac");
-        assert_eq!(word.skip(3).prefix(4).collect_vec(), vec!['c', 'a', 'c', 'a']);
+        assert_eq!(
+            word.skip(3).prefix(4).collect_vec(),
+            vec!['c', 'a', 'c', 'a']
+        );
         assert_eq!(
             word.skip(1)
                 .skip(1)
