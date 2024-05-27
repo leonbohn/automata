@@ -43,6 +43,7 @@ pub trait FiniteWord<S>: LinearWord<S> {
         Concat(prefix, self)
     }
 
+    /// Consumes `self` and collects the symbols into a [`Vec`].
     fn into_vec(self) -> Vec<S>
     where
         Self: Sized,

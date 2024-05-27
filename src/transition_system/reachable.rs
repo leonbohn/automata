@@ -64,6 +64,7 @@ impl<'a, Ts, const FULL_EDGE: bool> Reachable<'a, Ts, FULL_EDGE>
 where
     Ts: TransitionSystem,
 {
+    /// Creates a new iterator that will yield the reachable states of the transition system starting
     pub fn new(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
         let mut seen = Set::with_capacity(ts.size());
         seen.insert(origin);
@@ -84,6 +85,7 @@ impl<'a, Ts> Reachable<'a, Ts, false>
 where
     Ts: TransitionSystem,
 {
+    /// Creates a new variant that only outputs the indices of reachable vertices.
     pub fn state_indices(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
         Self::new(ts, origin)
     }
@@ -117,6 +119,7 @@ impl<'a, Ts> Reachable<'a, Ts, true>
 where
     Ts: TransitionSystem,
 {
+    /// Creates a new instance of the variant of `Self` that outputs full edges.
     pub fn edges(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
         Self::new(ts, origin)
     }

@@ -19,8 +19,17 @@ impl<T: TransitionSystem> MinimalRepresentative<T> {
         self.1
     }
 
+    /// Decomposes `self` into its inner vector of symbols and the state index.
     pub fn decompose(self) -> (Vec<SymbolOf<T>>, StateIndex<T>) {
         (self.0, self.1)
+    }
+    /// Consumes `self` and returns the inner vector of symbols.
+    pub fn into_inner(self) -> Vec<SymbolOf<T>> {
+        self.0
+    }
+    /// Creates a new instance of `MinimalRepresentative` from the given inner vector of symbols and state index.
+    pub fn new(inner: Vec<SymbolOf<T>>, id: StateIndex<T>) -> Self {
+        Self(inner, id)
     }
 }
 impl<T: TransitionSystem> PartialEq for MinimalRepresentative<T> {
@@ -60,15 +69,6 @@ impl<T: TransitionSystem> std::ops::Deref for MinimalRepresentative<T> {
 impl<T: TransitionSystem> std::ops::DerefMut for MinimalRepresentative<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
-    }
-}
-
-impl<T: TransitionSystem> MinimalRepresentative<T> {
-    pub fn into_inner(self) -> Vec<SymbolOf<T>> {
-        self.0
-    }
-    pub fn new(inner: Vec<SymbolOf<T>>, id: StateIndex<T>) -> Self {
-        Self(inner, id)
     }
 }
 
