@@ -13,7 +13,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = EdgeListsDeterministic::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
     /// let edge = ts.add_edge((q0, 'a', q1));
@@ -30,7 +30,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = EdgeListsDeterministic::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
     /// let edge = ts.add_edge((q0, 'a', q1));
@@ -52,7 +52,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = EdgeListsDeterministic::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(true);
     ///
@@ -78,7 +78,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = EdgeListsDeterministic::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(true);
     ///
@@ -104,7 +104,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = EdgeListsDeterministic::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(false);
     /// let q2 = ts.add_state(false);
@@ -127,7 +127,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = EdgeListsDeterministic::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(false);
     ///
@@ -148,7 +148,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = EdgeListsDeterministic::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(false);
     /// let q2 = ts.add_state(false);
@@ -186,5 +186,24 @@ pub trait Shrinkable: TransitionSystem {
         Self: Pointed,
     {
         self.trim_from(self.initial())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::prelude::*;
+    #[test]
+    fn asdf() {
+        let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
+        let q0 = ts.add_state(true);
+        let q1 = ts.add_state(false);
+
+        ts.add_edge((q0, 'a', q1));
+        ts.add_edge((q0, 'b', q1));
+        ts.add_edge((q1, 'a', q1));
+
+        assert_eq!(ts.remove_edges_to(q1).unwrap().len(), 3);
+        assert_eq!(ts.remove_edges_to(q0).unwrap().len(), 0);
+        assert_eq!(ts.remove_edges_to(2), None);
     }
 }
