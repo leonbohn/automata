@@ -342,6 +342,13 @@ pub trait TransitionSystem: Sized {
         self.state_indices().count()
     }
 
+    /// Gives a hint for the size of `self`. The first element is the minimum number of states that
+    /// are in the transition system. The second element is the maximum number of states that are in
+    /// the transition system. If the maximum number is not known, `None` is returned.
+    fn hint_size(&self) -> (usize, Option<usize>) {
+        (0, None)
+    }
+
     /// Returns `true` if and only if there exists at least one state.
     fn is_empty(&self) -> bool {
         self.size() == 0

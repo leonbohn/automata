@@ -48,6 +48,16 @@ impl<Ts: TransitionSystem> StateSet<Ts> {
     }
 }
 
+impl<Ts: TransitionSystem> std::fmt::Debug for StateSet<Ts> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0.is_empty() {
+            write!(f, "∅")
+        } else {
+            write!(f, "{{{}}}", self.iter().map(|q| q.show()).join(", "))
+        }
+    }
+}
+
 /// Represents the subset construction applied to a transition system. This is a deterministic
 /// transition system, which resolves the non-determinism by operating on sets of states.
 #[derive(Clone)]
@@ -64,6 +74,10 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
         let source = state.to_index(self)?;
+        tracing::trace!(
+            "Computing successor of state {source} for matcher {:?}",
+            matcher
+        );
         let (colorset, stateset): (Vec<Ts::EdgeColor>, StateSet<Ts>) = self
             .states
             .borrow()
@@ -79,6 +93,7 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
                 })
             })
             .unzip();
+        tracing::trace!("Found stateset {stateset:?} with colorset {colorset:?}",);
         let expression = self
             .expressions
             .values()
@@ -101,7 +116,6 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
 
 impl<Ts: TransitionSystem> Pointed for SubsetConstruction<Ts> {
     fn initial(&self) -> Self::StateIndex {
-        assert!(!self.states.borrow().is_empty());
         0
     }
 }
@@ -206,7 +220,7 @@ impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
 mod tests {
     use crate::prelude::*;
 
-    #[test]
+    #[test_log::test]
     fn subset_construction() {
         let nts = LinkedListNondeterministic::builder()
             .default_color(false)
@@ -217,13 +231,18 @@ mod tests {
                 (1, 'b', 1),
                 (1, 'a', 0),
             ])
-            .into_linked_list_nondeterministic()
+            .into_dts()
             .with_initial(0);
 
         let dts = nts.subset_construction();
 
+        for idx in dts.reachable_state_indices() {
+            println!("idx: {}[{:?}]", idx, dts.state_color(idx));
+        }
         assert_eq!(dts.reachable_state_indices().count(), 3);
+        println!("first");
         assert_eq!(dts.state_indices().count(), 3);
+        println!("second");
         assert_eq!(dts.trim_collect().0.size(), 3);
     }
 }
