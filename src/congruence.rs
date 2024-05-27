@@ -160,8 +160,7 @@ where
     ///
     /// assert!(dfa.equivalent(ts.looping_words(0)));
     /// ```
-    pub fn looping_words<Idx: Indexes<Self>>(&self, class: Idx) -> DFA<A> {
-        let idx = class.to_index(self).unwrap();
+    pub fn looping_words(&self, idx: StateIndex<Self>) -> DFA<A> {
         self.ts()
             .with_initial(idx)
             .with_state_color(DefaultIfMissing::new(
@@ -178,24 +177,16 @@ where
 
     /// Verifies whether an element of `self` is  idempotent, i.e. if the mr of the indexed
     /// class is u, then it should be that uu ~ u.
-    pub fn is_idempotent<I: Indexes<Self>>(&self, elem: I) -> bool {
-        let Some(idx) = elem.to_index(self) else {
-            panic!("is_idempotent called for non-existent index");
-        };
+    pub fn is_idempotent(&self, idx: StateIndex<Self>) -> bool {
         let Some(mr) = self.state_to_mr(idx) else {
             panic!("The class {} is not labeled!", idx.show());
         };
-        if let Some(q) = self.get(elem) {
-            self.reached_state_index_from(q, mr) == Some(q)
-        } else {
-            false
-        }
+        self.reached_state_index_from(idx, mr) == Some(idx)
     }
 
     /// Returns the [`Class`] that is referenced by `index`.
     #[inline(always)]
-    pub fn state_to_mr<Idx: Indexes<Self>>(&self, index: Idx) -> Option<&MinimalRepresentative<D>> {
-        let idx = index.to_index(self)?;
+    pub fn state_to_mr(&self, idx: StateIndex<Self>) -> Option<&MinimalRepresentative<D>> {
         self.minimal_representatives().get_by_left(&idx)
     }
 

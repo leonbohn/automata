@@ -85,13 +85,12 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool, IdType: ScalarIndexType>
 
     pub fn extract_edge_tuples_for<F>(
         &mut self,
-        state: impl Indexes<Self>,
+        q: StateIndex<Self>,
         pred: F,
     ) -> Option<Vec<EdgeTuple<Self>>>
     where
         F: FnMut(&EdgeListsOutEdge<A, C, IdType>) -> bool,
     {
-        let q = state.to_index(self)?;
         Some(ExtractEdgeTuplesFrom::new(self.states.get_mut(&q)?, pred).collect())
     }
 
@@ -176,53 +175,46 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool, IdType: ScalarIndexType>
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType>
     crate::transition_system::Shrinkable for EdgeLists<A, Q, C, DET, IdType>
 {
-    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Q> {
-        self.mutablets_remove_state(state.to_index(self)?)
+    fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Q> {
+        self.mutablets_remove_state(state)
     }
     fn remove_edges_from_matching(
         &mut self,
-        source: impl Indexes<Self>,
+        q: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let q = source.to_index(self)?;
         self.extract_edge_tuples_for(q, |(e, c, p)| matcher.matches(e))
     }
 
     fn remove_edges_between_matching(
         &mut self,
-        source: impl Indexes<Self>,
-        target: impl Indexes<Self>,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let source = source.to_index(self)?;
-        let target = target.to_index(self)?;
         self.extract_edge_tuples_for(source, |(e, c, p)| matcher.matches(e) && target.eq(p))
     }
 
     fn remove_edges_between(
         &mut self,
-        source: impl Indexes<Self>,
-        target: impl Indexes<Self>,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let source = source.to_index(self)?;
-        let target = target.to_index(self)?;
         self.extract_edge_tuples_for(source, |(e, c, p)| target.eq(p))
     }
 
     fn remove_edges_from(
         &mut self,
-        source: impl Indexes<Self>,
+        q: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let q = source.to_index(self)?;
         self.extract_edge_tuples_for(q, |_| true)
     }
 
-    fn remove_edges_to(&mut self, target: impl Indexes<Self>) -> Option<Vec<EdgeTuple<Self>>> {
-        let p = target.to_index(self)?;
-        if !self.states.contains_key(&p) {
+    fn remove_edges_to(&mut self, target: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>> {
+        if !self.states.contains_key(&target) {
             return None;
         }
-        Some(self.extract_edge_tuples(|_, (_, _, q)| *q == p))
+        Some(self.extract_edge_tuples(|_, (_, _, q)| *q == target))
     }
 }
 
@@ -356,13 +348,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> 
         self.states.keys().cloned()
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         self.raw_state_map().get(&state).map(|s| s.color().clone())
     }
 
-    fn edges_from<X: Indexes<Self>>(&self, state: X) -> Option<Self::EdgesFromIter<'_>> {
-        let q = state.to_index(self)?;
+    fn edges_from(&self, q: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         if !self.contains_state(q) {
             return None;
         }
@@ -480,20 +470,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> 
 
         Some(self.states.get_mut(&q)?.add_edge(a, c, p))
     }
-
-    fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
-        &mut self,
-        index: Idx,
-        color: X,
-    ) {
-        let Some(index) = index.to_index(self) else {
-            tracing::error!("cannot set color of state that does not exist");
-            return;
-        };
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
         self.states
             .get_mut(&index)
             .expect("State must exist")
-            .set_color(color.into());
+            .set_color(color);
     }
 }
 
@@ -734,8 +715,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> 
     type EdgesToIter<'this> = EdgeListsPredecessors<'this, A, Q, C, DET, IdType>
     where
         Self: 'this;
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        let target = state.to_index(self)?;
+    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
+        let target = state;
         let mut it = self.states.keys();
         Some(EdgeListsPredecessors {
             idx: it.next().cloned(),
