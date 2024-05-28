@@ -254,8 +254,8 @@ where
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        self.ts.predecessors(state.to_index(self)?)
+    fn predecessors(&self, state: StateIndex<D>) -> Option<Self::EdgesToIter<'_>> {
+        self.ts.predecessors(state)
     }
 }
 
@@ -281,17 +281,8 @@ where
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         self.ts.add_state(color)
     }
-    fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
-        &mut self,
-        index: Idx,
-        color: X,
-    ) {
-        self.ts.set_state_color(
-            index
-                .to_index(self)
-                .expect("cannot set color of state that does not exist"),
-            color,
-        )
+    fn set_state_color(&mut self, _index: StateIndex<Self>, _color: StateColor<Self>) {
+        todo!()
     }
 
     fn add_edge<E>(&mut self, t: E) -> Option<Self::EdgeRef<'_>>
@@ -299,6 +290,57 @@ where
         E: IntoEdgeTuple<Self>,
     {
         self.ts.add_edge(t.into_edge_tuple())
+    }
+}
+
+impl<A, Z, Q, C, D, const OMEGA: bool> Shrinkable for Automaton<A, Z, Q, C, D, OMEGA>
+where
+    A: Alphabet,
+    D: Shrinkable<Alphabet = A, StateColor = Q, EdgeColor = C>,
+    Q: Color,
+    C: Color,
+{
+    fn remove_state(&mut self, q: StateIndex<Self>) -> Option<Self::StateColor> {
+        self.ts_mut().remove_state(q)
+    }
+
+    fn remove_edges_from_matching(
+        &mut self,
+        source: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        self.ts_mut().remove_edges_from_matching(source, matcher)
+    }
+
+    fn remove_edges_between_matching(
+        &mut self,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        self.ts_mut()
+            .remove_edges_between_matching(source, target, matcher)
+    }
+    fn remove_edges_between(
+        &mut self,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        self.ts_mut().remove_edges_between(source, target)
+    }
+
+    fn remove_edges_from(
+        &mut self,
+        source: StateIndex<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        self.ts_mut().remove_edges_from(source)
+    }
+
+    fn remove_edges_to(
+        &mut self,
+        target: StateIndex<Self>,
+    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        self.ts_mut().remove_edges_to(target)
     }
 }
 
@@ -337,12 +379,12 @@ where
         self.ts.state_indices()
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        self.ts.edges_from(state.to_index(self)?)
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        self.ts.edges_from(state)
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        self.ts.state_color(state.to_index(self)?)
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        self.ts.state_color(state)
     }
 }
 

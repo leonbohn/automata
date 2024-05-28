@@ -41,7 +41,7 @@ pub trait IsEdge<'ts, E, Idx, C> {
 
 /// Represents an edge that is not associated to a transition system. It stores a color, an
 /// expression, as well as a source and target state index.
-#[derive(Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Clone, Eq, PartialEq, Debug, Ord, PartialOrd, Hash)]
 pub struct Edge<E, Idx, C> {
     source: Idx,
     target: Idx,
@@ -81,7 +81,7 @@ impl<E, Idx, C> Edge<E, Idx, C> {
 
 /// Represents a reference to an edge in a transition system. This stores a lifetime
 /// to the transition system and references to the color and expression.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq)]
 pub struct EdgeReference<'ts, E, Idx, C> {
     source: Idx,
     target: Idx,

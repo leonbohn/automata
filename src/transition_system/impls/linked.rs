@@ -58,23 +58,14 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable
         self.states.push(state);
         id
     }
-
-    fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
-        &mut self,
-        index: Idx,
-        color: X,
-    ) {
-        let Some(index) = index.to_index(self) else {
-            tracing::error!("cannot set color of state that does not exist");
-            return;
-        };
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
         if index >= self.states.len() {
             panic!(
                 "Index {index} is out of bounds, there are only {} states",
                 self.states.len()
             );
         }
-        self.states[index].color = color.into();
+        self.states[index].color = color;
     }
 
     fn add_edge<E>(&mut self, t: E) -> Option<Self::EdgeRef<'_>>
@@ -115,11 +106,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
 {
     fn remove_edges_from_matching(
         &mut self,
-        source: impl Indexes<Self>,
+        from: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let from = source.to_index(self)?;
-
         let mut out = vec![];
         while let Some(pos) = self.edge_position(from, &matcher) {
             let edge = self.remove_edge(from, pos);
@@ -127,14 +116,14 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
         }
         Some(out)
     }
-    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Self::StateColor> {
+    fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         todo!()
     }
 
     fn remove_edges_between_matching(
         &mut self,
-        source: impl Indexes<Self>,
-        target: impl Indexes<Self>,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
         todo!()
@@ -142,22 +131,22 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
 
     fn remove_edges_between(
         &mut self,
-        source: impl Indexes<Self>,
-        target: impl Indexes<Self>,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
         todo!()
     }
 
     fn remove_edges_from(
         &mut self,
-        source: impl Indexes<Self>,
+        source: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
         todo!()
     }
 
     fn remove_edges_to(
         &mut self,
-        target: impl Indexes<Self>,
+        target: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
         todo!()
     }
@@ -376,15 +365,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
         0..self.states.len()
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        Some(NTSEdgesFromIter::new(
-            &self.edges,
-            self.first_edge(state.to_index(self)?),
-        ))
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        Some(NTSEdgesFromIter::new(&self.edges, self.first_edge(state)))
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         if state >= self.states.len() {
             panic!(
                 "index {state} is out of bounds, there are only {} states",
@@ -427,8 +412,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
     where
         Self: 'this;
 
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        let state = state.to_index(self)?;
+    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
         assert!(state < self.states.len());
 
         Some(LinkedListTransitionSystemEdgesToIter::new(self, state))

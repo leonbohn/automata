@@ -1,4 +1,4 @@
-use crate::{hoa::HoaAlphabet, math::Set, prelude::*};
+use crate::{hoa::HoaAlphabet, math::Set, prelude::*, transition_system::impls::q};
 
 mod buchi;
 pub use buchi::*;
@@ -31,7 +31,7 @@ pub type NondeterministicOmegaAutomaton<A> = OmegaAutomaton<A, false>;
 /// such as when parsing automata. One should prefer using specific types such as
 /// [`DPA`] whenever possible.
 pub type OmegaAutomaton<A, const DET: bool = true> =
-    InfiniteWordAutomaton<A, OmegaAcceptanceCondition, usize, AcceptanceMask, DET>;
+    InfiniteWordAutomaton<A, OmegaAcceptanceCondition, Int, AcceptanceMask, DET>;
 
 /// Disambiguates between the different types of acceptance conditions. This is only
 /// used in conjunction with [`OmegaAutomaton`]/[`DeterministicOmegaAutomaton`] when
@@ -40,7 +40,7 @@ pub type OmegaAutomaton<A, const DET: bool = true> =
 #[derive(Debug, Clone, Eq, Copy, PartialEq, Ord, PartialOrd)]
 #[allow(missing_docs)]
 pub enum OmegaAcceptanceCondition {
-    Parity(usize, usize),
+    Parity(Int, Int),
     Buchi,
     Rabin,
     Streett,
@@ -70,8 +70,8 @@ impl<A: Alphabet, const DET: bool> OmegaAutomaton<A, DET> {
     /// Creates a new instance from the given transition system, initial state and
     /// acceptance condition.
     pub fn new(
-        ts: TS<A, usize, AcceptanceMask, DET>,
-        initial: usize,
+        ts: TS<A, Int, AcceptanceMask, DET>,
+        initial: DefaultIdType,
         acceptance: OmegaAcceptanceCondition,
     ) -> OmegaAutomaton<A, DET> {
         OmegaAutomaton {
@@ -136,7 +136,7 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
 
 impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
     fn from(value: DeterministicOmegaAutomaton<HoaAlphabet>) -> Self {
-        let size = value.size();
+        let size = q(value.size());
         let ts = TSBuilder::default()
             .with_state_colors((0..size).map(|i| value.state_color(i).unwrap()))
             .with_transitions(value.state_indices().flat_map(|q| {
@@ -163,7 +163,10 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
         let mut ts = DTS::for_alphabet(HoaAlphabet::try_from_char_alphabet(value.alphabet())?);
 
         for q in value.state_indices() {
-            assert!(q < size, "The state indices must be contiguous for this!");
+            assert!(
+                q.into_usize() < size,
+                "The state indices must be contiguous for this!"
+            );
             ts.add_state(value.state_color(q).unwrap());
         }
 
@@ -179,7 +182,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
             }
         }
 
-        assert!(value.initial() < size);
+        assert!(value.initial().into_usize() < size);
         Ok(DeterministicOmegaAutomaton::new(
             ts,
             value.initial,

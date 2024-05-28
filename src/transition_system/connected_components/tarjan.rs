@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, BTreeSet, VecDeque};
+use std::collections::{BTreeSet, VecDeque};
 
 use itertools::Itertools;
 use tracing::trace;
@@ -237,7 +237,7 @@ where
                 stack.push(q);
             }
 
-            if let Entry::Vacant(e) = indices.entry(q) {
+            if let math::map::Entry::Vacant(e) = indices.entry(q) {
                 trace!("assigning index {current} to state {}", q.show());
                 e.insert(current);
                 low.insert(q, current);
@@ -295,7 +295,7 @@ where
                 while on_stack.contains(&q) {
                     let top = stack.pop().unwrap();
                     low.insert(top, low_q);
-                    on_stack.remove(&top);
+                    on_stack.swap_remove(&top);
                     scc.push(top);
                 }
                 let scc = Scc::new(ts, scc.into_iter());
@@ -347,9 +347,7 @@ mod tests {
             .into_right_congruence(0);
 
         let rev = (&ts).reversed();
-        let reachable = rev
-            .reachable_state_indices_from(3usize)
-            .collect::<HashSet<_>>();
+        let reachable = rev.reachable_state_indices_from(3).collect::<HashSet<_>>();
         println!("{:?}", reachable);
         assert!(reachable.contains(&3));
         assert!(reachable.contains(&2));

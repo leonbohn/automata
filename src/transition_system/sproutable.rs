@@ -299,15 +299,11 @@ pub trait Sproutable: TransitionSystem {
     /// Sets the color of the state with the given index. If the state does not exist, the method
     /// should panic. Usually, we would like to avoid recoloring states individually, and instead
     /// use the [`TransitionSystem::map_state_colors`] method.
-    fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
-        &mut self,
-        index: Idx,
-        color: X,
-    );
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>);
 
     /// Sets the state color of the initial state. This method is only available for a ts if it
     /// is [`Pointed`] and it simply obtains the initial state and subsequetly [sets its color](`Self::set_state_color`).
-    fn set_initial_color<X: Into<StateColor<Self>>>(&mut self, color: X)
+    fn set_initial_color(&mut self, color: StateColor<Self>)
     where
         Self: Pointed,
     {

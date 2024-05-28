@@ -9,13 +9,13 @@ use tracing::{info, trace};
 use crate::{automaton::InfiniteWordAutomaton, math::Partition, prelude::*};
 
 /// A deterministic parity automaton (DPA). It uses a [`DTS`]
-/// as its transition system and a `usize` as its edge color.
+/// as its transition system and an [`Int`] as its edge color.
 /// The acceptance condition is given by the type `Sem`, which
 /// defaults to [`MinEvenParityCondition`], meaning the automaton accepts
 /// if the least color that appears infinitely often during
 /// a run is even.
-pub type DPA<A = CharAlphabet, Q = Void, Sem = MinEvenParityCondition, D = DTS<A, Q, usize>> =
-    InfiniteWordAutomaton<A, Sem, Q, usize, true, D>;
+pub type DPA<A = CharAlphabet, Q = Void, Sem = MinEvenParityCondition, D = DTS<A, Q, Int>> =
+    InfiniteWordAutomaton<A, Sem, Q, Int, true, D>;
 /// Helper type alias for converting a given transition system into a [`DPA`]
 /// with the given semantics.
 pub type IntoDPA<T, Sem = MinEvenParityCondition> =
@@ -32,14 +32,14 @@ pub type IntoDPA<T, Sem = MinEvenParityCondition> =
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
 pub struct MinEvenParityCondition;
 
-impl<Q> Semantics<Q, usize> for MinEvenParityCondition {
+impl<Q> Semantics<Q, Int> for MinEvenParityCondition {
     type Output = bool;
 }
 
-impl<Q> OmegaSemantics<Q, usize> for MinEvenParityCondition {
+impl<Q> OmegaSemantics<Q, Int> for MinEvenParityCondition {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
-        R: OmegaRun<StateColor = Q, EdgeColor = usize>,
+        R: OmegaRun<StateColor = Q, EdgeColor = Int>,
     {
         run.recurring_edge_colors_iter()
             .and_then(|colors| colors.min())
@@ -63,7 +63,7 @@ pub struct MaxOddParityCondition;
 
 impl<D> IntoDPA<D>
 where
-    D: Deterministic<EdgeColor = usize>,
+    D: Deterministic<EdgeColor = Int>,
 {
     /// Attempts to transform the given [`FiniteWord`] into a [`EdgeColor`]. This means that the
     /// word is run through the automaton and the last transition color is returned.
@@ -77,10 +77,10 @@ where
     }
 
     /// Computes the least and greatest edge color that appears on any edge of the automaton.
-    /// If there are no edges, `(usize::MAX, 0)` is returned.
-    pub fn low_and_high_priority(&self) -> (usize, usize) {
+    /// If there are no edges, `(Int::MAX, 0)` is returned.
+    pub fn low_and_high_priority(&self) -> (Int, Int) {
         self.edge_colors_unique()
-            .fold((usize::MAX, 0), |(low, high), c| (low.min(c), high.max(c)))
+            .fold((Int::MAX, 0), |(low, high), c| (low.min(c), high.max(c)))
     }
 
     /// Transforms the given [`FiniteWord`] into a [`EdgeColor`]. This simply calls [`Self::try_last_edge_color`]
@@ -141,7 +141,7 @@ where
     /// colors by one.
     pub fn complement(
         self,
-    ) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>> {
+    ) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>> {
         let initial = self.initial;
         self.map_edge_colors(|c| c + 1)
             .with_initial(initial)
@@ -151,14 +151,11 @@ where
     /// Gives a witness for the fact that `left` and `right` are not language-equivalent. This is
     /// done by finding a separating word, i.e. a word that is accepted from one of the two states
     /// but not by the other.
-    pub fn separate<X, Y>(&self, left: X, right: Y) -> Option<ReducedOmegaWord<SymbolOf<Self>>>
-    where
-        X: Indexes<Self>,
-        Y: Indexes<Self>,
-    {
-        let p = left.to_index(self)?;
-        let q = right.to_index(self)?;
-
+    pub fn separate(
+        &self,
+        p: StateIndex<Self>,
+        q: StateIndex<Self>,
+    ) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         if p == q {
             return None;
         }
@@ -233,22 +230,25 @@ where
     /// Attempts to find an omega-word that witnesses the given `color`, meaning the least color that
     /// appears infinitely often during the run of the returned word is equal to `color`. If no such
     /// word exists, `None` is returned.
-    pub fn witness_color(&self, color: usize) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
-        let restrict = self.edge_color_restricted(color, usize::MAX);
+    pub fn witness_color(&self, color: Int) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
+        let restrict = self.edge_color_restricted(color, Int::MAX);
         let sccs = restrict.sccs();
         for scc in sccs.iter() {
             if scc.is_transient() {
                 continue;
             }
             if scc.interior_edge_colors().contains(&color) {
-                let (q, rep) = scc
+                let rep = scc
                     .minimal_representative()
                     .as_ref()
                     .expect("We know this is reachable");
                 let cycle = scc
-                    .maximal_loop_from(*rep)
+                    .maximal_loop_from(rep.state_index())
                     .expect("This thing is non-transient");
-                return Some(ReducedOmegaWord::ultimately_periodic(q, cycle));
+                return Some(ReducedOmegaWord::ultimately_periodic(
+                    rep.collect_vec(),
+                    cycle,
+                ));
             }
         }
         None
@@ -258,15 +258,15 @@ where
     /// during the run of `self` on `w` is equal to `k` and the least color seen infinitely often
     /// during the run of `other` on `w` is equal to `l`. If no such word exists, `None` is returned.
     /// Main use of this is to witness the fact that `self` and `other` are not language-equivalent.
-    pub fn witness_colors<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
+    pub fn witness_colors<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
-        k: usize,
+        k: Int,
         other: &IntoDPA<O>,
-        l: usize,
+        l: Int,
     ) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         trace!("attempting to witness colors {k} and {l}");
-        let t1 = self.edge_color_restricted(k, usize::MAX);
-        let t2 = other.edge_color_restricted(l, usize::MAX);
+        let t1 = self.edge_color_restricted(k, Int::MAX);
+        let t2 = other.edge_color_restricted(l, Int::MAX);
         let prod = t1.ts_product(t2);
         let sccs = prod.sccs();
         for scc in sccs.iter() {
@@ -279,20 +279,20 @@ where
                 .min()
                 .expect("we know this is not transient");
             if *a == k && *b == l {
-                let Some((mr, spoke)) = scc.minimal_representative() else {
+                let Some(rep) = scc.minimal_representative() else {
                     continue;
                 };
                 let cycle = scc
-                    .maximal_loop_from(*spoke)
+                    .maximal_loop_from(rep.state_index())
                     .expect("This thing is non-transient");
-                return Some(ReducedOmegaWord::ultimately_periodic(mr, cycle));
+                return Some(ReducedOmegaWord::ultimately_periodic(rep.into_vec(), cycle));
             }
         }
         None
     }
 
     /// Returns an iterator over all colors that appear on edges of `self`.
-    pub fn colors(&self) -> impl Iterator<Item = usize> + '_ {
+    pub fn colors(&self) -> impl Iterator<Item = Int> + '_ {
         self.state_indices()
             .flat_map(|q| self.edges_from(q).unwrap().map(|e| e.color()))
             .unique()
@@ -301,7 +301,7 @@ where
     /// Attempts to find an omega-word that witnesses the fact that `self` and `other` are not
     /// language-equivalent. If no such word exists, `None` is returned. Internally, this uses
     /// [`Self::witness_not_subset_of`] in both directions.
-    pub fn witness_inequivalence<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
+    pub fn witness_inequivalence<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
         other: &IntoDPA<O>,
     ) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
@@ -311,7 +311,7 @@ where
 
     /// Returns true if `self` is language-equivalent to `other`, i.e. if and only if the Two
     /// DPAs accept the same language.
-    pub fn language_equivalent<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
+    pub fn language_equivalent<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
         other: &IntoDPA<O>,
     ) -> bool {
@@ -320,7 +320,7 @@ where
 
     /// Returns true if and only if `self` is included in `other`, i.e. if and only if the language
     /// accepted by `self` is a subset of the language accepted by `other`.
-    pub fn included_in<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
+    pub fn included_in<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
         other: &IntoDPA<O>,
     ) -> bool {
@@ -329,7 +329,7 @@ where
 
     /// Returns true if and only if `self` includes `other`, i.e. if and only if the language
     /// accepted by `self` is a superset of the language accepted by `other`.
-    pub fn includes<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
+    pub fn includes<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
         other: &IntoDPA<O>,
     ) -> bool {
@@ -338,7 +338,7 @@ where
 
     /// Attempts to find an omega-word that witnesses the fact that `self` is not included in `other`.
     /// If no such word exists, `None` is returned.
-    pub fn witness_not_subset_of<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>(
+    pub fn witness_not_subset_of<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
         other: &IntoDPA<O>,
     ) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
@@ -363,21 +363,15 @@ where
     /// "Computing the rabin index of a finite automaton". The procedure that this implementation actually uses
     /// is outlined by Schewe and Ehlers in [Natural Colors of Infinite Words](https://arxiv.org/pdf/2207.11000.pdf)
     /// in Section 4.1, Definition 2.
-    pub fn normalized(
-        &self,
-    ) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = usize>>
+    pub fn normalized(&self) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
         StateColor<Self>: Eq + Hash + Clone + Ord,
     {
         let start = std::time::Instant::now();
 
-        let (mut ts, _initial) = self
-            .with_initial(self.initial)
-            .collect_edge_lists_deterministic_pointed();
-        let out = self
-            .with_initial(self.initial)
-            .collect_linked_list_deterministic_pointed();
+        let (mut ts, _initial) = self.with_initial(self.initial).collect_dts_pointed();
+        let (out, out_initial) = self.with_initial(self.initial).collect_dts_pointed();
 
         let mut recoloring = Vec::new();
         let mut remove_states = Vec::new();
@@ -464,7 +458,6 @@ where
         }
 
         let ret = out
-            .0
             .map_edge_colors_full(|q, e, _, _| {
                 let Some(c) = recoloring
                     .iter()
@@ -475,7 +468,7 @@ where
                 };
                 c
             })
-            .with_initial(out.1)
+            .with_initial(out_initial)
             .collect_dpa();
 
         info!("normalizing DPA took {} μs", start.elapsed().as_micros());

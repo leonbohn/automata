@@ -97,8 +97,7 @@ impl<'a, Ts: TransitionSystem> TarjanDAG<'a, Ts> {
 
     /// Attempts to identify the index of the SCC containing the given state. If the state
     /// is not in any SCC, `None` is returned.
-    pub fn get<X: Indexes<Ts>>(&self, state: X) -> Option<usize> {
-        let q = state.to_index(self.ts)?;
+    pub fn get(&self, q: StateIndex<Ts>) -> Option<usize> {
         self.dag.find(|c| c.contains(&q))
     }
 

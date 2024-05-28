@@ -58,9 +58,9 @@ let aut = TSBuilder::without_edge_colors()
     .into_dfa(0);
 
 // reachable states in lenght-lexicographic order
-assert_eq!(aut.reachable_state_indices().collect::<Vec<_>>(), vec![0, 2, 1, 3]);
+assert_eq!(aut.reachable_state_indices().collect::<math::Set<_>>(), math::Set::from_iter([0, 1, 2, 3]));
 // but we can also just pick a different starting state
-assert_eq!(aut.reachable_state_indices_from(1).collect::<Vec<_>>(), vec![1, 0, 2, 3]);
+assert_eq!(aut.reachable_state_indices_from(3).collect::<math::Set<_>>(), math::Set::from_iter([3]));
 ```
 
 Operations can be chained together efficiently and are evaluated as needed.
@@ -222,12 +222,6 @@ Further traits that are of importance are
 - `Deterministic`, a marker trait that disambiguates between nondeterministic and deterministic TS. As `TransitionSystem` only provides iterators over the outgoing edges, it can be used to deal with nondeterministic TS, that have multiple overlapping edges. By implementing `Deterministic`, we guarantee, that there is always a single unique outgoing transition for each state.
 - `Sproutable` enables growing a TS state by state and edge/transition by edge/transition. Naturally, this is only implemented for the basic building blocks, i.e. `BTS`, `DTS` and `NTS`.
 
-
-### Documentation
-
-The docs use LaTeX syntax in some places and [as outlined here](https://github.com/victe/rust-latex-doc-minimal-example), one can enable their rendering by making use of KaTeX.
-This is configured through the `.cargo/config.toml`, which ensures that the `.cargo/docs-header.html` file is used as header in the HTML documentation that cargo builds.
-In that file, we load KaTeX 0.16.10 and use it to render the included math, which is delimited with the usual `$ .. $` or `\\( .. \\)` for inline and `$$ .. $$` or `\[ .. \]` for display math (in a separate box).
 
 ### License 
 

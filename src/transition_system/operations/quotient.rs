@@ -187,31 +187,29 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
         0..self.partition.len()
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         let it = self.class_iter_by_id(state)?;
         it.map(|o| self.ts.state_color(o)).collect()
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        if self.partition.len() <= state.to_index(self)? {
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        if self.partition.len() <= state {
             None
         } else {
             Some(QuotientEdgesFrom::new(
                 self,
                 self.alphabet().universe(),
-                state.to_index(self)?,
+                state,
             ))
         }
     }
 }
 impl<D: Deterministic> Deterministic for Quotient<D> {
-    fn edge<Idx: Indexes<Self>>(
+    fn edge(
         &self,
-        state: Idx,
+        origin: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let origin = state.to_index(self)?;
         let (states, colors): (math::Set<_>, Vec<_>) = self
             .class_iter_by_id(origin)?
             .filter_map(|q| {

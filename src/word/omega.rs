@@ -90,13 +90,13 @@ pub trait OmegaWord<S>: LinearWord<S> {
     /// Returns a vector consisting of the symbols making up the cycle of `self`. This simply collects
     /// whatever symbols make up [`OmegaWord::cycle()`];
     fn cycle_vec(&self) -> Vec<S> {
-        self.cycle().to_vec()
+        self.cycle().into_vec()
     }
 
     /// Returns a vector consisting of the symbols making up the spoke of `self`. This simply collects
     /// whatever symbols make up [`OmegaWord::spoke()`];
     fn spoke_vec(&self) -> Vec<S> {
-        self.spoke().to_vec()
+        self.spoke().collect_vec()
     }
 
     /// Returns the loop index of the word, i.e. the length of the spoke. This can be zero if
@@ -249,7 +249,7 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     /// assert!(word.cycle().equals("abc"));
     /// ```
     pub fn new<W: FiniteWord<S>>(word: W) -> Self {
-        let mut representation = word.to_vec();
+        let mut representation = word.collect_vec();
         deduplicate_inplace(&mut representation);
         Self { representation }
     }
@@ -377,7 +377,7 @@ impl<S: Symbol> ReducedOmegaWord<S> {
 
     /// Creates a new reduced omega word from a finite word. The input is deduplicated.
     pub fn periodic<W: FiniteWord<S>>(representation: W) -> Self {
-        let representation = deduplicate(representation.to_vec());
+        let representation = deduplicate(representation.collect_vec());
         Self {
             word: representation,
             loop_index: 0,
@@ -421,15 +421,15 @@ impl<S: Symbol> ReducedOmegaWord<S> {
             .map(|x| x + 1)
             .unwrap_or(0);
 
-        let mut loop_representation = cycle.to_vec();
+        let mut loop_representation = cycle.collect_vec();
         loop_representation.rotate_right(roll_in % cycle.len());
         deduplicate_inplace(&mut loop_representation);
 
-        let mut representation = spoke.to_vec();
+        let mut representation = spoke.collect_vec();
         representation.truncate(spoke.len().saturating_sub(roll_in));
         let loop_index = representation.len();
 
-        representation.extend(deduplicate(cycle.to_vec()));
+        representation.extend(deduplicate(cycle.collect_vec()));
         Self {
             word: representation,
             loop_index,
@@ -493,7 +493,7 @@ impl<S: Symbol> FiniteWord<S> for Epsilon {
         std::iter::empty()
     }
 
-    fn to_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<S> {
         vec![]
     }
 

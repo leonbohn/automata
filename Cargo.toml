@@ -20,9 +20,12 @@ edition = "2021"
 rustdoc-args = ["--html-in-header", "./docs-header.html"]
 
 [dependencies]
+# gryf = { git = "https://github.com/pnevyk/gryf", rev = "1efd3a2", optional = true }
+petgraph = { version = "0.6.5", optional = true, default-features = false, features = [
+    "stable_graph",
+] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
-fxhash = "0.2"
 itertools = "0.13.0"
 tabled = { version = "0.15", features = ["ansi"] }
 owo-colors = "4.0"
@@ -35,15 +38,18 @@ bimap = "0.6"
 fastrand = { version = "2", optional = true }
 hoars = { version = "0.2", optional = true }
 clap = { version = "4.5", optional = true }
+indexmap = "2.2"
+
 
 [features]
-default = ["hoa", "graphviz", "random", "minimize"]
+default = ["hoa", "graphviz", "random", "minimize", "petgraph"]
 random = ["fastrand"]
 minimize = []
 hoa = ["dep:hoars", "biodivine-lib-bdd"]
 graphviz = ["dep:tempfile"]
 oai-bin = ["clap"]
 linked_list_ts = []
+petgraph = ["dep:petgraph"]
 
 [dev-dependencies]
 lazy_static = "1.4"
