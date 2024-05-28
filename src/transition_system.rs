@@ -774,7 +774,7 @@ pub type StateColor<X> = <X as TransitionSystem>::StateColor;
 /// Type alias for extracting the edge color in a [`TransitionSystem`].
 pub type EdgeColor<X> = <X as TransitionSystem>::EdgeColor;
 /// Type alias for extracting the state index in a [`TransitionSystem`].
-pub type StateIndex<X> = <X as TransitionSystem>::StateIndex;
+pub type StateIndex<X = DTS> = <X as TransitionSystem>::StateIndex;
 /// Type alias for a tuple representing an edge in a [`TransitionSystem`].
 pub type EdgeTuple<Ts> = (
     StateIndex<Ts>,
