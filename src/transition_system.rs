@@ -2,7 +2,7 @@ use itertools::Itertools;
 use tracing::trace;
 
 use crate::{math::Partition, prelude::*};
-use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
+use std::{collections::BTreeSet, hash::Hash};
 
 mod edge;
 pub use edge::{Edge, EdgeReference, IsEdge};
@@ -25,9 +25,9 @@ pub mod operations;
 /// be removed. This is useful for constructing transition systems programmatically.
 pub mod impls;
 pub use impls::{
-    CollectLinkedList, EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, IntoEdgeLists,
-    IntoLinkedListNondeterministic, LinkedListDeterministic, LinkedListNondeterministic,
-    LinkedListTransitionSystem, LinkedListTransitionSystemEdge,
+    CollectLinkedList, EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, Id,
+    IntoEdgeLists, IntoLinkedListNondeterministic, LinkedListDeterministic,
+    LinkedListNondeterministic, LinkedListTransitionSystem, LinkedListTransitionSystemEdge,
 };
 
 /// Contains implementations and definitions for dealing with paths through a transition system.
@@ -48,9 +48,7 @@ pub use builder::TSBuilder;
 
 /// Deals with analysing reachability in transition systems.
 pub mod reachable;
-pub use reachable::{
-    MinimalRepresentative, MinimalRepresentatives, ReachableStateIndices, ReachableStates,
-};
+pub use reachable::{LengthLexicographicMinimalRepresentatives, Reachable};
 
 /// Contains implementations for SCC decompositions and the corresponding/associated types.
 pub mod connected_components;
@@ -196,13 +194,13 @@ pub trait TransitionSystem: Sized {
 
     /// Returns an iterator over the transitions that start in the given `state`. If the state does
     /// not exist, `None` is returned.
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>>;
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>>;
 
     /// Returns an iterator over all transitions that start in the given `state` and whose expression
     /// matches the given `sym`. If the state does not exist, `None` is returned.
     fn edges_matching(
         &self,
-        state: impl Indexes<Self>,
+        state: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<impl Iterator<Item = EdgeRef<'_, Self>>>
     where
@@ -264,18 +262,12 @@ pub trait TransitionSystem: Sized {
     /// Returns true if and only if there exists a transition from the given `source` state to the
     /// given `target` state, whose expression is matched by the given `sym`. If either the source
     /// or the target state does not exist, `false` is returned.
-    fn has_transition<Idx: Indexes<Self>, Jdx: Indexes<Self>>(
+    fn has_transition(
         &self,
-        source: Idx,
+        source: StateIndex<Self>,
         sym: SymbolOf<Self>,
-        target: Jdx,
+        target: StateIndex<Self>,
     ) -> bool {
-        let Some(source) = source.to_index(self) else {
-            return false;
-        };
-        let Some(target) = target.to_index(self) else {
-            return false;
-        };
         if let Some(mut it) = self.edges_from(source) {
             it.any(|t| t.target() == target && t.expression().matched_by(sym))
         } else {
@@ -285,13 +277,8 @@ pub trait TransitionSystem: Sized {
 
     /// Returns an iterator over the transitions that start in the given `state`. Panics if the
     /// state does not exist.
-    fn transitions_from<Idx: Indexes<Self>>(&self, state: Idx) -> TransitionsFrom<'_, Self> {
-        TransitionsFrom::new(
-            self,
-            state
-                .to_index(self)
-                .expect("Should only be called for states that exist!"),
-        )
+    fn transitions_from(&self, state: StateIndex<Self>) -> TransitionsFrom<'_, Self> {
+        TransitionsFrom::new(self, state)
     }
 
     /// Commence a new subset construction starting from the collection of states given by `states`.
@@ -315,23 +302,25 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns the color of the given `state`, if it exists. Otherwise, `None` is returned.
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor>;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor>;
 
     /// Attempts to find a word which leads from the state `from` to state `to`. If no such
     /// word exists, `None` is returned.
-    fn word_from_to<Idx: Indexes<Self>, Jdx: Indexes<Self>>(
+    fn word_from_to(
         &self,
-        from: Idx,
-        to: Jdx,
+        from: StateIndex<Self>,
+        to: StateIndex<Self>,
     ) -> Option<Vec<SymbolOf<Self>>>
     where
         Self: Sized,
     {
-        let from = from.to_index(self)?;
-        let to = to.to_index(self)?;
-
-        self.minimal_representatives_from(from)
-            .find_map(|(word, state)| if state == to { Some(word) } else { None })
+        self.minimal_representatives_from(from).find_map(|rep| {
+            if rep.state_index() == to {
+                Some(rep.decompose().0)
+            } else {
+                None
+            }
+        })
     }
 
     /// Gives the size of `self`, which is obtained simply by counting the number of elements yielded by [`Self::state_indices()`].
@@ -339,15 +328,16 @@ pub trait TransitionSystem: Sized {
         self.state_indices().count()
     }
 
+    /// Gives a hint for the size of `self`. The first element is the minimum number of states that
+    /// are in the transition system. The second element is the maximum number of states that are in
+    /// the transition system. If the maximum number is not known, `None` is returned.
+    fn hint_size(&self) -> (usize, Option<usize>) {
+        (0, None)
+    }
+
     /// Returns `true` if and only if there exists at least one state.
     fn is_empty(&self) -> bool {
         self.size() == 0
-    }
-
-    /// Tries to return the index of the state identified by `state`. If the state does not exist,
-    /// `None` is returned.
-    fn find_state_index<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateIndex> {
-        state.to_index(self)
     }
 
     /// Returns true if and only if the given state `index` exists.
@@ -373,15 +363,6 @@ pub trait TransitionSystem: Sized {
         StateColor<Self>: Eq,
     {
         self.find_by_color(color).is_some()
-    }
-
-    /// Obtains the [`Self::StateIndex`] of a state if it can be found. See [`Indexes`]
-    /// for more.
-    fn get<Idx: Indexes<Self>>(&self, elem: Idx) -> Option<Self::StateIndex>
-    where
-        Self: Sized,
-    {
-        elem.to_index(self)
     }
 
     /// Builds the [`operations::Quotient`] of `self` with regard to some given [`Partition`].
@@ -552,82 +533,62 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns `true` iff the given state is reachable from the initial state.
-    fn is_reachable<Idx: Indexes<Self>>(&self, state: Idx) -> bool
+    fn is_reachable(&self, state: StateIndex<Self>) -> bool
     where
         Self: Sized + Pointed,
     {
-        let Some(state) = state.to_index(self) else {
-            return false;
-        };
         self.is_reachable_from(self.initial(), state)
     }
 
     /// Returns `true` iff the given `state` is reachable from the given `origin` state.
-    fn is_reachable_from<Idx: Indexes<Self>, Jdx: Indexes<Self>>(
-        &self,
-        origin: Idx,
-        state: Jdx,
-    ) -> bool
+    fn is_reachable_from(&self, origin: StateIndex<Self>, state: StateIndex<Self>) -> bool
     where
         Self: Sized,
     {
-        let Some(origin) = origin.to_index(self) else {
-            tracing::error!("Origin state does not exist");
-            return false;
-        };
-        let Some(state) = state.to_index(self) else {
-            tracing::error!("Target state does not exist");
-            return false;
-        };
+        assert!(self.contains_state_index(origin));
+        assert!(self.contains_state_index(state));
         self.reachable_state_indices_from(origin)
             .any(|s| s == state)
     }
 
     /// Returns an iterator over the minimal representative (i.e. length-lexicographically minimal
     /// word reaching the state) of each state that is reachable from the initial state.
-    fn minimal_representatives(&self) -> MinimalRepresentatives<&Self>
+    fn minimal_representatives(&self) -> LengthLexicographicMinimalRepresentatives<'_, Self>
     where
         Self: Sized + Pointed,
     {
-        MinimalRepresentatives::new(self, self.initial())
+        LengthLexicographicMinimalRepresentatives::new(self, self.initial())
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the initial state. The iterator yields tuples
     /// (State Index, State Color)
-    fn reachable_states(&self) -> ReachableStates<&Self>
+    fn reachable_states(&self) -> Reachable<'_, Self, false>
     where
         Self: Sized + Pointed,
     {
-        ReachableStates::new(self, self.initial())
+        Reachable::new(self, self.initial())
     }
 
     /// Returns an iterator over all state colors that are reachable from the initial state. May yield the same color multiple times.
-    fn reachable_state_colors(&self) -> impl Iterator<Item = Self::StateColor>
+    fn reachable_state_colors(&self) -> impl Iterator<Item = Self::StateColor> + '_
     where
         Self: Sized + Pointed,
     {
-        self.reachable_states().map(|(_, c)| c)
+        self.reachable_states()
+            .map(|q| self.state_color(q).unwrap())
     }
 
     /// Returns an iterator over the minimal representatives (i.e. length-lexicographically minimal
     /// word reaching the state) of each state that is reachable from the given `state`.
-    fn minimal_representatives_from<Idx: Indexes<Self>>(
+    fn minimal_representatives_from(
         &self,
-        state: Idx,
-    ) -> MinimalRepresentatives<&Self>
-    where
-        Self: Sized,
-    {
-        MinimalRepresentatives::new(
-            self,
-            state
-                .to_index(self)
-                .expect("cannot comput minimal representatives from non-existing state"),
-        )
+        state: StateIndex<Self>,
+    ) -> LengthLexicographicMinimalRepresentatives<'_, Self> {
+        LengthLexicographicMinimalRepresentatives::new(self, state)
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the initial state.
-    fn reachable_state_indices(&self) -> ReachableStateIndices<&Self>
+    fn reachable_state_indices(&self) -> Reachable<'_, Self, false>
     where
         Self: Sized + Pointed,
     {
@@ -635,19 +596,19 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the given `state`.
-    fn reachable_state_indices_from(&self, state: Self::StateIndex) -> ReachableStateIndices<&Self>
+    fn reachable_state_indices_from(&self, state: Self::StateIndex) -> Reachable<'_, Self, false>
     where
         Self: Sized,
     {
-        ReachableStateIndices::new(self, state)
+        Reachable::state_indices(self, state)
     }
 
     /// Returns an iterator over the states that are reachable from the given `state`.
-    fn reachable_states_from<Idx: Indexes<Self>>(&self, state: Idx) -> ReachableStates<&Self>
+    fn reachable_states_from(&self, state: StateIndex<Self>) -> Reachable<'_, Self>
     where
         Self: Sized,
     {
-        ReachableStates::new(self, state.to_index(self).unwrap())
+        Reachable::new(self, state)
     }
 
     /// Returns an option containing the index of the initial state, if it exists.
@@ -691,12 +652,12 @@ impl<Ts: TransitionSystem> TransitionSystem for &Ts {
         Ts::state_indices(self)
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        Ts::edges_from(self, state.to_index(self)?)
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        Ts::edges_from(self, state)
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        Ts::state_color(self, state.to_index(self)?)
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        Ts::state_color(self, state)
     }
 }
 
@@ -729,40 +690,44 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
         Ts::state_indices(self)
     }
 
-    fn edges_from<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesFromIter<'_>> {
-        Ts::edges_from(self, state.to_index(self)?)
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        Ts::edges_from(self, state)
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        Ts::state_color(self, state.to_index(self)?)
-    }
-}
-
-/// Trait that helps with accessing states in more elaborate [`TransitionSystem`]s. For
-/// example in a [`RightCongruence`], we have more information than the [`crate::Color`]
-/// on a state, we have its [`crate::Class`] as well. Since we would like to be able to
-/// access a state of a congruence not only by its index, but also by its classname
-/// or any other [word](`crate::prelude::LinearWord`) of finite length, this trait is necessary.
-///
-/// Implementors should be able to _uniquely_ identify a single state in a transition
-/// system of type `Ts`.
-pub trait Indexes<Ts: TransitionSystem>: Debug {
-    /// Uniquely dentifies a state in `ts` and return its index.
-    fn to_index(&self, ts: &Ts) -> Option<Ts::StateIndex>;
-}
-
-impl<T: TransitionSystem, I: std::borrow::Borrow<StateIndex<T>> + Debug> Indexes<T> for I {
-    #[inline(always)]
-    fn to_index(&self, _ts: &T) -> Option<<T as TransitionSystem>::StateIndex> {
-        let q = *self.borrow();
-        Some(q)
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        Ts::state_color(self, state)
     }
 }
 
 /// Encapsulates what is necessary for a type to be usable as a state index in a [`TransitionSystem`].
 pub trait IndexType: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show {}
-
 impl<TY: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show> IndexType for TY {}
+
+/// Marker trait for [`IndexType`]s that are scalar, i.e. they can be converted to and from `usize`.
+pub trait ScalarIndexType:
+    IndexType + std::ops::Add<Output = Self> + std::ops::Sub<Output = Self>
+{
+    /// Converts a `usize` to the implementing type.
+    fn from_usize(n: usize) -> Self;
+    /// Converts the implementing type to a `usize`.
+    fn into_usize(self) -> usize;
+}
+impl ScalarIndexType for usize {
+    fn from_usize(n: usize) -> Self {
+        n
+    }
+    fn into_usize(self) -> usize {
+        self
+    }
+}
+impl ScalarIndexType for u32 {
+    fn from_usize(n: usize) -> Self {
+        n as u32
+    }
+    fn into_usize(self) -> usize {
+        self as usize
+    }
+}
 
 /// Implementors of this trait can be transformed into a owned tuple representation of
 /// an edge in a [`TransitionSystem`].
@@ -809,7 +774,7 @@ pub type StateColor<X> = <X as TransitionSystem>::StateColor;
 /// Type alias for extracting the edge color in a [`TransitionSystem`].
 pub type EdgeColor<X> = <X as TransitionSystem>::EdgeColor;
 /// Type alias for extracting the state index in a [`TransitionSystem`].
-pub type StateIndex<X> = <X as TransitionSystem>::StateIndex;
+pub type StateIndex<X = DTS> = <X as TransitionSystem>::StateIndex;
 /// Type alias for a tuple representing an edge in a [`TransitionSystem`].
 pub type EdgeTuple<Ts> = (
     StateIndex<Ts>,

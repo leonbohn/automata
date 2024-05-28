@@ -10,7 +10,7 @@ use tracing::{debug, info};
 ///   add a back edge that state.
 /// 3. If no back edge to some state was added, we insert an edge to a new state.
 /// 4. Repeat until all states and symbols have been treated.
-pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, usize) {
+pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, StateIndex<DTS>) {
     let alphabet = CharAlphabet::of_size(symbols);
     let mut dts = DTS::for_alphabet(alphabet.clone());
 
@@ -18,7 +18,7 @@ pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, usize) {
     let mut symbol_position = 0;
 
     'outer: loop {
-        if current >= dts.size() {
+        if current >= (dts.size() as DefaultIdType) {
             // we have treated all states, we can exit
             break 'outer;
         }
@@ -63,7 +63,7 @@ pub fn generate_random_dfa(symbols: usize, probability: f64) -> DFA {
 /// 1. Start with `size` states and no transitions.
 /// 2. For each state, for each symbol draw a target state and add the corresponding edge
 /// Note that depending on which state is chosen as the initial state, there may be unreachable states.
-pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, usize) {
+pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, StateIndex<DTS>) {
     let alphabet = CharAlphabet::of_size(symbols);
     let mut dts = DTS::for_alphabet(alphabet.clone());
     // add states
@@ -73,7 +73,7 @@ pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, usize) {
     // add edges
     for q in dts.state_indices_vec() {
         for sym in alphabet.universe() {
-            let target = fastrand::usize(..dts.size());
+            let target = fastrand::u32(..(dts.size() as DefaultIdType));
             dts.add_edge((q, sym, target));
         }
     }
@@ -97,13 +97,13 @@ pub fn generate_random_dba(symbols: usize, size: usize) -> DBA {
 /// Works as [`generate_random_ts_sized`], but returns a [`DPA`] instead by randomly
 /// assigning priorities in the range `0..priorities` to each edge.
 /// Removes unreachable states, that means the resulting DPA may be smaller than `size`.
-pub fn generate_random_dpa(symbols: usize, size: usize, priorities: usize) -> DPA {
+pub fn generate_random_dpa(symbols: usize, size: usize, priorities: Int) -> DPA {
     // draw random transition system
     let (mut dts, initial) = generate_random_ts_sized(symbols, size);
     // remove unreachable states
     dts.trim_from(initial);
     // draw acceptance condition
-    dts.map_edge_colors(|_| fastrand::usize(..priorities))
+    dts.map_edge_colors(|_| fastrand::u8(..priorities))
         .with_initial(initial)
         .collect_dpa()
 }

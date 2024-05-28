@@ -4,9 +4,10 @@ use tracing::debug;
 use crate::{
     math::{Map, Set},
     prelude::*,
-    transition_system::{EdgeReference, EdgeTuple},
+    transition_system::{EdgeReference, EdgeTuple, ScalarIndexType},
 };
 use std::{
+    borrow::Borrow,
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display},
     hash::Hash,
@@ -16,37 +17,49 @@ use std::{
 
 use self::alphabet::Matcher;
 
-pub type EdgeListsNondeterministic<A, Q, C> = EdgeLists<A, Q, C, false>;
-pub type EdgeListsDeterministic<A, Q, C> = EdgeLists<A, Q, C, true>;
+use super::DefaultIdType;
+
+pub type EdgeListsNondeterministic<A, Q, C, IdType = DefaultIdType> =
+    EdgeLists<A, Q, C, false, IdType>;
+pub type EdgeListsDeterministic<A, Q, C, IdType = DefaultIdType> = EdgeLists<A, Q, C, true, IdType>;
 
 /// An implementation of a transition system with states of type `Q` and colors of type `C`. It stores
 /// the states and edges in a vector, which allows for fast access and iteration. The states and edges
 /// are indexed by their position in the respective vector.
 #[derive(Clone, PartialEq, Eq)]
-pub struct EdgeLists<A: Alphabet, Q = crate::Void, C = crate::Void, const DET: bool = true> {
+pub struct EdgeLists<
+    A: Alphabet,
+    Q = crate::Void,
+    C = crate::Void,
+    const DET: bool = true,
+    IdType: ScalarIndexType = DefaultIdType,
+> {
     pub(crate) alphabet: A,
-    pub(crate) states: BTreeMap<usize, MutableTsState<A, Q, C>>,
+    pub(crate) states: Map<IdType, MutableTsState<A, Q, C, IdType>>,
 }
 
-/// Type alias that takes a [`TransitionSystem`] and gives the type of a corresponding [`MutableTs`], i.e. one
+/// type alias that takes a [`TransitionSystem`] and gives the type of a corresponding [`MutableTs`], i.e. one
 /// with the same alphabet, edge and state colors.
-pub type IntoEdgeLists<Ts, const DET: bool = true> = EdgeLists<
+pub type IntoEdgeLists<Ts, const DET: bool = true, IdType = DefaultIdType> = EdgeLists<
     <Ts as TransitionSystem>::Alphabet,
     <Ts as TransitionSystem>::StateColor,
     <Ts as TransitionSystem>::EdgeColor,
     DET,
+    IdType,
 >;
 
-impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
+impl<A: Alphabet, C: Color, Q: Color, const DET: bool, IdType: ScalarIndexType>
+    EdgeLists<A, Q, C, DET, IdType>
+{
     /// Creates a new transition system with the given alphabet.
     pub fn new(alphabet: A) -> Self {
         Self {
             alphabet,
-            states: BTreeMap::default(),
+            states: Map::default(),
         }
     }
 
-    pub fn into_deterministic(self) -> EdgeListsDeterministic<A, Q, C> {
+    pub fn into_deterministic(self) -> EdgeListsDeterministic<A, Q, C, IdType> {
         match self.try_into_deterministic() {
             Ok(ts) => ts,
             Err(ts) => {
@@ -56,7 +69,7 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
         }
     }
 
-    pub fn try_into_deterministic(self) -> Result<EdgeListsDeterministic<A, Q, C>, Self> {
+    pub fn try_into_deterministic(self) -> Result<EdgeListsDeterministic<A, Q, C, IdType>, Self> {
         if DET {
             if !self.is_deterministic() {
                 tracing::error!("Tried to convert non-deterministic transition system to deterministic one\n{:?}", self);
@@ -72,42 +85,41 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
 
     pub fn extract_edge_tuples_for<F>(
         &mut self,
-        state: impl Indexes<Self>,
+        q: StateIndex<Self>,
         pred: F,
     ) -> Option<Vec<EdgeTuple<Self>>>
     where
-        F: FnMut(&MutableTsOutEdge<A, C>) -> bool,
+        F: FnMut(&EdgeListsOutEdge<A, C, IdType>) -> bool,
     {
-        let q = state.to_index(self)?;
         Some(ExtractEdgeTuplesFrom::new(self.states.get_mut(&q)?, pred).collect())
     }
 
     pub fn extract_edge_tuples<F>(&mut self, pred: F) -> Vec<EdgeTuple<Self>>
     where
-        F: FnMut(usize, &MutableTsOutEdge<A, C>) -> bool,
+        F: FnMut(IdType, &EdgeListsOutEdge<A, C, IdType>) -> bool,
     {
         ExtractAllEdgeTuples::new(self, pred).collect()
     }
 
-    pub(crate) fn mutablets_remove_state(&mut self, usize: usize) -> Option<Q> {
-        let state = self.states.remove(&usize)?;
+    pub(crate) fn mutablets_remove_state(&mut self, q: IdType) -> Option<Q> {
+        let state = self.states.swap_remove(&q)?;
         self.states
             .iter_mut()
-            .for_each(|(_, s)| s.remove_outgoing_edges_to(usize));
+            .for_each(|(_, s)| s.remove_outgoing_edges_to(q));
         Some(state.color)
     }
 
     /// Creates a `MutableTs` from the given alphabet and states.
     pub(crate) fn from_parts(
         alphabet: A,
-        states: BTreeMap<usize, MutableTsState<A, Q, C>>,
+        states: Map<IdType, MutableTsState<A, Q, C, IdType>>,
     ) -> Self {
         Self { alphabet, states }
     }
 
     /// Decomposes the `MutableTs` into its constituent parts.
     #[allow(clippy::type_complexity)]
-    pub(crate) fn into_parts(self) -> (A, BTreeMap<usize, MutableTsState<A, Q, C>>) {
+    pub(crate) fn into_parts(self) -> (A, Map<IdType, MutableTsState<A, Q, C, IdType>>) {
         (self.alphabet, self.states)
     }
 
@@ -115,21 +127,11 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
     pub fn with_capacity(alphabet: A, states: usize) -> Self
     where
         StateColor<Self>: Default,
-        usize: From<usize> + IndexType,
+        IdType: From<usize> + IndexType,
     {
         Self {
             alphabet,
-            states:
-                (0..states)
-                    .map(|i| {
-                        (
-                            i,
-                            MutableTsState::new_with_intial_id(
-                                <StateColor<Self> as Default>::default(),
-                            ),
-                        )
-                    })
-                    .collect(),
+            states: Map::with_capacity(states),
         }
     }
 
@@ -139,7 +141,7 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
     }
 
     /// Returns a reference to the underlying statemap.
-    pub fn raw_state_map(&self) -> &BTreeMap<usize, MutableTsState<A, Q, C>> {
+    pub fn raw_state_map(&self) -> &Map<IdType, MutableTsState<A, Q, C, IdType>> {
         &self.states
     }
 
@@ -149,7 +151,7 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
     /// subsequent calls may lead to different results, if two states with the same color
     /// exist.
     #[inline(always)]
-    pub fn find_by_color(&self, color: &Q) -> Option<usize>
+    pub fn find_by_color(&self, color: &Q) -> Option<IdType>
     where
         Q: Eq,
     {
@@ -163,77 +165,72 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
     }
 
     /// Returns an iterator emitting pairs of state indices and their colors.
-    pub fn indices_with_color(&self) -> impl Iterator<Item = (usize, &StateColor<Self>)> {
+    pub fn indices_with_color(&self) -> impl Iterator<Item = (IdType, &StateColor<Self>)> {
         self.states
             .iter()
             .map(|(usize, state)| (*usize, state.color()))
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> crate::transition_system::Shrinkable
-    for EdgeLists<A, Q, C, DET>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType>
+    crate::transition_system::Shrinkable for EdgeLists<A, Q, C, DET, IdType>
 {
-    fn remove_state<Idx: Indexes<Self>>(&mut self, state: Idx) -> Option<Q> {
-        self.mutablets_remove_state(state.to_index(self)?)
+    fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Q> {
+        self.mutablets_remove_state(state)
     }
     fn remove_edges_from_matching(
         &mut self,
-        source: impl Indexes<Self>,
+        q: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let q = source.to_index(self)?;
         self.extract_edge_tuples_for(q, |(e, c, p)| matcher.matches(e))
     }
 
     fn remove_edges_between_matching(
         &mut self,
-        source: impl Indexes<Self>,
-        target: impl Indexes<Self>,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let source = source.to_index(self)?;
-        let target = target.to_index(self)?;
         self.extract_edge_tuples_for(source, |(e, c, p)| matcher.matches(e) && target.eq(p))
     }
 
     fn remove_edges_between(
         &mut self,
-        source: impl Indexes<Self>,
-        target: impl Indexes<Self>,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let source = source.to_index(self)?;
-        let target = target.to_index(self)?;
         self.extract_edge_tuples_for(source, |(e, c, p)| target.eq(p))
     }
 
     fn remove_edges_from(
         &mut self,
-        source: impl Indexes<Self>,
+        q: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let q = source.to_index(self)?;
         self.extract_edge_tuples_for(q, |_| true)
     }
 
-    fn remove_edges_to(&mut self, target: impl Indexes<Self>) -> Option<Vec<EdgeTuple<Self>>> {
-        let p = target.to_index(self)?;
-        if !self.states.contains_key(&p) {
+    fn remove_edges_to(&mut self, target: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>> {
+        if !self.states.contains_key(&target) {
             return None;
         }
-        Some(self.extract_edge_tuples(|_, (_, _, q)| *q == p))
+        Some(self.extract_edge_tuples(|_, (_, _, q)| *q == target))
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType>
+    EdgeLists<A, Q, C, DET, IdType>
+{
     /// Returns an iterator over the [`EdgeIndex`]es of the edges leaving the given state.
     pub(crate) fn mutablets_edges_from(
         &self,
-        source: usize,
-    ) -> Option<impl Iterator<Item = &'_ (A::Expression, C, usize)> + '_> {
+        source: IdType,
+    ) -> Option<impl Iterator<Item = &'_ (A::Expression, C, IdType)> + '_> {
         self.states.get(&source).map(|s| s.edges.iter())
     }
 
     /// Checks whether the state exists.
-    pub fn contains_state<I: Into<usize>>(&self, index: I) -> bool {
+    pub fn contains_state<I: Into<IdType>>(&self, index: I) -> bool {
         self.states.contains_key(&index.into())
     }
 }
@@ -241,23 +238,23 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> EdgeLists<A, Q, C, DET> {
 /// A state in a transition system. This stores the color of the state and the index of the
 /// first edge leaving the state.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct MutableTsState<A: Alphabet, Q, C> {
-    id: usize,
+pub struct MutableTsState<A: Alphabet, Q, C, IdType: ScalarIndexType = DefaultIdType> {
+    id: IdType,
     color: Q,
-    edges: Vec<(A::Expression, C, usize)>,
+    edges: Vec<(A::Expression, C, IdType)>,
 }
 
-impl<A: Alphabet, Q: Color, C: Color> MutableTsState<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color, IdType: ScalarIndexType> MutableTsState<A, Q, C, IdType> {
     pub fn new_with_intial_id(color: Q) -> Self {
         Self {
-            id: 0,
+            id: IdType::from_usize(0),
             color,
             edges: Default::default(),
         }
     }
 
     /// Creates a new state with the given color.
-    pub fn new(id: usize, color: Q) -> Self {
+    pub fn new(id: IdType, color: Q) -> Self {
         Self {
             id,
             color,
@@ -273,8 +270,8 @@ impl<A: Alphabet, Q: Color, C: Color> MutableTsState<A, Q, C> {
         &mut self,
         on: &A::Expression,
         color: &C,
-        to: usize,
-    ) -> Option<(usize, A::Expression, C, usize)> {
+        to: IdType,
+    ) -> Option<(IdType, A::Expression, C, IdType)> {
         if let Some(position) = self
             .edges
             .iter()
@@ -287,15 +284,15 @@ impl<A: Alphabet, Q: Color, C: Color> MutableTsState<A, Q, C> {
         }
     }
 
-    pub fn remove_outgoing_edges_to(&mut self, target: usize) {
+    pub fn remove_outgoing_edges_to(&mut self, target: IdType) {
         self.edges.retain(|(_e, _c, q)| *q != target);
     }
 
-    pub fn edges(&self) -> std::slice::Iter<'_, (A::Expression, C, usize)> {
+    pub fn edges(&self) -> std::slice::Iter<'_, (A::Expression, C, IdType)> {
         self.edges.iter()
     }
 
-    pub fn edge_map(&self) -> &[(A::Expression, C, usize)] {
+    pub fn edge_map(&self) -> &[(A::Expression, C, IdType)] {
         &self.edges
     }
 
@@ -303,8 +300,8 @@ impl<A: Alphabet, Q: Color, C: Color> MutableTsState<A, Q, C> {
         &mut self,
         on: A::Expression,
         color: C,
-        to: usize,
-    ) -> EdgeReference<'_, A::Expression, usize, C> {
+        to: IdType,
+    ) -> EdgeReference<'_, A::Expression, IdType, C> {
         debug_assert!(
             !self
                 .edges
@@ -319,7 +316,7 @@ impl<A: Alphabet, Q: Color, C: Color> MutableTsState<A, Q, C> {
         EdgeReference::new(self.id, e, c, *q)
     }
 
-    pub fn recolor<P: Color>(self, color: P) -> MutableTsState<A, P, C> {
+    pub fn recolor<P: Color>(self, color: P) -> MutableTsState<A, P, C, IdType> {
         MutableTsState {
             id: self.id,
             color,
@@ -333,14 +330,14 @@ impl<A: Alphabet, Q: Color, C: Color> MutableTsState<A, Q, C> {
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
-    for EdgeLists<A, Q, C, DET>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> TransitionSystem
+    for EdgeLists<A, Q, C, DET, IdType>
 {
     type StateColor = Q;
     type EdgeColor = C;
-    type StateIndex = usize;
-    type EdgeRef<'this> = EdgeReference<'this, A::Expression, usize, C> where Self: 'this;
-    type StateIndices<'this> = std::iter::Cloned<std::collections::btree_map::Keys<'this, usize, MutableTsState<A, Q, C>>> where Self: 'this;
+    type StateIndex = IdType;
+    type EdgeRef<'this> = EdgeReference<'this, A::Expression, IdType, C> where Self: 'this;
+    type StateIndices<'this> = std::iter::Cloned<math::map::Keys<'this, IdType, MutableTsState<A, Q, C, IdType>>> where Self: 'this;
 
     type Alphabet = A;
 
@@ -351,22 +348,20 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
         self.states.keys().cloned()
     }
 
-    fn state_color<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::StateColor> {
-        let state = state.to_index(self)?;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         self.raw_state_map().get(&state).map(|s| s.color().clone())
     }
 
-    fn edges_from<X: Indexes<Self>>(&self, state: X) -> Option<Self::EdgesFromIter<'_>> {
-        let q = state.to_index(self)?;
+    fn edges_from(&self, q: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         if !self.contains_state(q) {
             return None;
         }
         Some(EdgesFrom::new(q, self.states.get(&q).unwrap().edges.iter()))
     }
-    type EdgesFromIter<'this> = EdgesFrom<'this, A::Expression, C> where Self: 'this;
+    type EdgesFromIter<'this> = EdgesFrom<'this, A::Expression, C, IdType> where Self: 'this;
 }
 
-impl<Q, C, const DET: bool> EdgeLists<CharAlphabet, Q, C, DET> {
+impl<Q, C, const DET: bool, IdType: ScalarIndexType> EdgeLists<CharAlphabet, Q, C, DET, IdType> {
     /// Returns a transition system builder for a non-deterministic transition system. This should be the main method for the
     /// construction of non-deterministic transition systems on the fly.
     ///
@@ -392,20 +387,20 @@ impl<Q, C, const DET: bool> EdgeLists<CharAlphabet, Q, C, DET> {
 }
 
 /// Specialized iterator over the edges that leave a given state in a [`MutableTs`].
-pub struct EdgesFrom<'ts, E, C> {
-    edges: std::slice::Iter<'ts, (E, C, usize)>,
-    source: usize,
+pub struct EdgesFrom<'ts, E, C, IdType: ScalarIndexType> {
+    edges: std::slice::Iter<'ts, (E, C, IdType)>,
+    source: IdType,
 }
 
-impl<'ts, E, C> EdgesFrom<'ts, E, C> {
+impl<'ts, E, C, IdType: ScalarIndexType> EdgesFrom<'ts, E, C, IdType> {
     /// Creates a new instance from the given components.
-    pub fn new(source: usize, edges: std::slice::Iter<'ts, (E, C, usize)>) -> Self {
+    pub fn new(source: IdType, edges: std::slice::Iter<'ts, (E, C, IdType)>) -> Self {
         Self { edges, source }
     }
 }
 
-impl<'ts, E, C> Iterator for EdgesFrom<'ts, E, C> {
-    type Item = EdgeReference<'ts, E, usize, C>;
+impl<'ts, E, C, IdType: ScalarIndexType> Iterator for EdgesFrom<'ts, E, C, IdType> {
+    type Item = EdgeReference<'ts, E, IdType, C>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.edges
@@ -414,7 +409,8 @@ impl<'ts, E, C> Iterator for EdgesFrom<'ts, E, C> {
     }
 }
 
-impl<A, C, Q, const DET: bool> std::fmt::Debug for EdgeLists<A, Q, C, DET>
+impl<A, C, Q, const DET: bool, IdType: ScalarIndexType> std::fmt::Debug
+    for EdgeLists<A, Q, C, DET, IdType>
 where
     A: Alphabet,
     C: Color,
@@ -426,11 +422,11 @@ where
             writeln!(
                 f,
                 "q{}[{:?}] {}",
-                i,
+                i.show(),
                 state.color,
                 state
                     .edges()
-                    .map(|(e, c, p)| format!("{}:{:?}->{}", e.show(), c, p))
+                    .map(|(e, c, p)| format!("{}:{:?}->{}", e.show(), c, p.show()))
                     .join(", ")
             )?;
         }
@@ -438,11 +434,13 @@ where
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for EdgeLists<A, Q, C, DET> {
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> Sproutable
+    for EdgeLists<A, Q, C, DET, IdType>
+{
     /// Adds a state with given `color` to the transition system, returning the index of
     /// the new state.
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
-        let id = self.states.len();
+        let id = IdType::from_usize(self.states.len());
         let state = MutableTsState::new(id, color);
         self.states.insert(id, state);
         id
@@ -472,33 +470,26 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for EdgeLists<
 
         Some(self.states.get_mut(&q)?.add_edge(a, c, p))
     }
-
-    fn set_state_color<Idx: Indexes<Self>, X: Into<StateColor<Self>>>(
-        &mut self,
-        index: Idx,
-        color: X,
-    ) {
-        let Some(index) = index.to_index(self) else {
-            tracing::error!("cannot set color of state that does not exist");
-            return;
-        };
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
         self.states
             .get_mut(&index)
             .expect("State must exist")
-            .set_color(color.into());
+            .set_color(color);
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A> for EdgeLists<A, Q, C, DET> {
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> ForAlphabet<A>
+    for EdgeLists<A, Q, C, DET, IdType>
+{
     fn for_alphabet(from: A) -> Self {
         Self {
             alphabet: from,
-            states: BTreeMap::default(),
+            states: Map::default(),
         }
     }
 }
 
-type MutableTsOutEdge<A, C> = (<A as Alphabet>::Expression, C, usize);
+type EdgeListsOutEdge<A, C, IdType> = (<A as Alphabet>::Expression, C, IdType);
 
 /// An iterator which uses a closure to determine if an element should be removed.
 /// This is used for extracting elements from a `Vec` while mutating it in place.
@@ -509,11 +500,11 @@ type MutableTsOutEdge<A, C> = (<A as Alphabet>::Expression, C, usize);
 /// See the [`MutableTs::extract_edge_tuples`] method for an example of usage.
 #[derive(Debug)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct ExtractEdgeTuplesFrom<'a, A: Alphabet, Q, C, F>
+pub struct ExtractEdgeTuplesFrom<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType>
 where
-    F: FnMut(&MutableTsOutEdge<A, C>) -> bool,
+    F: FnMut(&EdgeListsOutEdge<A, C, IdType>) -> bool,
 {
-    pub(super) state: &'a mut MutableTsState<A, Q, C>,
+    pub(super) state: &'a mut MutableTsState<A, Q, C, IdType>,
     /// The index of the item that will be inspected by the next call to `next`.
     pub(super) usize: usize,
     /// The number of items that have been drained (removed) thus far.
@@ -524,14 +515,15 @@ where
     pub(super) pred: F,
 }
 
-impl<'a, A: Alphabet, Q, C, F> ExtractEdgeTuplesFrom<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType>
+    ExtractEdgeTuplesFrom<'a, A, Q, C, F, IdType>
 where
-    F: FnMut(&MutableTsOutEdge<A, C>) -> bool,
+    F: FnMut(&EdgeListsOutEdge<A, C, IdType>) -> bool,
 {
     pub fn new(
-        state: &'a mut MutableTsState<A, Q, C>,
+        state: &'a mut MutableTsState<A, Q, C, IdType>,
         pred: F,
-    ) -> ExtractEdgeTuplesFrom<'a, A, Q, C, F> {
+    ) -> ExtractEdgeTuplesFrom<'a, A, Q, C, F, IdType> {
         let old_len = state.edges.len();
         ExtractEdgeTuplesFrom {
             state,
@@ -543,13 +535,14 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C, F> Iterator for ExtractEdgeTuplesFrom<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType> Iterator
+    for ExtractEdgeTuplesFrom<'a, A, Q, C, F, IdType>
 where
-    F: FnMut(&MutableTsOutEdge<A, C>) -> bool,
+    F: FnMut(&EdgeListsOutEdge<A, C, IdType>) -> bool,
 {
-    type Item = (usize, A::Expression, C, usize);
+    type Item = (IdType, A::Expression, C, IdType);
 
-    fn next(&mut self) -> Option<(usize, A::Expression, C, usize)> {
+    fn next(&mut self) -> Option<(IdType, A::Expression, C, IdType)> {
         unsafe {
             while self.usize < self.old_len {
                 let i = self.usize;
@@ -566,8 +559,8 @@ where
                     return Some((self.state.id, e, c, p));
                 } else if self.del > 0 {
                     let del = self.del;
-                    let src: *const MutableTsOutEdge<A, C> = &v[i];
-                    let dst: *mut MutableTsOutEdge<A, C> = &mut v[i - del];
+                    let src: *const EdgeListsOutEdge<A, C, IdType> = &v[i];
+                    let dst: *mut EdgeListsOutEdge<A, C, IdType> = &mut v[i - del];
                     std::ptr::copy_nonoverlapping(src, dst, 1);
                 }
             }
@@ -580,9 +573,10 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C, F> Drop for ExtractEdgeTuplesFrom<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType> Drop
+    for ExtractEdgeTuplesFrom<'a, A, Q, C, F, IdType>
 where
-    F: FnMut(&MutableTsOutEdge<A, C>) -> bool,
+    F: FnMut(&EdgeListsOutEdge<A, C, IdType>) -> bool,
 {
     fn drop(&mut self) {
         unsafe {
@@ -608,11 +602,11 @@ where
 /// transition system that match a given predicate.
 #[derive(Debug)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct ExtractAllEdgeTuples<'a, A: Alphabet, Q, C, F>
+pub struct ExtractAllEdgeTuples<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType>
 where
-    F: FnMut(usize, &MutableTsOutEdge<A, C>) -> bool,
+    F: FnMut(IdType, &EdgeListsOutEdge<A, C, IdType>) -> bool,
 {
-    pub(super) state: Option<&'a mut MutableTsState<A, Q, C>>,
+    pub(super) state: Option<&'a mut MutableTsState<A, Q, C, IdType>>,
     /// The index of the item that will be inspected by the next call to `next`.
     pub(super) usize: usize,
     /// The number of items that have been drained (removed) thus far.
@@ -621,15 +615,14 @@ where
     pub(super) old_len: usize,
     /// The filter test predicate.
     pub(super) pred: F,
-    pub(super) remaining:
-        std::collections::btree_map::ValuesMut<'a, usize, MutableTsState<A, Q, C>>,
+    pub(super) remaining: math::map::ValuesMut<'a, IdType, MutableTsState<A, Q, C, IdType>>,
 }
 
-impl<'a, A: Alphabet, Q, C, F> ExtractAllEdgeTuples<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType> ExtractAllEdgeTuples<'a, A, Q, C, F, IdType>
 where
-    F: FnMut(usize, &MutableTsOutEdge<A, C>) -> bool,
+    F: FnMut(IdType, &EdgeListsOutEdge<A, C, IdType>) -> bool,
 {
-    pub fn new<const DET: bool>(ts: &'a mut EdgeLists<A, Q, C, DET>, pred: F) -> Self {
+    pub fn new<const DET: bool>(ts: &'a mut EdgeLists<A, Q, C, DET, IdType>, pred: F) -> Self {
         let mut it = ts.states.values_mut();
         if let Some(state) = it.next() {
             let old_len = state.edges.len();
@@ -654,11 +647,12 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C, F> Iterator for ExtractAllEdgeTuples<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType> Iterator
+    for ExtractAllEdgeTuples<'a, A, Q, C, F, IdType>
 where
-    F: FnMut(usize, &MutableTsOutEdge<A, C>) -> bool,
+    F: FnMut(IdType, &EdgeListsOutEdge<A, C, IdType>) -> bool,
 {
-    type Item = (usize, A::Expression, C, usize);
+    type Item = (IdType, A::Expression, C, IdType);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -688,8 +682,8 @@ where
                         return Some((id, e, c, p));
                     } else if self.del > 0 {
                         let del = self.del;
-                        let src: *const MutableTsOutEdge<A, C> = &v[i];
-                        let dst: *mut MutableTsOutEdge<A, C> = &mut v[i - del];
+                        let src: *const EdgeListsOutEdge<A, C, IdType> = &v[i];
+                        let dst: *mut EdgeListsOutEdge<A, C, IdType> = &mut v[i - del];
                         std::ptr::copy_nonoverlapping(src, dst, 1);
                     }
                 }
@@ -704,24 +698,25 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C, F> Drop for ExtractAllEdgeTuples<'a, A, Q, C, F>
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType> Drop
+    for ExtractAllEdgeTuples<'a, A, Q, C, F, IdType>
 where
-    F: FnMut(usize, &MutableTsOutEdge<A, C>) -> bool,
+    F: FnMut(IdType, &EdgeListsOutEdge<A, C, IdType>) -> bool,
 {
     fn drop(&mut self) {
         debug!("Not really sure how to handle dropping of ExtractAllEdgeTuples. Basically all the drop method is called for each ExtractEdgeTuplesFrom, so we should probably be fine. Or not. Who knows.");
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
-    for EdgeLists<A, Q, C, DET>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> PredecessorIterable
+    for EdgeLists<A, Q, C, DET, IdType>
 {
-    type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, usize, C> where Self: 'this;
-    type EdgesToIter<'this> = EdgeListsPredecessors<'this, A, Q, C, DET>
+    type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, IdType, C> where Self: 'this;
+    type EdgesToIter<'this> = EdgeListsPredecessors<'this, A, Q, C, DET, IdType>
     where
         Self: 'this;
-    fn predecessors<Idx: Indexes<Self>>(&self, state: Idx) -> Option<Self::EdgesToIter<'_>> {
-        let target = state.to_index(self)?;
+    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
+        let target = state;
         let mut it = self.states.keys();
         Some(EdgeListsPredecessors {
             idx: it.next().cloned(),
@@ -735,24 +730,31 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
 
 /// Iterator over the predecessors of a state in a BTS.
 #[derive(Clone)]
-pub struct EdgeListsPredecessors<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> {
-    idx: Option<usize>,
+pub struct EdgeListsPredecessors<
+    'a,
+    A: Alphabet,
+    Q: Color,
+    C: Color,
+    const DET: bool,
+    IdType: ScalarIndexType,
+> {
+    idx: Option<IdType>,
     inner_pos: usize,
-    target: usize,
-    it: std::collections::btree_map::Keys<'a, usize, MutableTsState<A, Q, C>>,
-    elp: &'a EdgeLists<A, Q, C, DET>,
+    target: IdType,
+    it: math::map::Keys<'a, IdType, MutableTsState<A, Q, C, IdType>>,
+    elp: &'a EdgeLists<A, Q, C, DET, IdType>,
 }
 
-impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> Iterator
-    for EdgeListsPredecessors<'a, A, Q, C, DET>
+impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> Iterator
+    for EdgeListsPredecessors<'a, A, Q, C, DET, IdType>
 {
-    type Item = EdgeReference<'a, A::Expression, usize, C>;
+    type Item = EdgeReference<'a, A::Expression, IdType, C>;
 
     fn next(&mut self) -> Option<Self::Item> {
         'outer: loop {
             let q = self.idx?;
             let Some(state) = self.elp.states.get(&q) else {
-                panic!("State with index {} does not exist", q);
+                panic!("State with index {} does not exist", Id(q));
             };
 
             loop {
@@ -771,9 +773,16 @@ impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> Iterator
     }
 }
 
-fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>(
-    ts: EdgeLists<A, Q, C, DET>,
-) -> EdgeLists<A, Q, C, OUT_DET> {
+fn recast<
+    A: Alphabet,
+    Q: Color,
+    C: Color,
+    const DET: bool,
+    const OUT_DET: bool,
+    IdType: ScalarIndexType,
+>(
+    ts: EdgeLists<A, Q, C, DET, IdType>,
+) -> EdgeLists<A, Q, C, OUT_DET, IdType> {
     if !DET && OUT_DET && !ts.is_deterministic() {
         panic!("cannot convert non-deterministic transition system to deterministic");
     }

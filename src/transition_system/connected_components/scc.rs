@@ -163,9 +163,9 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         Ts: Pointed,
     {
         self.minimal_representative.get_or_init(|| {
-            self.ts.minimal_representatives().find_map(|(access, q)| {
-                if self.states.contains(&q) {
-                    Some((access, q))
+            self.ts.minimal_representatives().find_map(|rep| {
+                if self.states.contains(&rep.state_index()) {
+                    Some(rep)
                 } else {
                     None
                 }
@@ -237,7 +237,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         while !queue.is_empty() {
             if queue.contains_key(&current) {
                 if queue.get(&current).unwrap().is_empty() {
-                    queue.remove(&current);
+                    queue.swap_remove(&current);
                     continue;
                 } else {
                     let (symbol, target) = *queue
@@ -248,7 +248,10 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                         .expect("We know this is non-empty");
                     debug_assert!(ts.has_transition(current, symbol, target));
 
-                    queue.get_mut(&current).unwrap().remove(&(symbol, target));
+                    queue
+                        .get_mut(&current)
+                        .unwrap()
+                        .swap_remove(&(symbol, target));
                     word.push(symbol);
                     current = target;
                 }
@@ -268,7 +271,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                     .unwrap_or_else(|| *queue.keys().next().unwrap());
                 debug_assert!(queue.contains_key(&q));
                 if queue.get(&q).unwrap().is_empty() {
-                    queue.remove(&q);
+                    queue.swap_remove(&q);
                     continue;
                 }
 
@@ -349,8 +352,7 @@ mod tests {
         let ts = LinkedListNondeterministic::builder()
             .default_color(())
             .with_transitions(&transitions)
-            .into_linked_list_deterministic()
-            .with_initial(0);
+            .into_dts_with_initial(0);
         let sccs = ts.sccs();
         let first = sccs.first();
         println!("{:?}", first);

@@ -1,40 +1,38 @@
 use crate::{math::Set, prelude::*};
-use std::collections::VecDeque;
-
-/// Type alias for a minimal representative of a state which is its length-lexicographically minimal
-/// access sequence and its state index.
-pub type MinimalRepresentative<Ts> = (Vec<SymbolOf<Ts>>, <Ts as TransitionSystem>::StateIndex);
+use std::collections::{BTreeMap, VecDeque};
 
 /// Struct that can return the minimal representatives of a transition system. A minimal representative
 /// for a state `q` of some transition system is the length-lexicographically minimal string with which
 /// `q` can be reached from a given state.
 #[derive(Debug, Clone)]
-pub struct MinimalRepresentatives<Ts: TransitionSystem> {
-    ts: Ts,
+pub struct LengthLexicographicMinimalRepresentatives<'a, Ts: TransitionSystem> {
+    ts: &'a Ts,
     seen: Set<Ts::StateIndex>,
-    queue: VecDeque<MinimalRepresentative<Ts>>,
+    queue: BTreeMap<MinimalRepresentative<Ts>, StateIndex<Ts>>,
 }
 
 #[allow(missing_docs)]
-impl<Ts> MinimalRepresentatives<Ts>
+impl<'a, Ts> LengthLexicographicMinimalRepresentatives<'a, Ts>
 where
     Ts: TransitionSystem,
 {
-    pub fn new(ts: Ts, origin: Ts::StateIndex) -> Self {
+    pub fn new(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
         let seen = Set::from_iter([origin]);
-        let queue = [(vec![], origin)].into_iter().collect();
+        let queue = [(MinimalRepresentative::new(vec![], origin), origin)]
+            .into_iter()
+            .collect();
         Self { ts, seen, queue }
     }
 }
 
-impl<Ts> Iterator for MinimalRepresentatives<Ts>
+impl<'a, Ts> Iterator for LengthLexicographicMinimalRepresentatives<'a, Ts>
 where
     Ts: TransitionSystem,
 {
     type Item = MinimalRepresentative<Ts>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((access, q)) = self.queue.pop_front() {
+        if let Some((access, q)) = self.queue.pop_first() {
             if let Some(it) = self.ts.edges_from(q) {
                 for edge in it {
                     let p = edge.target();
@@ -42,71 +40,109 @@ where
                         for sym in edge.expression().symbols() {
                             let mut new_access = access.clone();
                             new_access.push(sym);
-                            self.queue.push_back((new_access, p))
+                            self.queue
+                                .insert(MinimalRepresentative::new(new_access, p), p);
                         }
                     }
                 }
             }
-            return Some((access, q));
+            return Some(access);
         }
         None
     }
 }
 
 /// Allows iterating over the reachable states of a transition system.
-#[derive(Debug, Clone)]
-pub struct ReachableStates<Ts: TransitionSystem>(MinimalRepresentatives<Ts>);
+pub struct Reachable<'a, Ts: TransitionSystem, const FULL_EDGE: bool = false> {
+    ts: &'a Ts,
+    seen: Set<Ts::StateIndex>,
+    it: Ts::EdgesFromIter<'a>,
+    queue: VecDeque<StateIndex<Ts>>,
+}
 
-#[allow(missing_docs)]
-impl<Ts> ReachableStates<Ts>
+impl<'a, Ts, const FULL_EDGE: bool> Reachable<'a, Ts, FULL_EDGE>
 where
     Ts: TransitionSystem,
 {
-    pub fn new(ts: Ts, origin: Ts::StateIndex) -> Self {
-        Self(MinimalRepresentatives::new(ts, origin))
+    /// Creates a new iterator that will yield the reachable states of the transition system starting
+    pub fn new(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
+        let mut seen = Set::with_capacity(ts.hint_size().0);
+        seen.insert(origin);
+        let mut queue = VecDeque::with_capacity(ts.hint_size().0);
+        queue.push_front(origin);
+        Self {
+            seen,
+            ts,
+            it: ts.edges_from(origin).expect("origin state does not exist"),
+            queue,
+        }
     }
 }
 
-impl<Ts> Iterator for ReachableStates<Ts>
+// Iterator that does not output the color of the states.
+
+impl<'a, Ts> Reachable<'a, Ts, false>
 where
     Ts: TransitionSystem,
 {
-    type Item = (Ts::StateIndex, StateColor<Ts>);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|(_, q)| {
-            (
-                q,
-                self.0.ts.state_color(q).expect(
-                    "Something went wrong, every state should have a color but this one does not",
-                ),
-            )
-        })
+    /// Creates a new variant that only outputs the indices of reachable vertices.
+    pub fn state_indices(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
+        Self::new(ts, origin)
     }
 }
 
-/// Allows iterating over the indices of all reachable states in a [`TransitionSystem`].
-#[derive(Debug, Clone)]
-pub struct ReachableStateIndices<Ts: TransitionSystem>(MinimalRepresentatives<Ts>);
-
-impl<Ts> Iterator for ReachableStateIndices<Ts>
+impl<'a, Ts> Iterator for Reachable<'a, Ts, false>
 where
     Ts: TransitionSystem,
 {
     type Item = Ts::StateIndex;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|(_, q)| q)
+        let q = self.queue.pop_front()?;
+        let Some(it) = self.ts.edges_from(q) else {
+            panic!("state does not exist");
+        };
+        for edge in it {
+            if self.seen.insert(edge.target()) {
+                self.queue.push_back(edge.target());
+            }
+        }
+        Some(q)
     }
 }
 
-#[allow(missing_docs)]
-impl<Ts> ReachableStateIndices<Ts>
+// One that outputs the color of the states.
+
+impl<'a, Ts> Reachable<'a, Ts, true>
 where
     Ts: TransitionSystem,
 {
-    pub fn new(ts: Ts, origin: Ts::StateIndex) -> Self {
-        Self(MinimalRepresentatives::new(ts, origin))
+    /// Creates a new instance of the variant of `Self` that outputs full edges.
+    pub fn edges(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
+        Self::new(ts, origin)
+    }
+}
+
+impl<'a, Ts> Iterator for Reachable<'a, Ts, true>
+where
+    Ts: TransitionSystem,
+{
+    type Item = Ts::EdgeRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(edge) = self.it.next() {
+                if self.seen.insert(edge.target()) {
+                    self.queue.push_back(edge.target());
+                }
+                return Some(edge);
+            }
+            if let Some(q) = self.queue.pop_front() {
+                self.it = self.ts.edges_from(q).expect("state does not exist");
+            } else {
+                return None;
+            }
+        }
     }
 }
 
@@ -132,13 +168,14 @@ mod tests {
 
         assert_eq!(
             dfa.minimal_representatives_from(0).collect::<Vec<_>>(),
-            vec![(vec![], 0), (vec!['a'], 1), (vec!['a', 'a'], 2)]
+            vec![
+                MinimalRepresentative::new("".collect_vec(), 0u32),
+                MinimalRepresentative::new("a".collect_vec(), 1),
+                MinimalRepresentative::new("aa".collect_vec(), 2)
+            ]
         );
         assert_eq!(dfa.reachable_state_indices().collect_vec(), vec![0, 1, 2]);
-        assert_eq!(
-            dfa.reachable_states().collect_vec(),
-            vec![(0, false), (1, false), (2, true)]
-        );
+        assert_eq!(dfa.reachable_state_indices().collect_vec(), vec![0, 1, 2]);
 
         assert_eq!(dfa.reachable_state_indices_from(2).collect_vec(), vec![2]);
     }

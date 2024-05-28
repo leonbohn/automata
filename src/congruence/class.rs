@@ -72,7 +72,7 @@ impl<S: Symbol> FiniteWord<S> for Class<S> {
         self.0.iter().cloned()
     }
 
-    fn to_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<S> {
         self.0.clone()
     }
 

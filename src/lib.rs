@@ -5,28 +5,19 @@
 /// The prelude is supposed to make using this package easier. Including everything, i.e.
 /// `use automata::prelude::*;` should be enough to use the package.
 pub mod prelude {
-    #[cfg(feature = "linked_list_ts")]
+    #[cfg(not(feature = "petgraph"))]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
         LinkedListTransitionSystem<A, Q, C, DET>;
-    #[cfg(not(feature = "linked_list_ts"))]
+    #[cfg(feature = "petgraph")]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
-        EdgeLists<A, Q, C, DET>;
-    #[cfg(feature = "linked_list_ts")]
+        GraphTs<A, Q, C, DET>;
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
-    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = LinkedListDeterministic<A, Q, C>;
-    #[cfg(feature = "linked_list_ts")]
+    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, true>;
     /// Points to the default implementation of [`TransitionSystem`] in the case where it is
     /// **now known to be** [`Deterministic`].
-    pub type NTS<A = CharAlphabet, Q = Void, C = Void> = LinkedListNondeterministic<A, Q, C>;
-    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
-    #[cfg(not(feature = "linked_list_ts"))]
-    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = EdgeLists<A, Q, C>;
-    /// Points to the default implementation of [`TransitionSystem`] in the case where it is
-    /// **now known to be** [`Deterministic`].
-    #[cfg(not(feature = "linked_list_ts"))]
-    pub type NTS<A = CharAlphabet, Q = Void, C = Void> = EdgeListsNondeterministic<A, Q, C>;
+    pub type NTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, false>;
 
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case which
     /// is mutable. Especially, this type implements [`Shrinkable`] and [`Sproutable`], which allows
@@ -36,6 +27,8 @@ pub mod prelude {
     pub type MutableTsNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
         EdgeListsNondeterministic<A, Q, C>;
 
+    #[cfg(feature = "petgraph")]
+    pub use super::transition_system::impls::pg::{node_index, petgraph, state_index, GraphTs};
     pub use super::{
         alphabet,
         alphabet::{CharAlphabet, Expression, Matcher, Symbol},
@@ -47,27 +40,30 @@ pub mod prelude {
             OmegaAcceptanceCondition, OmegaAutomaton, OmegaSemantics, ReachabilityCondition,
             Semantics, WithInitial, DBA, DFA, DMA, DPA,
         },
-        congruence::{CollectRightCongruence, Congruence, IntoRightCongruence, RightCongruence},
+        congruence::{
+            CollectRightCongruence, Congruence, IntoRightCongruence, MinimalRepresentative,
+            RightCongruence,
+        },
         math,
         transition_system::operations,
         transition_system::{
             dot::Dottable,
+            impls::DefaultIdType,
             operations::{DefaultIfMissing, Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
-            reachable::MinimalRepresentative,
             run::{FiniteRun, OmegaRun},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
-            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, IndexType, Indexes,
+            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, Id, IndexType,
             IntoEdgeTuple, IsEdge, LinkedListDeterministic, LinkedListNondeterministic,
-            LinkedListTransitionSystem, Path, Shrinkable, Sproutable, StateColor, StateIndex,
-            SymbolOf, TSBuilder, TransitionSystem,
+            LinkedListTransitionSystem, Path, ScalarIndexType, Shrinkable, Sproutable, StateColor,
+            StateIndex, SymbolOf, TSBuilder, TransitionSystem,
         },
         upw,
         word::{
             FiniteWord, LinearWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord,
             ReducedOmegaWord, ReducedParseError,
         },
-        Alphabet, Class, Color, Pointed, Show, Void,
+        Alphabet, Class, Color, Int, Pointed, Show, Void,
     };
 }
 
@@ -126,6 +122,15 @@ pub trait Color: Clone + Eq + Hash + Debug {
 }
 
 impl<T: Eq + Clone + Hash + Debug> Color for T {}
+
+impl Show for u8 {
+    fn show(&self) -> String {
+        self.to_string()
+    }
+}
+
+/// Alias for the default integer type that is used for coloring edges and states.
+pub type Int = u8;
 
 /// Represents the absence of a color. The idea is that this can be used when collecting
 /// a transitions system as it can always be constructed from a color by simply forgetting it.

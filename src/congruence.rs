@@ -32,16 +32,14 @@ pub trait Congruence: Deterministic + Pointed {
     where
         Self: Congruence<StateColor = bool>,
     {
-        let (dts, initial) = self
-            .erase_edge_colors()
-            .collect_linked_list_deterministic_pointed();
+        let (dts, initial) = self.erase_edge_colors().collect_dts_pointed();
         DFA::from_parts(dts, initial)
     }
 
     /// Takes ownership of `self` and builds a new [`DPA`] from it.
     fn into_dpa(self) -> IntoDPA<Self>
     where
-        Self: Congruence<EdgeColor = usize>,
+        Self: Congruence<EdgeColor = Int>,
     {
         Automaton::from_pointed(self)
     }
@@ -49,7 +47,7 @@ pub trait Congruence: Deterministic + Pointed {
     /// Collects the transition system representing `self` and builds a new [`DPA`].
     fn collect_dpa(&self) -> DPA<Self::Alphabet>
     where
-        Self: Congruence<EdgeColor = usize>,
+        Self: Congruence<EdgeColor = Int>,
     {
         let (ts, initial) = self.erase_state_colors().collect_dts_pointed();
         DPA::from_parts(ts, initial)
@@ -129,7 +127,7 @@ impl<C: Deterministic + Pointed> Congruence for C {}
 /// Represents a right congruence relation, which is in essence a trim, deterministic
 /// transition system with a designated initial state.
 pub type RightCongruence<A = CharAlphabet, Q = Void, C = Void, D = DTS<A, Q, C>> =
-    FiniteWordAutomaton<A, LazyMinimalRepresentatives<A, StateIndex<D>>, Q, C, true, D>;
+    FiniteWordAutomaton<A, LazyMinimalRepresentatives<D>, Q, C, true, D>;
 
 /// Type alias for a [`RightCongruence`] that is obtained by wrapping the given transition system.
 pub type IntoRightCongruence<D> =
@@ -162,8 +160,7 @@ where
     ///
     /// assert!(dfa.equivalent(ts.looping_words(0)));
     /// ```
-    pub fn looping_words<Idx: Indexes<Self>>(&self, class: Idx) -> DFA<A> {
-        let idx = class.to_index(self).unwrap();
+    pub fn looping_words(&self, idx: StateIndex<Self>) -> DFA<A> {
         self.ts()
             .with_initial(idx)
             .with_state_color(DefaultIfMissing::new(
@@ -174,42 +171,28 @@ where
     }
 
     /// Returns a reference to the minimal representatives of the classes of the right congruence.
-    pub fn minimal_representatives(&self) -> &LazyMinimalRepresentatives<A, StateIndex<D>> {
+    pub fn minimal_representatives(&self) -> &LazyMinimalRepresentatives<D> {
         self.acceptance()
     }
 
     /// Verifies whether an element of `self` is  idempotent, i.e. if the mr of the indexed
     /// class is u, then it should be that uu ~ u.
-    pub fn is_idempotent<I: Indexes<Self>>(&self, elem: I) -> bool {
-        let Some(idx) = elem.to_index(self) else {
-            panic!("is_idempotent called for non-existent index");
-        };
+    pub fn is_idempotent(&self, idx: StateIndex<Self>) -> bool {
         let Some(mr) = self.state_to_mr(idx) else {
             panic!("The class {} is not labeled!", idx.show());
         };
-        if let Some(q) = self.get(elem) {
-            self.reached_state_index_from(q, mr) == Some(q)
-        } else {
-            false
-        }
+        self.reached_state_index_from(idx, mr) == Some(idx)
     }
 
     /// Returns the [`Class`] that is referenced by `index`.
     #[inline(always)]
-    pub fn state_to_mr<Idx: Indexes<Self>>(
-        &self,
-        index: Idx,
-    ) -> Option<&MinimalRepresentative<A::Symbol>> {
-        let idx = index.to_index(self)?;
+    pub fn state_to_mr(&self, idx: StateIndex<Self>) -> Option<&MinimalRepresentative<D>> {
         self.minimal_representatives().get_by_left(&idx)
     }
 
     #[inline(always)]
     /// Returns the index of the class containing the given word.
-    pub fn mr_to_state(
-        &self,
-        class: &MinimalRepresentative<A::Symbol>,
-    ) -> Option<StateIndex<Self>> {
+    pub fn mr_to_state(&self, class: &MinimalRepresentative<D>) -> Option<StateIndex<Self>> {
         self.minimal_representatives().get_by_right(class).cloned()
     }
 
@@ -217,7 +200,7 @@ where
     /// with the corresponding index of the class.
     pub fn classes(
         &self,
-    ) -> impl Iterator<Item = (&MinimalRepresentative<A::Symbol>, StateIndex<Self>)> + '_ {
+    ) -> impl Iterator<Item = (&MinimalRepresentative<D>, StateIndex<Self>)> + '_ {
         self.minimal_representatives()
             .iter()
             .map(|(idx, mr)| (mr, *idx))

@@ -160,6 +160,6 @@ mod tests {
     fn macro_upw() {
         let w = upw!("a", "bbbb");
         let ww = upw!("ab", "b");
-        assert_eq!(w.prefix(6).to_vec(), ww.prefix(6).to_vec());
+        assert_eq!(w.prefix(6).collect_vec(), ww.prefix(6).collect_vec());
     }
 }

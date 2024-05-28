@@ -174,7 +174,7 @@ impl HoaSuitableAlphabet for HoaAlphabet {
 
 /// Assumes that `low` is the least occurring and `high` is the highest occurring priority,
 /// *inclusive*.
-fn build_parity_condition_hoa(low: usize, high: usize) -> String {
+fn build_parity_condition_hoa(low: Int, high: Int) -> String {
     let parity = low % 2;
 
     if high <= low {
