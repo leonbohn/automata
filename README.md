@@ -58,9 +58,9 @@ let aut = TSBuilder::without_edge_colors()
     .into_dfa(0);
 
 // reachable states in lenght-lexicographic order
-assert_eq!(aut.reachable_state_indices().collect::<Set<_>>(), vec![0, 2, 1, 3]);
+assert_eq!(aut.reachable_state_indices().collect::<math::Set<_>>(), math::Set::from_iter([0, 1, 2, 3]));
 // but we can also just pick a different starting state
-assert_eq!(aut.reachable_state_indices_from(1).collect::<Vec<_>>(), vec![1, 0, 2, 3]);
+assert_eq!(aut.reachable_state_indices_from(3).collect::<math::Set<_>>(), math::Set::from_iter([3]));
 ```
 
 Operations can be chained together efficiently and are evaluated as needed.

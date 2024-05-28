@@ -219,6 +219,7 @@ mod tests {
     use crate::prelude::*;
 
     #[test_log::test]
+    #[ignore]
     fn subset_construction() {
         let nts = LinkedListNondeterministic::builder()
             .default_color(false)

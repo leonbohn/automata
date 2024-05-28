@@ -95,6 +95,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         source: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        if !self.contains_state_index(source) {
+            return None;
+        }
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
@@ -124,6 +127,12 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         target: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        if !self.contains_state_index(source) {
+            return None;
+        }
+        if !self.contains_state_index(target) {
+            return None;
+        }
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
@@ -152,6 +161,12 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         source: StateIndex<Self>,
         target: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        if !self.contains_state_index(source) {
+            return None;
+        }
+        if !self.contains_state_index(target) {
+            return None;
+        }
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
@@ -175,6 +190,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         &mut self,
         source: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        if !self.contains_state_index(source) {
+            return None;
+        }
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
@@ -198,6 +216,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         &mut self,
         target: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+        if !self.contains_state_index(target) {
+            return None;
+        }
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
@@ -281,6 +302,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
         Self: 'this;
 
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
+        if !self.contains_state_index(state) {
+            return None;
+        }
         let walker = self
             .graph
             .neighbors_directed(node_index(state), Direction::Incoming)
