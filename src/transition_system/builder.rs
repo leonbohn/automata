@@ -2,9 +2,7 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::{
-    congruence::RightCongruence, prelude::*, transition_system::LinkedListNondeterministic, Void,
-};
+use crate::prelude::*;
 
 use self::math::Set;
 

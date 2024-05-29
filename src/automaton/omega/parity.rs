@@ -480,8 +480,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::DPA;
-    use crate::{prelude::*, TransitionSystem, Void};
+    use crate::prelude::*;
 
     #[test_log::test]
     fn normalize_dpa() {

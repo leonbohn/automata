@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use itertools::Itertools;
 
-use crate::{prelude::Symbol, Show};
+use crate::prelude::*;
 
 use super::{omega::OmegaIteration, Concat, LinearWord, PeriodicOmegaWord};
 

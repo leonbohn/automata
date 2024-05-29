@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
-use crate::{math::Set, prelude::*, transition_system::Shrinkable, Void};
+use crate::{math::Set, prelude::*};
 use itertools::Itertools;
 
 mod linked_state;

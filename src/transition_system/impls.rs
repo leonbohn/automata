@@ -25,11 +25,7 @@ pub(crate) mod pg;
 use super::ScalarIndexType;
 
 pub type DefaultIdType = u32;
-impl Show for DefaultIdType {
-    fn show(&self) -> String {
-        self.to_string()
-    }
-}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id<Typ = DefaultIdType>(pub Typ);
 impl<IdType: IndexType> Show for Id<IdType> {

@@ -1,11 +1,8 @@
 use itertools::Itertools;
 use tracing::debug;
 
-use crate::{
-    math::{Map, Set},
-    prelude::*,
-    transition_system::{EdgeReference, EdgeTuple, ScalarIndexType},
-};
+use crate::math::Map;
+use crate::prelude::*;
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, BTreeSet},
@@ -29,8 +26,8 @@ pub type EdgeListsDeterministic<A, Q, C, IdType = DefaultIdType> = EdgeLists<A, 
 #[derive(Clone, PartialEq, Eq)]
 pub struct EdgeLists<
     A: Alphabet,
-    Q = crate::Void,
-    C = crate::Void,
+    Q = Void,
+    C = Void,
     const DET: bool = true,
     IdType: ScalarIndexType = DefaultIdType,
 > {

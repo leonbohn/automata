@@ -213,21 +213,6 @@ impl Matcher<char> for char {
     }
 }
 
-impl Show for char {
-    fn show(&self) -> String {
-        self.to_string()
-    }
-
-    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(iter: I) -> String
-    where
-        Self: 'a,
-    {
-        format!(
-            "\"{}\"",
-            iter.into_iter().map(|sym| sym.to_string()).join("")
-        )
-    }
-}
 impl Expression for char {
     type S = char;
     type SymbolsIter<'this> = std::iter::Once<char> where Self: 'this;

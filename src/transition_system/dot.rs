@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display};
 
 use itertools::Itertools;
 
-use crate::{automaton::IntoDPA, prelude::*, Alphabet, Color, Show, TransitionSystem};
+use crate::prelude::*;
 
 fn sanitize_dot_ident(name: &str) -> String {
     name.chars()

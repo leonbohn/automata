@@ -1,8 +1,5 @@
 [workspace]
-members = [
-    ".",
-    "automata-derive"
-]
+members = [".", "automata-derive", "automata-core"]
 
 [workspace.package]
 version = "0.1.0"
@@ -32,32 +29,6 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 
-[package.metadata.docs.rs]
-rustdoc-args = ["--html-in-header", "./docs-header.html"]
-
-[dependencies]
-# gryf = { git = "https://github.com/pnevyk/gryf", rev = "1efd3a2", optional = true }
-automata-derive = {path = "./automata-derive"}
-petgraph = { version = "0.6.5", optional = true, default-features = false, features = [
-    "stable_graph",
-] }
-tracing = "0.1"
-tracing-subscriber = "0.3"
-itertools = "0.13.0"
-tabled = { version = "0.15", features = ["ansi"] }
-owo-colors = "4.0"
-test-log = { version = "0.2", features = ["trace"] }
-tempfile = { version = "3.10", optional = true }
-paste = "1.0"
-biodivine-lib-bdd = { version = "0.5", optional = true }
-bit-set = "0.5"
-bimap = "0.6"
-fastrand = { version = "2", optional = true }
-hoars = { version = "0.2", optional = true }
-clap = { version = "4.5", optional = true }
-indexmap = "2.2"
-
-
 [features]
 default = ["hoa", "graphviz", "random", "minimize", "petgraph"]
 random = ["fastrand"]
@@ -67,6 +38,45 @@ graphviz = ["dep:tempfile"]
 oai-bin = ["clap"]
 linked_list_ts = []
 petgraph = ["dep:petgraph"]
+
+[workspace.dependencies]
+automata-derive = { version = "=0.1", path = "automata-derive" }
+automata-core = { version = "=0.1", path = "automata-core" }
+thiserror = "1.0.61"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+itertools = "0.13.0"
+tabled = { version = "0.15", features = ["ansi"] }
+bit-set = "0.5"
+bimap = "0.6"
+indexmap = "2.2"
+paste = "1.0"
+owo-colors = "4.0"
+
+[dependencies]
+automata-derive = { workspace = true }
+automata-core = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+itertools = { workspace = true }
+tabled = { workspace = true }
+bit-set = { workspace = true }
+bimap = { workspace = true }
+indexmap = { workspace = true }
+paste = { workspace = true }
+owo-colors = { workspace = true }
+
+tempfile = { version = "3.10", optional = true }
+biodivine-lib-bdd = { version = "0.5", optional = true }
+fastrand = { version = "2", optional = true }
+hoars = { version = "0.2", optional = true }
+clap = { version = "4.5", optional = true }
+petgraph = { version = "0.6.5", optional = true, default-features = false, features = [
+    "stable_graph",
+] }
+test-log = { version = "0.2", features = ["trace"] }
+
 
 [dev-dependencies]
 lazy_static = "1.4"
