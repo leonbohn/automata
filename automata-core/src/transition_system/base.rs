@@ -31,7 +31,7 @@ impl<T: TransitionSystemBase> TransitionSystemBase for &mut T {
     }
 }
 
-pub(crate) struct DefaultBase<
+pub struct DefaultBase<
     A: Alphabet = CharAlphabet,
     Q: Color = Void,
     C: Color = Void,

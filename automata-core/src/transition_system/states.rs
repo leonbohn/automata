@@ -33,14 +33,14 @@ pub trait StateIterable: TransitionSystemBase {
     where
         Self: 'this;
 
-    fn q(&self, idx: StateIndex<Self>) -> Self::StateRef<'_>;
+    fn q(&self, idx: StateIndex<Self>) -> Option<Self::StateRef<'_>>;
     fn states(&self) -> Self::StatesIter<'_>;
 }
 
 impl<T: StateIterable> StateIterable for &T {
     type StateRef<'this> = T::StateRef<'this> where Self: 'this;
     type StatesIter<'this> = T::StatesIter<'this> where Self: 'this;
-    fn q(&self, idx: StateIndex<Self>) -> Self::StateRef<'_> {
+    fn q(&self, idx: StateIndex<Self>) -> Option<Self::StateRef<'_>> {
         T::q(self, idx)
     }
     fn states(&self) -> Self::StatesIter<'_> {

@@ -46,7 +46,7 @@ pub fn state_iterable(tokens: TokenStream) -> TokenStream {
             type StatesIter<'this> = <#field_type as StateIterable>::StatesIter<'this>
             where Self: 'this;
 
-            fn q(&self, idx: StateIndex<#field_type>) -> Self::StateRef<'_> {
+            fn q(&self, idx: StateIndex<#field_type>) -> Option<Self::StateRef<'_>> {
                 <#field_type as StateIterable>::q(&self.#field_name, idx)
             }
             fn states(&self) -> Self::StatesIter<'_> {
