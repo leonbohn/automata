@@ -10,6 +10,8 @@ pub mod alphabet;
 pub mod transition_system;
 pub use transition_system::{IdType, ScalarIdType};
 
+pub type DefaultIdType = u32;
+
 /// A color is simply a type that can be used to color states or transitions.
 pub trait Color: Clone + Eq + Hash + Debug {
     /// Reduces a sequence of colors (of type `Self`) to a single color of type `Self`.
@@ -38,4 +40,15 @@ impl Debug for Void {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "#")
     }
+}
+
+pub(crate) mod innerlude {
+    pub use super::{
+        alphabet::{Alphabet, AlphabetExpression, AlphabetSymbol, CharAlphabet, Matcher},
+        transition_system::{
+            EdgeColor, Expression, StateColor, StateIndex, StateIterable, Symbol,
+            TransitionSystemBase,
+        },
+        Color, DefaultIdType, IdType, Int, Show, Void,
+    };
 }

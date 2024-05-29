@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::prelude::Symbol;
+use crate::prelude::AlphabetSymbol;
 
 use super::{ConsumingInfixIterator, FiniteWord, LinearWord, OmegaWord};
 
@@ -25,13 +25,13 @@ impl<'a, S, W: LinearWord<S>> Skip<'a, S, W> {
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Skip<'a, S, W> {
+impl<'a, S: AlphabetSymbol, W: LinearWord<S>> LinearWord<S> for Skip<'a, S, W> {
     fn nth(&self, position: usize) -> Option<S> {
         self.sequence.nth(self.offset + position)
     }
 }
 
-impl<'a, S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Skip<'a, S, W> {
+impl<'a, S: AlphabetSymbol, W: FiniteWord<S>> FiniteWord<S> for Skip<'a, S, W> {
     type Symbols<'this> = std::iter::Skip<W::Symbols<'this>> where Self: 'this;
 
     fn collect_vec(&self) -> Vec<S> {
@@ -52,7 +52,7 @@ impl<'a, S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Skip<'a, S, W> {
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
 pub struct Rotated<W>(pub W, pub usize);
 
-impl<S: Symbol, W: FiniteWord<S>> LinearWord<S> for Rotated<W> {
+impl<S: AlphabetSymbol, W: FiniteWord<S>> LinearWord<S> for Rotated<W> {
     fn nth(&self, position: usize) -> Option<S> {
         self.0.nth((position + self.1) % self.0.len())
     }
@@ -76,7 +76,7 @@ impl<'a, S, W> RotatedIter<'a, S, W> {
     }
 }
 
-impl<'a, S: Symbol, W: FiniteWord<S>> Iterator for RotatedIter<'a, S, W> {
+impl<'a, S: AlphabetSymbol, W: FiniteWord<S>> Iterator for RotatedIter<'a, S, W> {
     type Item = S;
     fn next(&mut self) -> Option<Self::Item> {
         if self.position < self.rotated.len() {
@@ -92,7 +92,7 @@ impl<'a, S: Symbol, W: FiniteWord<S>> Iterator for RotatedIter<'a, S, W> {
     }
 }
 
-impl<S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Rotated<W> {
+impl<S: AlphabetSymbol, W: FiniteWord<S>> FiniteWord<S> for Rotated<W> {
     type Symbols<'this> = RotatedIter<'this, S, W> where Self: 'this;
 
     fn symbols(&self) -> Self::Symbols<'_> {
@@ -108,7 +108,7 @@ impl<S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Rotated<W> {
     }
 }
 
-impl<'a, S: Symbol, W: OmegaWord<S>> OmegaWord<S> for Skip<'a, S, W> {
+impl<'a, S: AlphabetSymbol, W: OmegaWord<S>> OmegaWord<S> for Skip<'a, S, W> {
     type Spoke<'this> = Infix<'this, S, W>
     where
         Self: 'this;
@@ -164,7 +164,7 @@ impl<'a, S, W: LinearWord<S> + ?Sized> Infix<'a, S, W> {
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Infix<'a, S, W> {
+impl<'a, S: AlphabetSymbol, W: LinearWord<S>> LinearWord<S> for Infix<'a, S, W> {
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.length {
             self.sequence.nth(self.offset + position)
@@ -174,7 +174,7 @@ impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Infix<'a, S, W> {
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> FiniteWord<S> for Infix<'a, S, W> {
+impl<'a, S: AlphabetSymbol, W: LinearWord<S>> FiniteWord<S> for Infix<'a, S, W> {
     type Symbols<'this> = ConsumingInfixIterator<'this, S, W>
     where
         Self: 'this;

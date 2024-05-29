@@ -10,8 +10,8 @@ use crate::Show;
 /// - [`CharAlphabet`] alphabets, which are just a set of symbols.
 /// - Propositional alphabets, where a symbol is a valuation of all propositional variables. This is for example
 /// implemented in the `hoars` crate.
-pub trait Symbol: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show {}
-impl<S: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show> Symbol for S {}
+pub trait AlphabetSymbol: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show {}
+impl<S: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show> AlphabetSymbol for S {}
 
 /// Encapsulates that an [`Expression`] can be matched by some [`Symbol`], or by another expression.
 /// For simple [`CharAlphabet`]s, where expressions are single symbols, this is just equality.
@@ -29,9 +29,9 @@ impl<E, M: Matcher<E>> Matcher<E> for &M {
 /// An expression is used to label edges of a [`crate::transition_system::TransitionSystem`]. For [`CharAlphabet`]
 /// alphabets, an expression is simply a single symbol, whereas for a propositional alphabet, an expression
 /// is a propositional formula over the atomic propositions. See propositional for more details.
-pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show + Matcher<Self> {
+pub trait AlphabetExpression: Hash + Clone + Debug + Eq + Ord + Show + Matcher<Self> {
     /// The type of symbols that this expression matches.
-    type S: Symbol + Matcher<Self>;
+    type S: AlphabetSymbol + Matcher<Self>;
     /// Type of iterator over the concrete symbols matched by this expression.
     type SymbolsIter<'this>: Iterator<Item = Self::S>
     where
@@ -60,9 +60,9 @@ pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show + Matcher<Self> {
 /// An alphabet abstracts a collection of [`Symbol`]s and complex [`Expression`]s over those.
 pub trait Alphabet: Clone + Debug {
     /// The type of symbols in this alphabet.
-    type Symbol: Symbol + Matcher<Self::Expression>;
+    type Symbol: AlphabetSymbol + Matcher<Self::Expression>;
     /// The type of expressions in this alphabet.
-    type Expression: Expression<S = Self::Symbol>;
+    type Expression: AlphabetExpression<S = Self::Symbol>;
 
     /// Creates an expression from a single symbol.
     fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression;
@@ -221,7 +221,7 @@ impl Matcher<char> for char {
     }
 }
 
-impl Expression for char {
+impl AlphabetExpression for char {
     type S = char;
     type SymbolsIter<'this> = std::iter::Once<char> where Self: 'this;
     fn symbols(&self) -> Self::SymbolsIter<'_> {
@@ -286,7 +286,7 @@ impl Alphabet for CharAlphabet {
 /// since the performance gains (at least for simple operations like runs) is
 /// negligible.
 #[derive(Clone, Debug)]
-pub struct Fixed<S: Symbol, const N: usize>([S; N]);
+pub struct Fixed<S: AlphabetSymbol, const N: usize>([S; N]);
 
 impl Matcher<usize> for usize {
     fn matches(&self, expression: &usize) -> bool {
@@ -294,7 +294,7 @@ impl Matcher<usize> for usize {
     }
 }
 
-impl Expression for usize {
+impl AlphabetExpression for usize {
     type S = usize;
     type SymbolsIter<'this> = std::iter::Once<usize> where Self: 'this;
 
@@ -310,14 +310,16 @@ impl Expression for usize {
     }
 }
 
-impl<S: Symbol, const N: usize> Fixed<S, N> {
+impl<S: AlphabetSymbol, const N: usize> Fixed<S, N> {
     /// Create a new [`Fixed`] alphabet from a slice of length `N`.
     pub fn from(symbols: [S; N]) -> Self {
         Self(symbols)
     }
 }
 
-impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> Alphabet for Fixed<S, N> {
+impl<S: AlphabetSymbol + Matcher<S> + AlphabetExpression<S = S>, const N: usize> Alphabet
+    for Fixed<S, N>
+{
     type Symbol = S;
 
     type Expression = S;
@@ -387,7 +389,7 @@ impl Matcher<InvertibleChar> for InvertibleChar {
     }
 }
 
-impl Expression for InvertibleChar {
+impl AlphabetExpression for InvertibleChar {
     type S = InvertibleChar;
     type SymbolsIter<'this> = std::iter::Once<InvertibleChar> where Self: 'this;
 

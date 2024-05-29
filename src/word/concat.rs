@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use crate::prelude::Symbol;
+use crate::prelude::AlphabetSymbol;
 
 use super::{FiniteWord, LinearWord, OmegaWord};
 
@@ -9,7 +9,7 @@ use super::{FiniteWord, LinearWord, OmegaWord};
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Concat<X, Y>(pub X, pub Y);
 
-impl<S: Symbol, X: FiniteWord<S>, Y: LinearWord<S>> LinearWord<S> for Concat<X, Y> {
+impl<S: AlphabetSymbol, X: FiniteWord<S>, Y: LinearWord<S>> LinearWord<S> for Concat<X, Y> {
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.0.len() {
             self.0.nth(position)
@@ -19,7 +19,7 @@ impl<S: Symbol, X: FiniteWord<S>, Y: LinearWord<S>> LinearWord<S> for Concat<X, 
     }
 }
 
-impl<S: Symbol, X: FiniteWord<S>, Y: FiniteWord<S>> FiniteWord<S> for Concat<X, Y> {
+impl<S: AlphabetSymbol, X: FiniteWord<S>, Y: FiniteWord<S>> FiniteWord<S> for Concat<X, Y> {
     type Symbols<'this> = std::iter::Chain<X::Symbols<'this>, Y::Symbols<'this>>
     where
         Self: 'this;
@@ -39,7 +39,7 @@ impl<S: Symbol, X: FiniteWord<S>, Y: FiniteWord<S>> FiniteWord<S> for Concat<X, 
     }
 }
 
-impl<S: Symbol, X: FiniteWord<S>, Y: OmegaWord<S>> OmegaWord<S> for Concat<X, Y> {
+impl<S: AlphabetSymbol, X: FiniteWord<S>, Y: OmegaWord<S>> OmegaWord<S> for Concat<X, Y> {
     type Spoke<'this> = Concat<&'this X, Y::Spoke<'this>>
     where
         Self: 'this;

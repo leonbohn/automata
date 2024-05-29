@@ -66,7 +66,7 @@ pub trait FiniteWord<S>: LinearWord<S> {
     /// Panics if `self` is empty as the operation is not defined in that case.
     fn omega_power(&self) -> PeriodicOmegaWord<S>
     where
-        S: Symbol,
+        S: AlphabetSymbol,
     {
         assert!(
             !self.is_empty(),
@@ -80,7 +80,7 @@ pub trait FiniteWord<S>: LinearWord<S> {
     fn omega_iteration(self) -> OmegaIteration<Self>
     where
         Self: Sized,
-        S: Symbol,
+        S: AlphabetSymbol,
     {
         assert!(
             !self.is_empty(),
@@ -129,7 +129,7 @@ pub trait FiniteWord<S>: LinearWord<S> {
     }
 }
 
-impl<S: Symbol, const N: usize> FiniteWord<S> for [S; N] {
+impl<S: AlphabetSymbol, const N: usize> FiniteWord<S> for [S; N] {
     type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, S>>
     where
         Self: 'this;
@@ -143,13 +143,13 @@ impl<S: Symbol, const N: usize> FiniteWord<S> for [S; N] {
     }
 }
 
-impl<S: Symbol, const N: usize> LinearWord<S> for [S; N] {
+impl<S: AlphabetSymbol, const N: usize> LinearWord<S> for [S; N] {
     fn nth(&self, position: usize) -> Option<S> {
         self.get(position).cloned()
     }
 }
 
-impl<S: Symbol, Fw: FiniteWord<S> + ?Sized> FiniteWord<S> for &Fw {
+impl<S: AlphabetSymbol, Fw: FiniteWord<S> + ?Sized> FiniteWord<S> for &Fw {
     type Symbols<'this> = Fw::Symbols<'this> where Self: 'this;
 
     fn symbols(&self) -> Self::Symbols<'_> {
@@ -164,7 +164,7 @@ impl<S: Symbol, Fw: FiniteWord<S> + ?Sized> FiniteWord<S> for &Fw {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for VecDeque<S> {
+impl<S: AlphabetSymbol> LinearWord<S> for VecDeque<S> {
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {
             Some(self[position])
@@ -174,7 +174,7 @@ impl<S: Symbol> LinearWord<S> for VecDeque<S> {
     }
 }
 
-impl<S: Symbol> FiniteWord<S> for VecDeque<S> {
+impl<S: AlphabetSymbol> FiniteWord<S> for VecDeque<S> {
     type Symbols<'this> = std::iter::Cloned<std::collections::vec_deque::Iter<'this, S>>
     where
         Self: 'this;
@@ -237,7 +237,7 @@ impl FiniteWord<char> for String {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for Vec<S> {
+impl<S: AlphabetSymbol> LinearWord<S> for Vec<S> {
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {
             Some(self[position])
@@ -246,7 +246,7 @@ impl<S: Symbol> LinearWord<S> for Vec<S> {
         }
     }
 }
-impl<S: Symbol> FiniteWord<S> for Vec<S> {
+impl<S: AlphabetSymbol> FiniteWord<S> for Vec<S> {
     type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, S>>
     where
         Self: 'this;
@@ -267,7 +267,7 @@ impl<S: Symbol> FiniteWord<S> for Vec<S> {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for [S] {
+impl<S: AlphabetSymbol> LinearWord<S> for [S] {
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {
             Some(self[position])
@@ -276,7 +276,7 @@ impl<S: Symbol> LinearWord<S> for [S] {
         }
     }
 }
-impl<S: Symbol> FiniteWord<S> for [S] {
+impl<S: AlphabetSymbol> FiniteWord<S> for [S] {
     type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, S>>
     where
         Self: 'this;

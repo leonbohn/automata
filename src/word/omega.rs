@@ -59,7 +59,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     /// ```
     fn reduced(&self) -> ReducedOmegaWord<S>
     where
-        S: Symbol,
+        S: AlphabetSymbol,
     {
         ReducedOmegaWord::ultimately_periodic(self.spoke(), self.cycle())
     }
@@ -77,7 +77,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     /// ```
     fn equals<W: OmegaWord<S>>(&self, other: W) -> bool
     where
-        S: Symbol,
+        S: AlphabetSymbol,
     {
         self.reduced() == other.reduced()
     }
@@ -138,7 +138,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     where
         D: Congruence,
         D::Alphabet: Alphabet<Symbol = S>,
-        S: Symbol,
+        S: AlphabetSymbol,
     {
         let mut cur = cong.reached_state_index(self.spoke())?;
         let mut count = 0;
@@ -160,7 +160,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     }
 }
 
-impl<S: Symbol, W: OmegaWord<S>> OmegaWord<S> for &W {
+impl<S: AlphabetSymbol, W: OmegaWord<S>> OmegaWord<S> for &W {
     type Spoke<'this> = W::Spoke<'this>
     where
         Self: 'this;
@@ -205,7 +205,7 @@ pub struct PeriodicOmegaWord<S> {
     representation: Vec<S>,
 }
 
-impl<S: Symbol> TryFrom<ReducedOmegaWord<S>> for PeriodicOmegaWord<S> {
+impl<S: AlphabetSymbol> TryFrom<ReducedOmegaWord<S>> for PeriodicOmegaWord<S> {
     type Error = ();
     fn try_from(value: ReducedOmegaWord<S>) -> Result<Self, Self::Error> {
         if value.loop_index() > 0 {
@@ -218,24 +218,24 @@ impl<S: Symbol> TryFrom<ReducedOmegaWord<S>> for PeriodicOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> From<PeriodicOmegaWord<S>> for ReducedOmegaWord<S> {
+impl<S: AlphabetSymbol> From<PeriodicOmegaWord<S>> for ReducedOmegaWord<S> {
     fn from(value: PeriodicOmegaWord<S>) -> Self {
         Self::periodic(value.representation)
     }
 }
-impl<S: Symbol> From<&PeriodicOmegaWord<S>> for ReducedOmegaWord<S> {
+impl<S: AlphabetSymbol> From<&PeriodicOmegaWord<S>> for ReducedOmegaWord<S> {
     fn from(value: &PeriodicOmegaWord<S>) -> Self {
         Self::periodic(value.representation.clone())
     }
 }
 
-impl<S: Symbol> From<&ReducedOmegaWord<S>> for ReducedOmegaWord<S> {
+impl<S: AlphabetSymbol> From<&ReducedOmegaWord<S>> for ReducedOmegaWord<S> {
     fn from(value: &ReducedOmegaWord<S>) -> Self {
         Self::ultimately_periodic(value.spoke(), value.cycle())
     }
 }
 
-impl<S: Symbol> PeriodicOmegaWord<S> {
+impl<S: AlphabetSymbol> PeriodicOmegaWord<S> {
     /// Creates a new periodic omega word from a finite word. The word must not be empty and
     /// it is deduplicated.
     ///
@@ -260,14 +260,14 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for PeriodicOmegaWord<S> {
+impl<S: AlphabetSymbol> LinearWord<S> for PeriodicOmegaWord<S> {
     fn nth(&self, position: usize) -> Option<S> {
         self.representation
             .get(position % self.representation.len())
             .copied()
     }
 }
-impl<S: Symbol> OmegaWord<S> for PeriodicOmegaWord<S> {
+impl<S: AlphabetSymbol> OmegaWord<S> for PeriodicOmegaWord<S> {
     fn loop_index(&self) -> usize {
         0
     }
@@ -305,7 +305,7 @@ pub struct ReducedOmegaWord<S> {
     pub(super) loop_index: usize,
 }
 
-impl<S: Symbol> Show for ReducedOmegaWord<S> {
+impl<S: AlphabetSymbol> Show for ReducedOmegaWord<S> {
     fn show(&self) -> String {
         format!(
             "{},({})",
@@ -321,7 +321,7 @@ impl<S: Symbol> Show for ReducedOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for ReducedOmegaWord<S> {
+impl<S: AlphabetSymbol> LinearWord<S> for ReducedOmegaWord<S> {
     fn nth(&self, position: usize) -> Option<S> {
         if position >= self.word.len() {
             let loop_position = (position - self.loop_index) % self.cycle_length();
@@ -331,7 +331,7 @@ impl<S: Symbol> LinearWord<S> for ReducedOmegaWord<S> {
         }
     }
 }
-impl<S: Symbol> OmegaWord<S> for ReducedOmegaWord<S> {
+impl<S: AlphabetSymbol> OmegaWord<S> for ReducedOmegaWord<S> {
     fn loop_index(&self) -> usize {
         self.loop_index
     }
@@ -349,7 +349,7 @@ impl<S: Symbol> OmegaWord<S> for ReducedOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> ReducedOmegaWord<S> {
+impl<S: AlphabetSymbol> ReducedOmegaWord<S> {
     /// Returns `true` if and only if `self` is already normalized. This is done by
     /// computing the normalization of `self` and then comparing structural equality.
     ///
@@ -478,13 +478,13 @@ impl TryFrom<&str> for ReducedOmegaWord<char> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Epsilon();
 
-impl<S: Symbol> LinearWord<S> for Epsilon {
+impl<S: AlphabetSymbol> LinearWord<S> for Epsilon {
     fn nth(&self, _position: usize) -> Option<S> {
         None
     }
 }
 
-impl<S: Symbol> FiniteWord<S> for Epsilon {
+impl<S: AlphabetSymbol> FiniteWord<S> for Epsilon {
     type Symbols<'this> = std::iter::Empty<S>
     where
         Self: 'this;
@@ -508,7 +508,7 @@ pub struct OmegaIteration<W>(W);
 
 impl<W> OmegaIteration<W> {
     /// Iterate the given finite word `from`, panics if the word is empty.
-    pub fn new<S: Symbol>(from: W) -> Self
+    pub fn new<S: AlphabetSymbol>(from: W) -> Self
     where
         W: FiniteWord<S>,
     {
@@ -517,13 +517,13 @@ impl<W> OmegaIteration<W> {
     }
 }
 
-impl<S: Symbol, W: FiniteWord<S>> LinearWord<S> for OmegaIteration<W> {
+impl<S: AlphabetSymbol, W: FiniteWord<S>> LinearWord<S> for OmegaIteration<W> {
     fn nth(&self, position: usize) -> Option<S> {
         self.0.nth(position % self.0.len())
     }
 }
 
-impl<S: Symbol, W: FiniteWord<S>> OmegaWord<S> for OmegaIteration<W> {
+impl<S: AlphabetSymbol, W: FiniteWord<S>> OmegaWord<S> for OmegaIteration<W> {
     type Spoke<'this> = Epsilon
     where
         Self: 'this;

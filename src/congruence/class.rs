@@ -27,7 +27,7 @@ impl<S> Class<S> {
     /// Turns this class into a string, using the given alphabet to convert symbols to strings.
     pub fn mr_to_string(&self) -> String
     where
-        S: Symbol,
+        S: AlphabetSymbol,
     {
         if self.is_empty() {
             "ε".to_string()
@@ -43,7 +43,7 @@ impl<S> FromIterator<S> for Class<S> {
     }
 }
 
-impl<S: Symbol> std::fmt::Display for Class<S> {
+impl<S: AlphabetSymbol> std::fmt::Display for Class<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -57,12 +57,12 @@ impl<S: Symbol> std::fmt::Display for Class<S> {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for Class<S> {
+impl<S: AlphabetSymbol> LinearWord<S> for Class<S> {
     fn nth(&self, position: usize) -> Option<S> {
         self.0.get(position).cloned()
     }
 }
-impl<S: Symbol> FiniteWord<S> for Class<S> {
+impl<S: AlphabetSymbol> FiniteWord<S> for Class<S> {
     type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, S>>
     where
         Self: 'this,

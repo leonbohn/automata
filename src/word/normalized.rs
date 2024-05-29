@@ -22,7 +22,7 @@ use super::LinearWord;
 /// since `u` leads to `0` while `x` leads to `1`. The normalization of `w` wrt `T` would be `b(aa)^ω` since `aa` loops on the state `0`
 /// that is reached after reading `b` from the initial state `0`.
 #[derive(Clone, PartialEq, Eq)]
-pub struct NormalizedOmegaWord<S: Symbol> {
+pub struct NormalizedOmegaWord<S: AlphabetSymbol> {
     upw: ReducedOmegaWord<S>,
     pre_loop_count: usize,
     loop_size: usize,
@@ -30,7 +30,7 @@ pub struct NormalizedOmegaWord<S: Symbol> {
     rec: std::cell::OnceCell<Vec<S>>,
 }
 
-impl<S: Symbol> NormalizedOmegaWord<S> {
+impl<S: AlphabetSymbol> NormalizedOmegaWord<S> {
     /// Creates a new instance from the given ultimately periodic word `ux^ω`. The resulting normalized word will be
     /// `ux^i(x^j)^ω` where `i` is given by `pre_loop_count` and `j` is `loop_size`. This method should
     /// only really be called from inside the crate, for actually creating a normalization of an ultimately
@@ -74,13 +74,13 @@ impl<S: Symbol> NormalizedOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for NormalizedOmegaWord<S> {
+impl<S: AlphabetSymbol> LinearWord<S> for NormalizedOmegaWord<S> {
     fn nth(&self, position: usize) -> Option<S> {
         self.upw.nth(position)
     }
 }
 
-impl<S: Symbol> OmegaWord<S> for NormalizedOmegaWord<S> {
+impl<S: AlphabetSymbol> OmegaWord<S> for NormalizedOmegaWord<S> {
     type Spoke<'this> = &'this [S]
     where
         Self: 'this;
@@ -98,7 +98,7 @@ impl<S: Symbol> OmegaWord<S> for NormalizedOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> Debug for NormalizedOmegaWord<S> {
+impl<S: AlphabetSymbol> Debug for NormalizedOmegaWord<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let base = self.base_iter().map(|s| s.show()).join("");
         let rec = self.rec_iter().map(|s| s.show()).join("");
@@ -106,7 +106,7 @@ impl<S: Symbol> Debug for NormalizedOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> Hash for NormalizedOmegaWord<S> {
+impl<S: AlphabetSymbol> Hash for NormalizedOmegaWord<S> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.upw.hash(state);
         self.pre_loop_count.hash(state);

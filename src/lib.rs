@@ -6,8 +6,9 @@
 /// `use automata::prelude::*;` should be enough to use the package.
 pub mod prelude {
     pub use automata_core::{
-        alphabet, alphabet::Alphabet, alphabet::CharAlphabet, alphabet::Expression,
-        alphabet::Matcher, alphabet::Symbol, math, Color, IdType, Int, ScalarIdType, Show, Void,
+        alphabet, alphabet::Alphabet, alphabet::CharAlphabet, alphabet::AlphabetExpression,
+        alphabet::Matcher, alphabet::AlphabetSymbol, math, Color, DefaultIdType, IdType, Int, ScalarIdType,
+        Show, Void,
     };
 
     #[cfg(not(feature = "petgraph"))]
@@ -51,7 +52,6 @@ pub mod prelude {
         transition_system::operations,
         transition_system::{
             dot::Dottable,
-            impls::DefaultIdType,
             operations::{DefaultIfMissing, Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
             run::{FiniteRun, OmegaRun},

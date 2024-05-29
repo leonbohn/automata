@@ -24,8 +24,6 @@ pub(crate) mod pg;
 
 use super::ScalarIdType;
 
-pub type DefaultIdType = u32;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id<Typ = DefaultIdType>(pub Typ);
 impl<Idx: IdType> Show for Id<Idx> {

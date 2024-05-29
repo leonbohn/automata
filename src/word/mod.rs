@@ -74,7 +74,7 @@ pub trait LinearWord<S>: Hash + Eq {
     }
 }
 
-impl<S: Symbol, W: LinearWord<S> + ?Sized> LinearWord<S> for &W {
+impl<S: AlphabetSymbol, W: LinearWord<S> + ?Sized> LinearWord<S> for &W {
     fn nth(&self, position: usize) -> Option<S> {
         W::nth(self, position)
     }
@@ -86,20 +86,20 @@ impl<S: Symbol, W: LinearWord<S> + ?Sized> LinearWord<S> for &W {
 /// we check if the start position is strictly smaller than the end position, and if so, we return the symbol at
 /// the start position and increment it. Otherwise, we return `None`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct ConsumingInfixIterator<'a, S: Symbol, W: LinearWord<S>> {
+pub struct ConsumingInfixIterator<'a, S: AlphabetSymbol, W: LinearWord<S>> {
     word: &'a W,
     start: usize,
     end: usize,
     _marker: std::marker::PhantomData<S>,
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for ConsumingInfixIterator<'a, S, W> {
+impl<'a, S: AlphabetSymbol, W: LinearWord<S>> LinearWord<S> for ConsumingInfixIterator<'a, S, W> {
     fn nth(&self, position: usize) -> Option<S> {
         self.word.nth(self.start + position)
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> Iterator for ConsumingInfixIterator<'a, S, W> {
+impl<'a, S: AlphabetSymbol, W: LinearWord<S>> Iterator for ConsumingInfixIterator<'a, S, W> {
     type Item = S;
     fn next(&mut self) -> Option<Self::Item> {
         if self.start < self.end {
@@ -112,7 +112,7 @@ impl<'a, S: Symbol, W: LinearWord<S>> Iterator for ConsumingInfixIterator<'a, S,
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> ConsumingInfixIterator<'a, S, W> {
+impl<'a, S: AlphabetSymbol, W: LinearWord<S>> ConsumingInfixIterator<'a, S, W> {
     /// Creates a new [`ConsumingInfixIterator`] object from a reference to a word and a start and end position.
     pub fn new(word: &'a W, start: usize, end: usize) -> Self {
         Self {

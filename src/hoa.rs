@@ -356,7 +356,7 @@ impl Matcher<HoaExpression> for HoaSymbol {
     }
 }
 
-impl Expression for HoaExpression {
+impl AlphabetExpression for HoaExpression {
     type S = HoaSymbol;
     type SymbolsIter<'this> = HoaExpressionIter<'this> where Self: 'this;
 
