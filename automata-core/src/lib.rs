@@ -43,11 +43,23 @@ impl Debug for Void {
 }
 
 pub(crate) mod innerlude {
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
+    pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
+        GraphTs<A, Q, C, DET>;
+    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
+    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, true>;
+    /// Points to the default implementation of [`TransitionSystem`] in the case where it is
+    /// **now known to be** [`Deterministic`].
+    pub type NTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, false>;
+
     pub use super::{
+        alphabet,
         alphabet::{Alphabet, AlphabetExpression, AlphabetSymbol, CharAlphabet, Matcher},
+        math,
         transition_system::{
-            EdgeColor, Expression, StateColor, StateIndex, StateIterable, Symbol,
-            TransitionSystemBase,
+            EdgeColor, EdgeReference, EdgeTuple, Expression, ForAlphabet, GraphTs, IntoEdgeTuple,
+            PredecessorIterable, ScalarIdType, Shrinkable, Sproutable, StateColor, StateIndex,
+            StateIterable, StateReference, Symbol, TSBuilder, TransitionSystemBase,
         },
         Color, DefaultIdType, IdType, Int, Show, Void,
     };

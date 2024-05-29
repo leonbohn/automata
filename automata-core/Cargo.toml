@@ -17,3 +17,5 @@ thiserror = { workspace = true }
 itertools = { workspace = true }
 indexmap = { workspace = true }
 bimap = { workspace = true }
+bit-set = { workspace = true }
+petgraph = { version = "0.6.5" }

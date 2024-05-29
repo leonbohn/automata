@@ -4,10 +4,25 @@ mod base;
 pub use base::TransitionSystemBase;
 
 mod states;
-pub use states::StateIterable;
+pub use states::{StateIterable, StateReference};
 
 mod edges;
-pub use edges::EdgesFrom;
+pub use edges::{EdgeReference, EdgesFrom, IntoEdgeTuple};
+
+mod sproutable;
+pub use sproutable::{ForAlphabet, Sproutable};
+
+mod shrinkable;
+pub use shrinkable::Shrinkable;
+
+mod petgraph;
+pub use petgraph::GraphTs;
+
+mod builder;
+pub use builder::TSBuilder;
+
+mod predecessors;
+pub use predecessors::PredecessorIterable;
 
 /// Encapsulates what is necessary for a type to be usable as a state index in a [`TransitionSystem`].
 pub trait IdType: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show {}
@@ -25,6 +40,9 @@ pub type StateColor<X = base::DefaultBase> = <X as TransitionSystemBase>::StateC
 pub type EdgeColor<X = base::DefaultBase> = <X as TransitionSystemBase>::EdgeColor;
 /// Type alias for extracting the state index in a [`TransitionSystem`].
 pub type StateIndex<X = base::DefaultBase> = <X as TransitionSystemBase>::StateIndex;
+
+pub type EdgeTuple<X = base::DefaultBase> =
+    (StateIndex<X>, Expression<X>, EdgeColor<X>, StateIndex<X>);
 
 /// Marker trait for [`IdType`]s that are scalar, i.e. they can be converted to and from `usize`.
 pub trait ScalarIdType:

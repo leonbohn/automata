@@ -1,5 +1,24 @@
 use crate::innerlude::*;
 
+pub trait IntoEdgeTuple<T: TransitionSystemBase> {
+    fn into_tuple(self) -> (StateIndex<T>, Expression<T>, EdgeColor<T>, StateIndex<T>);
+}
+
+impl<T: TransitionSystemBase> IntoEdgeTuple<T>
+    for (StateIndex<T>, Expression<T>, EdgeColor<T>, StateIndex<T>)
+{
+    fn into_tuple(self) -> (StateIndex<T>, Expression<T>, EdgeColor<T>, StateIndex<T>) {
+        self
+    }
+}
+impl<T: TransitionSystemBase<EdgeColor = Void>> IntoEdgeTuple<T>
+    for (StateIndex<T>, Expression<T>, StateIndex<T>)
+{
+    fn into_tuple(self) -> (StateIndex<T>, Expression<T>, EdgeColor<T>, StateIndex<T>) {
+        (self.0, self.1, Void, self.2)
+    }
+}
+
 pub trait EdgeReference<'a, Idx: IdType, E: AlphabetExpression, C: Color> {
     fn source(&self) -> Idx;
     fn target(&self) -> Idx;
@@ -41,9 +60,6 @@ impl<'a, Idx: IdType, E: AlphabetExpression, C: Color> EdgeReference<'a, Idx, E,
 }
 
 pub trait EdgesFrom: TransitionSystemBase {
-    type EdgeRef<'this>: EdgeReference<'this, StateIndex<Self>, Expression<Self>, EdgeColor<Self>>
-    where
-        Self: 'this;
     type EdgesFromIter<'this>: Iterator<Item = Self::EdgeRef<'this>>
     where
         Self: 'this;

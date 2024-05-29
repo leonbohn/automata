@@ -19,6 +19,10 @@ pub fn transition_system_base(tokens: TokenStream) -> TokenStream {
             type StateIndex = <#field_type as TransitionSystemBase>::StateIndex;
             type StateColor = <#field_type as TransitionSystemBase>::StateColor;
             type EdgeColor = <#field_type as TransitionSystemBase>::EdgeColor;
+            type StateRef<'this> = <#field_type as TransitionSystemBase>::StateRef<'this>
+            where Self: 'this;
+            type EdgeRef<'this> = <#field_type as TransitionSystemBase>::StateRef<'this>
+            where Self: 'this;
 
             fn alphabet(&self) -> &Self::Alphabet {
                 <#field_type as TransitionSystemBase>::alphabet(&self.#field_name)
@@ -41,8 +45,6 @@ pub fn state_iterable(tokens: TokenStream) -> TokenStream {
 
     let out = quote! {
         impl #ig StateIterable for #name #tg #w {
-            type StateRef<'this> = <#field_type as StateIterable>::StateRef<'this>
-            where Self: 'this;
             type StatesIter<'this> = <#field_type as StateIterable>::StatesIter<'this>
             where Self: 'this;
 
@@ -70,8 +72,6 @@ pub fn edges_from(tokens: TokenStream) -> TokenStream {
 
     let out = quote! {
         impl #ig StateIterable for #name #tg #w {
-            type EdgeRef<'this> = <#field_type as EdgesFrom>::StateRef<'this>
-            where Self: 'this;
             type EdgesFrom<'this> = <#field_type as EdgesFrom>::StatesIter<'this>
             where Self: 'this;
 
