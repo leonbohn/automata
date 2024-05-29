@@ -6,6 +6,9 @@ pub use base::TransitionSystemBase;
 mod states;
 pub use states::StateIterable;
 
+mod edges;
+pub use edges::EdgesFrom;
+
 /// Encapsulates what is necessary for a type to be usable as a state index in a [`TransitionSystem`].
 pub trait IdType: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show {}
 impl<TY: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show> IdType for TY {}

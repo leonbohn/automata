@@ -5,6 +5,8 @@ pub trait TransitionSystemBase {
     type StateIndex: IdType;
     type StateColor: Color;
     type EdgeColor: Color;
+
+    fn alphabet(&self) -> &Self::Alphabet;
 }
 
 impl<T: TransitionSystemBase> TransitionSystemBase for &T {
@@ -12,6 +14,10 @@ impl<T: TransitionSystemBase> TransitionSystemBase for &T {
     type EdgeColor = T::EdgeColor;
     type StateColor = T::StateColor;
     type StateIndex = T::StateIndex;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        T::alphabet(self)
+    }
 }
 
 impl<T: TransitionSystemBase> TransitionSystemBase for &mut T {
@@ -19,6 +25,10 @@ impl<T: TransitionSystemBase> TransitionSystemBase for &mut T {
     type EdgeColor = T::EdgeColor;
     type StateColor = T::StateColor;
     type StateIndex = T::StateIndex;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        T::alphabet(self)
+    }
 }
 
 pub(crate) struct DefaultBase<
@@ -34,4 +44,7 @@ impl<A: Alphabet, Q: Color, C: Color, Idx: IdType> TransitionSystemBase
     type EdgeColor = C;
     type StateColor = Q;
     type StateIndex = Idx;
+    fn alphabet(&self) -> &Self::Alphabet {
+        panic!("This impl only provides types!")
+    }
 }
