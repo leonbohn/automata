@@ -1,9 +1,21 @@
-[package]
-name = "automata"
-license = "MIT"
+[workspace]
+members = [
+    ".",
+    "automata-derive"
+]
+
+[workspace.package]
+version = "0.1.0"
+license = "MIT or Apache-2.0"
+edition = "2021"
 description = "A library concerned with transition systems and automata for both finite and infinite words."
 homepage = "https://github.com/leonbohn/automata"
 repository = "https://github.com/leonbohn/automata"
+authors = ["León Bohn <bohn@lics.rwth-aachen.de>"]
+
+[package]
+name = "automata"
+description = "A library concerned with transition systems and automata for both finite and infinite words."
 keywords = [
     "omega-automata",
     "transition-system",
@@ -13,14 +25,19 @@ keywords = [
 ]
 categories = ["mathematics", "science"]
 readme = "README.md"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--html-in-header", "./docs-header.html"]
 
 [dependencies]
 # gryf = { git = "https://github.com/pnevyk/gryf", rev = "1efd3a2", optional = true }
+automata-derive = {path = "./automata-derive"}
 petgraph = { version = "0.6.5", optional = true, default-features = false, features = [
     "stable_graph",
 ] }

@@ -2,6 +2,18 @@
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
+use automata_derive::TransitionSystem;
+
+pub trait TS<A: Alphabet, Q: Color, C: Color> {
+    fn ts(&self) -> &impl TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = C>;
+}
+
+#[derive(TransitionSystem)]
+pub struct Asdf<T> {
+    #[ts]
+    ts: T,
+}
+
 /// The prelude is supposed to make using this package easier. Including everything, i.e.
 /// `use automata::prelude::*;` should be enough to use the package.
 pub mod prelude {
