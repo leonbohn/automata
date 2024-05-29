@@ -1,8 +1,8 @@
-use crate::Alphabet;
+use crate::prelude::*;
 
 use super::{
     deterministic::{FiniteRunResult, OmegaRunResult},
-    IndexType,
+    IdType,
 };
 
 /// A run is a sequence of states and edges that is consistent with the transition system.
@@ -13,7 +13,7 @@ pub trait FiniteRun {
     /// The type of the edge colors.
     type EdgeColor;
     /// The type of the state indices.
-    type StateIndex: IndexType;
+    type StateIndex: IdType;
     /// Returns an iterator over the state colors.
     fn state_colors(self) -> Option<impl Iterator<Item = Self::StateColor>>;
     /// Returns an iterator over the edge colors.
@@ -24,7 +24,7 @@ pub trait FiniteRun {
     fn successful(&self) -> bool;
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone, Idx: IndexType> FiniteRun for FiniteRunResult<A, Idx, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone, Idx: IdType> FiniteRun for FiniteRunResult<A, Idx, Q, C> {
     type StateColor = Q;
     type EdgeColor = C;
     type StateIndex = Idx;
@@ -54,7 +54,7 @@ pub trait OmegaRun {
     /// The type of the edge colors.
     type EdgeColor;
     /// The type of the state indices.
-    type StateIndex: IndexType;
+    type StateIndex: IdType;
     /// Returns an iterator over the state colors.
     fn recurring_state_colors_iter(self) -> Option<impl Iterator<Item = Self::StateColor>>;
     /// Returns an iterator over the edge colors.
@@ -63,7 +63,7 @@ pub trait OmegaRun {
     fn recurring_state_indices_iter(self) -> Option<impl Iterator<Item = Self::StateIndex>>;
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone, Idx: IndexType> OmegaRun for OmegaRunResult<A, Idx, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone, Idx: IdType> OmegaRun for OmegaRunResult<A, Idx, Q, C> {
     type StateColor = Q;
 
     type EdgeColor = C;

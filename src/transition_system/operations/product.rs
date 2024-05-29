@@ -188,8 +188,8 @@ impl<'a, Idx, Jdx, E, C, D> IsEdge<'a, E, ProductIndex<Idx, Jdx>, (C, D)>
 where
     C: Clone,
     D: Clone,
-    Idx: IndexType,
-    Jdx: IndexType,
+    Idx: IdType,
+    Jdx: IdType,
 {
     fn source(&self) -> ProductIndex<Idx, Jdx> {
         ProductIndex(self.source.0, self.source.1)
@@ -292,8 +292,8 @@ impl<'a, LI, RI, E, LC, RC> IsEdge<'a, E, ProductIndex<LI, RI>, (LC, RC)>
 where
     LC: Clone,
     RC: Clone,
-    LI: IndexType,
-    RI: IndexType,
+    LI: IdType,
+    RI: IdType,
 {
     fn color(&self) -> (LC, RC) {
         self.color.clone()

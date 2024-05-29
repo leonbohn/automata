@@ -22,13 +22,13 @@ pub struct Tarjan<Idx> {
     data: Map<Idx, TarjanData>,
 }
 
-impl<Idx: IndexType> Default for Tarjan<Idx> {
+impl<Idx: IdType> Default for Tarjan<Idx> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<Idx: IndexType> Tarjan<Idx> {
+impl<Idx: IdType> Tarjan<Idx> {
     /// Creates a new Tarjan SCC decomposition instance.
     pub fn new() -> Self {
         Self {

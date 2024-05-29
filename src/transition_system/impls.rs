@@ -22,13 +22,13 @@ pub use linked::{
 #[cfg(feature = "petgraph")]
 pub(crate) mod pg;
 
-use super::ScalarIndexType;
+use super::ScalarIdType;
 
 pub type DefaultIdType = u32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id<Typ = DefaultIdType>(pub Typ);
-impl<IdType: IndexType> Show for Id<IdType> {
+impl<Idx: IdType> Show for Id<Idx> {
     fn show(&self) -> String {
         self.0.show()
     }
@@ -38,13 +38,13 @@ impl<Typ> std::borrow::Borrow<Typ> for Id<Typ> {
         &self.0
     }
 }
-impl<Typ: IndexType> Display for Id<Typ> {
+impl<Typ: IdType> Display for Id<Typ> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Id({})", self.0.show())
     }
 }
 
-pub fn q<IdType: ScalarIndexType>(n: usize) -> IdType {
+pub fn q<IdType: ScalarIdType>(n: usize) -> IdType {
     IdType::from_usize(n)
 }
 

@@ -1,7 +1,14 @@
 use std::{fmt::Debug, hash::Hash};
 
+pub mod math;
+
 mod show;
 pub use show::Show;
+
+pub mod alphabet;
+
+pub mod transition_system;
+pub use transition_system::{IdType, ScalarIdType};
 
 /// A color is simply a type that can be used to color states or transitions.
 pub trait Color: Clone + Eq + Hash + Debug {

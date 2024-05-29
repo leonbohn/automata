@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use crate::alphabet::Symbol;
+use crate::prelude::*;
 
 mod skip;
 pub use skip::Skip;

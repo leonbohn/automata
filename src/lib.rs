@@ -5,7 +5,10 @@
 /// The prelude is supposed to make using this package easier. Including everything, i.e.
 /// `use automata::prelude::*;` should be enough to use the package.
 pub mod prelude {
-    pub use automata_core::{Color, Int, Show, Void};
+    pub use automata_core::{
+        alphabet, alphabet::Alphabet, alphabet::CharAlphabet, alphabet::Expression,
+        alphabet::Matcher, alphabet::Symbol, math, Color, IdType, Int, ScalarIdType, Show, Void,
+    };
 
     #[cfg(not(feature = "petgraph"))]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
@@ -31,9 +34,8 @@ pub mod prelude {
 
     #[cfg(feature = "petgraph")]
     pub use super::transition_system::impls::pg::{node_index, petgraph, state_index, GraphTs};
+
     pub use super::{
-        alphabet,
-        alphabet::{CharAlphabet, Expression, Matcher, Symbol},
         automaton::{
             Automaton, BuchiCondition, DeterministicOmegaAutomaton, FiniteSemantics,
             FiniteWordAutomaton, IntoDBA, IntoDFA, IntoDMA, IntoDPA, IntoDRA, IntoMealyMachine,
@@ -46,7 +48,6 @@ pub mod prelude {
             CollectRightCongruence, Congruence, IntoRightCongruence, MinimalRepresentative,
             RightCongruence,
         },
-        math,
         transition_system::operations,
         transition_system::{
             dot::Dottable,
@@ -56,26 +57,23 @@ pub mod prelude {
             run::{FiniteRun, OmegaRun},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
             EdgeListsDeterministic, EdgeListsNondeterministic, EdgeReference, EdgeTuple,
-            ForAlphabet, Id, IndexType, IntoEdgeTuple, IsEdge, LinkedListDeterministic,
-            LinkedListNondeterministic, LinkedListTransitionSystem, Path, ScalarIndexType,
-            Shrinkable, Sproutable, StateColor, StateIndex, SymbolOf, TSBuilder, TransitionSystem,
+            ForAlphabet, Id, IntoEdgeTuple, IsEdge, LinkedListDeterministic,
+            LinkedListNondeterministic, LinkedListTransitionSystem, Path, Shrinkable, Sproutable,
+            StateColor, StateIndex, SymbolOf, TSBuilder, TransitionSystem,
         },
         upw,
         word::{
             FiniteWord, LinearWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord,
             ReducedOmegaWord, ReducedParseError,
         },
-        Alphabet, Class, Pointed,
+        Class, Pointed,
     };
 }
 
-/// This module contains some definitions of mathematical objects which are used throughout the crate and
-/// do not really fit to the top level.
-pub mod math;
-
-/// Module that contains definitions for dealing with alphabets.
-pub mod alphabet;
-pub use alphabet::Alphabet;
+/// Reexports mathematical objects for things like sets, maps and bijections.
+pub mod math {
+    pub use automata_core::math::*;
+}
 
 /// This module defines transition systems and successor functions and such.
 #[macro_use]

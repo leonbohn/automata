@@ -2,7 +2,8 @@ use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
 use itertools::Itertools;
 
-use crate::prelude::*;
+use crate::math;
+use crate::Show;
 
 /// A symbol of an alphabet, which is also the type of the symbols in a word. We consider different types
 /// of alphabets:
@@ -158,6 +159,13 @@ impl CharAlphabet {
     pub fn of_size(size: usize) -> Self {
         assert!(size < 26, "Alphabet is too large");
         Self((0..size).map(|i| (b'a' + i as u8) as char).collect())
+    }
+}
+
+impl std::ops::Deref for CharAlphabet {
+    type Target = Vec<char>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -477,8 +485,8 @@ impl Alphabet for Directional {
 
 #[cfg(test)]
 mod tests {
+    use super::Alphabet;
     use super::{CharAlphabet, Directional};
-    use crate::Alphabet;
     use itertools::Itertools;
 
     #[test]

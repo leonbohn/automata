@@ -15,3 +15,5 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 thiserror = { workspace = true }
 itertools = { workspace = true }
+indexmap = { workspace = true }
+bimap = { workspace = true }

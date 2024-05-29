@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use itertools::Itertools;
 
-use crate::{math::Map, prelude::*};
+use crate::{prelude::math::Map, prelude::*};
 
 /// An omega word is an infinite word that can be indexed by a `usize`. We assume that all
 /// omega words can be represented as a concatenation of a finite prefix which we call spoke
