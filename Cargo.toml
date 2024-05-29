@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "automata-derive", "automata-core"]
+members = [".", "automata-macros", "automata-core"]
 
 [workspace.package]
 version = "0.1.0"
@@ -40,7 +40,7 @@ linked_list_ts = []
 petgraph = ["dep:petgraph"]
 
 [workspace.dependencies]
-automata-derive = { version = "=0.1", path = "automata-derive" }
+automata-macros = { version = "=0.1", path = "automata-macros" }
 automata-core = { version = "=0.1", path = "automata-core" }
 thiserror = "1.0.61"
 tracing = "0.1"
@@ -54,7 +54,7 @@ paste = "1.0"
 owo-colors = "4.0"
 
 [dependencies]
-automata-derive = { workspace = true }
+automata-macros = { workspace = true }
 automata-core = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

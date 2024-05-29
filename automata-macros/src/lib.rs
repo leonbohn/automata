@@ -28,7 +28,7 @@ fn get_ts_field(input: &DeriveInput) -> &Field {
         }) => fields
             .named
             .iter()
-            .find(|field| field.attrs.iter().any(|attr| attr.path.is_ident("ts"))),
+            .find(|field| field.attrs.iter().any(|attr| attr.path().is_ident("ts"))),
         _ => panic!("unsupported type (use struct with named fields)"),
     };
 
