@@ -13,6 +13,11 @@ homepage.workspace = true
 authors.workspace = true
 license.workspace = true
 
+exclude = [
+    "hoa/*",
+    "doc/hoaf.pdf"
+]
+
 [package.metadata.workspaces]
 independent = true
 
