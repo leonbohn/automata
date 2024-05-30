@@ -22,8 +22,8 @@ tracing-subscriber = { workspace = true }
 itertools = { workspace = true }
 biodivine-lib-bdd = { workspace = true }
 
-ariadne = "0.4"
-chumsky = { version = "0.9", default-features = false, features = [
+ariadne = "0.4.1"
+chumsky = { version = "0.9.3", default-features = false, features = [
     "ahash",
     "std",
 ] }
