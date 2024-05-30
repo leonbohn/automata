@@ -284,8 +284,7 @@ where
     fn set_state_color(&mut self, _index: StateIndex<Self>, _color: StateColor<Self>) {
         todo!()
     }
-
-    fn add_edge<E>(&mut self, t: E) -> Option<Self::EdgeRef<'_>>
+    fn add_edge<E>(&mut self, t: E) -> Option<crate::transition_system::EdgeTuple<Self>>
     where
         E: IntoEdgeTuple<Self>,
     {
