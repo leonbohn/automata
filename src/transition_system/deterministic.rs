@@ -53,6 +53,9 @@ pub trait Deterministic: TransitionSystem {
         state: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
+        if !self.contains_state_index(state) {
+            return None;
+        }
         let mut it = self
             .edges_from(state)?
             .filter(|e| matcher.matches(e.expression()));
@@ -84,6 +87,9 @@ pub trait Deterministic: TransitionSystem {
         state: StateIndex<Self>,
         symbol: SymbolOf<Self>,
     ) -> Option<Self::StateIndex> {
+        if !self.contains_state_index(state) {
+            return None;
+        }
         self.edge(state, symbol).map(|t| t.target())
     }
 
@@ -94,6 +100,9 @@ pub trait Deterministic: TransitionSystem {
         state: StateIndex<Self>,
         expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
+        if !self.contains_state_index(state) {
+            return None;
+        }
         let mut symbols = expression.symbols();
         let sym = symbols.next().unwrap();
         assert_eq!(
@@ -692,7 +701,7 @@ pub trait Deterministic: TransitionSystem {
     /// are reachable from the initial state. Naturally, this means that `self` must
     /// be a pointed transition system.
     #[allow(clippy::type_complexity)]
-    fn trim_collect(
+    fn trim_collect_pointed(
         &self,
     ) -> (
         crate::transition_system::DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
