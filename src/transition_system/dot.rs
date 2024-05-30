@@ -639,7 +639,7 @@ mod tests {
     #[test_log::test]
     #[ignore]
     fn render_dfa() {
-        let dfa = LinkedListNondeterministic::builder()
+        let dfa = DTS::builder()
             .with_transitions([
                 (0, 'a', Void, 0),
                 (0, 'b', Void, 1),

@@ -14,15 +14,7 @@ pub mod prelude {
     /// **now known to be** [`Deterministic`].
     pub type NTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, false>;
 
-    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case which
-    /// is mutable. Especially, this type implements [`Shrinkable`] and [`Sproutable`], which allows
-    /// removing and adding transitions.
-    pub type MutableTs<A = CharAlphabet, Q = Void, C = Void> = EdgeLists<A, Q, C>;
-    /// The nondeterministic variant of [`MutableTs`].
-    pub type MutableTsNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
-        EdgeListsNondeterministic<A, Q, C>;
-
-    pub use super::transition_system::impls::pg::{node_index, petgraph, state_index, GraphTs};
+    pub use super::transition_system::impls::pg::{petgraph, GraphTs};
     pub use super::{
         alphabet,
         alphabet::{CharAlphabet, Expression, Matcher, Symbol},
@@ -46,11 +38,9 @@ pub mod prelude {
             operations::{DefaultIfMissing, Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
             run::{FiniteRun, OmegaRun},
-            Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
-            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, IndexType,
-            IntoEdgeTuple, IsEdge, LinkedListDeterministic, LinkedListNondeterministic,
-            LinkedListTransitionSystem, Path, ScalarIndexType, Shrinkable, Sproutable, StateColor,
-            StateIndex, SymbolOf, TSBuilder, TransitionSystem,
+            Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, ForAlphabet,
+            IndexType, IntoEdgeTuple, IsEdge, Path, ScalarIndexType, Shrinkable, Sproutable,
+            StateColor, StateIndex, SymbolOf, TSBuilder, TransitionSystem,
         },
         upw,
         word::{
@@ -58,6 +48,12 @@ pub mod prelude {
             ReducedOmegaWord, ReducedParseError,
         },
         Alphabet, Class, Color, Int, Pointed, Show, Void,
+    };
+
+    #[cfg(feature = "implementations")]
+    pub use super::transition_system::{
+        EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, LinkedListDeterministic,
+        LinkedListNondeterministic, LinkedListTransitionSystem,
     };
 }
 

@@ -42,7 +42,7 @@ indexmap = "2.2"
 
 
 [features]
-default = ["hoa", "graphviz", "random", "implementations"]
+default = ["hoa", "graphviz", "random"]
 random = ["fastrand"]
 hoa = ["dep:hoars", "biodivine-lib-bdd"]
 graphviz = ["dep:tempfile"]

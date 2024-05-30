@@ -115,7 +115,7 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 1),
             ])
-            .into_linked_list_deterministic();
+            .into_dts();
         let dra = DRA::from_parts_with_acceptance(ts, 0, [RabinPair::from_iters([], [1])].into());
         assert!(dra.accepts(upw!("ba")));
         assert!(!dra.accepts(upw!("a")));

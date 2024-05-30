@@ -353,7 +353,7 @@ mod tests {
         ]
         .into_iter()
         .collect::<Set<_>>();
-        let ts = LinkedListNondeterministic::builder()
+        let ts = DTS::builder()
             .default_color(())
             .with_transitions(&transitions)
             .into_dts_with_initial(0);

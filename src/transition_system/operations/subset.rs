@@ -225,7 +225,7 @@ mod tests {
     #[test_log::test]
     #[ignore]
     fn subset_construction() {
-        let nts = LinkedListNondeterministic::builder()
+        let nts = DTS::builder()
             .default_color(false)
             .with_transitions([
                 (0, 'a', 0),
