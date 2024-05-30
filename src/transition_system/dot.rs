@@ -198,7 +198,10 @@ pub trait Dottable: TransitionSystem {
     }
 }
 
-impl<A: Alphabet> Dottable for DFA<A> {
+impl<A: Alphabet> Dottable for DFA<A>
+where
+    StateIndex<Self>: Show,
+{
     fn dot_name(&self) -> Option<String> {
         Some("DFA".into())
     }
@@ -235,7 +238,10 @@ impl<A: Alphabet> Dottable for DFA<A> {
         ]
     }
 }
-impl<A: Alphabet, Q: Color, C: Color> Dottable for crate::RightCongruence<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> Dottable for crate::RightCongruence<A, Q, C>
+where
+    StateIndex<Self>: Show,
+{
     fn dot_name(&self) -> Option<String> {
         Some("Congruence".into())
     }
