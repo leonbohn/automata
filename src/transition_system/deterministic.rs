@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use std::hash::Hash;
 
 use itertools::Itertools;
@@ -17,7 +16,6 @@ use super::operations::RestrictByStateIndex;
 use super::operations::StateIndexFilter;
 use super::path::Lasso;
 use super::sproutable::{IndexedAlphabet, Sproutable};
-use super::IntoEdgeLists;
 use super::Path;
 
 pub type FiniteRunResult<A, Idx, Q, C> = Result<Path<A, Idx, Q, C>, Path<A, Idx, Q, C>>;
@@ -30,7 +28,7 @@ pub type OmegaRunResult<A, Idx, Q, C> = Result<Lasso<A, Idx, Q, C>, Path<A, Idx,
 ///
 /// # Implementaiton
 /// This trait contains mostly convenience functions and provides default implementations. To ensure
-/// performance, the [`Self::collect_linked_list_deterministic`] function and any other collectors for different types of
+/// performance, the [`Self::collect_dts`] function and any other collectors for different types of
 /// transition system implementations should be overridden. By default, they simply insert states
 /// and edges one by one and are therefore horribly inefficient.
 pub trait Deterministic: TransitionSystem {
@@ -531,6 +529,7 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
+    #[cfg(feature = "implementations")]
     fn collect_linked_list_deterministic(
         self,
     ) -> LinkedListTransitionSystem<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
@@ -547,6 +546,7 @@ pub trait Deterministic: TransitionSystem {
     /// after the other and subsequently inserts all transitions, see
     /// [`Deterministic::collect_linked_list_deterministic`] for details.
     #[allow(clippy::type_complexity)]
+    #[cfg(feature = "implementations")]
     fn collect_linked_list_deterministic_pointed(
         self,
     ) -> (
@@ -571,6 +571,7 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
+    #[cfg(feature = "implementations")]
     fn collect_edge_lists_deterministic_pointed(self) -> (IntoEdgeLists<Self>, DefaultIdType)
     where
         EdgeColor<Self>: Hash + Eq,
@@ -589,8 +590,7 @@ pub trait Deterministic: TransitionSystem {
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_edge_lists_deterministic`] for details.
-    #[cfg(feature = "petgraph")]
+    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
     fn collect_graphts_deterministic(
         self,
     ) -> GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true> {
@@ -603,8 +603,7 @@ pub trait Deterministic: TransitionSystem {
     /// This method additionally also returns the initial state of the collected TS.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
-    #[cfg(feature = "petgraph")]
+    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
     #[allow(clippy::type_complexity)]
     fn collect_graphts_deterministic_pointed(
         self,
@@ -628,7 +627,8 @@ pub trait Deterministic: TransitionSystem {
     /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_edge_lists_deterministic`] for details.
+    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
+    #[cfg(feature = "implementations")]
     fn collect_edge_lists_deterministic(self) -> IntoEdgeLists<Self>
     where
         EdgeColor<Self>: Hash + Eq,
@@ -645,7 +645,7 @@ pub trait Deterministic: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let ts = TSBuilder::without_colors().with_edges([(0, 'a', 1), (1, 'b', 0)]).into_linked_list_deterministic();
+    /// let ts = TSBuilder::without_colors().with_edges([(0, 'a', 1), (1, 'b', 0)]).into_dts();
     /// let (collected, initial) = ts.with_initial(0).collect_complete_pointed(Void, Void);
     /// assert_eq!(collected.size(), 3);
     ///
@@ -785,22 +785,6 @@ impl<D: Deterministic> Deterministic for &mut D {
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Hash + Debug + Eq + Clone> Deterministic for EdgeLists<A, Q, C> {
-    fn edge(
-        &self,
-        state: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        let mut it = self.edges_matching(state, matcher)?;
-        let out = Some(it.next()?);
-        debug_assert!(
-            it.next().is_none(),
-            "Not deterministic, {state} has mutliple edges on the same expression!"
-        );
-        out
-    }
-}
-
 impl<L, R> Deterministic for MatchingProduct<L, R>
 where
     L: Deterministic,
@@ -881,11 +865,10 @@ mod tests {
         let words = [upw!("a"), upw!("a", "b"), upw!("b"), upw!("aa", "b")];
 
         // build transition system
-        let ts = LinkedListNondeterministic::builder()
+        let ts = DTS::builder()
             .with_transitions([(0, 'a', Void, 1), (1, 'b', Void, 1)])
             .default_color(Void)
-            .into_linked_list_deterministic()
-            .with_initial(0);
+            .into_dts_with_initial(0);
 
         assert!(ts
             .escape_prefixes(words.iter())

@@ -71,7 +71,7 @@ impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
             "{{{}}}",
             self.1
                 .iter()
-                .map(|scc| format!("[{}]", scc.iter().map(|q| q.show()).join(", ")))
+                .map(|scc| format!("[{}]", scc.iter().map(|q| format!("{q:?}")).join(", ")))
                 .join(", "),
         )
     }

@@ -219,7 +219,7 @@ pub trait Sproutable: TransitionSystem {
     /// let mut ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
-    ///     .into_linked_list_deterministic();
+    ///     .into_dts();
     /// assert!(!ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
     /// assert_eq!(ts.size(), 2);
@@ -234,7 +234,7 @@ pub trait Sproutable: TransitionSystem {
     /// let mut ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
-    ///     .into_linked_list_deterministic();
+    ///     .into_dts();
     /// assert!(ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
     /// assert_eq!(ts.size(), 1);
@@ -313,11 +313,11 @@ pub trait Sproutable: TransitionSystem {
 
 #[cfg(test)]
 mod tests {
-    use crate::{prelude::*, transition_system::LinkedListNondeterministic};
+    use crate::prelude::*;
 
     #[test]
     fn for_alphabet_inference() {
-        let mut ts = LinkedListTransitionSystem::for_alphabet(CharAlphabet::of_size(3));
+        let mut ts = DTS::for_alphabet(CharAlphabet::of_size(3));
         assert_eq!(ts.alphabet().size(), 3);
 
         let q0 = ts.add_state(false);
@@ -329,7 +329,7 @@ mod tests {
 
     #[test]
     fn sprout_after_creating() {
-        let mut ts = LinkedListTransitionSystem::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+        let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
         let q0 = ts.add_state(false);
         let q1 = ts.add_state(true);
         assert_eq!(ts.edge(q0, 'a'), None);
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn complete_ts() {
-        let mut partial = LinkedListNondeterministic::builder()
+        let mut partial = DTS::builder()
             .default_color(())
             .with_transitions([
                 (0, 'a', 0, 0),
@@ -347,7 +347,7 @@ mod tests {
                 (0, 'c', 0, 1),
                 (1, 'a', 0, 0),
             ])
-            .into_linked_list_deterministic();
+            .into_dts();
         assert_eq!(partial.reached_state_index_from(0, "aaacb"), None);
         assert!(!partial.is_complete());
 

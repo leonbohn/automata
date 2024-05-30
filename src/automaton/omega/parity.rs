@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeSet, VecDeque},
+    fmt::Debug,
     hash::Hash,
 };
 
@@ -170,11 +171,11 @@ where
     /// state and finding a state that is language-equivalent to it. If no such state exists, a new
     /// class is created.
     pub fn prefix_partition(&self) -> Partition<D::StateIndex> {
-        fn print<X: Show>(part: &[BTreeSet<X>]) -> String {
+        fn print<X: Debug>(part: &[BTreeSet<X>]) -> String {
             format!(
                 "{{{}}}",
                 part.iter()
-                    .map(|class| format!("[{}]", class.iter().map(|x| x.show()).join(", ")))
+                    .map(|class| format!("[{}]", class.iter().map(|x| format!("{x:?}")).join(", ")))
                     .join(", ")
             )
         }
@@ -188,8 +189,8 @@ where
 
         'outer: while let Some(q) = queue.pop_front() {
             trace!(
-                "considering state {}, current partition: {}",
-                q.show(),
+                "considering state {:?}, current partition: {}",
+                q,
                 print(&partition)
             );
             for i in 0..partition.len() {
@@ -203,8 +204,7 @@ where
                     .language_equivalent(&self.as_ref().with_initial(q).into_dpa())
                 {
                     trace!(
-                        "it is language equivalent to {}, adding it to the equivalence class",
-                        p.show()
+                        "it is language equivalent to {p:?}, adding it to the equivalence class",
                     );
                     partition.get_mut(i).unwrap().insert(q);
                     continue 'outer;
@@ -406,11 +406,10 @@ where
                     for state in scc.iter() {
                         for edge in ts.edges_from(*state).unwrap() {
                             trace!(
-                                "recolouring and removing {} --{}|{}--> {} with priority {}",
-                                state.show(),
+                                "recolouring and removing {state:?} --{}|{}--> {:?} with priority {}",
                                 edge.expression().show(),
                                 edge.color().show(),
-                                edge.target().show(),
+                                edge.target(),
                                 priority
                             );
                             recoloring.push(((*state, edge.expression().clone()), priority));
@@ -440,11 +439,9 @@ where
                     .filter(|(_q, _a, c, _p)| c == minimal_interior_edge_color)
                 {
                     trace!(
-                        "recolouring and removing {} --{}|{}--> {} with priority {}",
-                        q.show(),
+                        "recolouring and removing {q:?} --{}|{}--> {p:?} with priority {}",
                         a.show(),
                         c.show(),
-                        p.show(),
                         priority
                     );
                     recoloring.push(((*q, a.clone()), priority));
@@ -485,7 +482,7 @@ mod tests {
 
     #[test_log::test]
     fn normalize_dpa() {
-        let dpa = LinkedListNondeterministic::builder()
+        let dpa = DTS::builder()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 2, 0),
@@ -493,9 +490,7 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 1),
             ])
-            .into_linked_list_nondeterministic()
-            .into_deterministic()
-            .with_initial(0)
+            .into_dts_with_initial(0)
             .collect_dpa();
         let normalized = dpa.normalized();
         assert!(normalized.language_equivalent(&dpa));
@@ -507,7 +502,7 @@ mod tests {
     }
 
     fn example_dpa() -> DPA {
-        LinkedListNondeterministic::builder()
+        DTS::builder()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 0, 0),
@@ -538,7 +533,7 @@ mod tests {
     #[test_log::test]
     fn dpa_equivalences() {
         let good = [
-            LinkedListNondeterministic::builder()
+            DTS::builder()
                 .default_color(())
                 .with_transitions([
                     (0, 'a', 0, 1),
@@ -546,10 +541,9 @@ mod tests {
                     (1, 'a', 1, 1),
                     (1, 'b', 0, 0),
                 ])
-                .into_linked_list_deterministic()
-                .with_initial(0)
+                .into_dts_with_initial(0)
                 .collect_dpa(),
-            LinkedListNondeterministic::builder()
+            DTS::builder()
                 .default_color(())
                 .with_transitions([
                     (0, 'a', 5, 1),
@@ -559,24 +553,21 @@ mod tests {
                     (2, 'a', 3, 0),
                     (2, 'b', 5, 2),
                 ])
-                .into_linked_list_deterministic()
-                .with_initial(0)
+                .into_dts_with_initial(0)
                 .collect_dpa(),
         ];
         let bad = [
-            LinkedListNondeterministic::builder()
+            DTS::builder()
                 .default_color(())
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 0, 0)])
-                .into_linked_list_deterministic()
-                .with_initial(0)
+                .into_dts_with_initial(0)
                 .collect_dpa(),
-            LinkedListNondeterministic::builder()
+            DTS::builder()
                 .default_color(())
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 2, 0)])
-                .into_linked_list_deterministic()
-                .with_initial(0)
+                .into_dts_with_initial(0)
                 .collect_dpa(),
-            LinkedListNondeterministic::builder()
+            DTS::builder()
                 .default_color(())
                 .with_transitions([
                     (0, 'a', 4, 1),
@@ -584,8 +575,7 @@ mod tests {
                     (1, 'a', 5, 0),
                     (1, 'b', 3, 1),
                 ])
-                .into_linked_list_deterministic()
-                .with_initial(0)
+                .into_dts_with_initial(0)
                 .collect_dpa(),
         ];
 
@@ -605,7 +595,7 @@ mod tests {
 
     #[test]
     fn dpa_run() {
-        let dpa = LinkedListNondeterministic::builder()
+        let dpa = DTS::builder()
             .with_transitions([
                 (0, 'a', 1, 1),
                 (0, 'b', 1, 0),
@@ -621,17 +611,15 @@ mod tests {
 
     #[test]
     fn dpa_inclusion() {
-        let univ = LinkedListNondeterministic::builder()
+        let univ = DTS::builder()
             .default_color(())
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 2, 0)])
-            .into_linked_list_deterministic()
-            .with_initial(0)
+            .into_dts_with_initial(0)
             .collect_dpa();
-        let aomega = LinkedListNondeterministic::builder()
+        let aomega = DTS::builder()
             .default_color(())
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
-            .into_linked_list_deterministic()
-            .with_initial(0)
+            .into_dts_with_initial(0)
             .collect_dpa();
         assert!(univ.includes(&aomega));
         assert!(!univ.included_in(&aomega));
@@ -639,7 +627,7 @@ mod tests {
 
     #[test_log::test]
     fn dpa_equivalence_clases() {
-        let dpa = LinkedListNondeterministic::builder()
+        let dpa = DTS::builder()
             .with_transitions([
                 (0, 'a', 0, 1),
                 (0, 'b', 1, 0),
@@ -656,7 +644,7 @@ mod tests {
         assert!(cong.congruent("", "aa"));
         assert!(cong.congruent("ab", "baaba"));
 
-        let dpa = LinkedListNondeterministic::builder()
+        let dpa = DTS::builder()
             .with_transitions([
                 (0, 'a', 0, 0),
                 (0, 'b', 0, 1),

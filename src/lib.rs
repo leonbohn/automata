@@ -5,11 +5,6 @@
 /// The prelude is supposed to make using this package easier. Including everything, i.e.
 /// `use automata::prelude::*;` should be enough to use the package.
 pub mod prelude {
-    #[cfg(not(feature = "petgraph"))]
-    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
-    pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
-        LinkedListTransitionSystem<A, Q, C, DET>;
-    #[cfg(feature = "petgraph")]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
         GraphTs<A, Q, C, DET>;
@@ -19,16 +14,7 @@ pub mod prelude {
     /// **now known to be** [`Deterministic`].
     pub type NTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, false>;
 
-    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case which
-    /// is mutable. Especially, this type implements [`Shrinkable`] and [`Sproutable`], which allows
-    /// removing and adding transitions.
-    pub type MutableTs<A = CharAlphabet, Q = Void, C = Void> = EdgeLists<A, Q, C>;
-    /// The nondeterministic variant of [`MutableTs`].
-    pub type MutableTsNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
-        EdgeListsNondeterministic<A, Q, C>;
-
-    #[cfg(feature = "petgraph")]
-    pub use super::transition_system::impls::pg::{node_index, petgraph, state_index, GraphTs};
+    pub use super::transition_system::impls::pg::{petgraph, GraphTs};
     pub use super::{
         alphabet,
         alphabet::{CharAlphabet, Expression, Matcher, Symbol},
@@ -52,11 +38,9 @@ pub mod prelude {
             operations::{DefaultIfMissing, Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
             run::{FiniteRun, OmegaRun},
-            Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
-            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, Id, IndexType,
-            IntoEdgeTuple, IsEdge, LinkedListDeterministic, LinkedListNondeterministic,
-            LinkedListTransitionSystem, Path, ScalarIndexType, Shrinkable, Sproutable, StateColor,
-            StateIndex, SymbolOf, TSBuilder, TransitionSystem,
+            Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, ForAlphabet,
+            IndexType, IntoEdgeTuple, IsEdge, Path, ScalarIndexType, Shrinkable, Sproutable,
+            StateColor, StateIndex, SymbolOf, TSBuilder, TransitionSystem,
         },
         upw,
         word::{
@@ -64,6 +48,12 @@ pub mod prelude {
             ReducedOmegaWord, ReducedParseError,
         },
         Alphabet, Class, Color, Int, Pointed, Show, Void,
+    };
+
+    #[cfg(feature = "implementations")]
+    pub use super::transition_system::{
+        EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, LinkedListDeterministic,
+        LinkedListNondeterministic, LinkedListTransitionSystem,
     };
 }
 
@@ -94,8 +84,7 @@ pub use congruence::{Class, Congruence, RightCongruence};
 #[macro_use]
 pub mod word;
 
-/// Contains implementations different minimization algorithms. This is feature gated behind the `minimize` feature.
-#[cfg(feature = "minimize")]
+/// Contains implementations different minimization algorithms.
 pub mod minimization;
 
 #[cfg(feature = "hoa")]
@@ -215,6 +204,23 @@ impl Show for Option<usize> {
         I::IntoIter: DoubleEndedIterator,
     {
         usize::show_collection(iter.into_iter().filter_map(|x| x.as_ref()))
+    }
+}
+
+impl Show for u32 {
+    fn show(&self) -> String {
+        self.to_string()
+    }
+    fn show_collection<'a, I>(iter: I) -> String
+    where
+        Self: 'a,
+        I: IntoIterator<Item = &'a Self>,
+        I::IntoIter: DoubleEndedIterator,
+    {
+        format!(
+            "[{}]",
+            itertools::Itertools::join(&mut iter.into_iter().map(|x| x.show()), ", ")
+        )
     }
 }
 
