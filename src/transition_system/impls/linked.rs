@@ -485,7 +485,7 @@ mod tests {
     use crate::prelude::TSBuilder;
 
     #[test]
-    fn nts_equality() {
+    fn dts_equality() {
         let first = TSBuilder::default()
             .with_state_colors([0, 1])
             .with_edges([
@@ -494,7 +494,7 @@ mod tests {
                 (1, 'a', 200, 0),
                 (1, 'b', 2000, 1),
             ])
-            .into_linked_list_deterministic();
+            .into_dts();
         let second = TSBuilder::default()
             .with_state_colors([0, 1])
             .with_edges([
@@ -503,7 +503,7 @@ mod tests {
                 (0, 'a', 100u32, 0),
                 (1, 'a', 200, 0),
             ])
-            .into_linked_list_deterministic();
+            .into_dts();
         assert!(first == second, "equality should disregard order of edges");
     }
 }
