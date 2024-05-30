@@ -357,10 +357,57 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A> for GraphT
     }
 }
 
+impl<A: Alphabet + PartialEq, Q: Color, C: Color, const DET: bool> PartialEq
+    for GraphTs<A, Q, C, DET>
+{
+    fn eq(&self, other: &Self) -> bool {
+        if self.alphabet() != other.alphabet() {
+            return false;
+        }
+
+        for l in self.state_indices() {
+            let Some(r_edges) = other.edges_from(l).map(|it| it.collect::<math::Set<_>>()) else {
+                return false;
+            };
+            let Some(l_edges) = self.edges_from(l).map(|it| it.collect::<math::Set<_>>()) else {
+                return false;
+            };
+            if !l_edges.eq(&r_edges) {
+                return false;
+            }
+        }
+        true
+    }
+}
+impl<A: Alphabet + PartialEq, Q: Color, C: Color, const DET: bool> Eq for GraphTs<A, Q, C, DET> {}
+
 #[cfg(test)]
 mod tests {
     use super::GraphTs;
     use crate::prelude::*;
+
+    #[test]
+    fn petgraph_equality() {
+        let mut pgts: GraphTs<CharAlphabet, bool, Void> =
+            GraphTs::for_alphabet(CharAlphabet::of_size(3));
+        let q0 = pgts.add_state(true);
+        let q1 = pgts.add_state(false);
+        let q2 = pgts.add_state(false);
+        let q3 = pgts.add_state(false);
+
+        pgts.add_edge((q0, 'a', q0));
+        pgts.add_edge((q0, 'b', q1));
+        pgts.add_edge((q0, 'c', q3));
+        pgts.add_edge((q1, 'a', q1));
+        pgts.add_edge((q1, 'b', q2));
+        pgts.add_edge((q2, 'a', q2));
+        pgts.add_edge((q2, 'b', q0));
+
+        let other = pgts.clone();
+        assert_eq!(pgts, other);
+        pgts.remove_edges_between_matching(q2, q0, 'b');
+        assert_ne!(pgts, other);
+    }
 
     #[test]
     fn petgraph_impl() {
