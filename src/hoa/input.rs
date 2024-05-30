@@ -273,7 +273,7 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
 
             let color: AcceptanceMask = edge.acceptance_signature().into();
 
-            if ts.add_edge((state.id(), expr, color, target)).is_none() {
+            if ts.add_edge((state.id(), expr, color, target)).is_some() {
                 // this thing is not deterministic, so we return
                 return Err("Automaton is not deterministic".to_string());
             }

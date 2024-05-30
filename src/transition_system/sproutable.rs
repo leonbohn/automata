@@ -3,7 +3,7 @@ use itertools::Itertools;
 
 use crate::{math::Bijection, prelude::*};
 
-use super::StateIndex;
+use super::{EdgeTuple, StateIndex};
 
 /// Implemented by [`TransitionSystem`]s (TS) that can be created for a given [`Alphabet`],
 /// which is may be used in conjunction with [`Sproutable`] to successively grow a
@@ -103,12 +103,12 @@ pub trait Sproutable: TransitionSystem {
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
     /// assert!(ts.edge(q0, 'a').is_none());
-    /// assert!(ts.add_edge((q0, 'a', q1)).is_some());
+    /// assert!(ts.add_edge((q0, 'a', q1)).is_none());
     /// assert!(ts.edge(q0, 'a').is_some());
     ///
-    /// assert!(ts.add_edge((q0, 'a', q0)).is_none(), "Cannot add overlapping edges as ts is deterministic");
+    /// assert!(ts.add_edge((q0, 'a', q0)).is_some(), "Cannot add overlapping edges as ts is deterministic");
     /// ```
-    fn add_edge<E>(&mut self, t: E) -> Option<Self::EdgeRef<'_>>
+    fn add_edge<E>(&mut self, t: E) -> Option<EdgeTuple<Self>>
     where
         E: IntoEdgeTuple<Self>;
 

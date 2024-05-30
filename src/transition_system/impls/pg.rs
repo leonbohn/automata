@@ -3,6 +3,7 @@ use crate::transition_system::EdgeReference;
 pub use petgraph;
 pub use petgraph::prelude::*;
 pub use petgraph::stable_graph as sg;
+use tracing::trace;
 
 #[derive(Debug, Clone)]
 pub struct GraphTs<
@@ -61,24 +62,31 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for GraphTs<A,
         state_index(self.graph.add_node(color))
     }
 
-    fn add_edge<E>(&mut self, t: E) -> Option<Self::EdgeRef<'_>>
+    fn add_edge<E>(&mut self, t: E) -> Option<(u32, <A as Alphabet>::Expression, C, u32)>
     where
         E: IntoEdgeTuple<Self>,
     {
         let (source, expression, color, target) = t.into_edge_tuple();
 
-        if DET
-            && (self.edges_matching(source, &expression)?.next().is_some()
-                || !self.contains_state_index(target))
-        {
-            return None;
+        if !self.contains_state_index(source) || !self.contains_state_index(target) {
+            panic!("Source or target state does not exist");
+        }
+
+        let mut out = None;
+        if DET {
+            if let Some(removed) = self.remove_edges_from_matching(source, &expression) {
+                assert!(
+                    removed.len() <= 1,
+                    "Cannot have more than one overlapping edge!"
+                );
+                out = removed.into_iter().next();
+            }
         }
 
         let edge = self
             .graph
             .add_edge(node_index(source), node_index(target), (expression, color));
-        let (e, c) = self.graph.edge_weight(edge)?;
-        Some(EdgeReference::new(source, e, c, target))
+        out
     }
     fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
         self.graph[node_index(index)] = color;
@@ -270,6 +278,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        if !self.contains_state_index(state) {
+            return None;
+        }
         Some(
             self.graph
                 .edges_directed(node_index(state), Direction::Outgoing)
@@ -286,6 +297,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        if !self.contains_state_index(state) {
+            return None;
+        }
         self.graph.node_weight(node_index(state)).cloned()
     }
 }
@@ -385,6 +399,23 @@ impl<A: Alphabet + PartialEq, Q: Color, C: Color, const DET: bool> Eq for GraphT
 mod tests {
     use super::GraphTs;
     use crate::prelude::*;
+
+    #[test]
+    fn petgraph_overlapping() {
+        let mut ts: GraphTs<CharAlphabet, Void, Void> =
+            GraphTs::for_alphabet(CharAlphabet::of_size(2));
+        let q0 = ts.add_state(Void);
+        assert_eq!(ts.add_edge((q0, 'a', q0)), None);
+        assert_eq!(ts.add_edge((q0, 'b', q0)), None);
+        assert_eq!(ts.add_edge((q0, 'a', q0)), Some((q0, 'a', Void, q0)));
+
+        let mut ts: GraphTs<CharAlphabet, Void, Void, false> =
+            GraphTs::for_alphabet(CharAlphabet::of_size(2));
+        let q0 = ts.add_state(Void);
+        assert_eq!(ts.add_edge((q0, 'a', q0)), None);
+        assert_eq!(ts.add_edge((q0, 'b', q0)), None);
+        assert_eq!(ts.add_edge((q0, 'a', q0)), None);
+    }
 
     #[test]
     fn petgraph_equality() {

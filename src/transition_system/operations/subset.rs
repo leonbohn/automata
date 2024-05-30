@@ -77,10 +77,6 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
         source: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        tracing::trace!(
-            "Computing successor of state {source} for matcher {:?}",
-            matcher
-        );
         let (colorset, stateset): (Vec<Ts::EdgeColor>, StateSet<Ts>) = self
             .states
             .borrow()
@@ -96,7 +92,6 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
                 })
             })
             .unzip();
-        tracing::trace!("Found stateset {stateset:?} with colorset {colorset:?}",);
         let expression = self
             .expressions
             .values()
@@ -107,13 +102,9 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
             return Some(TransitionOwnedColor::new(source, expression, colorset, pos));
         }
 
+        let id = self.states.borrow().len();
         self.states.borrow_mut().push(stateset);
-        Some(TransitionOwnedColor::new(
-            source,
-            expression,
-            colorset,
-            self.states.borrow().len(),
-        ))
+        Some(TransitionOwnedColor::new(source, expression, colorset, id))
     }
 }
 
@@ -223,9 +214,8 @@ mod tests {
     use crate::prelude::*;
 
     #[test_log::test]
-    #[ignore]
     fn subset_construction() {
-        let nts = DTS::builder()
+        let nts = NTS::builder()
             .default_color(false)
             .with_transitions([
                 (0, 'a', 0),
@@ -234,18 +224,12 @@ mod tests {
                 (1, 'b', 1),
                 (1, 'a', 0),
             ])
-            .into_dts()
-            .with_initial(0);
+            .into_nts_with_initial(0);
 
         let dts = nts.subset_construction();
 
-        for idx in dts.reachable_state_indices() {
-            println!("idx: {}[{:?}]", idx, dts.state_color(idx));
-        }
         assert_eq!(dts.reachable_state_indices().count(), 3);
-        println!("first");
         assert_eq!(dts.state_indices().count(), 3);
-        println!("second");
-        assert_eq!(dts.trim_collect().0.size(), 3);
+        assert_eq!(dts.trim_collect_pointed().0.size(), 3);
     }
 }

@@ -150,7 +150,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     }
 
     /// Creates an instance of a non-deterministic [`GraphTs`] from `self`.
-    pub fn into_graphts_nondeterministic(self) -> GraphTs<CharAlphabet, Q, C, false> {
+    pub fn into_ts<const DOUT: bool>(self) -> TS<CharAlphabet, Q, C, DOUT> {
         let alphabet =
             CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
 
@@ -160,7 +160,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
             .flat_map(|(q, _, _, p)| [*p, *q])
             .unique()
             .count();
-        let mut ts = GraphTs::for_alphabet_size_hint(alphabet, num_states);
+        let mut ts = TS::for_alphabet_size_hint(alphabet, num_states);
 
         let mut created_states_number = 0;
         for i in 0..num_states {
@@ -180,9 +180,23 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         assert_eq!(created_states_number, num_states);
 
         for (q, e, c, p) in self.edges {
-            ts.add_edge((q, e, c, p));
+            if let Some((q, e, d, pp)) = ts.add_edge((q, e, c.clone(), p)) {
+                panic!("Failed to add edge from {q:?} on {e} to {p:?} with color {c:?}, it is overlapping an existing edge with color {d:?} to {pp:?}")
+            }
         }
         ts
+    }
+
+    /// Builds a [NondeterministicTransitionSystem](`NTS`) from `self`.
+    pub fn into_nts(self) -> NTS<CharAlphabet, Q, C> {
+        self.into_ts()
+    }
+    /// Builds a [NondeterministicTransitionSystem](`NTS`) from `self` with an initial state.
+    pub fn into_nts_with_initial(
+        self,
+        initial: DefaultIdType,
+    ) -> WithInitial<NTS<CharAlphabet, Q, C>> {
+        self.into_ts().with_initial(initial)
     }
 
     /// Assigns the given `color` to the state with the given index `idx`.
@@ -299,40 +313,8 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
 
 impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     /// Builds an instance of [`DTS`] from `self`.
-    #[cfg(not(feature = "linked_list_ts"))]
     pub fn into_dts(self) -> DTS<CharAlphabet, Q, C> {
-        let alphabet =
-            CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
-
-        let num_states = self
-            .edges
-            .iter()
-            .flat_map(|(q, _, _, p)| [*p, *q])
-            .unique()
-            .count();
-        let mut ts = DTS::for_alphabet_size_hint(alphabet, num_states);
-
-        let mut created_states_number = 0;
-        for i in 0..num_states {
-            let i = DefaultIdType::from_usize(i);
-            if self.colors.iter().all(|(q, _)| *q != i) && self.default.is_none() {
-                panic!("Default is needed as some states (specifically {i:?}) have no color",);
-            }
-
-            ts.add_state(
-                self.colors
-                    .iter()
-                    .find_map(|(q, c)| if *q == i { Some(c.clone()) } else { None })
-                    .unwrap_or_else(|| self.default.clone().unwrap()),
-            );
-            created_states_number += 1;
-        }
-        assert_eq!(created_states_number, num_states);
-
-        for (q, e, c, p) in self.edges {
-            ts.add_edge((q, e, c, p));
-        }
-        ts
+        self.into_ts()
     }
     /// Builds an instance of [`DTS`] from `self` and sets the given `initial` state
     /// as the designated initial state of the output object.
