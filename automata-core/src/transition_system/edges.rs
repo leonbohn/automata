@@ -1,17 +1,33 @@
 use crate::innerlude::*;
 
-pub trait IntoEdgeTuple<T: TransitionSystemBase> {
+use super::color::Weak;
+
+pub trait Edges: States {
+    type EdgeColor: Color;
+
+    type EdgeRef<'this>: EdgeReference<'this, StateIndex<Self>, Expression<Self>, EdgeColor<Self>>
+    where
+        Self: 'this;
+
+    type EdgesIter<'this>: Iterator<Item = Self::EdgeRef<'this>>
+    where
+        Self: 'this;
+
+    fn edges(&self) -> Self::EdgesIter<'_>;
+}
+
+pub trait IntoEdgeTuple<T: States + Edges> {
     fn into_tuple(self) -> (StateIndex<T>, Expression<T>, EdgeColor<T>, StateIndex<T>);
 }
 
-impl<T: TransitionSystemBase> IntoEdgeTuple<T>
+impl<T: States + Edges> IntoEdgeTuple<T>
     for (StateIndex<T>, Expression<T>, EdgeColor<T>, StateIndex<T>)
 {
     fn into_tuple(self) -> (StateIndex<T>, Expression<T>, EdgeColor<T>, StateIndex<T>) {
         self
     }
 }
-impl<T: TransitionSystemBase<EdgeColor = Void>> IntoEdgeTuple<T>
+impl<T: super::states::States + Edges<EdgeColor = Void>> IntoEdgeTuple<T>
     for (StateIndex<T>, Expression<T>, StateIndex<T>)
 {
     fn into_tuple(self) -> (StateIndex<T>, Expression<T>, EdgeColor<T>, StateIndex<T>) {
@@ -23,7 +39,7 @@ pub trait EdgeReference<'a, Idx: IdType, E: AlphabetExpression, C: Color> {
     fn source(&self) -> Idx;
     fn target(&self) -> Idx;
     fn expression(&self) -> &'a E;
-    fn color(&self) -> &'a C;
+    fn color(&self) -> Weak<'_, C>;
 }
 
 impl<'a, Idx: IdType, E: AlphabetExpression, C: Color> EdgeReference<'a, Idx, E, C>
@@ -38,8 +54,8 @@ impl<'a, Idx: IdType, E: AlphabetExpression, C: Color> EdgeReference<'a, Idx, E,
     fn expression(&self) -> &'a E {
         self.1
     }
-    fn color(&self) -> &'a C {
-        self.2
+    fn color(&self) -> Weak<'_, C> {
+        Weak::Borrowed(&self.2)
     }
 }
 impl<'a, Idx: IdType, E: AlphabetExpression, C: Color> EdgeReference<'a, Idx, E, C>
@@ -54,12 +70,12 @@ impl<'a, Idx: IdType, E: AlphabetExpression, C: Color> EdgeReference<'a, Idx, E,
     fn expression(&self) -> &'a E {
         &self.1
     }
-    fn color(&self) -> &'a C {
-        &self.2
+    fn color(&self) -> Weak<'_, C> {
+        Weak::Borrowed(&self.2)
     }
 }
 
-pub trait EdgesFrom: TransitionSystemBase {
+pub trait EdgesFrom: Edges {
     type EdgesFromIter<'this>: Iterator<Item = Self::EdgeRef<'this>>
     where
         Self: 'this;

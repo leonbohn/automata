@@ -4,10 +4,10 @@ mod base;
 pub use base::TransitionSystemBase;
 
 mod states;
-pub use states::{StateIterable, StateReference};
+pub use states::{StateIterable, StateReference, States};
 
 mod edges;
-pub use edges::{EdgeReference, EdgesFrom, IntoEdgeTuple};
+pub use edges::{EdgeReference, Edges, EdgesFrom, IntoEdgeTuple};
 
 mod sproutable;
 pub use sproutable::{ForAlphabet, Sproutable};
@@ -24,6 +24,9 @@ pub use builder::TSBuilder;
 mod predecessors;
 pub use predecessors::PredecessorIterable;
 
+mod color;
+pub use color::{Gives, Weak};
+
 /// Encapsulates what is necessary for a type to be usable as a state index in a [`TransitionSystem`].
 pub trait IdType: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show {}
 impl<TY: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show> IdType for TY {}
@@ -35,11 +38,11 @@ pub type Symbol<A = base::DefaultBase> =
 pub type Expression<A = base::DefaultBase> =
     <<A as TransitionSystemBase>::Alphabet as Alphabet>::Expression;
 /// Type alias for extracting the state color in a [`TransitionSystem`].
-pub type StateColor<X = base::DefaultBase> = <X as TransitionSystemBase>::StateColor;
+pub type StateColor<X = base::DefaultBase> = <X as States>::StateColor;
 /// Type alias for extracting the edge color in a [`TransitionSystem`].
-pub type EdgeColor<X = base::DefaultBase> = <X as TransitionSystemBase>::EdgeColor;
+pub type EdgeColor<X = base::DefaultBase> = <X as Edges>::EdgeColor;
 /// Type alias for extracting the state index in a [`TransitionSystem`].
-pub type StateIndex<X = base::DefaultBase> = <X as TransitionSystemBase>::StateIndex;
+pub type StateIndex<X = base::DefaultBase> = <X as States>::StateIndex;
 
 pub type EdgeTuple<X = base::DefaultBase> =
     (StateIndex<X>, Expression<X>, EdgeColor<X>, StateIndex<X>);

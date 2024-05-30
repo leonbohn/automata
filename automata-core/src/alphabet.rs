@@ -26,6 +26,14 @@ impl<E, M: Matcher<E>> Matcher<E> for &M {
     }
 }
 
+#[derive(Debug)]
+pub struct UniversalMatcher;
+impl<E> Matcher<E> for UniversalMatcher {
+    fn matches(&self, _expression: &E) -> bool {
+        true
+    }
+}
+
 /// An expression is used to label edges of a [`crate::transition_system::TransitionSystem`]. For [`CharAlphabet`]
 /// alphabets, an expression is simply a single symbol, whereas for a propositional alphabet, an expression
 /// is a propositional formula over the atomic propositions. See propositional for more details.

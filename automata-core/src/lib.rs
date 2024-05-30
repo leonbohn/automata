@@ -12,6 +12,12 @@ pub use transition_system::{IdType, ScalarIdType};
 
 pub type DefaultIdType = u32;
 
+pub trait Knows<X> {
+    fn point(&self) -> &X;
+    fn clone(&self) -> X;
+    fn give(self) -> X;
+}
+
 /// A color is simply a type that can be used to color states or transitions.
 pub trait Color: Clone + Eq + Hash + Debug {
     /// Reduces a sequence of colors (of type `Self`) to a single color of type `Self`.
@@ -57,10 +63,11 @@ pub(crate) mod innerlude {
         alphabet::{Alphabet, AlphabetExpression, AlphabetSymbol, CharAlphabet, Matcher},
         math,
         transition_system::{
-            EdgeColor, EdgeReference, EdgeTuple, Expression, ForAlphabet, GraphTs, IntoEdgeTuple,
-            PredecessorIterable, ScalarIdType, Shrinkable, Sproutable, StateColor, StateIndex,
-            StateIterable, StateReference, Symbol, TSBuilder, TransitionSystemBase,
+            EdgeColor, EdgeReference, EdgeTuple, Edges, EdgesFrom, Expression, ForAlphabet, Gives,
+            GraphTs, IntoEdgeTuple, PredecessorIterable, ScalarIdType, Shrinkable, Sproutable,
+            StateColor, StateIndex, StateIterable, StateReference, States, Symbol, TSBuilder,
+            TransitionSystemBase, Weak,
         },
-        Color, DefaultIdType, IdType, Int, Show, Void,
+        Color, DefaultIdType, IdType, Int, Knows, Show, Void,
     };
 }

@@ -18,6 +18,12 @@ pub struct GraphTs<
 }
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> GraphTs<A, Q, C, DET> {
+    pub(crate) fn graph(&self) -> &StableDiGraph<Q, (A::Expression, C), DefaultIdType> {
+        &self.graph
+    }
+    pub(crate) fn graph_mut(&mut self) -> &mut StableDiGraph<Q, (A::Expression, C), DefaultIdType> {
+        &mut self.graph
+    }
     pub(crate) fn try_recast<const ND: bool>(self) -> Result<GraphTs<A, Q, C, ND>, Self> {
         if DET {
             assert!(self.is_deterministic());
@@ -69,8 +75,8 @@ pub struct GraphTsEdgeReference<'a, E: AlphabetExpression, C: Color> {
 impl<'a, E: AlphabetExpression, C: Color> EdgeReference<'a, DefaultIdType, E, C>
     for GraphTsEdgeReference<'a, E, C>
 {
-    fn color(&self) -> &'a C {
-        self.color
+    fn color(&self) -> Weak<'a, C> {
+        Weak::Borrowed(&self.color)
     }
     fn expression(&self) -> &'a E {
         self.expression
@@ -89,9 +95,15 @@ pub struct GraphTsStateReference<'a, Q: Color> {
     color: &'a Q,
 }
 
+impl<'a, Q: Color> GraphTsStateReference<'a, Q> {
+    pub fn new(state_index: DefaultIdType, color: &'a Q) -> Self {
+        Self { state_index, color }
+    }
+}
+
 impl<'a, Q: Color> StateReference<'a, DefaultIdType, Q> for GraphTsStateReference<'a, Q> {
-    fn color(&self) -> &'a Q {
-        self.color
+    fn color(&self) -> Weak<'a, Q> {
+        Weak::Borrowed(&self.color)
     }
     fn state_index(&self) -> DefaultIdType {
         self.state_index
@@ -102,14 +114,38 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystemBase
     for GraphTs<A, Q, C, DET>
 {
     type Alphabet = A;
-    type StateIndex = DefaultIdType;
-    type EdgeColor = C;
-    type StateColor = Q;
-
-    type EdgeRef<'this> = GraphTsEdgeReference<'this, A::Expression, EdgeColor<Self>> where Self: 'this;
-    type StateRef<'this> = GraphTsStateReference<'this, StateColor<Self>> where Self: 'this;
     fn alphabet(&self) -> &Self::Alphabet {
         &self.alphabet
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Edges for GraphTs<A, Q, C, DET> {
+    type EdgeColor = C;
+    type EdgeRef<'this> = GraphTsEdgeReference<'this, A::Expression, C> where Self: 'this;
+    type EdgesIter<'this> = std::iter::Empty<Self::EdgeRef<'this>> where Self: 'this;
+    fn edges(&self) -> Self::EdgesIter<'_> {
+        std::iter::empty()
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> EdgesFrom for GraphTs<A, Q, C, DET> {
+    type EdgesFromIter<'this> = PgEdgesIter<'this, A, Q, C, DET>
+    where
+        Self: 'this;
+
+    fn edges_from(&self, source: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        if !self.contains_state_index(source) {
+            return None;
+        }
+        let walker = self
+            .graph
+            .neighbors_directed(node_index(source), Direction::Outgoing)
+            .detach();
+        Some(PgEdgesIter {
+            graph: &self.graph,
+            walker,
+            target: todo!(),
+        })
     }
 }
 
@@ -320,10 +356,19 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
     }
 }
 
-pub struct PgEdgesIter<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> {
+pub struct PgEdgesIter<
+    'a,
+    A: Alphabet,
+    Q: Color,
+    C: Color,
+    M: Matcher<A::Expression> = alphabet::UniversalMatcher,
+    const DET: bool,
+> {
     graph: &'a StableDiGraph<Q, (A::Expression, C), DefaultIdType>,
     walker: sg::WalkNeighbors<DefaultIdType>,
-    target: DefaultIdType,
+    target: Option<StateIndex>,
+    source: Option<StateIndex>,
+    matcher: M,
 }
 
 impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> Iterator
