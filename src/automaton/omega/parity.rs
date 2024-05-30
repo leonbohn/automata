@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeSet, VecDeque},
+    fmt::Debug,
     hash::Hash,
 };
 
@@ -170,11 +171,11 @@ where
     /// state and finding a state that is language-equivalent to it. If no such state exists, a new
     /// class is created.
     pub fn prefix_partition(&self) -> Partition<D::StateIndex> {
-        fn print<X: Show>(part: &[BTreeSet<X>]) -> String {
+        fn print<X: Debug>(part: &[BTreeSet<X>]) -> String {
             format!(
                 "{{{}}}",
                 part.iter()
-                    .map(|class| format!("[{}]", class.iter().map(|x| x.show()).join(", ")))
+                    .map(|class| format!("[{}]", class.iter().map(|x| format!("{x:?}")).join(", ")))
                     .join(", ")
             )
         }
@@ -188,8 +189,8 @@ where
 
         'outer: while let Some(q) = queue.pop_front() {
             trace!(
-                "considering state {}, current partition: {}",
-                q.show(),
+                "considering state {:?}, current partition: {}",
+                q,
                 print(&partition)
             );
             for i in 0..partition.len() {
@@ -203,8 +204,7 @@ where
                     .language_equivalent(&self.as_ref().with_initial(q).into_dpa())
                 {
                     trace!(
-                        "it is language equivalent to {}, adding it to the equivalence class",
-                        p.show()
+                        "it is language equivalent to {p:?}, adding it to the equivalence class",
                     );
                     partition.get_mut(i).unwrap().insert(q);
                     continue 'outer;

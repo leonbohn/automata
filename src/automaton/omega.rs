@@ -1,4 +1,4 @@
-use crate::{hoa::HoaAlphabet, math::Set, prelude::*, transition_system::impls::q};
+use crate::{hoa::HoaAlphabet, math::Set, prelude::*};
 
 mod buchi;
 pub use buchi::*;
@@ -136,7 +136,7 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
 
 impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
     fn from(value: DeterministicOmegaAutomaton<HoaAlphabet>) -> Self {
-        let size = q(value.size());
+        let size = value.size().into_index();
         let ts = TSBuilder::default()
             .with_state_colors((0..size).map(|i| value.state_color(i).unwrap()))
             .with_transitions(value.state_indices().flat_map(|q| {

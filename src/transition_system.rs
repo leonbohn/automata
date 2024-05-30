@@ -4,6 +4,9 @@ use tracing::trace;
 use crate::{math::Partition, prelude::*};
 use std::{collections::BTreeSet, hash::Hash};
 
+mod state_index;
+pub use state_index::{IndexType, ScalarIndexType};
+
 mod edge;
 pub use edge::{Edge, EdgeReference, IsEdge};
 
@@ -25,9 +28,9 @@ pub mod operations;
 /// be removed. This is useful for constructing transition systems programmatically.
 pub mod impls;
 pub use impls::{
-    CollectLinkedList, EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, Id,
-    IntoEdgeLists, IntoLinkedListNondeterministic, LinkedListDeterministic,
-    LinkedListNondeterministic, LinkedListTransitionSystem, LinkedListTransitionSystemEdge,
+    CollectLinkedList, EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, IntoEdgeLists,
+    IntoLinkedListNondeterministic, LinkedListDeterministic, LinkedListNondeterministic,
+    LinkedListTransitionSystem, LinkedListTransitionSystemEdge,
 };
 
 /// Contains implementations and definitions for dealing with paths through a transition system.
@@ -696,36 +699,6 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         Ts::state_color(self, state)
-    }
-}
-
-/// Encapsulates what is necessary for a type to be usable as a state index in a [`TransitionSystem`].
-pub trait IndexType: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show {}
-impl<TY: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show> IndexType for TY {}
-
-/// Marker trait for [`IndexType`]s that are scalar, i.e. they can be converted to and from `usize`.
-pub trait ScalarIndexType:
-    IndexType + std::ops::Add<Output = Self> + std::ops::Sub<Output = Self>
-{
-    /// Converts a `usize` to the implementing type.
-    fn from_usize(n: usize) -> Self;
-    /// Converts the implementing type to a `usize`.
-    fn into_usize(self) -> usize;
-}
-impl ScalarIndexType for usize {
-    fn from_usize(n: usize) -> Self {
-        n
-    }
-    fn into_usize(self) -> usize {
-        self
-    }
-}
-impl ScalarIndexType for u32 {
-    fn from_usize(n: usize) -> Self {
-        n as u32
-    }
-    fn into_usize(self) -> usize {
-        self as usize
     }
 }
 

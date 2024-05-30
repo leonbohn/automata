@@ -421,12 +421,11 @@ where
         for (i, state) in self.states.iter() {
             writeln!(
                 f,
-                "q{}[{:?}] {}",
-                i.show(),
+                "q{i:?}[{:?}] {}",
                 state.color,
                 state
                     .edges()
-                    .map(|(e, c, p)| format!("{}:{:?}->{}", e.show(), c, p.show()))
+                    .map(|(e, c, p)| format!("{}:{:?}->{p:?}", e.show(), c))
                     .join(", ")
             )?;
         }
@@ -463,9 +462,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> 
 
         assert!(
             self.contains_state(q) && self.contains_state(p),
-            "Source {} or target {} vertex does not exist in the graph.",
-            q.show(),
-            p.show()
+            "Source {q:?} or target {p:?} vertex does not exist in the graph.",
         );
 
         Some(self.states.get_mut(&q)?.add_edge(a, c, p))
@@ -754,7 +751,7 @@ impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexTy
         'outer: loop {
             let q = self.idx?;
             let Some(state) = self.elp.states.get(&q) else {
-                panic!("State with index {} does not exist", Id(q));
+                panic!("State with index {q:?} does not exist");
             };
 
             loop {

@@ -5,11 +5,6 @@
 /// The prelude is supposed to make using this package easier. Including everything, i.e.
 /// `use automata::prelude::*;` should be enough to use the package.
 pub mod prelude {
-    #[cfg(not(feature = "petgraph"))]
-    /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
-    pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
-        LinkedListTransitionSystem<A, Q, C, DET>;
-    #[cfg(feature = "petgraph")]
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
         GraphTs<A, Q, C, DET>;
@@ -27,7 +22,6 @@ pub mod prelude {
     pub type MutableTsNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
         EdgeListsNondeterministic<A, Q, C>;
 
-    #[cfg(feature = "petgraph")]
     pub use super::transition_system::impls::pg::{node_index, petgraph, state_index, GraphTs};
     pub use super::{
         alphabet,
@@ -53,7 +47,7 @@ pub mod prelude {
             predecessors::PredecessorIterable,
             run::{FiniteRun, OmegaRun},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, EdgeLists,
-            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, Id, IndexType,
+            EdgeListsDeterministic, EdgeListsNondeterministic, ForAlphabet, IndexType,
             IntoEdgeTuple, IsEdge, LinkedListDeterministic, LinkedListNondeterministic,
             LinkedListTransitionSystem, Path, ScalarIndexType, Shrinkable, Sproutable, StateColor,
             StateIndex, SymbolOf, TSBuilder, TransitionSystem,
@@ -94,8 +88,7 @@ pub use congruence::{Class, Congruence, RightCongruence};
 #[macro_use]
 pub mod word;
 
-/// Contains implementations different minimization algorithms. This is feature gated behind the `minimize` feature.
-#[cfg(feature = "minimize")]
+/// Contains implementations different minimization algorithms.
 pub mod minimization;
 
 #[cfg(feature = "hoa")]

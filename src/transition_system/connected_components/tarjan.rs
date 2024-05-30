@@ -171,7 +171,7 @@ where
     while let Some(next) = l.pop_front() {
         let mut scc = vec![next];
         for v in reversed.reachable_state_indices_from(next) {
-            trace!("{} is backward reachable from {}", v.show(), next.show());
+            trace!("{v:?} is backward reachable from {next:?}");
             if let Some(pos) = l.iter().position(|x| x == &v) {
                 l.remove(pos);
                 scc.push(v);
@@ -206,7 +206,7 @@ where
     // we do an outermost loop that executes as long as states have not seen all states
     while let Some(&next) = unvisited.first() {
         assert!(queue.is_empty());
-        trace!("adding {} to queue", next.show());
+        trace!("adding {next:?} to queue");
         current = 0;
         queue.push((
             next,
@@ -217,18 +217,17 @@ where
         // loop through the current queue
         'outer: while let Some((q, mut edges, min)) = queue.pop() {
             trace!(
-                "considering state {} with stored min {min}\nstack: {{{}}}\ton_stack: {{{}}}\nlows:{}",
-                q.show(),
+                "considering state {q:?} with stored min {min}\nstack: {{{}}}\ton_stack: {{{}}}\nlows:{}",
                 stack
                     .iter()
-                    .map(|idx: &Ts::StateIndex| idx.show())
+                    .map(|idx: &Ts::StateIndex| format!("{idx:?}"))
                     .join(", "),
                 on_stack
                     .iter()
-                    .map(|idx: &Ts::StateIndex| idx.show())
+                    .map(|idx: &Ts::StateIndex| format!("{idx:?}"))
                     .join(", "),
                 low.iter()
-                    .map(|(k, v): (&Ts::StateIndex, &usize)| format!("{} -> {v}", k.show()))
+                    .map(|(k, v): (&Ts::StateIndex, &usize)| format!("{} -> {v}", format!("{k:?}")))
                     .join(", ")
             );
             unvisited.remove(&q);
@@ -238,7 +237,7 @@ where
             }
 
             if let math::map::Entry::Vacant(e) = indices.entry(q) {
-                trace!("assigning index {current} to state {}", q.show());
+                trace!("assigning index {current} to state {q:?}");
                 e.insert(current);
                 low.insert(q, current);
                 current += 1;
@@ -251,16 +250,15 @@ where
                 }
 
                 trace!(
-                    "considering edge {} --{}--> {}",
-                    edge.source().show(),
+                    "considering edge {:?} --{}--> {:?}",
+                    edge.source(),
                     edge.expression().show(),
-                    edge.target().show()
+                    edge.target()
                 );
                 let target = edge.target();
                 if unvisited.contains(&target) {
                     trace!(
-                        "successor {} on {} has not been visited, descending",
-                        target.show(),
+                        "successor {target:?} on {} has not been visited, descending",
                         edge.expression().show()
                     );
                     queue.push((q, edges, min));
@@ -276,10 +274,9 @@ where
                         *low.get_mut(x).unwrap() = new_low;
                     }
                     trace!(
-                        "successor {} on {} was alread seen, assigning new minimum {new_low} to states {}",
-                        target.show(),
+                        "successor {target:?} on {} was alread seen, assigning new minimum {new_low} to states {}",
                         edge.expression().show(),
-                        itt.into_iter().map(|x| x.show()).join(", ")
+                        itt.into_iter().map(|x| format!("{x:?}")).join(", ")
                     );
                 }
             }
@@ -287,10 +284,7 @@ where
             // reached when all edges have been explored
             let low_q = *low.get(&q).unwrap();
             if low_q == *indices.get(&q).unwrap() {
-                trace!(
-                    "{} has matching index and low {low_q}, extracting scc",
-                    q.show()
-                );
+                trace!("{q:?} has matching index and low {low_q}, extracting scc",);
                 let mut scc = vec![];
                 while on_stack.contains(&q) {
                     let top = stack.pop().unwrap();

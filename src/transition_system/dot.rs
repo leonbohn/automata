@@ -307,7 +307,7 @@ where
     }
 
     fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
-        format!("q{}", idx.show())
+        format!("q{idx:?}")
     }
 }
 
@@ -342,7 +342,7 @@ where
     }
 
     fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
-        format!("q{}", idx.show())
+        format!("q{idx:?}")
     }
 }
 
@@ -376,7 +376,7 @@ where
     }
 
     fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
-        format!("q{}", idx.show())
+        format!("q{idx:?}")
     }
 }
 

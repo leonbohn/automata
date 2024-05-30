@@ -202,10 +202,10 @@ where
         let mut out = String::new();
         for (i, rs) in self.0.iter().enumerate() {
             out.push_str(&format!(
-                "{i} -{}|{}-> {}",
+                "{i} -{}|{}-> {:?}",
                 rs.sc().show(),
                 rs.ec().show(),
-                rs.state().show()
+                rs.state()
             ))
         }
         out
@@ -425,13 +425,11 @@ where
             };
 
             let (profile, _) = self.tps.get(*profile_idx).expect("Must exist!");
-            row.extend(profile.iter().map(|tp| {
-                format!(
-                    "{}|{}",
-                    tp.state().show().blue(),
-                    (tp.sc(), tp.ec()).show().purple(),
-                )
-            }));
+            row.extend(
+                profile
+                    .iter()
+                    .map(|tp| format!("{:?}|{}", tp.state(), (tp.sc(), tp.ec()).show().purple(),)),
+            );
             b.push_record(row);
         }
 
