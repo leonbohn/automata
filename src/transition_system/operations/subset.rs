@@ -53,7 +53,11 @@ impl<Ts: TransitionSystem> std::fmt::Debug for StateSet<Ts> {
         if self.0.is_empty() {
             write!(f, "∅")
         } else {
-            write!(f, "{{{}}}", self.iter().map(|q| q.show()).join(", "))
+            write!(
+                f,
+                "{{{}}}",
+                self.iter().map(|q| format!("{q:?}")).join(", ")
+            )
         }
     }
 }
@@ -184,7 +188,7 @@ where
                         .get(idx)
                         .unwrap()
                         .iter()
-                        .map(|q| q.show())
+                        .map(|q| format!("{q:?}"))
                         .join(", ")
                 ),
                 |edge| edge.target().to_string()

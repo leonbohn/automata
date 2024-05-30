@@ -248,7 +248,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
                     "{{{}}}",
                     states.iter().map(|idx| idx.to_string()).join(", ")
                 );
-                panic!("From {origin}|{} with matcher {:?}, we reach {} while precisely one state should be reached!", self.class_iter_by_id(origin).unwrap().map(|c| c.show()).join(", "), matcher, string)
+                panic!("From {origin}|{} with matcher {:?}, we reach {} while precisely one state should be reached!", self.class_iter_by_id(origin).unwrap().map(|c| format!("{c:?}")).join(", "), matcher, string)
             }
         }
     }

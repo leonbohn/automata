@@ -590,7 +590,6 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Deterministic::collect_edge_lists_deterministic`] for details.
-    #[cfg(feature = "petgraph")]
     fn collect_graphts_deterministic(
         self,
     ) -> GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true> {
@@ -604,7 +603,6 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
     /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
-    #[cfg(feature = "petgraph")]
     #[allow(clippy::type_complexity)]
     fn collect_graphts_deterministic_pointed(
         self,

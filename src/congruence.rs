@@ -179,7 +179,7 @@ where
     /// class is u, then it should be that uu ~ u.
     pub fn is_idempotent(&self, idx: StateIndex<Self>) -> bool {
         let Some(mr) = self.state_to_mr(idx) else {
-            panic!("The class {} is not labeled!", idx.show());
+            panic!("The class {idx:?} is not labeled!");
         };
         self.reached_state_index_from(idx, mr) == Some(idx)
     }

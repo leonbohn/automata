@@ -71,8 +71,7 @@ impl<'a, D: TransitionSystem + 'a> TransitionsFrom<'a, D> {
     pub fn new(det: &'a D, state: D::StateIndex) -> Self {
         let Some(edges) = det.edges_from(state) else {
             panic!(
-                "We should at least get an iterator. Probably the state {} does not exist.",
-                state.show()
+                "We should at least get an iterator. Probably the state {state:?} does not exist.",
             );
         };
 

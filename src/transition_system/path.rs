@@ -252,12 +252,12 @@ impl<A: Alphabet, Idx: IndexType, Q: std::fmt::Debug, C: std::fmt::Debug> std::f
 impl<A: Alphabet, Idx: IndexType, Q: Show, C: Show> Show for Path<A, Idx, Q, C> {
     fn show(&self) -> String {
         format!(
-            "{}{}",
+            "{}{:?}",
             self.transitions
                 .iter()
-                .map(|(p, a, c)| format!("{} -{}|{}-> ", p.show(), a.show(), c.show()))
+                .map(|(p, a, c)| format!("{p:?} -{}|{}-> ", a.show(), c.show()))
                 .join(""),
-            self.end.show()
+            self.end
         )
     }
 }
