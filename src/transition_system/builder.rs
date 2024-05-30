@@ -2,13 +2,11 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::{
-    congruence::RightCongruence, prelude::*, transition_system::LinkedListNondeterministic, Void,
-};
+use crate::{congruence::RightCongruence, prelude::*, Void};
 
 use self::math::Set;
 
-use super::{impls::linked::LinkedListTransitionSystem, IntoEdgeTuple};
+use super::IntoEdgeTuple;
 
 /// Helper struct for the construction of non-deterministic transition systems. It stores a list of edges, a list of colors and a default color.
 /// This can also be used to construct deterministic transition systems, deterministic parity automata and Mealy machines.
@@ -112,6 +110,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     }
 
     /// Creates an instance of a non-deterministic transition edge lists backed system from `self`.
+    #[cfg(feature = "implementations")]
     pub fn into_edge_lists_nondeterministic(self) -> EdgeListsNondeterministic<CharAlphabet, Q, C>
     where
         C: Hash + Eq,
@@ -131,10 +130,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         for i in 0..num_states {
             let i = DefaultIdType::from_usize(i);
             if self.colors.iter().all(|(q, _)| *q != i) && self.default.is_none() {
-                panic!(
-                    "Default is needed as some states (specifically {}) have no color",
-                    i.show()
-                );
+                panic!("Default is needed as some states (specifically {i:?}) have no color",);
             }
 
             ts.add_state(
@@ -170,10 +166,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         for i in 0..num_states {
             let i = DefaultIdType::from_usize(i);
             if self.colors.iter().all(|(q, _)| *q != i) && self.default.is_none() {
-                panic!(
-                    "Default is needed as some states (specifically {}) have no color",
-                    i.show()
-                );
+                panic!("Default is needed as some states (specifically {i:?}) have no color",);
             }
 
             ts.add_state(
@@ -266,6 +259,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     }
 
     /// Collects self into a non-deterministic transition system.
+    #[cfg(feature = "implementations")]
     pub fn into_linked_list_nondeterministic(
         self,
     ) -> LinkedListNondeterministic<CharAlphabet, Q, C> {
@@ -289,10 +283,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
                 color
             } else {
                 self.default.clone().unwrap_or_else(|| {
-                    panic!(
-                        "Default is needed as some states (specifically {}) have no color",
-                        x.show()
-                    )
+                    panic!("Default is needed as some states (specifically {x:?}) have no color",)
                 })
             }
         });
@@ -325,10 +316,7 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
         for i in 0..num_states {
             let i = DefaultIdType::from_usize(i);
             if self.colors.iter().all(|(q, _)| *q != i) && self.default.is_none() {
-                panic!(
-                    "Default is needed as some states (specifically {}) have no color",
-                    i.show()
-                );
+                panic!("Default is needed as some states (specifically {i:?}) have no color",);
             }
 
             ts.add_state(
@@ -359,11 +347,13 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     }
 
     /// Build a deterministic transition system from `self`. Panics if `self` is not deterministic.
+    #[cfg(feature = "implementations")]
     pub fn into_linked_list_deterministic(self) -> LinkedListTransitionSystem<CharAlphabet, Q, C> {
         self.into_linked_list_nondeterministic()
             .into_deterministic()
     }
     /// Creates an instance of a deterministic transition edge lists backed system from `self`.
+    #[cfg(feature = "implementations")]
     pub fn into_edge_lists_deterministic(self) -> EdgeLists<CharAlphabet, Q, C>
     where
         C: Hash + Eq,
@@ -381,6 +371,7 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     }
     /// Build a deterministic transition system from `self` and set the given `initial` state as the
     /// designated initial state of the output object. Panics if `self` is not deterministic.
+    #[cfg(feature = "implementations")]
     pub fn into_linked_list_deterministic_with_initial(
         self,
         initial: usize,
@@ -388,6 +379,7 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
         self.into_linked_list_deterministic().with_initial(initial)
     }
     /// Creates an instance of a deterministic transition edge lists backed system from `self`.
+    #[cfg(feature = "implementations")]
     pub fn into_edge_lists_deterministic_with_initial(
         self,
         initial: DefaultIdType,

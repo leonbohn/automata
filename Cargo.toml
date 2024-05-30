@@ -21,7 +21,7 @@ rustdoc-args = ["--html-in-header", "./docs-header.html"]
 
 [dependencies]
 # gryf = { git = "https://github.com/pnevyk/gryf", rev = "1efd3a2", optional = true }
-petgraph = { version = "0.6.5", optional = true, default-features = false, features = [
+petgraph = { version = "0.6.5", default-features = false, features = [
     "stable_graph",
 ] }
 tracing = "0.1"
@@ -42,25 +42,8 @@ indexmap = "2.2"
 
 
 [features]
-default = ["hoa", "graphviz", "random", "minimize", "petgraph"]
+default = ["hoa", "graphviz", "random"]
 random = ["fastrand"]
-minimize = []
 hoa = ["dep:hoars", "biodivine-lib-bdd"]
 graphviz = ["dep:tempfile"]
-oai-bin = ["clap"]
-linked_list_ts = []
-petgraph = ["dep:petgraph"]
-
-[dev-dependencies]
-lazy_static = "1.4"
-criterion = { version = "0.5", features = ["html_reports"] }
-# iai = { git = "https://github.com/sigaloid/iai", rev = "6c83e942" }
-
-[[bench]]
-name = "ts"
-harness = false
-
-[[bin]]
-name = "oai"
-path = "bin/oai.rs"
-required-features = ["oai-bin"]
+implementations = []

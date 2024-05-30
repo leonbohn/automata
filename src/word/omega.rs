@@ -127,8 +127,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
-    ///     .into_linked_list_deterministic()
-    ///     .with_initial(0);
+    ///     .into_dts_with_initial(0);
     /// let word = upw!("b", "a");
     /// let normalized = word.normalize_for(&ts).expect("must be normalizable");
     /// assert_eq!(normalized.spoke_vec(), vec!['b']);

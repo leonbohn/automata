@@ -235,6 +235,22 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType>
     }
 }
 
+impl<A: Alphabet, Q: Color, C: Hash + Debug + Eq + Clone> Deterministic for EdgeLists<A, Q, C> {
+    fn edge(
+        &self,
+        state: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Self::EdgeRef<'_>> {
+        let mut it = self.edges_matching(state, matcher)?;
+        let out = Some(it.next()?);
+        debug_assert!(
+            it.next().is_none(),
+            "Not deterministic, {state} has mutliple edges on the same expression!"
+        );
+        out
+    }
+}
+
 /// A state in a transition system. This stores the color of the state and the index of the
 /// first edge leaving the state.
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -421,12 +437,11 @@ where
         for (i, state) in self.states.iter() {
             writeln!(
                 f,
-                "q{}[{:?}] {}",
-                i.show(),
+                "q{i:?}[{:?}] {}",
                 state.color,
                 state
                     .edges()
-                    .map(|(e, c, p)| format!("{}:{:?}->{}", e.show(), c, p.show()))
+                    .map(|(e, c, p)| format!("{}:{:?}->{p:?}", e.show(), c))
                     .join(", ")
             )?;
         }
@@ -463,9 +478,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> 
 
         assert!(
             self.contains_state(q) && self.contains_state(p),
-            "Source {} or target {} vertex does not exist in the graph.",
-            q.show(),
-            p.show()
+            "Source {q:?} or target {p:?} vertex does not exist in the graph.",
         );
 
         Some(self.states.get_mut(&q)?.add_edge(a, c, p))
@@ -754,7 +767,7 @@ impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexTy
         'outer: loop {
             let q = self.idx?;
             let Some(state) = self.elp.states.get(&q) else {
-                panic!("State with index {} does not exist", Id(q));
+                panic!("State with index {q:?} does not exist");
             };
 
             loop {

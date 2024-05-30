@@ -331,7 +331,11 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
 
 impl<'a, Ts: TransitionSystem> Debug for Scc<'a, Ts> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}]", self.states.iter().map(|q| q.show()).join(", "))
+        write!(
+            f,
+            "[{}]",
+            self.states.iter().map(|q| format!("{q:?}")).join(", ")
+        )
     }
 }
 
@@ -349,7 +353,7 @@ mod tests {
         ]
         .into_iter()
         .collect::<Set<_>>();
-        let ts = LinkedListNondeterministic::builder()
+        let ts = DTS::builder()
             .default_color(())
             .with_transitions(&transitions)
             .into_dts_with_initial(0);

@@ -4,6 +4,9 @@ use tracing::trace;
 use crate::{math::Partition, prelude::*};
 use std::{collections::BTreeSet, hash::Hash};
 
+mod state_index;
+pub use state_index::{IndexType, ScalarIndexType};
+
 mod edge;
 pub use edge::{Edge, EdgeReference, IsEdge};
 
@@ -13,22 +16,9 @@ pub use transitions_from::{DeterministicEdgesFrom, TransitionsFrom};
 /// Defines implementations for common operations on automata/transition systems.
 pub mod operations;
 
-/// This module contains the various provided implementations of [`TransitionSystem`]. There are
-/// two variants of concern, which differ mainly in the data structure that backs them.
-/// - [`NTS`] is a (nondeterministic) transition system which is backed by an edge list. It is
-/// efficient for large systems and this implementation is used by default. There is a variant
-/// [`DTS`] which is simply a thin wrapper around [`NTS`], indicating that the wrapped transition
-/// system is deterministic, i.e. it implements [`Deterministic`].
-/// - [`MutableTs`] is a (deterministic) transition system which is backed by a [`math::Set`] of
-/// states and a [`crate::math::Map`] of edges. In other words, it uses a hash table internally.
-/// This offers a distinct advantage over [`DTS`] in that states and edges can
-/// be removed. This is useful for constructing transition systems programmatically.
+/// This module contains the various provided implementations of [`TransitionSystem`].
 pub mod impls;
-pub use impls::{
-    CollectLinkedList, EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, Id,
-    IntoEdgeLists, IntoLinkedListNondeterministic, LinkedListDeterministic,
-    LinkedListNondeterministic, LinkedListTransitionSystem, LinkedListTransitionSystemEdge,
-};
+pub use impls::*;
 
 /// Contains implementations and definitions for dealing with paths through a transition system.
 pub mod path;
@@ -452,7 +442,7 @@ pub trait TransitionSystem: Sized {
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
-    ///     .into_linked_list_deterministic_with_initial(0);
+    ///     .into_dts_with_initial(0);
     /// let colored = ts.with_state_color(UniformColor(false));
     /// assert_eq!(colored.reached_state_color("a"), Some(false));
     /// assert_eq!(colored.with_state_color(UniformColor(true)).reached_state_color("a"), Some(true));
@@ -696,36 +686,6 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         Ts::state_color(self, state)
-    }
-}
-
-/// Encapsulates what is necessary for a type to be usable as a state index in a [`TransitionSystem`].
-pub trait IndexType: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show {}
-impl<TY: Copy + std::hash::Hash + std::fmt::Debug + Eq + Ord + Show> IndexType for TY {}
-
-/// Marker trait for [`IndexType`]s that are scalar, i.e. they can be converted to and from `usize`.
-pub trait ScalarIndexType:
-    IndexType + std::ops::Add<Output = Self> + std::ops::Sub<Output = Self>
-{
-    /// Converts a `usize` to the implementing type.
-    fn from_usize(n: usize) -> Self;
-    /// Converts the implementing type to a `usize`.
-    fn into_usize(self) -> usize;
-}
-impl ScalarIndexType for usize {
-    fn from_usize(n: usize) -> Self {
-        n
-    }
-    fn into_usize(self) -> usize {
-        self
-    }
-}
-impl ScalarIndexType for u32 {
-    fn from_usize(n: usize) -> Self {
-        n as u32
-    }
-    fn into_usize(self) -> usize {
-        self as usize
     }
 }
 

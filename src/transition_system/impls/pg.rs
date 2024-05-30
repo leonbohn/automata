@@ -44,13 +44,13 @@ impl<Q: Color, C: Color, const DET: bool> GraphTs<CharAlphabet, Q, C, DET> {
     }
 }
 
-pub fn node_index(id: DefaultIdType) -> sg::NodeIndex {
+pub(crate) fn node_index(id: DefaultIdType) -> sg::NodeIndex {
     sg::node_index(
         id.try_into()
             .expect("Cannot convert default id type to node index"),
     )
 }
-pub fn state_index(idx: sg::NodeIndex) -> DefaultIdType {
+pub(crate) fn state_index(idx: sg::NodeIndex) -> DefaultIdType {
     idx.index()
         .try_into()
         .expect("Cannot convert node index to default id type")
@@ -297,7 +297,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = PgEdgesIter<'this, A, Q, C, DET>
+    type EdgesToIter<'this> = GraphTsNeighborsIter<'this, A, Q, C, DET>
     where
         Self: 'this;
 
@@ -309,7 +309,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
             .graph
             .neighbors_directed(node_index(state), Direction::Incoming)
             .detach();
-        Some(PgEdgesIter {
+        Some(GraphTsNeighborsIter {
             graph: &self.graph,
             walker,
             target: state,
@@ -317,14 +317,14 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
     }
 }
 
-pub struct PgEdgesIter<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> {
+pub struct GraphTsNeighborsIter<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> {
     graph: &'a StableDiGraph<Q, (A::Expression, C), DefaultIdType>,
     walker: sg::WalkNeighbors<DefaultIdType>,
     target: DefaultIdType,
 }
 
 impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> Iterator
-    for PgEdgesIter<'a, A, Q, C, DET>
+    for GraphTsNeighborsIter<'a, A, Q, C, DET>
 {
     type Item = EdgeReference<
         'a,
