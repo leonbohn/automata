@@ -235,6 +235,22 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType>
     }
 }
 
+impl<A: Alphabet, Q: Color, C: Hash + Debug + Eq + Clone> Deterministic for EdgeLists<A, Q, C> {
+    fn edge(
+        &self,
+        state: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Self::EdgeRef<'_>> {
+        let mut it = self.edges_matching(state, matcher)?;
+        let out = Some(it.next()?);
+        debug_assert!(
+            it.next().is_none(),
+            "Not deterministic, {state} has mutliple edges on the same expression!"
+        );
+        out
+    }
+}
+
 /// A state in a transition system. This stores the color of the state and the index of the
 /// first edge leaving the state.
 #[derive(Clone, Eq, PartialEq, Debug)]

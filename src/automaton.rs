@@ -68,7 +68,7 @@ pub struct Automaton<
 }
 
 impl<Z, Q: Color, C: Color + std::hash::Hash + Eq, const OMEGA: bool>
-    Automaton<CharAlphabet, Z, Q, C, EdgeLists<CharAlphabet, Q, C>, OMEGA>
+    Automaton<CharAlphabet, Z, Q, C, DTS<CharAlphabet, Q, C>, OMEGA>
 {
     /// Instantiates a new [`TSBuilder`] for the edge and state color of `self`.
     pub fn builder() -> TSBuilder<Q, C> {

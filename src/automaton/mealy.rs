@@ -138,10 +138,9 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 0, 0),
             ])
-            .into_linked_list_deterministic()
-            .with_initial(0)
+            .into_dts_with_initial(0)
             .collect_mealy();
-        let mm2: MealyMachine = LinkedListNondeterministic::builder()
+        let mm2: MealyMachine = DTS::builder()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),
@@ -151,10 +150,9 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 1, 0),
             ])
-            .into_linked_list_deterministic()
-            .with_initial(0)
+            .into_dts_with_initial(0)
             .collect_mealy();
-        let _mm3: MealyMachine = LinkedListNondeterministic::builder()
+        let _mm3: MealyMachine = DTS::builder()
             .default_color(Void)
             .with_transitions([
                 (0, 'a', 1, 0),
@@ -164,8 +162,7 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 0, 2),
             ])
-            .into_linked_list_deterministic()
-            .with_initial(0)
+            .into_dts_with_initial(0)
             .collect_mealy();
 
         assert_eq!(mm1.witness_inequivalence(&mm2), Some(vec!['b', 'b', 'b']))

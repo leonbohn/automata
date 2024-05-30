@@ -227,7 +227,7 @@ mod tests {
 
     #[test_log::test]
     fn partition_refinement_mealy() {
-        let mm = LinkedListNondeterministic::builder()
+        let mm = DTS::builder()
             .with_transitions([
                 (0, 'a', 0, 1),
                 (0, 'b', 1, 0),

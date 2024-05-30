@@ -14,6 +14,22 @@ pub trait ScalarIndexType:
     fn into_index<T: ScalarIndexType>(self) -> T {
         T::from_usize(self.into_usize())
     }
+    /// Converts an index of a [`petgraph::stable_graph::StableGraph`] into an instance of the
+    /// implementing type.
+    fn from_pg_index(n: petgraph::stable_graph::NodeIndex<Self>) -> Self
+    where
+        Self: petgraph::stable_graph::IndexType,
+    {
+        Self::from_usize(n.index())
+    }
+    /// Converts `self` into a [`petgraph::stable_graph::NodeIndex`] which can be used to access
+    /// a node in a [`petgraph::stable_graph::StableGraph`].
+    fn into_pg_index(self) -> petgraph::stable_graph::NodeIndex<Self>
+    where
+        Self: petgraph::stable_graph::IndexType,
+    {
+        petgraph::stable_graph::NodeIndex::new(self.into_usize())
+    }
 }
 
 macro_rules! int_index_type {
