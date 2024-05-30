@@ -131,10 +131,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         for i in 0..num_states {
             let i = DefaultIdType::from_usize(i);
             if self.colors.iter().all(|(q, _)| *q != i) && self.default.is_none() {
-                panic!(
-                    "Default is needed as some states (specifically {}) have no color",
-                    i.show()
-                );
+                panic!("Default is needed as some states (specifically {i:?}) have no color",);
             }
 
             ts.add_state(
@@ -170,10 +167,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         for i in 0..num_states {
             let i = DefaultIdType::from_usize(i);
             if self.colors.iter().all(|(q, _)| *q != i) && self.default.is_none() {
-                panic!(
-                    "Default is needed as some states (specifically {}) have no color",
-                    i.show()
-                );
+                panic!("Default is needed as some states (specifically {i:?}) have no color",);
             }
 
             ts.add_state(
@@ -289,10 +283,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
                 color
             } else {
                 self.default.clone().unwrap_or_else(|| {
-                    panic!(
-                        "Default is needed as some states (specifically {}) have no color",
-                        x.show()
-                    )
+                    panic!("Default is needed as some states (specifically {x:?}) have no color",)
                 })
             }
         });
@@ -325,10 +316,7 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
         for i in 0..num_states {
             let i = DefaultIdType::from_usize(i);
             if self.colors.iter().all(|(q, _)| *q != i) && self.default.is_none() {
-                panic!(
-                    "Default is needed as some states (specifically {}) have no color",
-                    i.show()
-                );
+                panic!("Default is needed as some states (specifically {i:?}) have no color",);
             }
 
             ts.add_state(

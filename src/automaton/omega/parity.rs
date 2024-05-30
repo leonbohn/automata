@@ -406,11 +406,10 @@ where
                     for state in scc.iter() {
                         for edge in ts.edges_from(*state).unwrap() {
                             trace!(
-                                "recolouring and removing {} --{}|{}--> {} with priority {}",
-                                state.show(),
+                                "recolouring and removing {state:?} --{}|{}--> {:?} with priority {}",
                                 edge.expression().show(),
                                 edge.color().show(),
-                                edge.target().show(),
+                                edge.target(),
                                 priority
                             );
                             recoloring.push(((*state, edge.expression().clone()), priority));
@@ -440,11 +439,9 @@ where
                     .filter(|(_q, _a, c, _p)| c == minimal_interior_edge_color)
                 {
                     trace!(
-                        "recolouring and removing {} --{}|{}--> {} with priority {}",
-                        q.show(),
+                        "recolouring and removing {q:?} --{}|{}--> {p:?} with priority {}",
                         a.show(),
                         c.show(),
-                        p.show(),
                         priority
                     );
                     recoloring.push(((*q, a.clone()), priority));

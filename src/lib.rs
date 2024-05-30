@@ -211,6 +211,23 @@ impl Show for Option<usize> {
     }
 }
 
+impl Show for u32 {
+    fn show(&self) -> String {
+        self.to_string()
+    }
+    fn show_collection<'a, I>(iter: I) -> String
+    where
+        Self: 'a,
+        I: IntoIterator<Item = &'a Self>,
+        I::IntoIter: DoubleEndedIterator,
+    {
+        format!(
+            "[{}]",
+            itertools::Itertools::join(&mut iter.into_iter().map(|x| x.show()), ", ")
+        )
+    }
+}
+
 impl Show for usize {
     fn show(&self) -> String {
         self.to_string()
