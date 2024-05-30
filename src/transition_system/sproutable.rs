@@ -219,7 +219,7 @@ pub trait Sproutable: TransitionSystem {
     /// let mut ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
-    ///     .into_linked_list_deterministic();
+    ///     .into_dts();
     /// assert!(!ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
     /// assert_eq!(ts.size(), 2);
@@ -234,7 +234,7 @@ pub trait Sproutable: TransitionSystem {
     /// let mut ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
-    ///     .into_linked_list_deterministic();
+    ///     .into_dts();
     /// assert!(ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
     /// assert_eq!(ts.size(), 1);

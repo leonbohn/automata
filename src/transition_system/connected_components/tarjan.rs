@@ -227,7 +227,7 @@ where
                     .map(|idx: &Ts::StateIndex| format!("{idx:?}"))
                     .join(", "),
                 low.iter()
-                    .map(|(k, v): (&Ts::StateIndex, &usize)| format!("{} -> {v}", format!("{k:?}")))
+                    .map(|(k, v): (&Ts::StateIndex, &usize)| format!("{k:?} -> {v}"))
                     .join(", ")
             );
             unvisited.remove(&q);
