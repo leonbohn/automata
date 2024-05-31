@@ -113,6 +113,10 @@ pub trait Alphabet: Clone + Debug {
 
     /// Returns the number of symbols in the alphabet.
     fn size(&self) -> usize;
+
+    fn is_empty(&self) -> bool {
+        self.size() == 0
+    }
 }
 
 impl<A: Alphabet> Alphabet for &A {
@@ -158,19 +162,6 @@ impl CharAlphabet {
     pub fn of_size(size: usize) -> Self {
         assert!(size < 26, "Alphabet is too large");
         Self((0..size).map(|i| (b'a' + i as u8) as char).collect())
-    }
-    /// Returns an iterator over the symbols in the alphabet.
-    pub fn iter(&self) -> impl Iterator<Item = char> + '_ {
-        self.0.iter().copied()
-    }
-    /// Returns the number of symbols in the alphabet.
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Returns true if and only if the alphabet is empty.
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 }
 
