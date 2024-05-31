@@ -39,6 +39,8 @@ fastrand = { version = "2", optional = true }
 hoars = { version = "0.2", optional = true }
 clap = { version = "4.5", optional = true }
 indexmap = "2.2"
+rand = "0.8.5"
+rand_distr = "0.4.3"
 
 
 [features]
