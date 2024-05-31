@@ -51,6 +51,8 @@ pub mod run;
 /// This module defines traits for dealing with predecessors in a transition system.
 pub mod predecessors;
 
+pub mod id;
+
 /// Encapsulates the transition function δ of a (finite) transition system. This is the main trait that
 /// is used to query a transition system. Transitions are labeled with a [`Alphabet::Expression`], which
 /// determines on which [`Alphabet::Symbol`]s the transition can be taken. Additionally, every transition
@@ -692,41 +694,40 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 
 /// Implementors of this trait can be transformed into a owned tuple representation of
 /// an edge in a [`TransitionSystem`].
-pub trait IntoEdgeTuple<Ts: TransitionSystem> {
+pub trait IntoEdgeTuple<A: Alphabet, C: Color, N: IndexType> {
     /// Consumes `self` and returns a tuple representing an edge in a [`TransitionSystem`].
     /// Owned edges in their tuple representation may simply be cloned, whereas if we have
     /// a tuple represetation of an edge with a borrowed expression, this operation may
     /// have to clone the expression.
-    fn into_edge_tuple(self) -> EdgeTuple<Ts>;
+    fn into_edge_tuple(self) -> (N, A::Expression, C, N);
 }
 
-impl<T: TransitionSystem> IntoEdgeTuple<T> for EdgeTuple<T> {
+impl<A: Alphabet, C: Color, N: GraphTsId> IntoEdgeTuple<A, C, Id<N>> for (N, A::Expression, C, N) {
     #[inline(always)]
-    fn into_edge_tuple(self) -> EdgeTuple<T> {
-        self
+    fn into_edge_tuple(self) -> (Id<N>, A::Expression, C, Id<N>) {
+        (Id(self.0), self.1, self.2, Id(self.3))
     }
 }
-
-impl<T: TransitionSystem<EdgeColor = Void>> IntoEdgeTuple<T>
-    for (StateIndex<T>, EdgeExpression<T>, StateIndex<T>)
-{
+impl<A: Alphabet, C: Color, N: GraphTsId> IntoEdgeTuple<A, C, N> for (N, A::Expression, C, N) {
     #[inline(always)]
-    fn into_edge_tuple(self) -> EdgeTuple<T> {
+    fn into_edge_tuple(self) -> (N, A::Expression, C, N) {
+        (self.0, self.1, self.2, self.3)
+    }
+}
+impl<A: Alphabet, N: GraphTsId> IntoEdgeTuple<A, Void, N> for (N, A::Expression, N) {
+    #[inline(always)]
+    fn into_edge_tuple(self) -> (N, A::Expression, Void, N) {
         (self.0, self.1, Void, self.2)
     }
 }
-
-impl<T: TransitionSystem, TT: IntoEdgeTuple<T>> IntoEdgeTuple<T> for &TT
-where
-    TT: Clone,
-{
+impl<A: Alphabet, N: GraphTsId> IntoEdgeTuple<A, Void, Id<N>> for (N, A::Expression, N) {
     #[inline(always)]
-    fn into_edge_tuple(self) -> EdgeTuple<T> {
-        self.clone().into_edge_tuple()
+    fn into_edge_tuple(self) -> (Id<N>, A::Expression, Void, Id<N>) {
+        (Id(self.0), self.1, Void, Id(self.2))
     }
 }
 
-/// Helper trait for extracting the [`Symbol`] type from an a transition system.
+/// Helper trait for extracting the [`crate::alphabet::Symbol`] type from an a transition system.
 pub type SymbolOf<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Symbol;
 /// Helper trait for extracting the [`Expression`] type from an a transition system.
 pub type EdgeExpression<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Expression;
@@ -774,7 +775,10 @@ impl<P: Pointed> Pointed for &mut P {
 pub mod dot;
 pub use dot::Dottable;
 
-use self::operations::{ProvidesStateColor, WithStateColor};
+use self::{
+    operations::{ProvidesStateColor, WithStateColor},
+    pg::GraphTsId,
+};
 
 #[cfg(test)]
 pub mod tests {}

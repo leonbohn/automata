@@ -3,7 +3,7 @@ use itertools::Itertools;
 
 use crate::{math::Bijection, prelude::*};
 
-use super::{EdgeTuple, StateIndex};
+use super::{pg::GraphTsId, EdgeTuple, StateIndex};
 
 /// Implemented by [`TransitionSystem`]s (TS) that can be created for a given [`Alphabet`],
 /// which is may be used in conjunction with [`Sproutable`] to successively grow a
@@ -109,7 +109,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     fn add_edge<E>(&mut self, t: E) -> Option<EdgeTuple<Self>>
     where
-        E: IntoEdgeTuple<Self>;
+        E: IntoEdgeTuple<Self::Alphabet, EdgeColor<Self>, StateIndex<Self>>;
 
     /// Builds a new transition system by collecting all states and transitions present in another.
     /// The method returns the new transition system and a [bijective mapping](`Bijection`) between the old and new
@@ -139,6 +139,7 @@ pub trait Sproutable: TransitionSystem {
     ) -> (Self, Bijection<Ts::StateIndex, StateIndex<Self>>)
     where
         Self: ForAlphabet<Ts::Alphabet>,
+        StateIndex<Self>: GraphTsId,
         Ts: TransitionSystem<
             Alphabet = Self::Alphabet,
             StateColor = StateColor<Self>,
@@ -193,6 +194,7 @@ pub trait Sproutable: TransitionSystem {
     fn sprout_from_ts<Ts>(ts: Ts) -> Self
     where
         Self: ForAlphabet<Ts::Alphabet>,
+        StateIndex<Self>: GraphTsId,
         Ts: TransitionSystem<
             Alphabet = Self::Alphabet,
             StateColor = StateColor<Self>,
@@ -242,6 +244,7 @@ pub trait Sproutable: TransitionSystem {
     fn complete_with_colors(&mut self, sink_color: Self::StateColor, edge_color: Self::EdgeColor)
     where
         Self::Alphabet: IndexedAlphabet,
+        StateIndex<Self>: GraphTsId,
     {
         // in case we are already a complete TS, we can return without changes
         if self.is_complete() {

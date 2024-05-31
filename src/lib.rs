@@ -6,13 +6,20 @@
 /// `use automata::prelude::*;` should be enough to use the package.
 pub mod prelude {
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
-    pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
-        GraphTs<A, Q, C, DET>;
+    pub type TS<
+        A = CharAlphabet,
+        Q = Void,
+        C = Void,
+        const DET: bool = true,
+        N: RepresentableId = DefaultIdType,
+    > = GraphTs<A, Q, C, DET, N>;
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
-    pub type DTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, true>;
+    pub type DTS<A = CharAlphabet, Q = Void, C = Void, N: RepresentableId = DefaultIdType> =
+        TS<A, Q, C, true, N>;
     /// Points to the default implementation of [`TransitionSystem`] in the case where it is
     /// **now known to be** [`Deterministic`].
-    pub type NTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, false>;
+    pub type NTS<A = CharAlphabet, Q = Void, C = Void, N: RepresentableId = DefaultIdType> =
+        TS<A, Q, C, false, N>;
 
     pub use super::transition_system::impls::pg::{petgraph, GraphTs};
     pub use super::{
@@ -31,6 +38,7 @@ pub mod prelude {
         transition_system::operations,
         transition_system::{
             dot::Dottable,
+            id::*,
             impls::DefaultIdType,
             operations::{DefaultIfMissing, Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
@@ -56,7 +64,7 @@ pub use automata_core::math;
 #[macro_use]
 pub mod transition_system;
 pub use transition_system::connected_components;
-pub use transition_system::{Pointed, TransitionSystem};
+pub use transition_system::{id::*, Pointed, TransitionSystem};
 
 /// Defines automata and common types of combinations of transition system with acceptance condition.
 #[allow(clippy::upper_case_acronyms)]

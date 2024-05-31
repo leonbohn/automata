@@ -1,3 +1,6 @@
+use std::fmt::Debug;
+use std::ops::Deref;
+
 use crate::prelude::*;
 use crate::transition_system::EdgeReference;
 pub use petgraph;
@@ -11,13 +14,24 @@ pub struct GraphTs<
     Q: Color = Void,
     C: Color = Void,
     const DET: bool = true,
+    N: GraphTsId = DefaultIdType,
 > {
     alphabet: A,
-    graph: StableDiGraph<Q, (A::Expression, C), DefaultIdType>,
+    graph: StableDiGraph<Q, (A::Expression, C), N>,
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> GraphTs<A, Q, C, DET> {
-    pub(crate) fn try_recast<const ND: bool>(self) -> Result<GraphTs<A, Q, C, ND>, Self> {
+pub trait GraphTsId: ScalarIndexType + sg::IndexType + IdType {}
+impl<T: ScalarIndexType + sg::IndexType + IdType> GraphTsId for T {}
+
+pub(super) fn pg_to_id<N: GraphTsId>(idx: sg::NodeIndex<N>) -> Id<N> {
+    Id::from(idx.index())
+}
+pub(super) fn id_to_pg<N: GraphTsId>(idx: Id<N>) -> sg::NodeIndex<N> {
+    sg::NodeIndex::new(idx.into_usize())
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, N: GraphTsId> GraphTs<A, Q, C, DET, N> {
+    pub(crate) fn try_recast<const ND: bool>(self) -> Result<GraphTs<A, Q, C, ND, N>, Self> {
         if DET {
             assert!(self.is_deterministic());
         }
@@ -26,7 +40,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> GraphTs<A, Q, C, DET> {
             graph: self.graph,
         })
     }
-    pub(crate) fn try_into_deterministic(self) -> Result<GraphTs<A, Q, C, true>, Self> {
+    pub(crate) fn try_into_deterministic(self) -> Result<GraphTs<A, Q, C, true, N>, Self> {
         if DET {
             assert!(self.is_deterministic());
         } else if !self.is_deterministic() {
@@ -45,24 +59,14 @@ impl<Q: Color, C: Color, const DET: bool> GraphTs<CharAlphabet, Q, C, DET> {
     }
 }
 
-pub(crate) fn node_index(id: DefaultIdType) -> sg::NodeIndex {
-    sg::node_index(
-        id.try_into()
-            .expect("Cannot convert default id type to node index"),
-    )
-}
-pub(crate) fn state_index(idx: sg::NodeIndex) -> DefaultIdType {
-    idx.index()
-        .try_into()
-        .expect("Cannot convert node index to default id type")
-}
-
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for GraphTs<A, Q, C, DET> {
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, N: GraphTsId> Sproutable
+    for GraphTs<A, Q, C, DET, N>
+{
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
-        state_index(self.graph.add_node(color))
+        pg_to_id(self.graph.add_node(color))
     }
 
-    fn add_edge<E>(&mut self, t: E) -> Option<(u32, <A as Alphabet>::Expression, C, u32)>
+    fn add_edge<E>(&mut self, t: E) -> Option<crate::transition_system::EdgeTuple<Self>>
     where
         E: IntoEdgeTuple<Self>,
     {
@@ -85,17 +89,19 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for GraphTs<A,
 
         let edge = self
             .graph
-            .add_edge(node_index(source), node_index(target), (expression, color));
+            .add_edge(id_to_pg(source), id_to_pg(target), (expression, color));
         out
     }
     fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
-        self.graph[node_index(index)] = color;
+        self.graph[id_to_pg(index)] = color;
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A, Q, C, DET> {
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, N: GraphTsId> Shrinkable
+    for GraphTs<A, Q, C, DET, N>
+{
     fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        let color = self.graph.remove_node(node_index(state))?;
+        let color = self.graph.remove_node(id_to_pg(state))?;
         Some(color)
     }
     fn remove_edges_from_matching(
@@ -109,15 +115,15 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
-                .map(|(s, _)| s == node_index(source))
+                .map(|(s, _)| s == id_to_pg(source))
                 .unwrap_or(false)
             {
                 if matcher.matches(&g[e].0) {
                     removed.push((
-                        state_index(g.edge_endpoints(e).unwrap().0),
+                        pg_to_id(g.edge_endpoints(e).unwrap().0),
                         g[e].0.clone(),
                         g[e].1.clone(),
-                        state_index(g.edge_endpoints(e).unwrap().1),
+                        pg_to_id(g.edge_endpoints(e).unwrap().1),
                     ));
                     false
                 } else {
@@ -144,15 +150,15 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
-                .map(|(s, t)| s == node_index(source) && t == node_index(target))
+                .map(|(s, t)| s == id_to_pg(source) && t == id_to_pg(target))
                 .unwrap_or(false)
             {
                 if matcher.matches(&g[e].0) {
                     removed.push((
-                        state_index(g.edge_endpoints(e).unwrap().0),
+                        pg_to_id(g.edge_endpoints(e).unwrap().0),
                         g[e].0.clone(),
                         g[e].1.clone(),
-                        state_index(g.edge_endpoints(e).unwrap().1),
+                        pg_to_id(g.edge_endpoints(e).unwrap().1),
                     ));
                     false
                 } else {
@@ -178,14 +184,14 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
-                .map(|(s, t)| s == node_index(source) && t == node_index(target))
+                .map(|(s, t)| s == id_to_pg(source) && t == id_to_pg(target))
                 .unwrap_or(false)
             {
                 removed.push((
-                    state_index(g.edge_endpoints(e).unwrap().0),
+                    pg_to_id(g.edge_endpoints(e).unwrap().0),
                     g[e].0.clone(),
                     g[e].1.clone(),
-                    state_index(g.edge_endpoints(e).unwrap().1),
+                    pg_to_id(g.edge_endpoints(e).unwrap().1),
                 ));
                 false
             } else {
@@ -204,14 +210,14 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
-                .map(|(s, t)| s == node_index(source))
+                .map(|(s, t)| s == id_to_pg(source))
                 .unwrap_or(false)
             {
                 removed.push((
-                    state_index(g.edge_endpoints(e).unwrap().0),
+                    pg_to_id(g.edge_endpoints(e).unwrap().0),
                     g[e].0.clone(),
                     g[e].1.clone(),
-                    state_index(g.edge_endpoints(e).unwrap().1),
+                    pg_to_id(g.edge_endpoints(e).unwrap().1),
                 ));
                 false
             } else {
@@ -230,14 +236,14 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
         let mut removed = Vec::new();
         self.graph.retain_edges(|g, e| {
             if g.edge_endpoints(e)
-                .map(|(s, t)| t == node_index(target))
+                .map(|(s, t)| t == id_to_pg(target))
                 .unwrap_or(false)
             {
                 removed.push((
-                    state_index(g.edge_endpoints(e).unwrap().0),
+                    pg_to_id(g.edge_endpoints(e).unwrap().0),
                     g[e].0.clone(),
                     g[e].1.clone(),
-                    state_index(g.edge_endpoints(e).unwrap().1),
+                    pg_to_id(g.edge_endpoints(e).unwrap().1),
                 ));
                 false
             } else {
@@ -248,10 +254,12 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for GraphTs<A,
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for GraphTs<A, Q, C, DET> {
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, N: GraphTsId> TransitionSystem
+    for GraphTs<A, Q, C, DET, N>
+{
     type Alphabet = A;
 
-    type StateIndex = DefaultIdType;
+    type StateIndex = Id<N>;
 
     type StateColor = Q;
 
@@ -261,11 +269,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = std::iter::Map<sg::Edges<'this, (A::Expression, C), Directed, StateIndex<Self>>, fn(sg::EdgeReference<'this, (A::Expression, C), StateIndex<Self>>) -> Self::EdgeRef<'this>>
+    type EdgesFromIter<'this> = std::iter::Map<sg::Edges<'this, (A::Expression, C), Directed, N>, fn(sg::EdgeReference<'this, (A::Expression, C), N>) -> Self::EdgeRef<'this>>
     where
         Self: 'this;
 
-    type StateIndices<'this> = std::iter::Map<sg::NodeIndices<'this, Q, StateIndex<Self>>, fn(sg::NodeIndex) -> StateIndex<Self>>
+    type StateIndices<'this> = std::iter::Map<sg::NodeIndices<'this, Q, N>, fn(sg::NodeIndex<N>) -> StateIndex<Self>>
     where
         Self: 'this;
 
@@ -274,7 +282,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
     }
 
     fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.graph.node_indices().map(state_index)
+        self.graph.node_indices().map(pg_to_id)
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -283,14 +291,14 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
         }
         Some(
             self.graph
-                .edges_directed(node_index(state), Direction::Outgoing)
+                .edges_directed(id_to_pg(state), Direction::Outgoing)
                 .map(|edge| {
                     let (expression, color) = edge.weight();
                     EdgeReference::new(
-                        state_index(edge.source()),
+                        pg_to_id(edge.source()),
                         expression,
                         color,
-                        state_index(edge.target()),
+                        pg_to_id(edge.target()),
                     )
                 }),
         )
@@ -300,18 +308,18 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Grap
         if !self.contains_state_index(state) {
             return None;
         }
-        self.graph.node_weight(node_index(state)).cloned()
+        self.graph.node_weight(id_to_pg(state)).cloned()
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
-    for GraphTs<A, Q, C, DET>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, N: GraphTsId> PredecessorIterable
+    for GraphTs<A, Q, C, DET, N>
 {
     type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, StateIndex<Self>, EdgeColor<Self>>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = GraphTsNeighborsIter<'this, A, Q, C, DET>
+    type EdgesToIter<'this> = GraphTsNeighborsIter<'this, A, Q, C, DET, N>
     where
         Self: 'this;
 
@@ -321,36 +329,42 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
         }
         let walker = self
             .graph
-            .neighbors_directed(node_index(state), Direction::Incoming)
+            .neighbors_directed(id_to_pg(state), Direction::Incoming)
             .detach();
         Some(GraphTsNeighborsIter {
             graph: &self.graph,
             walker,
-            target: state,
+            target: *state,
         })
     }
 }
 
-pub struct GraphTsNeighborsIter<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> {
-    graph: &'a StableDiGraph<Q, (A::Expression, C), DefaultIdType>,
-    walker: sg::WalkNeighbors<DefaultIdType>,
-    target: DefaultIdType,
+pub struct GraphTsNeighborsIter<'a, A: Alphabet, Q: Color, C: Color, const DET: bool, N: GraphTsId>
+{
+    graph: &'a StableDiGraph<Q, (A::Expression, C), N>,
+    walker: sg::WalkNeighbors<N>,
+    target: N,
 }
 
-impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> Iterator
-    for GraphTsNeighborsIter<'a, A, Q, C, DET>
+impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool, N: GraphTsId> Iterator
+    for GraphTsNeighborsIter<'a, A, Q, C, DET, N>
 {
     type Item = EdgeReference<
         'a,
         A::Expression,
-        StateIndex<GraphTs<A, Q, C, DET>>,
-        EdgeColor<GraphTs<A, Q, C, DET>>,
+        StateIndex<GraphTs<A, Q, C, DET, N>>,
+        EdgeColor<GraphTs<A, Q, C, DET, N>>,
     >;
     fn next(&mut self) -> Option<Self::Item> {
         let (edge_id, source_id) = self.walker.next(self.graph)?;
         let (expression, color) = self.graph.edge_weight(edge_id)?;
-        let source = state_index(source_id);
-        Some(EdgeReference::new(source, expression, color, self.target))
+        let source = pg_to_id(source_id);
+        Some(EdgeReference::new(
+            source,
+            expression,
+            color,
+            Id(self.target),
+        ))
     }
 }
 
@@ -461,7 +475,7 @@ mod tests {
         let succs: math::Set<_> = pgts.reachable_state_indices_from(q0).collect();
         assert_eq!(succs, math::Set::from_iter([q0, q1, q3, q2]));
 
-        let mut dfa = pgts.into_dfa_with_initial(0);
+        let mut dfa = pgts.into_dfa_with_initial(Id(0));
 
         for pos in ["", "bbb", "abababa", "a"] {
             assert!(dfa.accepts(pos))

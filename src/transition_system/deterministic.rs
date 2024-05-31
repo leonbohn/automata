@@ -521,7 +521,7 @@ pub trait Deterministic: TransitionSystem {
         self,
     ) -> (
         DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
-        DefaultIdType,
+        StateIndex<DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>>,
     )
     where
         Self: Sized + Pointed,
@@ -664,7 +664,7 @@ pub trait Deterministic: TransitionSystem {
         sink_edge_color: Self::EdgeColor,
     ) -> (
         DTS<Self::Alphabet, StateColor<Self>, Self::EdgeColor>,
-        DefaultIdType,
+        StateIndex<DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>>,
     )
     where
         Self: Pointed,
@@ -674,9 +674,9 @@ pub trait Deterministic: TransitionSystem {
         if !ts.is_complete() {
             let sink = ts.add_state(sink_state_color);
             for q in 0..ts.size() {
-                let q = DefaultIdType::from_usize(q);
+                let q = DefaultIdType::from_representation(q);
                 for sym in self.alphabet().universe() {
-                    if ts.edge(q, sym).is_none() {
+                    if ts.edge(Id(q), sym).is_none() {
                         ts.add_edge((q, ts.make_expression(sym), sink_edge_color.clone(), sink));
                     }
                 }
@@ -701,8 +701,8 @@ pub trait Deterministic: TransitionSystem {
     fn trim_collect_pointed(
         &self,
     ) -> (
-        crate::transition_system::DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
-        DefaultIdType,
+        DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
+        StateIndex<DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>>,
     )
     where
         Self: Pointed,
@@ -872,7 +872,7 @@ mod tests {
 
         // build transition system
         let ts = DTS::builder()
-            .with_transitions([(0, 'a', Void, 1), (1, 'b', Void, 1)])
+            .with_transitions([(0, 'a', 1), (1, 'b', 1)])
             .default_color(Void)
             .into_dts_with_initial(0);
 

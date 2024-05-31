@@ -461,11 +461,11 @@ where
                     .find(|((p, f), _)| *p == q && f == e)
                     .map(|(_, c)| *c)
                 else {
-                    panic!("Could not find recoloring for edge ({}, {:?})", q, e);
+                    panic!("Could not find recoloring for edge ({q:?}, {:?})", e);
                 };
                 c
             })
-            .with_initial(out_initial)
+            .with_initial(Id(out_initial))
             .collect_dpa();
 
         info!("normalizing DPA took {} μs", start.elapsed().as_micros());

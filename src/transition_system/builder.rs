@@ -162,7 +162,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
 
         let mut created_states_number = 0;
         for i in 0..num_states {
-            let i = DefaultIdType::from_usize(i);
+            let i = DefaultIdType::from_representation(i);
             if self.colors.iter().all(|(q, _)| *q != i) && self.default.is_none() {
                 panic!("Default is needed as some states (specifically {i:?}) have no color",);
             }
@@ -178,7 +178,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         assert_eq!(created_states_number, num_states);
 
         for (q, e, c, p) in self.edges {
-            if let Some((q, e, d, pp)) = ts.add_edge((q, e, c.clone(), p)) {
+            if let Some((q, e, d, pp)) = ts.add_edge((Id(q), e, c.clone(), Id(p))) {
                 panic!("Failed to add edge from {q:?} on {e} to {p:?} with color {c:?}, it is overlapping an existing edge with color {d:?} to {pp:?}")
             }
         }
@@ -194,7 +194,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         self,
         initial: DefaultIdType,
     ) -> WithInitial<NTS<CharAlphabet, Q, C>> {
-        self.into_ts().with_initial(initial)
+        self.into_ts().with_initial(Id(initial))
     }
 
     /// Assigns the given `color` to the state with the given index `idx`.
@@ -230,8 +230,10 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         mut self,
         iter: T,
     ) -> Self {
-        self.edges
-            .extend(iter.into_iter().map(|t| t.into_edge_tuple()));
+        self.edges.extend(iter.into_iter().map(|t| {
+            let (Id(p), e, c, Id(q)) = t.into_edge_tuple();
+            (p, e, c, q)
+        }));
         self
     }
 
@@ -265,8 +267,10 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         mut self,
         iter: I,
     ) -> Self {
-        self.edges
-            .extend(iter.into_iter().map(|e| e.into_edge_tuple()));
+        self.edges.extend(iter.into_iter().map(|e| {
+            let (Id(p), e, c, Id(q)) = e.into_edge_tuple();
+            (p, e, c, q)
+        }));
         self
     }
 
@@ -323,7 +327,7 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     where
         C: Hash + Eq,
     {
-        self.into_dts().with_initial(initial)
+        self.into_dts().with_initial(Id(initial))
     }
 
     /// Build a deterministic transition system from `self`. Panics if `self` is not deterministic.
@@ -346,7 +350,7 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
         initial: DefaultIdType,
     ) -> RightCongruence<CharAlphabet, Q, C> {
         self.into_dts()
-            .with_initial(initial)
+            .with_initial(Id(initial))
             .collect_right_congruence()
     }
     /// Build a deterministic transition system from `self` and set the given `initial` state as the
@@ -374,7 +378,7 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
 impl TSBuilder<bool, Void, true> {
     /// Tries to turn `self` into a deterministic finite automaton. Panics if `self` is not deterministic.
     pub fn into_dfa(self, initial: DefaultIdType) -> DFA<CharAlphabet> {
-        self.into_dts().with_initial(initial).collect_dfa()
+        self.into_dts().with_initial(Id(initial)).collect_dfa()
     }
 }
 
@@ -383,7 +387,7 @@ impl TSBuilder<Void, bool, true> {
     pub fn into_dba(self, initial: DefaultIdType) -> DBA<CharAlphabet> {
         self.default_color(Void)
             .into_dts()
-            .with_initial(initial)
+            .with_initial(Id(initial))
             .collect_dba()
     }
 }
@@ -393,7 +397,7 @@ impl TSBuilder<Void, Int, true> {
     pub fn into_dpa(self, initial: DefaultIdType) -> DPA<CharAlphabet> {
         self.default_color(Void)
             .into_dts()
-            .with_initial(initial)
+            .with_initial(Id(initial))
             .collect_dpa()
     }
 
@@ -401,7 +405,7 @@ impl TSBuilder<Void, Int, true> {
     pub fn into_mealy(self, initial: DefaultIdType) -> MealyMachine<CharAlphabet> {
         self.default_color(Void)
             .into_dts()
-            .with_initial(initial)
+            .with_initial(Id(initial))
             .collect_mealy()
     }
 }
@@ -409,7 +413,7 @@ impl TSBuilder<Void, Int, true> {
 impl TSBuilder<Int, Void, true> {
     /// Builds a Moore machine from `self`. Panics if `self` is not deterministic.
     pub fn into_moore(self, initial: DefaultIdType) -> MooreMachine<CharAlphabet> {
-        self.into_dts().with_initial(initial).collect_moore()
+        self.into_dts().with_initial(Id(initial)).collect_moore()
     }
 }
 
@@ -421,7 +425,7 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
         initial: DefaultIdType,
     ) -> RightCongruence<CharAlphabet> {
         self.into_dts()
-            .with_initial(initial)
+            .with_initial(Id(initial))
             .erase_state_colors()
             .erase_edge_colors()
             .collect_right_congruence()
