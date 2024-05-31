@@ -1,7 +1,8 @@
 use itertools::Itertools;
 use tracing::trace;
 
-use crate::{math::Partition, prelude::*};
+use crate::prelude::*;
+use math::Partition;
 use std::{collections::BTreeSet, hash::Hash};
 
 mod state_index;
@@ -725,7 +726,7 @@ where
     }
 }
 
-/// Helper trait for extracting the [`crate::alphabet::Symbol`] type from an a transition system.
+/// Helper trait for extracting the [`Symbol`] type from an a transition system.
 pub type SymbolOf<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Symbol;
 /// Helper trait for extracting the [`Expression`] type from an a transition system.
 pub type EdgeExpression<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Expression;

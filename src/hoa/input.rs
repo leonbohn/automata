@@ -251,7 +251,7 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
     aut: HoaAutomaton,
 ) -> Result<OmegaAutomaton<HoaAlphabet, DET>, String> {
     let aps = aut.num_aps();
-    assert!(aps <= MAX_APS);
+    assert!(aps as u16 <= MAX_APS);
 
     let mut ts: TS<HoaAlphabet, Int, AcceptanceMask, DET> =
         TS::for_alphabet(HoaAlphabet::from_hoa_automaton(&aut));

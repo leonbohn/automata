@@ -25,7 +25,7 @@ impl<E, M: Matcher<E>> Matcher<E> for &M {
     }
 }
 
-/// An expression is used to label edges of a [`crate::transition_system::TransitionSystem`]. For [`CharAlphabet`]
+/// An expression is used to label edges of a transition system/automaton. For [`CharAlphabet`]
 /// alphabets, an expression is simply a single symbol, whereas for a propositional alphabet, an expression
 /// is a propositional formula over the atomic propositions. See propositional for more details.
 pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show + Matcher<Self> {
@@ -113,6 +113,10 @@ pub trait Alphabet: Clone + Debug {
 
     /// Returns the number of symbols in the alphabet.
     fn size(&self) -> usize;
+
+    fn is_empty(&self) -> bool {
+        self.size() == 0
+    }
 }
 
 impl<A: Alphabet> Alphabet for &A {
@@ -146,7 +150,7 @@ impl<A: Alphabet> Alphabet for &A {
 ///
 /// # Example
 /// Assume we have a [`CharAlphabet`] over the symbols 'a' and 'b'. Then a **symbol** would be just one of these
-/// characters, e.g. 'a'. This is used to label transitions in a [`crate::transition_system::TransitionSystem`].
+/// characters, e.g. 'a'. This is used to label transitions in a transition system or automaton.
 /// Now an **expression** would also be just a single character, e.g. 'a'. Then such an expression is
 /// matched by a symbol if the expression equals the symbol.
 #[derive(Clone, Hash, PartialEq, Eq, Debug, PartialOrd, Ord)]
@@ -174,14 +178,14 @@ impl std::ops::Index<usize> for CharAlphabet {
 ///
 /// # Examples
 /// ```
-/// use automata::prelude::*;
+/// use automata_core::prelude::*;
 /// let alphabet = alphabet!(simple 'a', 'b', 'c');
 /// assert_eq!(alphabet.size(), 3);
 /// ```
 #[macro_export]
 macro_rules! alphabet {
     (simple $($c:literal),*) => {
-        $crate::alphabet::CharAlphabet::new(vec![$($c),*])
+        $crate::prelude::CharAlphabet::new(vec![$($c),*])
     };
 }
 
@@ -492,8 +496,8 @@ impl Alphabet for Directional {
 
 #[cfg(test)]
 mod tests {
+    use super::Alphabet;
     use super::{CharAlphabet, Directional};
-    use crate::Alphabet;
     use itertools::Itertools;
 
     #[test]

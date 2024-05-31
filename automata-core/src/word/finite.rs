@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use itertools::Itertools;
 
-use crate::{prelude::Symbol, Show};
+use crate::prelude::{Show, Symbol};
 
 use super::{omega::OmegaIteration, Concat, LinearWord, PeriodicOmegaWord};
 
@@ -98,7 +98,7 @@ pub trait FiniteWord<S>: LinearWord<S> {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata_core::prelude::*;
     /// let word = "abc";
     ///
     /// assert_eq!(word.nth_back(0), Some('c'));

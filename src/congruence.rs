@@ -121,6 +121,52 @@ pub trait Congruence: Deterministic + Pointed {
         let (ts, initial) = self.collect_dts_pointed();
         RightCongruence::from_parts(ts, initial)
     }
+
+    /// Computes the normalization with regard to the given deterministic transition system `cong`.
+    /// Specifically, for an ultimately periodic word `ux^ω`, this procedure returns the ultimately
+    /// periodic word `u^i(x^j)^ω` such that `i` and `j` are the least natural numbers verifying that
+    /// `u^i` and `u^ix^j` lead the same state in `cong`.
+    ///
+    /// The function will return `None` if no normalization exists. This may be the case if the
+    /// transition system is incomplete.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let ts = TSBuilder::without_colors()
+    ///     .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
+    ///     .into_dts_with_initial(0);
+    /// let word = upw!("b", "a");
+    /// let normalized = ts.normalize_upw(&word).expect("must be normalizable");
+    /// assert_eq!(normalized.spoke_vec(), vec!['b']);
+    /// assert_eq!(normalized.cycle_vec(), vec!['a', 'a']);
+    /// ```
+    fn normalize_upw(
+        &self,
+        word: impl OmegaWord<SymbolOf<Self>>,
+    ) -> Option<NormalizedOmegaWord<SymbolOf<Self>>>
+    where
+        Self: Pointed,
+    {
+        let mut cur = self.reached_state_index(word.spoke())?;
+        let mut count = 0;
+        let mut map = math::Map::default();
+        loop {
+            match map.insert(cur, count) {
+                None => {
+                    count += 1;
+                    cur = self.reached_state_index_from(cur, word.cycle())?;
+                }
+                Some(i) => {
+                    // the spoke is the spoke of self plus `i` times the cycle, while the
+                    // cycle is `count - i` times the cycle
+                    assert!(i < count);
+                    return Some(NormalizedOmegaWord::new(word.reduced(), i, count - i));
+                }
+            }
+        }
+    }
 }
 impl<C: Deterministic + Pointed> Congruence for C {}
 
