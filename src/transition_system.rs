@@ -1,7 +1,8 @@
 use itertools::Itertools;
 use tracing::trace;
 
-use crate::{math::Partition, prelude::*};
+use crate::prelude::*;
+use math::Partition;
 use std::{collections::BTreeSet, hash::Hash};
 
 mod state_index;

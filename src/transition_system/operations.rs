@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 mod map;
 pub use map::*;
 
@@ -18,8 +20,6 @@ pub use quotient::{Quotient, QuotientEdgesFrom, QuotientTransition};
 
 mod with_state_color;
 pub use with_state_color::{DefaultIfMissing, ProvidesStateColor, UniformColor, WithStateColor};
-
-use crate::Void;
 
 use super::{EdgeColor, StateColor};
 

@@ -1,7 +1,5 @@
 use crate::prelude::*;
 
-use self::alphabet::Matcher;
-
 use super::EdgeTuple;
 
 /// Encapsulates the ability to remove states, edges, and transitions from a transition system.
@@ -189,7 +187,7 @@ mod tests {
     use crate::prelude::*;
     #[test]
     fn asdf() {
-        let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
+        let mut ts = DTS::for_alphabet(automata_core::alphabet!(simple 'a', 'b'));
         let q0 = ts.add_state(true);
         let q1 = ts.add_state(false);
 
