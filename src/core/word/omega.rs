@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use itertools::Itertools;
 
-use crate::{math::Map, prelude::*};
+use crate::prelude::*;
 
 /// An omega word is an infinite word that can be indexed by a `usize`. We assume that all
 /// omega words can be represented as a concatenation of a finite prefix which we call spoke
@@ -26,7 +26,7 @@ use crate::{math::Map, prelude::*};
 ///
 /// # Example
 /// ```
-/// use automata::prelude::*;
+/// use automata_core::prelude::*;
 /// let word = upw!("abc", "def"); // represents abc(def)^𝜔 = abcdefdefdef...
 /// assert_eq!(word.loop_index(), 3);
 /// assert_eq!(word.cycle_length(), 3);
@@ -52,7 +52,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata_core::prelude::*;
     /// let word = upw!("abac", "acac");
     /// assert!(word.spoke().equals("ab"));
     /// assert!(word.cycle().equals("ac"));
@@ -67,7 +67,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     /// Tests whether `self` is *semantically* equal to `other`. To see the difference compared to syntactic
     /// equality, consider the exampe below.
     /// ```
-    /// use automata::prelude::*;
+    /// use automata_core::prelude::*;
     /// let word = upw!("a"); // represents the periodic omega word a^𝜔 = aaa...
     /// let offset1 = word.skip(1); // the word obtained by skipping the first symbol of `word`
     /// let offset2 = word.skip(2);
@@ -111,51 +111,6 @@ pub trait OmegaWord<S>: LinearWord<S> {
     /// represented by the cycle `a`.
     fn cycle_length(&self) -> usize {
         self.cycle().len()
-    }
-
-    /// Computes the normalization with regard to the given deterministic transition system `cong`.
-    /// Specifically, for an ultimately periodic word `ux^ω`, this procedure returns the ultimately
-    /// periodic word `u^i(x^j)^ω` such that `i` and `j` are the least natural numbers verifying that
-    /// `u^i` and `u^ix^j` lead the same state in `cong`.
-    ///
-    /// The function will return `None` if no normalization exists. This may be the case if the
-    /// transition system is incomplete.
-    ///
-    /// # Example
-    /// ```
-    /// use automata::{prelude::*, word::NormalizedOmegaWord};
-    ///
-    /// let ts = TSBuilder::without_colors()
-    ///     .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
-    ///     .into_dts_with_initial(0);
-    /// let word = upw!("b", "a");
-    /// let normalized = word.normalize_for(&ts).expect("must be normalizable");
-    /// assert_eq!(normalized.spoke_vec(), vec!['b']);
-    /// assert_eq!(normalized.cycle_vec(), vec!['a', 'a']);
-    /// ```
-    fn normalize_for<D>(&self, cong: D) -> Option<NormalizedOmegaWord<S>>
-    where
-        D: Congruence,
-        D::Alphabet: Alphabet<Symbol = S>,
-        S: Symbol,
-    {
-        let mut cur = cong.reached_state_index(self.spoke())?;
-        let mut count = 0;
-        let mut map = Map::default();
-        loop {
-            match map.insert(cur, count) {
-                None => {
-                    count += 1;
-                    cur = cong.reached_state_index_from(cur, self.cycle())?;
-                }
-                Some(i) => {
-                    // the spoke is the spoke of self plus `i` times the cycle, while the
-                    // cycle is `count - i` times the cycle
-                    assert!(i < count);
-                    return Some(NormalizedOmegaWord::new(self.reduced(), i, count - i));
-                }
-            }
-        }
     }
 }
 
@@ -240,7 +195,7 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata_core::prelude::*;
     /// let word = upw!("abcabcabc");
     /// assert_eq!(word.cycle_length(), 3);
     /// assert_eq!(word.loop_index(), 0);
@@ -354,7 +309,7 @@ impl<S: Symbol> ReducedOmegaWord<S> {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata_core::prelude::*;
     /// let non_normalized = ReducedOmegaWord::from_raw_parts(vec!['a', 'a'], 0);
     /// assert!(!non_normalized.is_reduced()); // the constructed word is not normalized
     /// let normalized = non_normalized.reduced();

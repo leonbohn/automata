@@ -11,8 +11,6 @@ use biodivine_lib_bdd::{
 use hoars::HoaAutomaton;
 use itertools::Itertools;
 
-use self::alphabet::Matcher;
-
 pub static MAX_APS: usize = 6;
 
 #[derive(Debug, Clone, Eq, PartialEq)]

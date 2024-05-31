@@ -37,7 +37,7 @@ pub trait LinearWord<S>: Hash + Eq {
     ///
     /// # Example
     /// ```
-    /// use automata::word::{LinearWord, FiniteWord};
+    /// use automata_core::word::{LinearWord, FiniteWord};
     /// let word = "abcde".to_string();
     /// assert_eq!(word.infix(1, 3).as_string(), "bcd");
     /// ```
@@ -133,7 +133,7 @@ impl<'a, S: Symbol, W: LinearWord<S>> ConsumingInfixIterator<'a, S, W> {
 ///
 /// # Example:
 /// ```
-/// use automata::prelude::*;
+/// use automata_core::prelude::*;
 /// let ultimately_periodic = upw!("ab", "bb"); // represents the ultimately periodic word `ab(bb)^𝜔`
 /// assert!(ultimately_periodic.spoke().equals("a")); // the spoke is normalized to just `a`
 /// assert!(ultimately_periodic.cycle().equals("b")); // while the loop normalizes to `b`
