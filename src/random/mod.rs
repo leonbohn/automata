@@ -1,5 +1,7 @@
 #![allow(unused)]
 use crate::prelude::*;
+use rand::{rngs::ThreadRng, Rng};
+use rand_distr::{Distribution, Exp};
 use tracing::{debug, info};
 
 /// Uses sprout-like algorithm to generate a random transition system. `symbols` determines the
@@ -83,13 +85,16 @@ pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, StateIndex
 
 /// Works as [`generate_random_ts_sized`], but returns a [`DBA`] instead by randomly coloring the edges.
 /// Removes unreachable states, that means the resulting DBA may be smaller than `size`.
-pub fn generate_random_dba(symbols: usize, size: usize) -> DBA {
+/// The acceptance condition is drawn from an exponential distribution controlled by parameter `lambda`.
+/// Values `lambda <= .01` approximate a uniform distribution.
+pub fn generate_random_dba(symbols: usize, size: usize, lambda: f64) -> DBA {
     // draw random transition system
     let (mut dts, initial) = generate_random_ts_sized(symbols, size);
     // remove unreachable states
     dts.trim_from(initial);
     // draw acceptance condition
-    dts.map_edge_colors(|_| fastrand::bool())
+    let exp = Exp::new(lambda).unwrap();
+    dts.map_edge_colors(|_| if draw_prio(exp, 2) == 0 { false } else { true })
         .with_initial(initial)
         .collect_dba()
 }
@@ -97,15 +102,31 @@ pub fn generate_random_dba(symbols: usize, size: usize) -> DBA {
 /// Works as [`generate_random_ts_sized`], but returns a [`DPA`] instead by randomly
 /// assigning priorities in the range `0..priorities` to each edge.
 /// Removes unreachable states, that means the resulting DPA may be smaller than `size`.
-pub fn generate_random_dpa(symbols: usize, size: usize, priorities: Int) -> DPA {
+/// The acceptance condition is drawn from an exponential distribution controlled by parameter `lambda`.
+/// Values `lambda <= 1/20/num_prios` approximate a uniform distribution.
+pub fn generate_random_dpa(symbols: usize, size: usize, num_prios: Int, lambda: f64) -> DPA {
     // draw random transition system
     let (mut dts, initial) = generate_random_ts_sized(symbols, size);
     // remove unreachable states
     dts.trim_from(initial);
     // draw acceptance condition
-    dts.map_edge_colors(|_| fastrand::u8(..priorities))
+    let exp = Exp::new(lambda).unwrap();
+    dts.map_edge_colors(|_| num_prios - 1 - draw_prio(exp, num_prios))
         .with_initial(initial)
         .collect_dpa()
+}
+
+/// Randomly draw a priority in range [0,num_prios) from distribution `dist`
+pub fn draw_prio<D: Distribution<f64>>(dist: D, num_prios: u8) -> u8 {
+    let mut rng = rand::thread_rng();
+    let mut prio;
+    loop {
+        prio = dist.sample(&mut rng) as u8;
+        if prio < num_prios {
+            break;
+        }
+    }
+    prio
 }
 
 /// Generate a random `String` over the universe of the `alphabet`
@@ -292,7 +313,13 @@ pub(crate) fn print_random_ts_benchmark(
 
 #[cfg(test)]
 mod tests {
-    use crate::{random::CharAlphabet, transition_system::Dottable, word, TransitionSystem};
+    use crate::{
+        random::{draw_prio, CharAlphabet},
+        transition_system::Dottable,
+        word, TransitionSystem,
+    };
+    use rand_distr::Exp;
+    use std::collections::HashMap;
 
     use super::{
         generate_random_dba, generate_random_dfa, generate_random_dpa, generate_random_omega_words,
@@ -314,13 +341,13 @@ mod tests {
 
     #[test]
     fn random_dba_sized() {
-        let dba = generate_random_dba(2, 10);
+        let dba = generate_random_dba(2, 10, 1.0);
         assert!(dba.size() <= 10);
     }
 
     #[test]
     fn random_dpa_sized() {
-        let dpa = generate_random_dpa(2, 10, 3);
+        let dpa = generate_random_dpa(2, 10, 3, 0.5);
         assert!(dpa.size() <= 10);
     }
 
