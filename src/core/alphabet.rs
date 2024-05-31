@@ -167,6 +167,11 @@ impl CharAlphabet {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
+    /// Returns true if and only if the alphabet is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl std::ops::Index<usize> for CharAlphabet {
