@@ -132,13 +132,13 @@ pub trait Congruence: Deterministic + Pointed {
     ///
     /// # Example
     /// ```
-    /// use automata::{prelude::*, word::NormalizedOmegaWord};
+    /// use automata::prelude::*;
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
     ///     .into_dts_with_initial(0);
     /// let word = upw!("b", "a");
-    /// let normalized = word.normalize_for(&ts).expect("must be normalizable");
+    /// let normalized = ts.normalize_upw(&word).expect("must be normalizable");
     /// assert_eq!(normalized.spoke_vec(), vec!['b']);
     /// assert_eq!(normalized.cycle_vec(), vec!['a', 'a']);
     /// ```
