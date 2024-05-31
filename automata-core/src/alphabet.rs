@@ -159,6 +159,14 @@ impl CharAlphabet {
         assert!(size < 26, "Alphabet is too large");
         Self((0..size).map(|i| (b'a' + i as u8) as char).collect())
     }
+    /// Returns an iterator over the symbols in the alphabet.
+    pub fn iter(&self) -> impl Iterator<Item = char> + '_ {
+        self.0.iter().copied()
+    }
+    /// Returns the number of symbols in the alphabet.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl std::ops::Index<usize> for CharAlphabet {
@@ -181,7 +189,7 @@ impl std::ops::Index<usize> for CharAlphabet {
 #[macro_export]
 macro_rules! alphabet {
     (simple $($c:literal),*) => {
-        $crate::alphabet::CharAlphabet::new(vec![$($c),*])
+        $crate::prelude::CharAlphabet::new(vec![$($c),*])
     };
 }
 
@@ -492,8 +500,8 @@ impl Alphabet for Directional {
 
 #[cfg(test)]
 mod tests {
+    use super::Alphabet;
     use super::{CharAlphabet, Directional};
-    use crate::Alphabet;
     use itertools::Itertools;
 
     #[test]

@@ -13,10 +13,7 @@ homepage.workspace = true
 authors.workspace = true
 license.workspace = true
 
-exclude = [
-    "hoa/*",
-    "doc/hoaf.pdf"
-]
+exclude = ["hoa/*", "doc/hoaf.pdf"]
 
 [package.metadata.workspaces]
 independent = true
@@ -25,6 +22,7 @@ independent = true
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 itertools = { workspace = true }
+automata-core = { workspace = true }
 biodivine-lib-bdd = { workspace = true }
 
 ariadne = "0.4.1"

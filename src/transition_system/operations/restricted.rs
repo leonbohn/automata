@@ -1,6 +1,6 @@
+use crate::prelude::*;
+use math::Set;
 use std::marker::PhantomData;
-
-use crate::{math::Set, prelude::*};
 
 /// Abstracts the filtering of a transition system's state indices. This trait is implemented by
 /// functions which take a state index and return a boolean value indicating whether the state index

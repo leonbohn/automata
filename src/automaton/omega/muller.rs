@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 
 use crate::automaton::InfiniteWordAutomaton;
-use crate::math::Set;
 
 use crate::prelude::*;
 
+use math::Set;
 /// A deterministic Muller automaton (DMA) uses a [`MullerCondition`] to determine acceptance.
 /// Such a condition consists of a set of sets of colors. It considers an infinite run to
 /// be accepting, if the set of colors that appear infinitely often in the run is an element

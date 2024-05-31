@@ -1,10 +1,4 @@
-use crate::Alphabet;
-
-use super::{
-    deterministic::{FiniteRunResult, OmegaRunResult},
-    IndexType,
-};
-
+use crate::prelude::*;
 /// A run is a sequence of states and edges that is consistent with the transition system.
 /// Implementors of this trait represent such a run.
 pub trait FiniteRun {
@@ -24,7 +18,9 @@ pub trait FiniteRun {
     fn successful(&self) -> bool;
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone, Idx: IndexType> FiniteRun for FiniteRunResult<A, Idx, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone, Idx: IndexType> FiniteRun
+    for super::deterministic::FiniteRunResult<A, Idx, Q, C>
+{
     type StateColor = Q;
     type EdgeColor = C;
     type StateIndex = Idx;
@@ -63,7 +59,9 @@ pub trait OmegaRun {
     fn recurring_state_indices_iter(self) -> Option<impl Iterator<Item = Self::StateIndex>>;
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone, Idx: IndexType> OmegaRun for OmegaRunResult<A, Idx, Q, C> {
+impl<A: Alphabet, Q: Clone, C: Clone, Idx: IndexType> OmegaRun
+    for super::deterministic::OmegaRunResult<A, Idx, Q, C>
+{
     type StateColor = Q;
 
     type EdgeColor = C;

@@ -292,7 +292,7 @@ pub(crate) fn print_random_ts_benchmark(
 
 #[cfg(test)]
 mod tests {
-    use crate::{random::CharAlphabet, transition_system::Dottable, word, TransitionSystem};
+    use crate::{random::CharAlphabet, transition_system::Dottable, TransitionSystem};
 
     use super::{
         generate_random_dba, generate_random_dfa, generate_random_dpa, generate_random_omega_words,
