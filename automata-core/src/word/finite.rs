@@ -98,7 +98,7 @@ pub trait FiniteWord<S>: LinearWord<S> {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata_core::prelude::*;
     /// let word = "abc";
     ///
     /// assert_eq!(word.nth_back(0), Some('c'));
