@@ -19,6 +19,8 @@ pub use omega::{OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, ReducedParseErro
 
 pub use self::skip::Infix;
 
+pub mod prefixes;
+
 /// A linear word is a word that can be indexed by a `usize`. This is the case for both finite and
 /// infinite words.
 pub trait LinearWord<S>: Hash + Eq {

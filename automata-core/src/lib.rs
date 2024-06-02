@@ -9,6 +9,8 @@ mod show;
 /// Alias for the default integer type that is used for coloring edges and states.
 pub type Int = u8;
 
+pub type Id = u32;
+
 /// Represents the absence of a color. The idea is that this can be used when collecting
 /// a transitions system as it can always be constructed from a color by simply forgetting it.
 /// This is useful for example when we want to collect a transition system into a different
@@ -26,7 +28,7 @@ impl std::fmt::Debug for Void {
 pub mod prelude {
     pub use super::math;
     pub use super::show::Show;
-    pub use super::{Int, Void};
+    pub use super::{Id, Int, Void};
     pub use crate::alphabet;
     pub use crate::alphabet::*;
     pub use crate::upw;

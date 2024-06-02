@@ -156,6 +156,20 @@ impl<A: Alphabet> Alphabet for &A {
 #[derive(Clone, Hash, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct CharAlphabet(pub(crate) Vec<char>);
 
+impl AsRef<Vec<char>> for CharAlphabet {
+    fn as_ref(&self) -> &Vec<char> {
+        &self.0
+    }
+}
+
+impl std::ops::Deref for CharAlphabet {
+    type Target = Vec<char>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl CharAlphabet {
     /// Creates a new [`CharAlphabet`] alphabet of the given size. The symbols are just the first `size` letters
     /// of the alphabet, i.e. 'a' to 'z'.

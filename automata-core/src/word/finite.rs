@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::prelude::{Show, Symbol};
 
-use super::{omega::OmegaIteration, Concat, LinearWord, PeriodicOmegaWord};
+use super::{omega::OmegaIteration, Concat, Infix, LinearWord, PeriodicOmegaWord};
 
 /// A finite word is a [`LinearWord`] that has a finite length.
 pub trait FiniteWord<S>: LinearWord<S> {
@@ -23,6 +23,19 @@ pub trait FiniteWord<S>: LinearWord<S> {
         Self: Sized,
     {
         Concat(self, suffix)
+    }
+
+    fn drop_back(&self, n: usize) -> Infix<'_, S, Self>
+    where
+        Self: Sized,
+    {
+        Infix::new(self, 0, self.len() - n)
+    }
+    fn drop_front(&self, n: usize) -> Infix<'_, S, Self>
+    where
+        Self: Sized,
+    {
+        Infix::new(self, n, self.len() - n)
     }
 
     /// Checks if the given word is equal to this word. Note, that this operation only makes sense
@@ -126,6 +139,44 @@ pub trait FiniteWord<S>: LinearWord<S> {
         } else {
             out
         }
+    }
+
+    fn eq_deque(&self, other: &VecDeque<S>) -> bool
+    where
+        S: Ord,
+    {
+        if self.len() != other.len() {
+            return false;
+        }
+        for i in 0..self.len() {
+            if self.nth(i).unwrap() != other[i] {
+                return false;
+            }
+        }
+        true
+    }
+    fn llex_before_deque(&self, other: &VecDeque<S>) -> bool
+    where
+        S: Ord,
+    {
+        if self.len() < other.len() {
+            return true;
+        } else if other.len() < self.len() {
+            return false;
+        };
+
+        for i in 0..self.len() {
+            if self.nth(i).unwrap() < other[i] {
+                return true;
+            }
+        }
+        false
+    }
+    fn llex_after_deque(&self, other: &VecDeque<S>) -> bool
+    where
+        S: Ord,
+    {
+        !self.llex_before_deque(other)
     }
 }
 

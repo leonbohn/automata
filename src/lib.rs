@@ -66,6 +66,8 @@ pub mod automaton;
 pub mod congruence;
 pub use congruence::{Class, Congruence, RightCongruence};
 
+mod incongruence;
+
 /// Contains implementations different minimization algorithms.
 pub mod minimization;
 
