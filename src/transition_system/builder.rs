@@ -81,7 +81,7 @@ impl<Q, C, const DET: bool> Default for TSBuilder<Q, C, DET> {
 
 impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     /// Sets the default color for states that have no color specified.
-    pub fn default_color(mut self, color: Q) -> Self {
+    pub fn default_color(mut self, color: Q) -> TSBuilder<Q, C, DET> {
         self.default = Some(color);
         self
     }
@@ -178,7 +178,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         assert_eq!(created_states_number, num_states);
 
         for (q, e, c, p) in self.edges {
-            if let Some((q, e, d, pp)) = ts.add_edge((Id(q), e, c.clone(), Id(p))) {
+            if let Some((q, e, d, pp)) = ts.add_edge((q, e, c.clone(), p)) {
                 panic!("Failed to add edge from {q:?} on {e} to {p:?} with color {c:?}, it is overlapping an existing edge with color {d:?} to {pp:?}")
             }
         }
@@ -224,14 +224,14 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
     pub fn with_transitions<
-        E: IntoEdgeTuple<DTS<CharAlphabet, Q, C>>,
+        E: IntoEdgeTuple<CharAlphabet, C, DefaultIdType>,
         T: IntoIterator<Item = E>,
     >(
         mut self,
         iter: T,
     ) -> Self {
         self.edges.extend(iter.into_iter().map(|t| {
-            let (Id(p), e, c, Id(q)) = t.into_edge_tuple();
+            let (p, e, c, q) = t.into_edge_tuple();
             (p, e, c, q)
         }));
         self
@@ -263,12 +263,15 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     ///     .with_edges([(1, 'b', 0)]) // We can also skip the `Void` entry at position 3
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
-    pub fn with_edges<E: IntoEdgeTuple<DTS<CharAlphabet, Q, C>>, I: IntoIterator<Item = E>>(
+    pub fn with_edges<
+        E: IntoEdgeTuple<CharAlphabet, C, DefaultIdType>,
+        I: IntoIterator<Item = E>,
+    >(
         mut self,
         iter: I,
     ) -> Self {
         self.edges.extend(iter.into_iter().map(|e| {
-            let (Id(p), e, c, Id(q)) = e.into_edge_tuple();
+            let (p, e, c, q) = e.into_edge_tuple();
             (p, e, c, q)
         }));
         self

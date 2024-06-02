@@ -20,7 +20,7 @@ pub struct MappedPreEdge<Idx, T, F, C> {
 
 impl<'a, Idx, E: 'a, C, D, F, T> IsEdge<'a, E, Idx, D> for MappedPreEdge<Idx, T, F, C>
 where
-    Idx: IndexType,
+    Idx: IdType,
     C: Color,
     D: Color,
     F: Fn(Idx, &E, C, Idx) -> D,
@@ -72,7 +72,7 @@ impl<'a, Idx, I, F, C> MappedEdgesToIter<'a, Idx, I, F, C> {
 impl<'a, Idx, I, F, C> Iterator for MappedEdgesToIter<'a, Idx, I, F, C>
 where
     I: Iterator,
-    Idx: IndexType,
+    Idx: IdType,
 {
     type Item = MappedPreEdge<Idx, I::Item, &'a F, C>;
 
@@ -118,7 +118,7 @@ pub struct MapEdgesSuccessorsIter<'a, Idx, I, F, C> {
     _old_color: PhantomData<C>,
 }
 
-impl<'a, Idx: IndexType, I: Iterator, F, C> Iterator for MapEdgesSuccessorsIter<'a, Idx, I, F, C> {
+impl<'a, Idx: IdType, I: Iterator, F, C> Iterator for MapEdgesSuccessorsIter<'a, Idx, I, F, C> {
     type Item = MappedEdge<Idx, I::Item, &'a F, C>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -154,7 +154,7 @@ impl<Idx, T, F, C> MappedEdge<Idx, T, F, C> {
 
 impl<'ts, Idx, E: 'ts, C, D, F, T> IsEdge<'ts, E, Idx, D> for MappedEdge<Idx, T, F, C>
 where
-    Idx: IndexType,
+    Idx: IdType,
     C: Color,
     D: Color,
     F: Fn(Idx, &E, C, Idx) -> D,
@@ -349,7 +349,7 @@ impl<T, F, C> MappedTransition<T, F, C> {
 
 impl<'ts, Idx, E, C, D, F, T> IsEdge<'ts, E, Idx, D> for MappedTransition<T, F, C>
 where
-    Idx: IndexType,
+    Idx: IdType,
     C: Color,
     D: Color,
     F: Fn(C) -> D,
@@ -410,9 +410,9 @@ pub struct MappedPreTransition<T, F, C> {
     _old_color: PhantomData<C>,
 }
 
-// impl<Idx: IndexType, E, C: Clone, D: Clone, F: Fn(C) -> D, T: IsTransition<E, Idx, C>>
+// impl<Idx: IdType, E, C: Clone, D: Clone, F: Fn(C) -> D, T: IsTransition<E, Idx, C>>
 // IsTransition<E, Idx, D> for MappedTransition<T, F, C>
-impl<'a, Idx: IndexType, E, C: Color, D: Color, F: Fn(C) -> D, T: IsEdge<'a, E, Idx, C>>
+impl<'a, Idx: IdType, E, C: Color, D: Color, F: Fn(C) -> D, T: IsEdge<'a, E, Idx, C>>
     IsEdge<'a, E, Idx, D> for MappedPreTransition<T, F, C>
 {
     fn source(&self) -> Idx {

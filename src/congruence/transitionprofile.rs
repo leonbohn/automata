@@ -135,7 +135,7 @@ impl Accumulates for usize {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct RunSignature<Idx, Q, C>(Idx, Q, C);
 
-impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
+impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
     pub fn state(&self) -> Idx {
         self.0
     }
@@ -149,7 +149,7 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
     }
 }
 
-impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
+impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
     pub fn empty_from(q: Idx) -> Self {
         Self(q, Q::neutral(), C::neutral())
     }
@@ -193,7 +193,7 @@ impl<Idx, Q, C> RunProfile<Idx, Q, C> {
     }
 }
 
-impl<Idx: IndexType, Q: Accumulates, C: Accumulates> Show for RunProfile<Idx, Q, C>
+impl<Idx: IdType, Q: Accumulates, C: Accumulates> Show for RunProfile<Idx, Q, C>
 where
     Q: Show,
     C: Show,
@@ -212,7 +212,7 @@ where
     }
 }
 
-impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
+impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
     pub fn new<I: IntoIterator<Item = (Idx, Q, C)>>(iter: I) -> Self {
         Self(
             iter.into_iter()

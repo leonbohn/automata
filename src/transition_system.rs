@@ -5,9 +5,6 @@ use crate::prelude::*;
 use math::Partition;
 use std::{collections::BTreeSet, hash::Hash};
 
-mod state_index;
-pub use state_index::{IndexType, ScalarIndexType};
-
 mod edge;
 pub use edge::{Edge, EdgeReference, IsEdge};
 
@@ -70,7 +67,7 @@ pub trait TransitionSystem: Sized {
     /// The type of the underlying [`Alphabet`].
     type Alphabet: Alphabet;
     /// The type of the indices of the states of the transition system.
-    type StateIndex: IndexType;
+    type StateIndex: IdType;
     /// The type of the colors of the states of the transition system.
     type StateColor: Color;
     /// The type of the colors of the edges of the transition system.
@@ -694,7 +691,7 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 
 /// Implementors of this trait can be transformed into a owned tuple representation of
 /// an edge in a [`TransitionSystem`].
-pub trait IntoEdgeTuple<A: Alphabet, C: Color, N: IndexType> {
+pub trait IntoEdgeTuple<A: Alphabet, C, N> {
     /// Consumes `self` and returns a tuple representing an edge in a [`TransitionSystem`].
     /// Owned edges in their tuple representation may simply be cloned, whereas if we have
     /// a tuple represetation of an edge with a borrowed expression, this operation may

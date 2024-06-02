@@ -20,8 +20,8 @@ pub struct GraphTs<
     graph: StableDiGraph<Q, (A::Expression, C), N>,
 }
 
-pub trait GraphTsId: ScalarIndexType + sg::IndexType + IdType {}
-impl<T: ScalarIndexType + sg::IndexType + IdType> GraphTsId for T {}
+pub trait GraphTsId: RepresentableId + sg::IndexType + IdType {}
+impl<T: RepresentableId + sg::IndexType + IdType> GraphTsId for T {}
 
 pub(super) fn pg_to_id<N: GraphTsId>(idx: sg::NodeIndex<N>) -> Id<N> {
     Id::from(idx.index())

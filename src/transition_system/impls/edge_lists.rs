@@ -4,7 +4,7 @@ use tracing::debug;
 use crate::{
     math::{Map, Set},
     prelude::*,
-    transition_system::{EdgeReference, EdgeTuple, ScalarIndexType},
+    transition_system::{EdgeReference, EdgeTuple, ScalarIdType},
 };
 use std::{
     borrow::Borrow,
@@ -32,7 +32,7 @@ pub struct EdgeLists<
     Q = crate::Void,
     C = crate::Void,
     const DET: bool = true,
-    IdType: ScalarIndexType = DefaultIdType,
+    IdType: ScalarIdType = DefaultIdType,
 > {
     pub(crate) alphabet: A,
     pub(crate) states: Map<IdType, MutableTsState<A, Q, C, IdType>>,
@@ -48,7 +48,7 @@ pub type IntoEdgeLists<Ts, const DET: bool = true, IdType = DefaultIdType> = Edg
     IdType,
 >;
 
-impl<A: Alphabet, C: Color, Q: Color, const DET: bool, IdType: ScalarIndexType>
+impl<A: Alphabet, C: Color, Q: Color, const DET: bool, IdType: ScalarIdType>
     EdgeLists<A, Q, C, DET, IdType>
 {
     /// Creates a new transition system with the given alphabet.
@@ -127,7 +127,7 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool, IdType: ScalarIndexType>
     pub fn with_capacity(alphabet: A, states: usize) -> Self
     where
         StateColor<Self>: Default,
-        IdType: From<usize> + IndexType,
+        IdType: From<usize> + IdType,
     {
         Self {
             alphabet,
@@ -172,7 +172,7 @@ impl<A: Alphabet, C: Color, Q: Color, const DET: bool, IdType: ScalarIndexType>
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIdType>
     crate::transition_system::Shrinkable for EdgeLists<A, Q, C, DET, IdType>
 {
     fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Q> {
@@ -218,7 +218,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType>
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIdType>
     EdgeLists<A, Q, C, DET, IdType>
 {
     /// Returns an iterator over the [`EdgeIndex`]es of the edges leaving the given state.
@@ -254,13 +254,13 @@ impl<A: Alphabet, Q: Color, C: Hash + Debug + Eq + Clone> Deterministic for Edge
 /// A state in a transition system. This stores the color of the state and the index of the
 /// first edge leaving the state.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct MutableTsState<A: Alphabet, Q, C, IdType: ScalarIndexType = DefaultIdType> {
+pub struct MutableTsState<A: Alphabet, Q, C, IdType: ScalarIdType = DefaultIdType> {
     id: IdType,
     color: Q,
     edges: Vec<(A::Expression, C, IdType)>,
 }
 
-impl<A: Alphabet, Q: Color, C: Color, IdType: ScalarIndexType> MutableTsState<A, Q, C, IdType> {
+impl<A: Alphabet, Q: Color, C: Color, IdType: ScalarIdType> MutableTsState<A, Q, C, IdType> {
     pub fn new_with_intial_id(color: Q) -> Self {
         Self {
             id: IdType::from_usize(0),
@@ -346,7 +346,7 @@ impl<A: Alphabet, Q: Color, C: Color, IdType: ScalarIndexType> MutableTsState<A,
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> TransitionSystem
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIdType> TransitionSystem
     for EdgeLists<A, Q, C, DET, IdType>
 {
     type StateColor = Q;
@@ -377,7 +377,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> 
     type EdgesFromIter<'this> = EdgesFrom<'this, A::Expression, C, IdType> where Self: 'this;
 }
 
-impl<Q, C, const DET: bool, IdType: ScalarIndexType> EdgeLists<CharAlphabet, Q, C, DET, IdType> {
+impl<Q, C, const DET: bool, IdType: ScalarIdType> EdgeLists<CharAlphabet, Q, C, DET, IdType> {
     /// Returns a transition system builder for a non-deterministic transition system. This should be the main method for the
     /// construction of non-deterministic transition systems on the fly.
     ///
@@ -403,19 +403,19 @@ impl<Q, C, const DET: bool, IdType: ScalarIndexType> EdgeLists<CharAlphabet, Q, 
 }
 
 /// Specialized iterator over the edges that leave a given state in a [`MutableTs`].
-pub struct EdgesFrom<'ts, E, C, IdType: ScalarIndexType> {
+pub struct EdgesFrom<'ts, E, C, IdType: ScalarIdType> {
     edges: std::slice::Iter<'ts, (E, C, IdType)>,
     source: IdType,
 }
 
-impl<'ts, E, C, IdType: ScalarIndexType> EdgesFrom<'ts, E, C, IdType> {
+impl<'ts, E, C, IdType: ScalarIdType> EdgesFrom<'ts, E, C, IdType> {
     /// Creates a new instance from the given components.
     pub fn new(source: IdType, edges: std::slice::Iter<'ts, (E, C, IdType)>) -> Self {
         Self { edges, source }
     }
 }
 
-impl<'ts, E, C, IdType: ScalarIndexType> Iterator for EdgesFrom<'ts, E, C, IdType> {
+impl<'ts, E, C, IdType: ScalarIdType> Iterator for EdgesFrom<'ts, E, C, IdType> {
     type Item = EdgeReference<'ts, E, IdType, C>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -425,7 +425,7 @@ impl<'ts, E, C, IdType: ScalarIndexType> Iterator for EdgesFrom<'ts, E, C, IdTyp
     }
 }
 
-impl<A, C, Q, const DET: bool, IdType: ScalarIndexType> std::fmt::Debug
+impl<A, C, Q, const DET: bool, IdType: ScalarIdType> std::fmt::Debug
     for EdgeLists<A, Q, C, DET, IdType>
 where
     A: Alphabet,
@@ -449,7 +449,7 @@ where
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> Sproutable
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIdType> Sproutable
     for EdgeLists<A, Q, C, DET, IdType>
 {
     /// Adds a state with given `color` to the transition system, returning the index of
@@ -491,7 +491,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> 
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> ForAlphabet<A>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIdType> ForAlphabet<A>
     for EdgeLists<A, Q, C, DET, IdType>
 {
     fn for_alphabet(from: A) -> Self {
@@ -513,7 +513,7 @@ type EdgeListsOutEdge<A, C, IdType> = (<A as Alphabet>::Expression, C, IdType);
 /// See the [`MutableTs::extract_edge_tuples`] method for an example of usage.
 #[derive(Debug)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct ExtractEdgeTuplesFrom<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType>
+pub struct ExtractEdgeTuplesFrom<'a, A: Alphabet, Q, C, F, IdType: ScalarIdType>
 where
     F: FnMut(&EdgeListsOutEdge<A, C, IdType>) -> bool,
 {
@@ -528,7 +528,7 @@ where
     pub(super) pred: F,
 }
 
-impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType>
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIdType>
     ExtractEdgeTuplesFrom<'a, A, Q, C, F, IdType>
 where
     F: FnMut(&EdgeListsOutEdge<A, C, IdType>) -> bool,
@@ -548,7 +548,7 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType> Iterator
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIdType> Iterator
     for ExtractEdgeTuplesFrom<'a, A, Q, C, F, IdType>
 where
     F: FnMut(&EdgeListsOutEdge<A, C, IdType>) -> bool,
@@ -586,7 +586,7 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType> Drop
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIdType> Drop
     for ExtractEdgeTuplesFrom<'a, A, Q, C, F, IdType>
 where
     F: FnMut(&EdgeListsOutEdge<A, C, IdType>) -> bool,
@@ -615,7 +615,7 @@ where
 /// transition system that match a given predicate.
 #[derive(Debug)]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct ExtractAllEdgeTuples<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType>
+pub struct ExtractAllEdgeTuples<'a, A: Alphabet, Q, C, F, IdType: ScalarIdType>
 where
     F: FnMut(IdType, &EdgeListsOutEdge<A, C, IdType>) -> bool,
 {
@@ -631,7 +631,7 @@ where
     pub(super) remaining: math::map::ValuesMut<'a, IdType, MutableTsState<A, Q, C, IdType>>,
 }
 
-impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType> ExtractAllEdgeTuples<'a, A, Q, C, F, IdType>
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIdType> ExtractAllEdgeTuples<'a, A, Q, C, F, IdType>
 where
     F: FnMut(IdType, &EdgeListsOutEdge<A, C, IdType>) -> bool,
 {
@@ -660,7 +660,7 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType> Iterator
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIdType> Iterator
     for ExtractAllEdgeTuples<'a, A, Q, C, F, IdType>
 where
     F: FnMut(IdType, &EdgeListsOutEdge<A, C, IdType>) -> bool,
@@ -711,7 +711,7 @@ where
     }
 }
 
-impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIndexType> Drop
+impl<'a, A: Alphabet, Q, C, F, IdType: ScalarIdType> Drop
     for ExtractAllEdgeTuples<'a, A, Q, C, F, IdType>
 where
     F: FnMut(IdType, &EdgeListsOutEdge<A, C, IdType>) -> bool,
@@ -721,7 +721,7 @@ where
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> PredecessorIterable
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIdType> PredecessorIterable
     for EdgeLists<A, Q, C, DET, IdType>
 {
     type PreEdgeRef<'this> = EdgeReference<'this, A::Expression, IdType, C> where Self: 'this;
@@ -749,7 +749,7 @@ pub struct EdgeListsPredecessors<
     Q: Color,
     C: Color,
     const DET: bool,
-    IdType: ScalarIndexType,
+    IdType: ScalarIdType,
 > {
     idx: Option<IdType>,
     inner_pos: usize,
@@ -758,7 +758,7 @@ pub struct EdgeListsPredecessors<
     elp: &'a EdgeLists<A, Q, C, DET, IdType>,
 }
 
-impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIndexType> Iterator
+impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool, IdType: ScalarIdType> Iterator
     for EdgeListsPredecessors<'a, A, Q, C, DET, IdType>
 {
     type Item = EdgeReference<'a, A::Expression, IdType, C>;
@@ -792,7 +792,7 @@ fn recast<
     C: Color,
     const DET: bool,
     const OUT_DET: bool,
-    IdType: ScalarIndexType,
+    IdType: ScalarIdType,
 >(
     ts: EdgeLists<A, Q, C, DET, IdType>,
 ) -> EdgeLists<A, Q, C, OUT_DET, IdType> {

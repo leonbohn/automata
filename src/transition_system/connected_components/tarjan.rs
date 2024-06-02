@@ -22,13 +22,13 @@ pub struct Tarjan<Idx> {
     data: Map<Idx, TarjanData>,
 }
 
-impl<Idx: IndexType> Default for Tarjan<Idx> {
+impl<Idx: IdType> Default for Tarjan<Idx> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<Idx: IndexType> Tarjan<Idx> {
+impl<Idx: IdType> Tarjan<Idx> {
     /// Creates a new Tarjan SCC decomposition instance.
     pub fn new() -> Self {
         Self {
@@ -341,10 +341,12 @@ mod tests {
             .into_right_congruence(0);
 
         let rev = (&ts).reversed();
-        let reachable = rev.reachable_state_indices_from(3).collect::<HashSet<_>>();
+        let reachable = rev
+            .reachable_state_indices_from(Id(3))
+            .collect::<HashSet<_>>();
         println!("{:?}", reachable);
-        assert!(reachable.contains(&3));
-        assert!(reachable.contains(&2));
+        assert!(reachable.contains(&Id(3)));
+        assert!(reachable.contains(&Id(2)));
 
         let start = Instant::now();
         let _sccs = kosaraju(&ts, ts.initial());

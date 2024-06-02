@@ -44,8 +44,8 @@ pub mod prelude {
             predecessors::PredecessorIterable,
             run::{FiniteRun, OmegaRun},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, ForAlphabet,
-            IndexType, IntoEdgeTuple, IsEdge, Path, ScalarIndexType, Shrinkable, Sproutable,
-            StateColor, StateIndex, SymbolOf, TSBuilder, TransitionSystem,
+            IntoEdgeTuple, IsEdge, Path, Shrinkable, Sproutable, StateColor, StateIndex, SymbolOf,
+            TSBuilder, TransitionSystem,
         },
         Class, Color, Pointed,
     };

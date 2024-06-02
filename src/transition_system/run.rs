@@ -7,7 +7,7 @@ pub trait FiniteRun {
     /// The type of the edge colors.
     type EdgeColor;
     /// The type of the state indices.
-    type StateIndex: IndexType;
+    type StateIndex: IdType;
     /// Returns an iterator over the state colors.
     fn state_colors(self) -> Option<impl Iterator<Item = Self::StateColor>>;
     /// Returns an iterator over the edge colors.
@@ -18,7 +18,7 @@ pub trait FiniteRun {
     fn successful(&self) -> bool;
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone, Idx: IndexType> FiniteRun
+impl<A: Alphabet, Q: Clone, C: Clone, Idx: IdType> FiniteRun
     for super::deterministic::FiniteRunResult<A, Idx, Q, C>
 {
     type StateColor = Q;
@@ -50,7 +50,7 @@ pub trait OmegaRun {
     /// The type of the edge colors.
     type EdgeColor;
     /// The type of the state indices.
-    type StateIndex: IndexType;
+    type StateIndex: IdType;
     /// Returns an iterator over the state colors.
     fn recurring_state_colors_iter(self) -> Option<impl Iterator<Item = Self::StateColor>>;
     /// Returns an iterator over the edge colors.
@@ -59,7 +59,7 @@ pub trait OmegaRun {
     fn recurring_state_indices_iter(self) -> Option<impl Iterator<Item = Self::StateIndex>>;
 }
 
-impl<A: Alphabet, Q: Clone, C: Clone, Idx: IndexType> OmegaRun
+impl<A: Alphabet, Q: Clone, C: Clone, Idx: IdType> OmegaRun
     for super::deterministic::OmegaRunResult<A, Idx, Q, C>
 {
     type StateColor = Q;

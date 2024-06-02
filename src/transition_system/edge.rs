@@ -89,7 +89,7 @@ pub struct EdgeReference<'ts, E, Idx, C> {
     expression: &'ts E,
 }
 
-impl<'ts, E: Eq, Idx: IndexType, C: Clone + Eq> PartialEq<(Idx, E, C, Idx)>
+impl<'ts, E: Eq, Idx: IdType, C: Clone + Eq> PartialEq<(Idx, E, C, Idx)>
     for EdgeReference<'ts, E, Idx, C>
 {
     fn eq(&self, other: &(Idx, E, C, Idx)) -> bool {
@@ -100,7 +100,7 @@ impl<'ts, E: Eq, Idx: IndexType, C: Clone + Eq> PartialEq<(Idx, E, C, Idx)>
     }
 }
 
-impl<'ts, E: Eq, Idx: IndexType> PartialEq<(Idx, E, Idx)> for EdgeReference<'ts, E, Idx, Void> {
+impl<'ts, E: Eq, Idx: IdType> PartialEq<(Idx, E, Idx)> for EdgeReference<'ts, E, Idx, Void> {
     fn eq(&self, other: &(Idx, E, Idx)) -> bool {
         self.source == other.0 && self.target == other.2 && self.expression == &other.1
     }
@@ -118,7 +118,7 @@ impl<'ts, E, Idx, C> EdgeReference<'ts, E, Idx, C> {
     }
 }
 
-impl<'ts, E, Idx: IndexType, C: Clone> IsEdge<'ts, E, Idx, C> for EdgeReference<'ts, E, Idx, C> {
+impl<'ts, E, Idx: IdType, C: Clone> IsEdge<'ts, E, Idx, C> for EdgeReference<'ts, E, Idx, C> {
     fn source(&self) -> Idx {
         self.source
     }
@@ -158,7 +158,7 @@ impl<'ts, E, Idx, C> TransitionOwnedColor<'ts, E, Idx, C> {
     }
 }
 
-impl<'ts, E, Idx: IndexType, C: Clone> IsEdge<'ts, E, Idx, C>
+impl<'ts, E, Idx: IdType, C: Clone> IsEdge<'ts, E, Idx, C>
     for TransitionOwnedColor<'ts, E, Idx, C>
 {
     fn source(&self) -> Idx {

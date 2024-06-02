@@ -20,6 +20,6 @@ pub use linked::{
     LinkedListTransitionSystemEdgesToIter, LinkedListTransitionSystemState, NTSEdgesFromIter,
 };
 
-use super::ScalarIndexType;
+use super::ScalarIdType;
 
 pub type DefaultIdType = u32;

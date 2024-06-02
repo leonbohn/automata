@@ -4,9 +4,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::ScalarIndexType;
-
-pub trait IdType: Copy + Eq + Hash {}
+pub trait IdType: Copy + Eq + Hash + Ord + Debug {}
 
 macro_rules! impl_integer_id_type {
     ($($t:ty),*) => {
@@ -22,16 +20,6 @@ pub type DefaultIdType = u32;
 
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Id<N: IdType = DefaultIdType>(pub N);
-
-impl<N: RepresentableId> ScalarIndexType for Id<N> {
-    fn from_usize(n: usize) -> Self {
-        Self(N::from_usize(n))
-    }
-
-    fn into_usize(self) -> usize {
-        todo!()
-    }
-}
 
 impl<N: IdType + Debug> Debug for Id<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

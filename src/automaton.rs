@@ -286,7 +286,7 @@ where
     }
     fn add_edge<E>(&mut self, t: E) -> Option<crate::transition_system::EdgeTuple<Self>>
     where
-        E: IntoEdgeTuple<Self>,
+        E: IntoEdgeTuple<A, C, StateIndex<Self>>,
     {
         self.ts.add_edge(t.into_edge_tuple())
     }
