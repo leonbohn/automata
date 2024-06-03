@@ -94,7 +94,7 @@ pub fn generate_random_dba(symbols: usize, size: usize, lambda: f64) -> DBA {
     dts.trim_from(initial);
     // draw acceptance condition
     let exp = Exp::new(lambda).unwrap();
-    dts.map_edge_colors(|_| if draw_prio(exp, 2) == 0 { false } else { true })
+    dts.map_edge_colors(|_| draw_prio(exp, 2) != 0)
         .with_initial(initial)
         .collect_dba()
 }
