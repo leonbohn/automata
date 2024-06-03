@@ -1,8 +1,8 @@
 use std::{cell::OnceCell, collections::BTreeSet, fmt::Debug, hash::Hash};
 
+use crate::prelude::*;
 use itertools::Itertools;
-
-use crate::{math::Map, math::Set, prelude::*};
+use math::Set;
 
 type InteriorEdgeSet<Ts> = Set<(
     <Ts as TransitionSystem>::StateIndex,
@@ -219,7 +219,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         let ts = self.ts;
         debug_assert!(!self.is_empty());
 
-        let mut queue = Map::default();
+        let mut queue = math::Map::default();
         for (p, a, _, q) in self.interior_transitions() {
             queue
                 .entry(*p)
@@ -341,7 +341,8 @@ impl<'a, Ts: TransitionSystem> Debug for Scc<'a, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{math::Set, prelude::*};
+    use crate::prelude::*;
+    use math::Set;
 
     #[test]
     fn interior_transitions() {

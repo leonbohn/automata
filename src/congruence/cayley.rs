@@ -1,8 +1,5 @@
 #![allow(dead_code)]
-
 use crate::{prelude::*, transition_system::EdgeReference};
-
-use self::alphabet::{Directional, InvertibleChar};
 
 use super::{Accumulates, RunProfile, TransitionMonoid};
 

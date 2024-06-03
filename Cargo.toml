@@ -1,51 +1,72 @@
+[workspace]
+members = [".", "hoars", "automata-core"]
+
+[workspace.package]
+license = "MIT or Apache-2.0"
+edition = "2021"
+homepage = "https://github.com/leonbohn/automata"
+authors = ["León Bohn <bohn@lics.rwth-aachen.de>"]
+
 [package]
 name = "automata"
-license = "MIT"
-description = "A library concerned with transition systems and automata for both finite and infinite words."
-homepage = "https://github.com/leonbohn/automata"
+version = "0.0.4"
+readme = "README.md"
+description = "A library for transition systems and automata over (in)finite words."
 repository = "https://github.com/leonbohn/automata"
 keywords = [
-    "omega-automata",
     "transition-system",
     "language",
     "hoa",
     "automata",
+    "omega-automata",
 ]
 categories = ["mathematics", "science"]
-readme = "README.md"
-version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+homepage.workspace = true
+authors.workspace = true
+license.workspace = true
 
-[package.metadata.docs.rs]
-rustdoc-args = ["--html-in-header", "./docs-header.html"]
-
-[dependencies]
-# gryf = { git = "https://github.com/pnevyk/gryf", rev = "1efd3a2", optional = true }
-petgraph = { version = "0.6.5", default-features = false, features = [
-    "stable_graph",
-] }
+[workspace.dependencies]
 tracing = "0.1"
 tracing-subscriber = "0.3"
+biodivine-lib-bdd = "0.5"
 itertools = "0.13.0"
+automata-core = { version = "0.1.0", path = "automata-core" }
+indexmap = "2.2"
+bimap = "0.6"
+
+[dependencies]
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+biodivine-lib-bdd = { workspace = true }
+itertools = { workspace = true }
+indexmap = { workspace = true }
+bimap = { workspace = true }
+
+# from this workspace
+hoars = { version = "0.2.0", optional = true, path = "hoars" }
+automata-core = { workspace = true }
+
 tabled = { version = "0.15", features = ["ansi"] }
 owo-colors = "4.0"
 test-log = { version = "0.2", features = ["trace"] }
 tempfile = { version = "3.10", optional = true }
-paste = "1.0"
-biodivine-lib-bdd = { version = "0.5", optional = true }
 bit-set = "0.5"
-bimap = "0.6"
 fastrand = { version = "2", optional = true }
-hoars = { version = "0.2", optional = true }
 clap = { version = "4.5", optional = true }
-indexmap = "2.2"
 rand = "0.8.5"
 rand_distr = "0.4.3"
 
+# default backend
+petgraph = { version = "0.6.5", default-features = false, features = [
+    "stable_graph",
+] }
+# experimental backend sometime?
+# gryf = { git = "https://github.com/pnevyk/gryf", rev = "1efd3a2", optional = true }
 
 [features]
 default = ["hoa", "graphviz", "random"]
 random = ["fastrand"]
-hoa = ["dep:hoars", "biodivine-lib-bdd"]
+hoa = ["dep:hoars"]
 graphviz = ["dep:tempfile"]
 implementations = []

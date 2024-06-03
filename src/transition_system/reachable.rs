@@ -1,4 +1,5 @@
-use crate::{math::Set, prelude::*};
+use crate::prelude::*;
+use math::Set;
 use std::collections::{BTreeMap, VecDeque};
 
 /// Struct that can return the minimal representatives of a transition system. A minimal representative

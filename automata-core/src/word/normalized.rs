@@ -34,11 +34,13 @@ impl<S: Symbol> NormalizedOmegaWord<S> {
     /// Creates a new instance from the given ultimately periodic word `ux^ω`. The resulting normalized word will be
     /// `ux^i(x^j)^ω` where `i` is given by `pre_loop_count` and `j` is `loop_size`. This method should
     /// only really be called from inside the crate, for actually creating a normalization of an ultimately
-    /// periodic word one should use [`OmegaWord::normalize_for`] instead.
+    /// periodic word, there exist special functions in the `automata`
+    /// package.
     ///
     /// # Example
     /// ```
-    /// use automata::{prelude::*, word::NormalizedOmegaWord};
+    /// use automata_core::prelude::*;
+    ///
     /// let word = upw!("b", "a");
     /// let normalized = NormalizedOmegaWord::new(word, 1, 2);
     /// assert_eq!(normalized.spoke_vec(), vec!['b', 'a']);

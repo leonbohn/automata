@@ -50,9 +50,8 @@ impl IndexedAlphabet for CharAlphabet {
     }
 
     fn expression_to_index(&self, sym: &Self::Expression) -> usize {
-        self.0
-            .iter()
-            .position(|x| x == sym)
+        self.universe()
+            .position(|x| x == *sym)
             .expect("Must be present in alphabet")
     }
 
@@ -61,8 +60,8 @@ impl IndexedAlphabet for CharAlphabet {
     }
 
     fn expression_from_index(&self, index: usize) -> Self::Expression {
-        assert!(index < self.0.len());
-        self.0[index]
+        assert!(index < self.size());
+        self[index]
     }
 }
 

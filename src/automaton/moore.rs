@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::fmt::Debug;
 
-use crate::{prelude::*, Void};
+use crate::prelude::*;
 
 use super::FiniteWordAutomaton;
 

@@ -1,10 +1,8 @@
 use std::hash::Hash;
 
+use crate::prelude::*;
 use itertools::Itertools;
-
-use crate::{congruence::RightCongruence, prelude::*, Void};
-
-use self::math::Set;
+use math::Set;
 
 use super::IntoEdgeTuple;
 
