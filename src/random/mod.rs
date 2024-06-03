@@ -315,11 +315,11 @@ pub(crate) fn print_random_ts_benchmark(
 mod tests {
     use crate::{
         random::{draw_prio, CharAlphabet},
-        transition_system::Dottable,
-        word, TransitionSystem,
+        transition_system::Dottable, TransitionSystem,
     };
     use rand_distr::Exp;
     use std::collections::HashMap;
+    use automata_core::word;
 
     use super::{
         generate_random_dba, generate_random_dfa, generate_random_dpa, generate_random_omega_words,

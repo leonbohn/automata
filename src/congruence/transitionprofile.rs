@@ -440,6 +440,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::congruence::TransitionMonoid;
+    use crate::prelude::*;
 
     #[test]
     fn tp_from_ts_time() {
@@ -455,6 +456,6 @@ mod tests {
             start.elapsed().as_micros()
         );
         assert_eq!(tps.elements(), 5);
-        println!("{}", crate::Show::show(&tps));
+        println!("{}", Show::show(&tps));
     }
 }
