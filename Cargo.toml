@@ -52,8 +52,10 @@ owo-colors = "4.0"
 test-log = { version = "0.2", features = ["trace"] }
 tempfile = { version = "3.10", optional = true }
 bit-set = "0.5"
-fastrand = { version = "2", optional = true }
 clap = { version = "4.5", optional = true }
+rand = { version = "0.8.5", optional = true }
+rand_distr = { version = "0.4.3", optional = true }
+
 # default backend
 petgraph = { version = "0.6.5", default-features = false, features = [
     "stable_graph",
@@ -63,7 +65,7 @@ petgraph = { version = "0.6.5", default-features = false, features = [
 
 [features]
 default = ["hoa", "graphviz", "random"]
-random = ["fastrand"]
+random = ["dep:rand", "dep:rand_distr"]
 hoa = ["dep:hoars"]
 graphviz = ["dep:tempfile"]
 implementations = []
