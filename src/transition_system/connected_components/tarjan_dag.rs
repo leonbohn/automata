@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use std::hash::Hash;
 
-use crate::dag::{Dag, ReachableIter};
 use crate::prelude::*;
+use dag::{Dag, ReachableIter};
 
 use super::{EdgeColor, Scc, SccDecomposition};
 

@@ -187,7 +187,7 @@ mod tests {
     use crate::prelude::*;
     #[test]
     fn asdf() {
-        let mut ts = DTS::for_alphabet(automata_core::alphabet!(simple 'a', 'b'));
+        let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
         let q0 = ts.add_state(true);
         let q1 = ts.add_state(false);
 

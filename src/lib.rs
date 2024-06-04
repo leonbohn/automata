@@ -76,9 +76,6 @@ pub mod hoa;
 #[cfg(feature = "random")]
 pub mod random;
 
-/// Implements a directed acyclic graph.
-pub mod dag;
-
 use std::{fmt::Debug, hash::Hash};
 
 /// A color is simply a type that can be used to color states or transitions.
