@@ -1,6 +1,6 @@
 use std::{hash::Hash, marker::PhantomData};
 
-use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddValuation, BddVariableSet, IntoBdd};
+use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddValuation, BddVariableSet};
 use tracing::trace;
 
 use crate::prelude::*;
@@ -112,6 +112,9 @@ impl PropExpression<u32> {
             _ty: PhantomData,
         }
     }
+    pub fn into_bdd(self) -> Bdd {
+        self.bdd
+    }
     pub fn universal(num_aps: u8) -> Self {
         let vars = BddVariableSet::new_anonymous(num_aps as u16);
         Self {
@@ -123,6 +126,16 @@ impl PropExpression<u32> {
     pub fn sat_vals(&self) -> PropExpressionSymbols<'_, u32> {
         PropExpressionSymbols {
             iter: self.bdd.sat_valuations(),
+            _ty: PhantomData,
+        }
+    }
+    pub fn from_bdd(bdd: Bdd) -> Self {
+        Self {
+            num_aps: bdd
+                .num_vars()
+                .try_into()
+                .expect("Number of variables does not fit into u8"),
+            bdd,
             _ty: PhantomData,
         }
     }
