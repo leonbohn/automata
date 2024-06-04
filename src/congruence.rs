@@ -145,7 +145,7 @@ pub trait Congruence: Deterministic + Pointed {
     fn normalize_upw(
         &self,
         word: impl OmegaWord<SymbolOf<Self>>,
-    ) -> Option<NormalizedOmegaWord<SymbolOf<Self>>>
+    ) -> Option<word::NormalizedOmegaWord<SymbolOf<Self>>>
     where
         Self: Pointed,
     {
@@ -162,7 +162,7 @@ pub trait Congruence: Deterministic + Pointed {
                     // the spoke is the spoke of self plus `i` times the cycle, while the
                     // cycle is `count - i` times the cycle
                     assert!(i < count);
-                    return Some(NormalizedOmegaWord::new(word.reduced(), i, count - i));
+                    return Some(word::NormalizedOmegaWord::new(word.reduced(), i, count - i));
                 }
             }
         }

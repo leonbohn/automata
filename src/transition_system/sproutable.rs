@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn sprout_after_creating() {
-        let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+        let mut ts = DTS::for_alphabet(CharAlphabet::of_size(3));
         let q0 = ts.add_state(false);
         let q1 = ts.add_state(true);
         assert_eq!(ts.edge(q0, 'a'), None);
