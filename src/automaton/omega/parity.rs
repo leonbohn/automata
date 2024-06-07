@@ -66,6 +66,43 @@ impl<D> IntoDPA<D>
 where
     D: Deterministic<EdgeColor = Int>,
 {
+    /// Creates a streamlined version of `self`, that is DPA where the edge colors are
+    /// normalized and the transition structure is minimized as a Mealy machine.
+    ///
+    /// This method is just a thin wrapper that first calls [`Self::normalized`] to
+    /// normalize the priorities and subsequently runs a mealy partition refinement
+    /// algorithm to obtain a minimal quotient automaton.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    /// let dpa = TSBuilder::without_state_colors()
+    ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
+    ///     .into_dpa(0);
+    /// let streamlined = dpa.streamlined();
+    /// assert_eq!(dpa.size(), streamlined.size());
+    ///
+    /// let dpa = TSBuilder::without_state_colors()
+    ///     .with_transitions([(0, 'a', 0, 1), (0, 'b', 1, 1),
+    ///                        (1, 'a', 0, 0), (1, 'b', 3, 0)])
+    ///     .into_dpa(0);
+    /// assert_eq!(dpa.last_edge_color("ab"), 3);
+    /// let streamlined = dpa.streamlined();
+    /// assert_eq!(streamlined.size(), 1);
+    /// assert_eq!(streamlined.last_edge_color("ab"), 1)
+    /// ```
+    pub fn streamlined(
+        &self,
+    ) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
+    where
+        EdgeColor<Self>: Eq + Hash + Clone + Ord,
+    {
+        let minimized = crate::minimization::partition_refinement::mealy_partition_refinement(
+            self.normalized(),
+        );
+        DPA::from_pointed(minimized)
+    }
+
     /// Attempts to transform the given [`FiniteWord`] into a [`EdgeColor`]. This means that the
     /// word is run through the automaton and the last transition color is returned.
     pub fn try_last_edge_color<W: FiniteWord<SymbolOf<Self>>>(
@@ -366,7 +403,7 @@ where
     pub fn normalized(&self) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
-        StateColor<Self>: Eq + Hash + Clone + Ord,
+        // StateColor<Self>: Eq + Hash + Clone + Ord,
     {
         let start = std::time::Instant::now();
 
