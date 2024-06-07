@@ -96,7 +96,6 @@ where
     ) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
-        StateColor<Self>: Eq + Hash + Clone + Ord,
     {
         let minimized = crate::minimization::partition_refinement::mealy_partition_refinement(
             self.normalized(),
@@ -404,7 +403,7 @@ where
     pub fn normalized(&self) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
-        StateColor<Self>: Eq + Hash + Clone + Ord,
+        // StateColor<Self>: Eq + Hash + Clone + Ord,
     {
         let start = std::time::Instant::now();
 
