@@ -1,4 +1,4 @@
-mod partition_refinement;
+pub(crate) mod partition_refinement;
 
 use crate::prelude::*;
 
