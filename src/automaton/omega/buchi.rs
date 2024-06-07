@@ -42,6 +42,18 @@ impl<C> IntoDBA<C>
 where
     C: Deterministic<EdgeColor = bool>,
 {
+    /// Performs a streamlining operation akin to [`DPA::streamline`].
+    pub fn streamline(&self) -> DBA<C::Alphabet> {
+        self.map_edge_colors(|c| if c { 0 } else { 1 })
+            .into_dpa()
+            .streamlined()
+            .map_edge_colors(|c| {
+                assert!(c == 0 || c == 1, "too many colors");
+                c % 2 == 0
+            })
+            .collect_dba()
+    }
+
     /// Tries to identify a word which is accepted by `self`. If such a word exists, it returns it and otherwise
     /// the function gives back `None`.
     pub fn give_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
