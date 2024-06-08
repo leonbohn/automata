@@ -1,8 +1,8 @@
 /// Computes the inverse cumulative density function of the continuous bernoulli distribution
 /// as described in [10.3390/fractalfract7050386](https://www.mdpi.com/2504-3110/7/5/386).
 pub fn continuous_bernoulli_inverse_cumulative_density_function(lambda: f64, y: f64) -> f64 {
-    assert!(0.0 <= lambda && lambda <= 1.0);
-    assert!(0.0 <= y && y <= 1.0);
+    assert!((0.0..=1.0).contains(&lambda));
+    assert!((0.0..=1.0).contains(&y));
     let fraction_numerator = (2.0 * lambda - 1.0) / (1.0 - lambda);
     let inner_numerator = 1.0 + fraction_numerator * y;
     let inner_denominator = lambda / (1.0 - lambda);
@@ -12,7 +12,7 @@ pub fn continuous_bernoulli_inverse_cumulative_density_function(lambda: f64, y: 
 /// Computes the mean of the continuous bernoulli distribution for the
 /// given parameter lambda.
 pub fn continuous_bernoulli_mean(lambda: f64) -> f64 {
-    assert!(0.0 <= lambda && lambda <= 1.0);
+    assert!((0.0..=1.0).contains(&lambda));
     let first = lambda / (2.0 * lambda - 1.0);
     let second = 1.0 / (2.0 * (1.0 - 2.0 * lambda).atanh());
     first + second
@@ -23,7 +23,7 @@ pub fn continuous_bernoulli_mean(lambda: f64) -> f64 {
 /// The inverse of this value under the cumulative density function of the continuous
 /// bernoulli function gives a sample of this distribution.
 pub fn sample_continuous_bernoulli(lambda: f64) -> f64 {
-    assert!(0.0 <= lambda && lambda <= 1.1);
+    assert!((0.0..=1.1).contains(&lambda));
     let y = rand::random::<f64>();
     continuous_bernoulli_inverse_cumulative_density_function(lambda, y)
 }
