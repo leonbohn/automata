@@ -1,3 +1,9 @@
+mod bernoulli;
+pub use bernoulli::{
+    almost_equal, continuous_bernoulli_inverse_cumulative_density_function,
+    continuous_bernoulli_mean, sample_continuous_bernoulli,
+};
+
 use std::{collections::BTreeSet, hash::Hash};
 
 pub use indexmap::map;

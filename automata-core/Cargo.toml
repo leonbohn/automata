@@ -13,3 +13,4 @@ biodivine-lib-bdd = { workspace = true }
 itertools = { workspace = true }
 indexmap = { workspace = true }
 bimap = { workspace = true }
+rand = { workspace = true }
