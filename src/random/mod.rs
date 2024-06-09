@@ -1,7 +1,8 @@
 #![allow(unused)]
 use crate::prelude::*;
+use math::sample_continuous_bernoulli;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use rand_distr::{Distribution, Exp};
+use std::cmp::max;
 use tracing::{debug, info};
 
 /// Uses sprout-like algorithm to generate a random transition system. `symbols` determines the
@@ -95,8 +96,7 @@ pub fn generate_random_dba(symbols: usize, size: usize, lambda: f64) -> DBA {
     // remove unreachable states
     dts.trim_from(initial);
     // draw acceptance condition
-    let exp = Exp::new(lambda).unwrap();
-    dts.map_edge_colors(|_| draw_prio(exp, 2) != 0)
+    dts.map_edge_colors(|_| draw_priority(2, lambda) == 0)
         .with_initial(initial)
         .collect_dba()
 }
@@ -112,23 +112,15 @@ pub fn generate_random_dpa(symbols: usize, size: usize, num_prios: Int, lambda: 
     // remove unreachable states
     dts.trim_from(initial);
     // draw acceptance condition
-    let exp = Exp::new(lambda).unwrap();
-    dts.map_edge_colors(|_| num_prios - 1 - draw_prio(exp, num_prios))
+    dts.map_edge_colors(|_| draw_priority(num_prios, lambda))
         .with_initial(initial)
         .collect_dpa()
 }
 
-/// Randomly draw a priority in range [0,num_prios) from distribution `dist`
-pub fn draw_prio<D: Distribution<f64>>(dist: D, num_prios: u8) -> u8 {
-    let mut rng = rand::thread_rng();
-    let mut prio;
-    loop {
-        prio = dist.sample(&mut rng) as u8;
-        if prio < num_prios {
-            break;
-        }
-    }
-    prio
+/// Randomly draw a priority in range [0,num_prios) from continuous Bernoulli distribution
+pub fn draw_priority(num_prios: u8, lambda: f64) -> u8 {
+    let r = sample_continuous_bernoulli(lambda);
+    max((r * num_prios as f64).floor() as u8, num_prios - 1)
 }
 
 /// Generate a random `String` over the universe of the `alphabet`
@@ -317,12 +309,11 @@ pub(crate) fn print_random_ts_benchmark(
 #[cfg(test)]
 mod tests {
     use crate::{
-        random::{draw_prio, CharAlphabet},
+        random::{draw_priority, CharAlphabet},
         transition_system::Dottable,
         TransitionSystem,
     };
     use automata_core::word;
-    use rand_distr::Exp;
     use std::collections::HashMap;
 
     use super::{
@@ -345,7 +336,7 @@ mod tests {
 
     #[test]
     fn random_dba_sized() {
-        let dba = generate_random_dba(2, 10, 1.0);
+        let dba = generate_random_dba(2, 10, 0.99);
         assert!(dba.size() <= 10);
     }
 
