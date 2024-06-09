@@ -2,7 +2,7 @@
 use crate::prelude::*;
 use math::sample_continuous_bernoulli;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use std::cmp::max;
+use std::cmp::min;
 use tracing::{debug, info};
 
 /// Uses sprout-like algorithm to generate a random transition system. `symbols` determines the
@@ -120,7 +120,7 @@ pub fn generate_random_dpa(symbols: usize, size: usize, num_prios: Int, lambda: 
 /// Randomly draw a priority in range [0,num_prios) from continuous Bernoulli distribution
 pub fn draw_priority(num_prios: u8, lambda: f64) -> u8 {
     let r = sample_continuous_bernoulli(lambda);
-    max((r * num_prios as f64).floor() as u8, num_prios - 1)
+    min((r * num_prios as f64).floor() as u8, num_prios - 1)
 }
 
 /// Generate a random `String` over the universe of the `alphabet`
