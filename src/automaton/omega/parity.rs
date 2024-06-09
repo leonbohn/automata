@@ -66,6 +66,33 @@ impl<D> IntoDPA<D>
 where
     D: Deterministic<EdgeColor = Int>,
 {
+    /// Verifies whether or not the unerlying transition system represents an
+    /// informative right congruence or not. Specifically, this means that
+    /// any two distinct states can be distinguished from each other by a word
+    /// which is accepted starting from one of the two states but not starting
+    /// from the other.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let mut dpa = TSBuilder::without_state_colors()
+    ///     .with_transitions([(0, 'a', 0, 1), (0, 'b', 1, 1),
+    ///                        (1, 'a', 0, 0), (1, 'b', 3, 0)])
+    ///     .into_dpa(0);
+    /// assert!(!dpa.is_informative_right_congruent());
+    ///
+    /// dpa.add_edge((0, 'c', 2, 0));
+    /// dpa.add_edge((1, 'c', 1, 1));
+    /// assert!(dpa.is_informative_right_congruent());
+    /// ```
+    pub fn is_informative_right_congruent(&self) -> bool {
+        self.prefix_partition().iter().all(|c| {
+            assert!(!c.is_empty(), "Should not have empty classes");
+            c.len() == 1
+        })
+    }
+
     /// Creates a streamlined version of `self`, that is DPA where the edge colors are
     /// normalized and the transition structure is minimized as a Mealy machine.
     ///
