@@ -354,7 +354,31 @@ impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> Iterator
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color> Deterministic for GraphTs<A, Q, C, true> {}
+impl<A: Alphabet, Q: Color, C: Color> Deterministic for GraphTs<A, Q, C, true> {
+    fn collect_graphts_deterministic(
+        self,
+    ) -> GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true> {
+        self
+    }
+    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>
+    where
+        Self: Sized,
+        EdgeColor<Self>: std::hash::Hash + Eq,
+    {
+        self
+    }
+    fn collect_graphts_deterministic_pointed(
+        self,
+    ) -> (
+        GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true>,
+        StateIndex<GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true>>,
+    )
+    where
+        Self: Pointed,
+    {
+        (self.collect_dts(), 0)
+    }
+}
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A> for GraphTs<A, Q, C, DET> {
     fn for_alphabet(from: A) -> Self {

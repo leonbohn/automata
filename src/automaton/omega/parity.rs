@@ -434,7 +434,7 @@ where
     {
         let start = std::time::Instant::now();
 
-        let (mut ts, _initial) = self.with_initial(self.initial).collect_dts_pointed();
+        let mut ts = self.collect_dts();
         let (out, out_initial) = self.with_initial(self.initial).collect_dts_pointed();
 
         let mut recoloring = Vec::new();
@@ -450,6 +450,26 @@ where
                 );
             }
             for state in remove_states.drain(..) {
+                trace!("removing state {state}");
+                for edge in ts.edges_from(state).unwrap() {
+                    trace!("inside loop");
+                    let Some(idx) = recoloring
+                        .iter()
+                        .position(|((p, e), _)| edge.source().eq(p) && edge.expression().eq(e))
+                    else {
+                        panic!(
+                            "no recoloring stored for {} --{}-->",
+                            edge.source(),
+                            edge.expression().show()
+                        );
+                    };
+                    trace!(
+                        "recoloring edge {} --{}--> with {:?}",
+                        recoloring[idx].0 .0,
+                        recoloring[idx].0 .1.show(),
+                        recoloring[idx].1
+                    );
+                }
                 assert!(
                     ts.remove_state(state).is_some(),
                     "We must be able to actually remove these edges"
@@ -466,7 +486,7 @@ where
             'inner: for scc in dag.iter() {
                 trace!("inner priority {priority} | scc {:?}", scc);
                 if scc.is_transient() {
-                    trace!("scc is transient");
+                    trace!("scc {:?} is transient", scc);
                     for state in scc.iter() {
                         for edge in ts.edges_from(*state).unwrap() {
                             trace!(
@@ -488,6 +508,14 @@ where
                     .iter()
                     .min()
                     .expect("We know this is not transient");
+
+                for (q, e, _c, p) in scc.border_edges() {
+                    trace!(
+                        "recoloring border edge {q} --{}--> {p} with prio {priority}",
+                        e.show()
+                    );
+                    recoloring.push(((*q, e.clone()), priority));
+                }
 
                 if priority % 2 != minimal_interior_edge_color % 2 {
                     trace!("minimal interior priority: {minimal_interior_edge_color}, skipping");
@@ -718,5 +746,23 @@ mod tests {
             .into_dpa(0);
         let cong = dpa.prefix_congruence();
         assert_eq!(cong.size(), 1);
+    }
+
+    #[test_log::test]
+    fn bug_normalized() {
+        let dpa = TSBuilder::without_state_colors()
+            .with_transitions([
+                (0, 'a', 3, 2),
+                (0, 'b', 3, 0),
+                (1, 'a', 4, 0),
+                (1, 'b', 3, 2),
+                (2, 'a', 2, 1),
+                (2, 'b', 0, 2),
+            ])
+            .into_dpa(0);
+        let normalized = dpa.normalized();
+        assert_eq!(normalized.last_edge_color("aaa"), 0);
+        assert_eq!(normalized.last_edge_color("aa"), 0);
+        assert_eq!(normalized.last_edge_color("aab"), 0);
     }
 }
