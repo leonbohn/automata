@@ -42,8 +42,8 @@ impl<C> IntoDBA<C>
 where
     C: Deterministic<EdgeColor = bool>,
 {
-    /// Performs a streamlining operation akin to [`DPA::streamline`].
-    pub fn streamline(&self) -> DBA<C::Alphabet> {
+    /// Performs a streamlining operation akin to [`DPA::streamlined`].
+    pub fn streamlined(&self) -> DBA<C::Alphabet> {
         self.map_edge_colors(|c| if c { 0 } else { 1 })
             .into_dpa()
             .streamlined()

@@ -16,16 +16,30 @@ type InteriorTransitionSet<Ts> = Set<(
     <Ts as TransitionSystem>::EdgeColor,
     <Ts as TransitionSystem>::StateIndex,
 )>;
+type BorderEdgeSet<Ts> = Set<(
+    <Ts as TransitionSystem>::StateIndex,
+    EdgeExpression<Ts>,
+    <Ts as TransitionSystem>::EdgeColor,
+    <Ts as TransitionSystem>::StateIndex,
+)>;
+type BorderTransitionSet<Ts> = Set<(
+    <Ts as TransitionSystem>::StateIndex,
+    SymbolOf<Ts>,
+    <Ts as TransitionSystem>::EdgeColor,
+    <Ts as TransitionSystem>::StateIndex,
+)>;
 
 /// Represents a strongly connected component of a transition system.
 #[derive(Clone)]
 pub struct Scc<'a, Ts: TransitionSystem> {
     ts: &'a Ts,
     states: BTreeSet<Ts::StateIndex>,
-    transitions: OnceCell<InteriorTransitionSet<Ts>>,
-    edges: OnceCell<InteriorEdgeSet<Ts>>,
+    interior_transitions: OnceCell<InteriorTransitionSet<Ts>>,
+    interior_edges: OnceCell<InteriorEdgeSet<Ts>>,
     edge_colors: OnceCell<Set<Ts::EdgeColor>>,
     minimal_representative: OnceCell<Option<MinimalRepresentative<Ts>>>,
+    border_edges: OnceCell<BorderEdgeSet<Ts>>,
+    border_transitions: OnceCell<BorderTransitionSet<Ts>>,
 }
 
 impl<'a, Ts: TransitionSystem> IntoIterator for Scc<'a, Ts> {
@@ -76,9 +90,11 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         let minimal_representative = OnceCell::new();
         Self {
             ts,
-            transitions: edges,
+            interior_transitions: edges,
             states,
-            edges: OnceCell::new(),
+            interior_edges: OnceCell::new(),
+            border_edges: OnceCell::new(),
+            border_transitions: OnceCell::new(),
             minimal_representative,
             edge_colors,
         }
@@ -109,6 +125,50 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         self.size() == 1
     }
 
+    /// Gives a reference to all edges that leave the SCC, i.e. their source lies inside the
+    /// SCC and the target lies outside of it.
+    pub fn border_edges(&self) -> &BorderEdgeSet<Ts>
+    where
+        EdgeColor<Ts>: Hash + Eq,
+    {
+        self.border_edges.get_or_init(|| {
+            let mut edges = Set::default();
+            for q in &self.states {
+                let it = self.ts.edges_from(*q).expect("State must exist");
+                for edge in it {
+                    let p = edge.target();
+                    if !self.states.contains(&p) {
+                        edges.insert((*q, edge.expression().clone(), edge.color().clone(), p));
+                    }
+                }
+            }
+            edges
+        })
+    }
+
+    /// Gives a reference to all border edges of the SCC. A border edge is one whose
+    /// source is in the SCC and whose target lies outside of the SCC.
+    pub fn border_transitions(&self) -> &BorderTransitionSet<Ts>
+    where
+        EdgeColor<Ts>: Hash + Eq,
+    {
+        self.border_transitions.get_or_init(|| {
+            let mut edges = Set::default();
+            for q in &self.states {
+                let it = self.ts.edges_from(*q).expect("State must exist");
+                for edge in it {
+                    let p = edge.target();
+                    for a in edge.expression().symbols() {
+                        if !self.states.contains(&p) {
+                            edges.insert((*q, a, edge.color().clone(), p));
+                        }
+                    }
+                }
+            }
+            edges
+        })
+    }
+
     /// Gives a reference to all interior edges of the SCC. An interior edge is an edge whose source
     /// and target states are in the SCC itself.
     ///
@@ -117,7 +177,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     where
         EdgeColor<Ts>: Hash + Eq,
     {
-        self.edges.get_or_init(|| {
+        self.interior_edges.get_or_init(|| {
             let mut edges = Set::default();
             for q in &self.states {
                 let it = self.ts.edges_from(*q).expect("State must exist");
@@ -140,7 +200,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     where
         EdgeColor<Ts>: Hash + Eq,
     {
-        self.transitions.get_or_init(|| {
+        self.interior_transitions.get_or_init(|| {
             let mut edges = Set::default();
             for q in &self.states {
                 let it = self.ts.edges_from(*q).expect("State must exist");
