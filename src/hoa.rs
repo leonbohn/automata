@@ -14,7 +14,35 @@ use itertools::Itertools;
 pub static MAX_APS: usize = 6;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct HoaString(pub(crate) String);
+pub struct HoaString(pub String);
+
+impl std::ops::Deref for HoaString {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for HoaString {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl std::borrow::Borrow<str> for HoaString {
+    fn borrow(&self) -> &str {
+        self.0.as_str()
+    }
+}
+impl From<String> for HoaString {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+impl From<HoaString> for String {
+    fn from(value: HoaString) -> Self {
+        value.0
+    }
+}
 
 /// A propositional alphabet, where a symbol is a valuation of all propositional variables.
 ///
@@ -514,9 +542,7 @@ mod tests {
         [!0] 3
         --END--
         "#;
-        let start = std::time::Instant::now();
         let auts = hoa_to_ts(hoa);
-        println!("Took {}ms", start.elapsed().as_millis());
         assert_eq!(auts.len(), 1);
         let aut = &auts[0];
         assert_eq!(aut.size(), 10);
