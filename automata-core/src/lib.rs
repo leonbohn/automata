@@ -1,3 +1,4 @@
+#[macro_use]
 pub mod alphabet;
 
 #[macro_use]
@@ -34,6 +35,7 @@ pub mod prelude {
     pub use crate::alphabet::{Alphabet, CharAlphabet, Expression, Matcher, Symbol};
     pub use crate::upw;
     pub use crate::word::{
-        self, FiniteWord, LinearWord, OmegaWord, PeriodicOmegaWord, ReducedOmegaWord,
+        self, FiniteWord, LinearWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord,
+        ReducedOmegaWord,
     };
 }

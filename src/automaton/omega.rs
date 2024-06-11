@@ -1,4 +1,4 @@
-use crate::{hoa::HoaAlphabet, math::Set, prelude::*};
+use crate::{math::Set, prelude::*};
 
 mod buchi;
 pub use buchi::*;
@@ -134,8 +134,10 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
     }
 }
 
-impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
-    fn from(value: DeterministicOmegaAutomaton<HoaAlphabet>) -> Self {
+impl From<DeterministicOmegaAutomaton<hoa::HoaAlphabet>>
+    for DeterministicOmegaAutomaton<CharAlphabet>
+{
+    fn from(value: DeterministicOmegaAutomaton<hoa::HoaAlphabet>) -> Self {
         let size = value.size().into_index();
         let ts = TSBuilder::default()
             .with_state_colors((0..size).map(|i| value.state_color(i).unwrap()))
@@ -153,14 +155,14 @@ impl From<DeterministicOmegaAutomaton<HoaAlphabet>> for DeterministicOmegaAutoma
 }
 
 impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
-    for DeterministicOmegaAutomaton<HoaAlphabet>
+    for DeterministicOmegaAutomaton<hoa::HoaAlphabet>
 {
     /// For now, we allow this to error out in exactly one case: if the number of alphabet symbols
     /// is not a power of 2 and cannot be mapped immediately into AP combinations.
     type Error = String;
     fn try_from(value: DeterministicOmegaAutomaton<CharAlphabet>) -> Result<Self, Self::Error> {
         let size = value.size();
-        let mut ts = DTS::for_alphabet(HoaAlphabet::try_from_char_alphabet(value.alphabet())?);
+        let mut ts = DTS::for_alphabet(hoa::HoaAlphabet::try_from_char_alphabet(value.alphabet())?);
 
         for q in value.state_indices() {
             assert!(
@@ -175,7 +177,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
                 ts.add_edge((
                     edge.source(),
                     ts.alphabet()
-                        .make_expression(ts.alphabet().char_to_hoa_symbol(*edge.expression())),
+                        .make_expression(ts.alphabet().char_to_symbol(*edge.expression())),
                     edge.color(),
                     edge.target(),
                 ));
