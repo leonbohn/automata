@@ -5,7 +5,7 @@ use super::{Accumulates, RunProfile, TransitionMonoid};
 
 /// Represents the two-sided Cayley graph of a deterministic transition system.
 /// In essence, it is a graph using transition profiles of the ts as nodes. It uses
-/// a [`Directional`] alphabet to represent concatenation both from the left and the right.
+/// a [`alphabet::Directional`] alphabet to represent concatenation both from the left and the right.
 ///
 /// There are different ways of building the Cayley graph. The most important distinction
 /// lies in how two colours are combined, which is determined through the [`Accumulates`] trait.

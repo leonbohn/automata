@@ -48,6 +48,11 @@ pub mod prelude {
         EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, LinkedListDeterministic,
         LinkedListNondeterministic, LinkedListTransitionSystem,
     };
+    /// implements the interface to the `hoars` package. Is only available on create feature `hoa`.
+    #[cfg(feature = "hoa")]
+    pub mod hoa {
+        pub use hoars::*;
+    }
 }
 
 pub use automata_core::math;

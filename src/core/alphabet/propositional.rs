@@ -1,4 +1,9 @@
-use std::{hash::Hash, marker::PhantomData};
+use std::{
+    fmt::Display,
+    hash::Hash,
+    marker::PhantomData,
+    sync::{Arc, Mutex},
+};
 
 use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddValuation, BddVariableSet};
 use tracing::trace;
@@ -10,23 +15,35 @@ pub trait RawSymbolRepr: std::fmt::Debug + Hash + Eq + Ord + Copy {
     fn from_usize(from: usize) -> Self;
     fn bit(&self, n: usize) -> bool;
     fn set(&mut self, n: usize);
+    fn max_aps() -> usize;
 }
-impl RawSymbolRepr for u32 {
-    fn as_usize(&self) -> usize {
-        *self as usize
-    }
-    fn from_usize(from: usize) -> Self {
-        from.try_into().unwrap()
-    }
-    fn bit(&self, n: usize) -> bool {
-        assert!(n <= 8usize.saturating_pow(std::mem::size_of::<Self>() as u32));
-        *self & (1 << n) != 0
-    }
-    fn set(&mut self, n: usize) {
-        assert!(n <= 8usize.saturating_pow(std::mem::size_of::<Self>() as u32));
-        *self |= 1 << n;
+
+macro_rules! impl_raw_symbol_repr {
+    ($($ty:ty),*) => {
+        $(
+            impl RawSymbolRepr for $ty {
+                fn max_aps() -> usize {
+                    std::mem::size_of::<$ty>() * 8
+                }
+                fn as_usize(&self) -> usize {
+                    *self as usize
+                }
+                fn from_usize(from: usize) -> Self {
+                    from.try_into().unwrap()
+                }
+                fn bit(&self, n: usize) -> bool {
+                    assert!(n <= Self::max_aps());
+                    *self & (1 << n) != 0
+                }
+                fn set(&mut self, n: usize) {
+                    assert!(n <= Self::max_aps());
+                    *self |= 1 << n;
+                }
+            }
+        )*
     }
 }
+impl_raw_symbol_repr!(u8, u16, u32, u64, u128, usize);
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub struct PropSymbol<RawTy: RawSymbolRepr = u32> {
@@ -35,6 +52,23 @@ pub struct PropSymbol<RawTy: RawSymbolRepr = u32> {
 }
 
 impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
+    pub fn as_expression(&self) -> PropExpression<RawTy> {
+        PropExpression::from_parts(self.num_aps, self.as_bdd_valuation().into())
+    }
+    pub fn as_char(&self) -> char {
+        (b'a' + ((self.raw.as_usize() as u8) & 0b1111)) as char
+    }
+    pub fn from_char(value: char, aps: usize) -> Self {
+        assert!(aps <= RawTy::max_aps());
+        let val = value as u8;
+        assert!(b'a' <= val);
+        assert!(val < b'p');
+
+        Self {
+            raw: RawTy::from_usize(((val - b'a') & 0b1111) as usize),
+            num_aps: aps.try_into().unwrap(),
+        }
+    }
     pub fn as_bools(&self) -> Vec<bool> {
         assert!(
             self.num_aps as usize <= 8usize.saturating_pow(std::mem::size_of::<RawTy>() as u32)
@@ -103,14 +137,17 @@ pub struct PropExpression<RawTy: RawSymbolRepr = u32> {
     _ty: PhantomData<RawTy>,
 }
 
-impl PropExpression<u32> {
-    pub fn new(num_aps: u8, string: &str) -> Self {
-        let vars = BddVariableSet::new_anonymous(num_aps as u16);
+impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
+    pub fn from_parts(num_aps: u8, bdd: Bdd) -> Self {
         Self {
             num_aps,
-            bdd: vars.eval_expression_string(string),
+            bdd,
             _ty: PhantomData,
         }
+    }
+    pub fn new(num_aps: u8, string: &str) -> PropExpression<RawTy> {
+        let vars = BddVariableSet::new_anonymous(num_aps as u16);
+        Self::from_parts(num_aps, vars.eval_expression_string(string))
     }
     pub fn into_bdd(self) -> Bdd {
         self.bdd
@@ -123,7 +160,7 @@ impl PropExpression<u32> {
             _ty: PhantomData,
         }
     }
-    pub fn sat_vals(&self) -> PropExpressionSymbols<'_, u32> {
+    pub fn sat_vals(&self) -> PropExpressionSymbols<'_, RawTy> {
         PropExpressionSymbols {
             iter: self.bdd.sat_valuations(),
             _ty: PhantomData,
@@ -139,12 +176,60 @@ impl PropExpression<u32> {
             _ty: PhantomData,
         }
     }
+    pub fn chars_iter(&self) -> impl Iterator<Item = char> + '_ {
+        PropExpressionSymbols {
+            iter: self.bdd.sat_valuations(),
+            _ty: PhantomData,
+        }
+        .map(|e: PropSymbol<RawTy>| e.as_char())
+    }
+}
+
+impl<RawTy: RawSymbolRepr> std::ops::BitAnd for PropExpression<RawTy> {
+    type Output = PropExpression<RawTy>;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        assert_eq!(self.num_aps, rhs.num_aps);
+        PropExpression {
+            num_aps: self.num_aps,
+            bdd: self.bdd.and(&rhs.bdd),
+            _ty: PhantomData,
+        }
+    }
+}
+impl<RawTy: RawSymbolRepr> std::ops::Not for PropExpression<RawTy> {
+    type Output = PropExpression<RawTy>;
+
+    fn not(self) -> Self::Output {
+        Self::from_parts(self.num_aps, self.bdd.not())
+    }
+}
+
+impl<RawTy: RawSymbolRepr> std::ops::BitOr for PropExpression<RawTy> {
+    type Output = PropExpression<RawTy>;
+    fn bitor(self, rhs: Self) -> Self::Output {
+        assert_eq!(self.num_aps, rhs.num_aps);
+        Self::from_parts(self.num_aps, self.bdd.or(&rhs.bdd))
+    }
+}
+
+impl<RawTy: RawSymbolRepr> std::ops::BitAndAssign for PropExpression<RawTy> {
+    fn bitand_assign(&mut self, rhs: Self) {
+        assert_eq!(self.num_aps, rhs.num_aps);
+        *self = Self::from_parts(self.num_aps, self.bdd.and(&rhs.bdd));
+    }
+}
+
+impl<RawTy: RawSymbolRepr> std::ops::BitOrAssign for PropExpression<RawTy> {
+    fn bitor_assign(&mut self, rhs: Self) {
+        assert_eq!(self.num_aps, rhs.num_aps);
+        *self = Self::from_parts(self.num_aps, self.bdd.or(&rhs.bdd));
+    }
 }
 
 impl<RawTy: RawSymbolRepr> PartialOrd for PropExpression<RawTy> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        assert_eq!(self.num_aps, other.num_aps);
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 impl<RawTy: RawSymbolRepr> Ord for PropExpression<RawTy> {
@@ -170,8 +255,11 @@ impl<RawTy: RawSymbolRepr> Matcher<PropExpression<RawTy>> for PropSymbol<RawTy> 
 }
 
 impl<RawTy: RawSymbolRepr> Matcher<PropExpression<RawTy>> for PropExpression<RawTy> {
-    fn matches(&self, _expression: &PropExpression<RawTy>) -> bool {
-        todo!()
+    fn matches(&self, expression: &PropExpression<RawTy>) -> bool {
+        assert_eq!(self.num_aps, expression.num_aps);
+        // all values in self should also be in expression
+        // we share nothing with the complement of the expression
+        expression.bdd.not().and(&self.bdd).sat_witness().is_none()
     }
 }
 
@@ -207,27 +295,108 @@ impl<'a, RawTy: RawSymbolRepr> Iterator for PropExpressionSymbols<'a, RawTy> {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct PropCache {
+/// Represents a propositional alphabet, which consists of a list of atomic propositions.
+///
+/// A symbol of this alphabet simply a valuation of the atomic propositions, which is
+/// represented as a binary string of length `num_aps` (whose limit gets determined by
+/// the number of bits in the type parameter `RawTy`).
+///
+/// An Expression is represented by a boolean formula over the atomic propositions. Here,
+/// we store it as a [`PropExpression`] which in turn contains a [`Bdd`].
+///
+/// # Example
+/// Assume we have a propositional alphabet over the atomic propositions `a`, `b` and `c`.
+///
+/// Then a **symbol** in this alphabet is a valuation of these variables, e.g. `a & !b & c`.
+///
+/// An **expression** on the other hand is used to label edges and it is a boolean expression over
+/// the atomic propositions, e.g. `(a | b) & c`. Such an expression is matched by
+/// a symbol if the symbol satisfies the expression, i.e. if the expression evaluates to `true` under the given
+/// valuation. The expression from above, for example, would be matched by the symbol given above (`a & !b & c`),
+/// but not by the symbols `a & b & !c` or `!a & !b & c`.
+#[derive(Clone, Debug)]
+pub struct PropAlphabet<RawTy: RawSymbolRepr = u32> {
     aps: Vec<String>,
-    universal: PropExpression,
-    expressions: std::cell::RefCell<math::Set<PropExpression>>,
+    universal: PropExpression<RawTy>,
+    expressions: Arc<Mutex<math::Set<PropExpression<RawTy>>>>,
 }
 
-impl PropCache {
+impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
     pub fn new(aps: Vec<String>) -> Self {
+        assert!(aps.len() < RawTy::max_aps());
+        assert!(!aps.is_empty());
+
+        let universal = PropExpression::<RawTy>::universal(aps.len() as u8);
         Self {
-            universal: PropExpression::universal(aps.len() as u8),
-            expressions: [].into_iter().collect::<math::Set<_>>().into(),
+            expressions: Arc::new(Mutex::new(math::Set::from_iter([universal.clone()]))),
+            universal,
             aps,
         }
     }
+
+    pub fn aps(&self) -> u8 {
+        self.aps.len() as u8
+    }
+
+    pub fn char_to_symbol(&self, value: char) -> PropSymbol<RawTy> {
+        assert!(value >= 'a');
+
+        let raw = RawTy::from_usize(((value as u8) - b'a') as usize);
+        PropSymbol {
+            raw,
+            num_aps: self.aps(),
+        }
+    }
+
+    pub fn hoa_symbol_to_char(&self, sym: &PropSymbol<RawTy>) -> char {
+        assert_eq!(sym.num_aps, self.aps(), "symbol does not match alphabet");
+        assert!((sym.num_aps as usize) < RawTy::max_aps(), "too many aps");
+
+        (b'a' + (sym.raw.as_usize() as u8)) as char
+    }
+
+    pub fn size(&self) -> usize {
+        2u32.saturating_pow(self.aps() as u32)
+            .try_into()
+            .expect("Cannot fit value into usize")
+    }
+    pub fn apnames(&self) -> &[String] {
+        &self.aps
+    }
+
+    /// Attempts to build an instance of `Self` from the given pointer to a [`CharAlphabet`]. This
+    /// only works (for the moment) if the number of symbols in the given alphabet is an exact
+    /// power of two.
+    pub fn try_from_char_alphabet(value: &CharAlphabet) -> Result<Self, String> {
+        let alphabet_size = value.size();
+        if alphabet_size != alphabet_size.next_power_of_two() || alphabet_size == 0 {
+            return Err(format!(
+                "Alphabet size is not a power of two: {alphabet_size}"
+            ));
+        }
+
+        let aps = alphabet_size.ilog2() as u8;
+        assert!(aps > 0, "We do not want this edge case");
+
+        Ok(Self::from_apnames(
+            (0u8..aps).map(|i| ((b'a' + i) as char).to_string()),
+        ))
+    }
+
+    pub fn from_apnames<I>(apnames: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Display,
+    {
+        let apnames: Vec<_> = apnames.into_iter().map(|i| i.to_string()).collect();
+        Self::new(apnames)
+    }
 }
 
-impl Alphabet for PropCache {
-    type Symbol = PropSymbol;
+impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
+    type Symbol = PropSymbol<RawTy>;
 
-    type Expression = PropExpression;
+    type Expression = PropExpression<RawTy>;
 
     fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
         let expr = PropExpression {
@@ -235,7 +404,8 @@ impl Alphabet for PropCache {
             num_aps: symbol.num_aps,
             _ty: PhantomData,
         };
-        self.expressions.borrow_mut().insert(expr.clone());
+        let mut expressions = self.expressions.lock().unwrap();
+        expressions.insert(expr.clone());
         expr
     }
 
@@ -244,7 +414,7 @@ impl Alphabet for PropCache {
         left.bdd.and(&right.bdd).sat_witness().is_some()
     }
 
-    type Universe<'this> = PropExpressionSymbols<'this, u32>
+    type Universe<'this> = PropExpressionSymbols<'this, RawTy>
     where
         Self: 'this;
 
@@ -276,7 +446,7 @@ mod tests {
 
     #[test_log::test]
     fn prop_expression() {
-        let pe = PropExpression::new(3, "x_0 | (x_1 & x_2)");
+        let pe = PropExpression::<u32>::new(3, "x_0 | (x_1 & x_2)");
 
         assert!(PropSymbol::from_bools(vec![false, true, true]).matches(&pe));
         assert!(PropSymbol::from_bools(vec![false, true, true]).matches(&pe));
