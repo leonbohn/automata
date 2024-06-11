@@ -84,6 +84,9 @@ impl OmegaAcceptanceCondition {
                     build_parity_condition_hoa(*low, *high)
                 )
             }
+            OmegaAcceptanceCondition::Buchi => {
+                write!(w, "acc-name: Buchi\nAcceptance: 1 Inf(0)\n")
+            }
             _ => todo!("Can not yet deal with other acceptance types"),
         }
     }
@@ -92,6 +95,40 @@ impl OmegaAcceptanceCondition {
 pub trait HoaSuitableAlphabet: Alphabet {
     fn write_expression<W: std::fmt::Write>(&self, w: &mut W, expr: &Self::Expression) -> Result;
     fn write_alphabet_description<W: std::fmt::Write>(&self, w: &mut W) -> Result;
+}
+
+impl<A: HoaSuitableAlphabet> WriteHoa for DBA<A> {
+    fn write_edge_color<W: std::fmt::Write>(&self, w: &mut W, label: EdgeColor<Self>) -> Result {
+        if label {
+            write!(w, "{{{}}}", 0)
+        } else {
+            write!(w, "{{{}}}", 1)
+        }
+    }
+
+    fn write_expression<W: std::fmt::Write>(
+        &self,
+        w: &mut W,
+        expr: &EdgeExpression<Self>,
+    ) -> Result {
+        self.alphabet().write_expression(w, expr)
+    }
+
+    fn write_state_id<W: std::fmt::Write>(
+        &self,
+        w: &mut W,
+        id: Self::StateIndex,
+    ) -> std::fmt::Result {
+        write!(w, "{}", id)
+    }
+
+    fn write_alphabet_description<W: std::fmt::Write>(&self, w: &mut W) -> Result {
+        self.alphabet().write_alphabet_description(w)
+    }
+
+    fn write_acceptance<W: std::fmt::Write>(&self, w: &mut W) -> Result {
+        OmegaAcceptanceCondition::Buchi.write_hoa(w)
+    }
 }
 
 impl<A: HoaSuitableAlphabet> WriteHoa for DPA<A> {
@@ -235,6 +272,18 @@ mod tests {
         assert_eq!(
             hoa,
             "HOA: v1\nAP: 3 \"a\" \"b\" \"c\"\nStates: 1\nStart: 0\nacc-name: parity min even 3\nAcceptance: 3 Inf(0) | (Fin(1) & Inf(2))\n--BODY--\nState: 0\n[0 & !1 & !2] 0 {0}\n[!0 & 1 & !2] 0 {1}\n[!0 & !1 & 2] 0 {2}\n--END--\n"
+        );
+    }
+
+    #[test]
+    fn write_hoa_dba() {
+        let dba = TSBuilder::without_state_colors()
+            .with_edges([(0, 'a', true, 0), (0, 'b', false, 0), (0, 'c', true, 0)])
+            .into_dba(0);
+        let hoa = dba.to_hoa();
+        assert_eq!(
+            hoa,
+            "HOA: v1\nAP: 3 \"a\" \"b\" \"c\"\nStates: 1\nStart: 0\nacc-name: Buchi\nAcceptance: 1 Inf(0)\n--BODY--\nState: 0\n[0 & !1 & !2] 0 {0}\n[!0 & 1 & !2] 0 {1}\n[!0 & !1 & 2] 0 {0}\n--END--\n"
         );
     }
 }
