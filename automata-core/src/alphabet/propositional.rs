@@ -267,8 +267,8 @@ impl<RawTy: RawSymbolRepr> Show for PropExpression<RawTy> {
         if clauses > 1 {
             let mut out = format!("({})", clause_to_string(&dnf[0]));
 
-            for i in 0..clauses {
-                out.push_str(&format!(" | ({})", clause_to_string(&dnf[i])));
+            for clause in &dnf {
+                out.push_str(&format!(" | ({})", clause_to_string(clause)));
             }
 
             out

@@ -243,7 +243,7 @@ impl<const DET: bool> TryFrom<HoaRepresentation> for OmegaAutomaton<hoa::HoaAlph
     }
 }
 
-/// Converts a [`HoaAutomaton`] into a [`NTS`] with the same semantics. This creates the appropriate
+/// Converts a [`HoaRepresentation`] into a [`NTS`] with the same semantics. This creates the appropriate
 /// number of states and inserts transitions with the appropriate labels and colors.
 pub fn hoa_automaton_to_ts<const DET: bool>(
     aut: HoaRepresentation,
