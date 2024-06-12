@@ -70,3 +70,11 @@ random = ["dep:rand_distr"]
 hoa = ["dep:hoars"]
 graphviz = ["dep:tempfile"]
 implementations = []
+
+[dev-dependencies]
+clap = "4.5.7"
+
+[[bin]]
+name = "oai"
+path = "bin/oai.rs"
+required-features = ["clap"]

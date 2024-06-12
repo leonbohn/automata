@@ -1,9 +1,78 @@
 #![allow(missing_docs)]
+
+use tracing::{trace, warn};
+
 pub mod input;
+pub use input::{
+    HoaAutomatonStream, IntoDeterministicHoaAutomatonStream, NoneterministicHoaAutomatonStream,
+};
+
 pub mod output;
+pub use output::WriteHoa;
+
+pub type HoaAutomaton<const DET: bool> = crate::automaton::OmegaAutomaton<hoars::HoaAlphabet, DET>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct HoaString(pub String);
+pub struct HoaString(pub(crate) String);
+
+impl HoaString {
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+
+    pub fn pop<const DET: bool>(&mut self) -> Option<HoaAutomaton<DET>> {
+        const END_LEN: usize = "--END--".len();
+        const ABORT_LEN: usize = "--ABORT--".len();
+
+        loop {
+            match (self.0.find("--ABORT--"), self.0.find("--END--")) {
+                (None, Some(pos)) => {
+                    trace!("Returnting first automaton, going up to position {pos}");
+                    match input::parse_omega_automaton_range(&self.0, 0, pos + END_LEN) {
+                        Ok(aut) => return Some(aut),
+                        Err(e) => {
+                            warn!("Could not parse automaton, skipping... {:?}", e);
+                            self.0 = self.0[pos + END_LEN..].trim_start().to_string();
+                        }
+                    }
+                }
+                (Some(abort), None) => {
+                    trace!("Found only one automaton --ABORT--ed at {abort}, but no subsequent --END-- of automaton to parse.");
+                    return None;
+                }
+                (Some(abort), Some(end)) => {
+                    if abort < end {
+                        trace!("Found --ABORT-- before --END--, returning first automaton from {abort} to {end}");
+                        match input::parse_omega_automaton_range(
+                            &self.0,
+                            abort + ABORT_LEN,
+                            end + END_LEN,
+                        ) {
+                            Ok(aut) => return Some(aut),
+                            Err(e) => {
+                                warn!("Could not parse automaton, skipping... {:?}", e);
+                                self.0 = self.0[end + END_LEN..].trim_start().to_string();
+                            }
+                        }
+                    } else {
+                        trace!("Found --END--, returning first automaton up to {end}");
+                        match input::parse_omega_automaton_range(&self.0, 0, end + END_LEN) {
+                            Ok(aut) => return Some(aut),
+                            Err(e) => {
+                                warn!("Could not parse automaton, skipping... {:?}", e);
+                                self.0 = self.0[end + END_LEN..].trim_start().to_string();
+                            }
+                        }
+                    }
+                }
+                (None, None) => {
+                    trace!("No end of automaton found, there is no automaton to parse.");
+                    return None;
+                }
+            }
+        }
+    }
+}
 
 impl std::ops::Deref for HoaString {
     type Target = String;

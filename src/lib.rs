@@ -53,6 +53,8 @@ pub mod prelude {
     pub mod hoa {
         pub use hoars::*;
     }
+    #[cfg(feature = "hoa")]
+    pub use crate::hoa::WriteHoa;
 }
 
 pub use automata_core::math;
