@@ -48,6 +48,13 @@ pub mod prelude {
         EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, LinkedListDeterministic,
         LinkedListNondeterministic, LinkedListTransitionSystem,
     };
+    /// implements the interface to the `hoars` package. Is only available on create feature `hoa`.
+    #[cfg(feature = "hoa")]
+    pub mod hoa {
+        pub use hoars::*;
+    }
+    #[cfg(feature = "hoa")]
+    pub use crate::hoa::WriteHoa;
 }
 
 pub use automata_core::math;
@@ -75,9 +82,6 @@ pub mod hoa;
 /// Implements the generation of random transition systems.
 #[cfg(feature = "random")]
 pub mod random;
-
-/// Implements a directed acyclic graph.
-pub mod dag;
 
 use std::{fmt::Debug, hash::Hash};
 

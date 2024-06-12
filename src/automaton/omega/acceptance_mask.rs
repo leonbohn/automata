@@ -37,6 +37,16 @@ impl AcceptanceMask {
         }
         priority
     }
+
+    pub fn as_bool(&self) -> bool {
+        let Some(next) = self.iter().next() else {
+            return false;
+        };
+        if next != 0 {
+            tracing::error!("invalid acceptance mask: {self:?}, expected color 0 or no color");
+        }
+        true
+    }
 }
 
 impl Show for AcceptanceMask {

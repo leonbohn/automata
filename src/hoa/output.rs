@@ -3,7 +3,7 @@ use tracing::trace;
 
 use crate::prelude::*;
 
-use super::HoaAlphabet;
+use hoa::HoaAlphabet;
 
 use std::fmt::{Result, Write};
 
@@ -196,7 +196,7 @@ impl HoaSuitableAlphabet for HoaAlphabet {
         writeln!(
             w,
             "AP: {} {}",
-            self.apnames_len(),
+            self.aps(),
             self.apnames()
                 .iter()
                 .map(|name| format!("\"{}\"", name))

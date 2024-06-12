@@ -2,29 +2,28 @@ use std::{io::BufRead, ops::Deref};
 
 use crate::{
     automaton::{AcceptanceMask, DeterministicOmegaAutomaton},
-    hoa::HoaExpression,
     prelude::*,
 };
-use hoars::{HoaAutomaton, MAX_APS};
+use hoars::HoaRepresentation;
 use tracing::{trace, warn};
 
-use super::{HoaAlphabet, HoaString};
+use super::HoaString;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct FilterDeterministicHoaAutomatonStream<R, const DET: bool> {
-    base: HoaAutomatonStream<R, DET>,
+pub struct IntoDeterministicHoaAutomatonStream<R> {
+    base: HoaAutomatonStream<R, false>,
 }
 
-impl<R, const DET: bool> FilterDeterministicHoaAutomatonStream<R, DET> {
-    pub fn new(read: R) -> Self {
+impl<R> IntoDeterministicHoaAutomatonStream<R> {
+    pub fn new(read: R) -> IntoDeterministicHoaAutomatonStream<R> {
         Self {
             base: HoaAutomatonStream::new(read),
         }
     }
 }
 
-impl<R: BufRead, const DET: bool> Iterator for FilterDeterministicHoaAutomatonStream<R, DET> {
-    type Item = DeterministicOmegaAutomaton<HoaAlphabet>;
+impl<R: BufRead> Iterator for IntoDeterministicHoaAutomatonStream<R> {
+    type Item = DeterministicOmegaAutomaton<hoa::HoaAlphabet>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -42,15 +41,17 @@ impl<R: BufRead, const DET: bool> Iterator for FilterDeterministicHoaAutomatonSt
     }
 }
 
+pub type NoneterministicHoaAutomatonStream<R> = HoaAutomatonStream<R, false>;
+
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct HoaAutomatonStream<R, const DET: bool> {
+pub struct HoaAutomatonStream<R, const DET: bool = true> {
     read: R,
     buf: String,
     pos: usize,
 }
 
 impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
-    type Item = OmegaAutomaton<HoaAlphabet, DET>;
+    type Item = OmegaAutomaton<hoa::HoaAlphabet, DET>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -70,7 +71,7 @@ impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
                             "encountered --END-- in stream, attempting to parse automaton \n{}",
                             &self.buf[..end]
                         );
-                        let aut: Result<OmegaAutomaton<HoaAlphabet, DET>, _> =
+                        let aut: Result<OmegaAutomaton<hoa::HoaAlphabet, DET>, _> =
                             parse_omega_automaton_range(&self.buf, 0, end);
                         self.buf.clear();
                         self.pos = 0;
@@ -82,11 +83,8 @@ impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
                                 );
                             }
                             Ok(aut) => {
-                                if DET && !aut.ts().is_deterministic() {
-                                    panic!("Encountered automaton that is not deterministic, even though the type indicates it\n{:?}", aut);
-                                } else {
-                                    return Some(aut);
-                                }
+                                assert!(!DET || aut.ts().is_deterministic(), "type error");
+                                return Some(aut);
                             }
                         }
                     }
@@ -109,12 +107,12 @@ impl<R, const DET: bool> HoaAutomatonStream<R, DET> {
     }
 }
 
-fn parse_omega_automaton_range<const DET: bool>(
+pub fn parse_omega_automaton_range<const DET: bool>(
     hoa: &str,
     start: usize,
     end: usize,
-) -> Result<OmegaAutomaton<HoaAlphabet, DET>, String> {
-    match HoaAutomaton::try_from(&hoa[start..end]) {
+) -> Result<OmegaAutomaton<hoa::HoaAlphabet, DET>, String> {
+    match HoaRepresentation::try_from(&hoa[start..end]) {
         Ok(aut) => match OmegaAutomaton::try_from(aut) {
             Ok(aut) => Ok(aut),
             Err(e) => Err(format!(
@@ -131,7 +129,7 @@ fn parse_omega_automaton_range<const DET: bool>(
 
 pub fn pop_deterministic_omega_automaton(
     hoa: HoaString,
-) -> Option<(DeterministicOmegaAutomaton<HoaAlphabet>, HoaString)> {
+) -> Option<(DeterministicOmegaAutomaton<hoa::HoaAlphabet>, HoaString)> {
     pop_omega_automaton(hoa)
 }
 
@@ -140,7 +138,7 @@ pub fn pop_deterministic_omega_automaton(
 /// function returns `None`.
 pub fn pop_omega_automaton<const DET: bool>(
     hoa: HoaString,
-) -> Option<(OmegaAutomaton<HoaAlphabet, DET>, HoaString)> {
+) -> Option<(OmegaAutomaton<hoa::HoaAlphabet, DET>, HoaString)> {
     let mut hoa = hoa;
     const END_LEN: usize = "--END--".len();
     const ABORT_LEN: usize = "--ABORT--".len();
@@ -207,7 +205,7 @@ pub fn pop_omega_automaton<const DET: bool>(
 
 /// Considers the given HOA string as a single automaton and tries to parse it into an
 /// [`OmegaAutomaton`].
-pub fn hoa_to_ts<const DET: bool>(hoa: &str) -> Vec<OmegaAutomaton<HoaAlphabet, DET>> {
+pub fn hoa_to_ts<const DET: bool>(hoa: &str) -> Vec<OmegaAutomaton<hoa::HoaAlphabet, DET>> {
     let mut out = vec![];
     for hoa_aut in hoars::parse_hoa_automata(hoa) {
         match hoa_aut.try_into() {
@@ -238,27 +236,29 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
     }
 }
 
-impl<const DET: bool> TryFrom<HoaAutomaton> for OmegaAutomaton<HoaAlphabet, DET> {
+impl<const DET: bool> TryFrom<HoaRepresentation> for OmegaAutomaton<hoa::HoaAlphabet, DET> {
     type Error = String;
-    fn try_from(value: HoaAutomaton) -> Result<Self, Self::Error> {
+    fn try_from(value: HoaRepresentation) -> Result<Self, Self::Error> {
         hoa_automaton_to_ts(value)
     }
 }
 
-/// Converts a [`HoaAutomaton`] into a [`NTS`] with the same semantics. This creates the appropriate
+/// Converts a [`HoaRepresentation`] into a [`NTS`] with the same semantics. This creates the appropriate
 /// number of states and inserts transitions with the appropriate labels and colors.
 pub fn hoa_automaton_to_ts<const DET: bool>(
-    aut: HoaAutomaton,
-) -> Result<OmegaAutomaton<HoaAlphabet, DET>, String> {
+    aut: HoaRepresentation,
+) -> Result<OmegaAutomaton<hoa::HoaAlphabet, DET>, String> {
     let aps = aut.num_aps();
-    assert!(aps as u16 <= MAX_APS);
+    assert!(aps <= hoa::MAX_APS);
 
-    let mut ts: TS<HoaAlphabet, Int, AcceptanceMask, DET> =
-        TS::for_alphabet(HoaAlphabet::from_hoa_automaton(&aut));
+    let alphabet = hoa::HoaAlphabet::from_apnames(aut.aps().iter());
+    let mut ts: TS<hoa::HoaAlphabet, Int, AcceptanceMask, DET> = TS::for_alphabet(alphabet);
+
     for (id, state) in aut.body().iter().enumerate() {
         assert_eq!(id, state.id() as usize);
         assert_eq!(id, ts.add_state(state.id() as Int) as usize);
     }
+
     for state in aut.body().iter() {
         for edge in state.edges() {
             let target = edge
@@ -267,10 +267,7 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
                 .expect("Cannot yet deal with conjunctions of target states");
             let label = edge.label().deref().clone();
 
-            let bdd = label.try_into_bdd(&ts.alphabet().variable_set, &ts.alphabet().variables)?;
-
-            let expr = HoaExpression::new(bdd, aps);
-
+            let expr = label.try_into_hoa_expression(aps)?;
             let color: AcceptanceMask = edge.acceptance_signature().into();
 
             if ts.add_edge((state.id(), expr, color, target)).is_some() {
