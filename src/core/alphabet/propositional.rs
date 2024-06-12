@@ -5,7 +5,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddValuation, BddVariableSet};
+use biodivine_lib_bdd::{
+    Bdd, BddPartialValuation, BddSatisfyingValuations, BddValuation, BddVariableSet,
+};
+use itertools::Itertools;
 use tracing::trace;
 
 use crate::prelude::*;
@@ -241,9 +244,37 @@ impl<RawTy: RawSymbolRepr> Ord for PropExpression<RawTy> {
     }
 }
 
+fn clause_to_string(clause: &BddPartialValuation) -> String {
+    let offset = |x| (b'a' + x as u8) as char;
+    let mut vals = clause.to_values();
+    vals.sort();
+    vals.into_iter()
+        .map(|(v, b)| {
+            if b {
+                offset(v.to_index()).to_string()
+            } else {
+                format!("!{}", offset(v.to_index()))
+            }
+        })
+        .join("&")
+}
+
 impl<RawTy: RawSymbolRepr> Show for PropExpression<RawTy> {
     fn show(&self) -> String {
-        format!("{} aps: {}", self.num_aps, self.bdd)
+        let dnf = self.bdd.to_optimized_dnf();
+        let clauses = dnf.len();
+
+        if clauses > 1 {
+            let mut out = format!("({})", clause_to_string(&dnf[0]));
+
+            for i in 0..clauses {
+                out.push_str(&format!(" | ({})", clause_to_string(&dnf[i])));
+            }
+
+            out
+        } else {
+            clause_to_string(&dnf[0])
+        }
     }
 }
 

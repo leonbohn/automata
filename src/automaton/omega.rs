@@ -44,7 +44,7 @@ pub enum OmegaAcceptanceCondition {
     Buchi,
     Rabin,
     Streett,
-    MaxParity,
+    MaxParity(Int, Int),
     CoBuchi,
     Reachability,
     Safety,
@@ -122,15 +122,42 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
     /// Consumes and converts `self` into a [`DPA`]. Since [`DPA`]s can capture the
     /// full class of omega-regular languages, this operation never fails.
     pub fn into_dpa(self) -> DPA<A> {
-        assert!(
-            matches!(self.acceptance, OmegaAcceptanceCondition::Parity(_, _)),
-            "Can only turn DPA into DPA for now"
-        );
-
-        self.ts
-            .map_edge_colors(|mask| mask.as_priority())
-            .with_initial(self.initial)
-            .collect_dpa()
+        match self.acceptance {
+            OmegaAcceptanceCondition::Parity(_, _) => self
+                .ts
+                .map_edge_colors(|mask| mask.as_priority())
+                .with_initial(self.initial)
+                .collect_dpa(),
+            OmegaAcceptanceCondition::Buchi => self
+                .ts
+                .map_edge_colors(|mask| if mask.as_bool() { 0 } else { 1 })
+                .with_initial(self.initial)
+                .collect_dpa(),
+            OmegaAcceptanceCondition::CoBuchi => self
+                .ts
+                .map_edge_colors(|mask| if mask.as_bool() { 1 } else { 0 })
+                .with_initial(self.initial)
+                .collect_dpa(),
+            OmegaAcceptanceCondition::MaxParity(low, high) => {
+                let k = (high - low) + if low % 2 == 0 { 0 } else { 1 };
+                let to_new = |mask: AcceptanceMask| {
+                    let c = mask.as_priority();
+                    assert!(c >= low);
+                    assert!(c <= high);
+                    let diff = high - c;
+                    assert!(diff <= k);
+                    diff
+                };
+                self.ts
+                    .map_edge_colors(to_new)
+                    .with_initial(self.initial)
+                    .collect_dpa()
+            }
+            OmegaAcceptanceCondition::Rabin => todo!(),
+            OmegaAcceptanceCondition::Streett => todo!(),
+            OmegaAcceptanceCondition::Reachability => todo!(),
+            OmegaAcceptanceCondition::Safety => todo!(),
+        }
     }
 }
 
