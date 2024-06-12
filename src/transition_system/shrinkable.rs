@@ -11,7 +11,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
     /// let edge = ts.add_edge((q0, 'a', q1));
@@ -28,7 +28,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
     /// let edge = ts.add_edge((q0, 'a', q1));
@@ -50,7 +50,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(true);
     ///
@@ -76,7 +76,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+    /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(3));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(true);
     ///
@@ -102,7 +102,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(false);
     /// let q2 = ts.add_state(false);
@@ -125,7 +125,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(false);
     ///
@@ -146,7 +146,7 @@ pub trait Shrinkable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b'));
+    /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(false);
     /// let q2 = ts.add_state(false);
@@ -187,7 +187,7 @@ mod tests {
     use crate::prelude::*;
     #[test]
     fn asdf() {
-        let mut ts = DTS::for_alphabet(automata_core::alphabet!(simple 'a', 'b'));
+        let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
         let q0 = ts.add_state(true);
         let q1 = ts.add_state(false);
 

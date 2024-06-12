@@ -29,7 +29,7 @@ license.workspace = true
 [workspace.dependencies]
 tracing = "0.1"
 tracing-subscriber = "0.3"
-biodivine-lib-bdd = "0.5"
+biodivine-lib-bdd = "0.5.17"
 itertools = "0.13.0"
 automata-core = { version = "0.1.0", path = "automata-core" }
 indexmap = "2.2"
@@ -70,3 +70,11 @@ random = ["dep:rand_distr"]
 hoa = ["dep:hoars"]
 graphviz = ["dep:tempfile"]
 implementations = []
+
+[dev-dependencies]
+clap = "4.5.7"
+
+[[bin]]
+name = "oai"
+path = "bin/oai.rs"
+required-features = ["clap"]

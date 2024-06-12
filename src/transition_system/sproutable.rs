@@ -74,7 +74,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///     
-    /// let mut ts = DTS::<_, _, Void>::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+    /// let mut ts = DTS::<_, _, Void>::for_alphabet(CharAlphabet::of_size(3));
     /// let q0 = ts.add_state(false);
     /// let before = ts.size();
     /// let q1 = ts.add_state(true);
@@ -98,7 +98,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::prelude::*;
     ///
-    /// let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+    /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(3));
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
     /// assert!(ts.edge(q0, 'a').is_none());
@@ -282,7 +282,7 @@ pub trait Sproutable: TransitionSystem {
     /// use automata::prelude::*;
     ///
     ///
-    /// let mut ts = DTS::<_, _, Void>::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+    /// let mut ts = DTS::<_, _, Void>::for_alphabet(CharAlphabet::of_size(3));
     /// let states = ts.extend_states([true, false, true]);
     /// assert_eq!(states.collect::<Vec<_>>(), vec![0, 1, 2]);
     /// ```
@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn sprout_after_creating() {
-        let mut ts = DTS::for_alphabet(alphabet!(simple 'a', 'b', 'c'));
+        let mut ts = DTS::for_alphabet(CharAlphabet::of_size(3));
         let q0 = ts.add_state(false);
         let q1 = ts.add_state(true);
         assert_eq!(ts.edge(q0, 'a'), None);

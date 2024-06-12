@@ -1,10 +1,13 @@
-mod alphabet;
+#[macro_use]
+pub mod alphabet;
 
 #[macro_use]
 pub mod word;
 
 pub mod math;
 mod show;
+
+pub mod dag;
 
 /// Alias for the default integer type that is used for coloring edges and states.
 pub type Int = u8;
@@ -24,11 +27,15 @@ impl std::fmt::Debug for Void {
 }
 
 pub mod prelude {
+    pub use super::dag;
     pub use super::math;
     pub use super::show::Show;
     pub use super::{Int, Void};
     pub use crate::alphabet;
-    pub use crate::alphabet::*;
+    pub use crate::alphabet::{Alphabet, CharAlphabet, Expression, Matcher, Symbol};
     pub use crate::upw;
-    pub use crate::word::*;
+    pub use crate::word::{
+        self, FiniteWord, LinearWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord,
+        ReducedOmegaWord,
+    };
 }

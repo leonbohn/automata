@@ -8,138 +8,15 @@ mod lexer;
 pub mod output;
 mod value;
 
-use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddVariable, BddVariableSet};
+pub mod label;
+pub use label::{
+    build_vars, AbstractLabelExpression, HoaAlphabet, HoaExpression, HoaRepr, HoaSymbol, Label,
+    LabelExpression, MAX_APS,
+};
+
+use automata_core::prelude::*;
+
 use std::fmt::{Debug, Display};
-
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub enum AbstractLabelExpression {
-    Boolean(bool),
-    Integer(u16),
-    Negated(Box<AbstractLabelExpression>),
-    Conjunction(Vec<AbstractLabelExpression>),
-    Disjunction(Vec<AbstractLabelExpression>),
-}
-
-pub(crate) enum Atomic {
-    Positive(u16),
-    Negative(u16),
-}
-
-impl Atomic {
-    pub(crate) fn to_value(&self, vars: &[BddVariable]) -> (BddVariable, bool) {
-        match self {
-            Atomic::Positive(i) => (vars[*i as usize], true),
-            Atomic::Negative(i) => (vars[*i as usize], false),
-        }
-    }
-}
-
-impl AbstractLabelExpression {
-    pub(crate) fn try_atom(&self) -> Option<Atomic> {
-        match self {
-            AbstractLabelExpression::Integer(i) => Some(Atomic::Positive(*i)),
-            AbstractLabelExpression::Negated(bx) => match **bx {
-                AbstractLabelExpression::Integer(i) => Some(Atomic::Negative(i)),
-                _ => None,
-            },
-            _ => None,
-        }
-    }
-    pub fn try_into_bdd(self, vs: &BddVariableSet, vars: &[BddVariable]) -> Result<Bdd, String> {
-        match self {
-            AbstractLabelExpression::Boolean(b) => Ok(match b {
-                true => vs.mk_true(),
-                false => vs.mk_false(),
-            }),
-            AbstractLabelExpression::Integer(i) => {
-                if i < vs.num_vars() {
-                    Ok(vs.mk_var(vars[i as usize]))
-                } else {
-                    Err(format!("AP identifier {i} is too high"))
-                }
-            }
-            AbstractLabelExpression::Negated(e) => Ok(e.try_into_bdd(vs, vars)?.not()),
-            AbstractLabelExpression::Conjunction(cs) => {
-                if let Some(ints) = cs.iter().map(|c| c.try_atom()).collect::<Option<Vec<_>>>() {
-                    let valuation = BddPartialValuation::from_values(
-                        &ints.into_iter().map(|a| a.to_value(vars)).collect_vec(),
-                    );
-                    Ok(vs.mk_conjunctive_clause(&valuation))
-                } else {
-                    Err(format!(
-                        "could not parse label expression conjunct {cs:?}, expected atom"
-                    ))
-                }
-            }
-            AbstractLabelExpression::Disjunction(ds) => {
-                if let Some(ints) = ds.iter().map(|c| c.try_atom()).collect::<Option<Vec<_>>>() {
-                    let valuation = BddPartialValuation::from_values(
-                        &ints.into_iter().map(|a| a.to_value(vars)).collect_vec(),
-                    );
-                    Ok(vs.mk_disjunctive_clause(&valuation))
-                } else {
-                    Err(format!(
-                        "could not parse label expression disjunct {ds:?}, expected atom"
-                    ))
-                }
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub enum LabelExpression {
-    Parsed(Bdd),
-    Abstract(AbstractLabelExpression),
-}
-
-impl LabelExpression {
-    pub fn try_into_bdd(self, vs: &BddVariableSet, vars: &[BddVariable]) -> Result<Bdd, String> {
-        match self {
-            LabelExpression::Parsed(b) => Ok(b),
-            LabelExpression::Abstract(a) => a.try_into_bdd(vs, vars),
-        }
-    }
-}
-
-pub const MAX_APS: u16 = 8;
-
-pub fn build_vars(count: u16) -> (BddVariableSet, Vec<BddVariable>) {
-    let vs = BddVariableSet::new_anonymous(count);
-    let vars = vs.variables().into_iter().take(count as usize).collect();
-    (vs, vars)
-}
-
-pub fn first_automaton_split_position(input: &str) -> Option<usize> {
-    const ENDLEN: usize = "--END--".len();
-
-    'outer: loop {
-        if let Some(end) = input.find("--END--") {
-            if let Some(abort) = input.find("--ABORT--") {
-                if abort < end {
-                    continue 'outer;
-                }
-            }
-            return Some(end + ENDLEN);
-        } else {
-            return None;
-        }
-    }
-}
-
-pub fn parse_hoa_automata(input: &str) -> Vec<HoaAutomaton> {
-    let mut out = Vec::new();
-    for hoa_aut in input.split_inclusive("--END--") {
-        if !hoa_aut.contains("--BODY--") {
-            continue;
-        }
-        match hoa_aut.try_into() {
-            Ok(aut) => out.push(aut),
-            Err(e) => println!("Error when parsing automaton: {}", e),
-        }
-    }
-    out
-}
 
 use ariadne::{Color, Fmt, ReportKind, Source};
 
@@ -152,7 +29,7 @@ pub use format::{
     AcceptanceCondition, AcceptanceInfo, AcceptanceName, AcceptanceSignature, AliasName, Property,
 };
 
-pub use body::{Body, Edge, Label, State};
+pub use body::{Body, Edge, State};
 pub use header::{Header, HeaderItem};
 
 use itertools::Itertools;
@@ -161,7 +38,7 @@ use lexer::Token;
 /// The type of identifier used for states.
 pub type Id = u32;
 
-/// Represents the different types of error that can be encountered when parsing a [`HoaAutomaton`].
+/// Represents the different types of error that can be encountered when parsing a [`HoaRepresentation`].
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FromHoaError {
     /// The version string does not match, we only support v1.
@@ -205,7 +82,7 @@ impl Display for FromHoaError {
 /// The header contains all the information about the automaton (e.g. the number of states, the
 /// acceptance condition, aliases etc.) and the body contains the actual transitions.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct HoaAutomaton {
+pub struct HoaRepresentation {
     header: Header,
     body: Body,
 }
@@ -217,7 +94,7 @@ pub type HoaAcceptance = (usize, AcceptanceCondition);
 /// names and label expression. This can be used to unalias an automaton.
 pub type Aliases = Vec<(AliasName, LabelExpression)>;
 
-impl HoaAutomaton {
+impl HoaRepresentation {
     /// Adds the given state.
     pub fn add_state(&mut self, state: State) {
         self.body.push(state);
@@ -255,7 +132,7 @@ impl HoaAutomaton {
         Header::parser()
             .then(Body::parser())
             .then_ignore(end())
-            .map(HoaAutomaton::from_parsed)
+            .map(HoaRepresentation::from_parsed)
     }
 
     /// Creates a new HOA automaton from the given version, header and
@@ -344,8 +221,11 @@ impl HoaAutomaton {
     }
 
     /// Counts the number of atomic propositions in the automaton.
-    pub fn num_aps(&self) -> usize {
-        self.aps().len()
+    pub fn num_aps(&self) -> u8 {
+        self.aps()
+            .len()
+            .try_into()
+            .expect("Could not fit number of aps in u8!")
     }
 
     /// Returns the acceptance condition of the automaton.
@@ -402,13 +282,13 @@ impl HoaAutomaton {
     }
 }
 
-impl Default for HoaAutomaton {
+impl Default for HoaRepresentation {
     fn default() -> Self {
-        HoaAutomaton::from_parts(vec![HeaderItem::Version("v1".into())].into(), vec![].into())
+        HoaRepresentation::from_parts(vec![HeaderItem::Version("v1".into())].into(), vec![].into())
     }
 }
 
-impl TryFrom<&str> for HoaAutomaton {
+impl TryFrom<&str> for HoaRepresentation {
     type Error = FromHoaError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -533,80 +413,39 @@ fn build_error_report<I: Iterator<Item = Simple<String>>>(input: &str, errs: I) 
 }
 
 #[cfg(test)]
-#[allow(unused)]
-pub(crate) struct Anonymous<const PARSED: bool = false>;
-#[cfg(test)]
-#[allow(unused)]
-pub(crate) type AnonymousParsed = Anonymous<true>;
-#[cfg(test)]
-#[allow(unused)]
-pub(crate) type AnonymousAbstract = Anonymous<false>;
-
-#[cfg(test)]
-#[allow(unused)]
-use AbstractLabelExpression::*;
-
-#[cfg(test)]
-#[allow(unused)]
-#[allow(dead_code)]
-impl Anonymous<false> {
-    pub fn var_expr(n: u16) -> LabelExpression {
-        assert!(n < MAX_APS);
-        LabelExpression::Abstract(AbstractLabelExpression::Integer(n))
-    }
-    pub fn not_var_expr(n: u16) -> LabelExpression {
-        assert!(n < MAX_APS);
-        LabelExpression::Abstract(Negated(Box::new(Integer(n))))
-    }
-    pub fn top_label() -> Label {
-        Label(LabelExpression::Abstract(AbstractLabelExpression::Boolean(
-            true,
-        )))
-    }
-    pub fn var_label(n: u16) -> Label {
-        assert!(n < MAX_APS);
-        Label(Self::var_expr(n))
-    }
-    pub fn not_var_label(n: u16) -> Label {
-        assert!(n < MAX_APS);
-        Label(Self::not_var_expr(n))
-    }
-}
-
-#[cfg(test)]
-#[allow(unused)]
-#[allow(dead_code)]
-impl Anonymous<true> {
-    pub fn var_expr(n: usize) -> LabelExpression {
-        assert!(n < MAX_APS as usize);
-        LabelExpression::Parsed(Self::var(n))
-    }
-    pub fn var_label(n: usize) -> Label {
-        assert!(n < MAX_APS as usize);
-        Label(Self::var_expr(n))
-    }
-    pub fn var(n: usize) -> Bdd {
-        assert!(n < MAX_APS as usize);
-        BddVariableSet::new_anonymous(MAX_APS).mk_var(BddVariable::from_index(n))
-    }
-    pub fn not_var(n: usize) -> Bdd {
-        assert!(n < MAX_APS as usize);
-        BddVariableSet::new_anonymous(MAX_APS).mk_not_var(BddVariable::from_index(n))
-    }
-    pub fn top() -> Bdd {
-        BddVariableSet::new_anonymous(MAX_APS).mk_true()
-    }
-    pub fn top_expr() -> LabelExpression {
-        LabelExpression::Parsed(Self::top())
-    }
-    pub fn top_label() -> Label {
-        Label(Self::top_expr())
-    }
-}
-
-#[cfg(test)]
 fn print_error_report<I: Iterator<Item = Simple<String>>>(input: &str, errs: I) {
     eprintln!("{}", build_error_report(input, errs))
+}
+
+pub fn first_automaton_split_position(input: &str) -> Option<usize> {
+    const ENDLEN: usize = "--END--".len();
+
+    'outer: loop {
+        if let Some(end) = input.find("--END--") {
+            if let Some(abort) = input.find("--ABORT--") {
+                if abort < end {
+                    continue 'outer;
+                }
+            }
+            return Some(end + ENDLEN);
+        } else {
+            return None;
+        }
+    }
+}
+
+pub fn parse_hoa_automata(input: &str) -> Vec<HoaRepresentation> {
+    let mut out = Vec::new();
+    for hoa_aut in input.split_inclusive("--END--") {
+        if !hoa_aut.contains("--BODY--") {
+            continue;
+        }
+        match hoa_aut.try_into() {
+            Ok(aut) => out.push(aut),
+            Err(e) => println!("Error when parsing automaton: {}", e),
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -614,8 +453,9 @@ mod tests {
     use crate::{
         body::{Edge, State},
         header::Header,
-        AcceptanceAtom, AcceptanceCondition, AcceptanceName, AcceptanceSignature,
-        AnonymousAbstract, Body, HeaderItem, HoaAutomaton, StateConjunction,
+        label::AnonymousAbstract,
+        AcceptanceAtom, AcceptanceCondition, AcceptanceName, AcceptanceSignature, Body, HeaderItem,
+        HoaRepresentation, StateConjunction,
     };
 
     #[test]
@@ -646,7 +486,7 @@ mod tests {
               [!0] 2
              --END--
              "#;
-        let hoa_aut = HoaAutomaton::try_from(contents);
+        let hoa_aut = HoaRepresentation::try_from(contents);
 
         if let Err(err) = hoa_aut {
             println!("Encountered paring error\n{}", err);
@@ -711,7 +551,7 @@ mod tests {
         );
         assert_eq!(
             hoa_aut,
-            Ok(HoaAutomaton::from_parts(
+            Ok(HoaRepresentation::from_parts(
                 header,
                 Body::from(vec![q0, q1, q2])
             ))

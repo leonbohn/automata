@@ -135,7 +135,10 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
     {
         self.minimal_representatives()
-            .flat_map(|rep| self.symbols().map(move |a| Concat(&rep, [a]).collect_vec()))
+            .flat_map(|rep| {
+                self.symbols()
+                    .map(move |a| word::Concat(&rep, [a]).collect_vec())
+            })
             .unique()
     }
 

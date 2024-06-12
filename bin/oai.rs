@@ -1,9 +1,5 @@
-use automata::hoa::output::WriteHoa;
-use automata::hoa::HoaAlphabet;
 use automata::prelude::*;
-use automata::{
-    automaton::DeterministicOmegaAutomaton, hoa::input::FilterDeterministicHoaAutomatonStream,
-};
+use hoa::HoaAlphabet;
 
 use tracing::{debug, info, trace};
 use tracing_subscriber::{filter, prelude::*};
@@ -30,15 +26,16 @@ fn cli() -> clap::Command {
 }
 
 fn setup_logging(matches: &ArgMatches) {
-    let Ok(Some(verbosity)) = matches.try_get_one::<String>("verbosity") else {
-        return;
-    };
-
-    let level = match verbosity.as_str() {
-        "trace" => filter::LevelFilter::TRACE,
-        "debug" => filter::LevelFilter::DEBUG,
-        "info" => filter::LevelFilter::INFO,
-        _ => unreachable!(),
+    let level = match matches
+        .try_get_one::<String>("verbosity")
+        .ok()
+        .flatten()
+        .map(|m| m.as_str())
+    {
+        Some("trace") => filter::LevelFilter::TRACE,
+        Some("debug") => filter::LevelFilter::DEBUG,
+        Some("info") => filter::LevelFilter::INFO,
+        _ => filter::LevelFilter::INFO,
     };
 
     let stdout_log = tracing_subscriber::fmt::layer()
@@ -58,7 +55,8 @@ pub fn main() {
     setup_logging(&matches);
 
     debug!("reading automata from stdin");
-    let mut stream = FilterDeterministicHoaAutomatonStream::new(std::io::stdin().lock());
+    let mut stream =
+        automata::hoa::IntoDeterministicHoaAutomatonStream::new(std::io::stdin().lock());
 
     match matches.subcommand() {
         Some(("todpa", _sub_matches)) => {
