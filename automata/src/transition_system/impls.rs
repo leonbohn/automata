@@ -2,8 +2,8 @@
 #![allow(missing_docs)]
 use crate::prelude::*;
 
-pub(crate) mod pg;
-pub use pg::{petgraph, GraphTs, GraphTsNeighborsIter};
+pub(crate) mod petgraph_backed;
+pub use petgraph_backed::{petgraph, GraphTs, GraphTsNeighborsIter};
 
 #[cfg(feature = "implementations")]
 pub(crate) mod edge_lists;

@@ -144,6 +144,9 @@ impl<Ts: TransitionSystem, F> RestrictByStateIndex<Ts, F> {
     pub fn new(ts: Ts, filter: F) -> Self {
         Self { ts, filter }
     }
+    pub fn into_parts(self) -> (Ts, F) {
+        (self.ts, self.filter)
+    }
 
     pub fn filter(&self) -> &F {
         &self.filter

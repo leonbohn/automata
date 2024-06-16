@@ -14,7 +14,7 @@ pub mod prelude {
     /// **now known to be** [`Deterministic`].
     pub type NTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, false>;
 
-    pub use super::transition_system::impls::pg::{petgraph, GraphTs};
+    pub use super::transition_system::impls::petgraph_backed::{petgraph, GraphTs};
     pub use super::{
         automaton::{
             Automaton, BuchiCondition, DeterministicOmegaAutomaton, FiniteSemantics,
@@ -28,6 +28,7 @@ pub mod prelude {
             CollectRightCongruence, Congruence, IntoRightCongruence, MinimalRepresentative,
             RightCongruence,
         },
+        representation::IntoDts,
         transition_system::operations,
         transition_system::{
             dot::Dottable,
@@ -68,6 +69,10 @@ pub use transition_system::{Pointed, TransitionSystem};
 /// Defines automata and common types of combinations of transition system with acceptance condition.
 #[allow(clippy::upper_case_acronyms)]
 pub mod automaton;
+
+/// Defines different representations of automata as mappings between an input and
+/// an output alphabet.
+pub mod representation;
 
 /// Defines congruence relations and congruence classes.
 pub mod congruence;

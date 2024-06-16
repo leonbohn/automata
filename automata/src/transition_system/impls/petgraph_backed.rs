@@ -16,8 +16,84 @@ pub struct GraphTs<
     graph: StableDiGraph<Q, (A::Expression, C), DefaultIdType>,
 }
 
+impl<A: Alphabet, X: Color, Q: Color, C: Color, const DET: bool> GraphTs<A, (X, Q), C, DET> {
+    pub fn unzip_state_indices(self) -> GraphTs<A, Q, C, DET> {
+        GraphTs {
+            alphabet: self.alphabet,
+            graph: self.graph.map_node_weights(|(_, w)| w),
+        }
+    }
+}
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> GraphTs<A, Q, C, DET> {
-    pub(crate) fn try_recast<const ND: bool>(self) -> Result<GraphTs<A, Q, C, ND>, Self> {
+    pub fn zip_state_indices(self) -> GraphTs<A, (DefaultIdType, Q), C, DET> {
+        GraphTs {
+            alphabet: self.alphabet,
+            graph: self.graph.map_nodes(|i, w| (i.into_inner(), w)),
+        }
+    }
+    pub fn graphts_map_state<QQ: Color, F>(self, f: F) -> GraphTs<A, QQ, C, DET>
+    where
+        F: Fn(DefaultIdType, Q) -> QQ,
+    {
+        GraphTs {
+            alphabet: self.alphabet,
+            graph: self.graph.map_nodes(|i, q| f(i.into_inner(), q)),
+        }
+    }
+    pub fn graphts_map_state_color<QQ: Color, F>(self, f: F) -> GraphTs<A, QQ, C, DET>
+    where
+        F: Fn(Q) -> QQ,
+    {
+        GraphTs {
+            alphabet: self.alphabet,
+            graph: self.graph.map_node_weights(f),
+        }
+    }
+    pub fn graphts_map_edge<CC: Color, F>(self, f: F) -> GraphTs<A, Q, CC, DET>
+    where
+        F: Fn(DefaultIdType, C) -> CC,
+    {
+        GraphTs {
+            alphabet: self.alphabet,
+            graph: self.graph.map_edges(|i, (e, c)| (e, f(i.into_inner(), c))),
+        }
+    }
+
+    pub fn graphts_map_edge_color<CC: Color, F>(self, f: F) -> GraphTs<A, Q, CC, DET>
+    where
+        F: Fn(C) -> CC,
+    {
+        GraphTs {
+            alphabet: self.alphabet,
+            graph: self.graph.map_edge_weights(|(e, c)| (e, f(c))),
+        }
+    }
+
+    pub fn graphts_restrict_states<F>(self, f: F) -> GraphTs<A, Q, C, DET>
+    where
+        F: Fn(StateIndex<Self>, &Q) -> bool,
+    {
+        let mut graph = self.graph;
+        (0..graph.node_count()).for_each(|i| {
+            let index = NodeIndex::new(i);
+            if graph.contains_node(index) && !f(i.try_into().unwrap(), &graph[index]) {
+                graph.remove_node(index);
+            }
+        });
+        GraphTs {
+            alphabet: self.alphabet,
+            graph,
+        }
+    }
+
+    pub fn graphts_restrict_state_indices<F>(self, f: F) -> GraphTs<A, Q, C, DET>
+    where
+        F: operations::StateIndexFilter<DefaultIdType>,
+    {
+        self.graphts_restrict_states(|i, _| f.is_unmasked(i))
+    }
+
+    pub fn try_recast<const ND: bool>(self) -> Result<GraphTs<A, Q, C, ND>, Self> {
         if DET {
             assert!(self.is_deterministic());
         }
@@ -26,7 +102,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> GraphTs<A, Q, C, DET> {
             graph: self.graph,
         })
     }
-    pub(crate) fn try_into_deterministic(self) -> Result<GraphTs<A, Q, C, true>, Self> {
+    pub fn try_into_deterministic(self) -> Result<GraphTs<A, Q, C, true>, Self> {
         if DET {
             assert!(self.is_deterministic());
         } else if !self.is_deterministic() {

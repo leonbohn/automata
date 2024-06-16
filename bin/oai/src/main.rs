@@ -55,14 +55,13 @@ pub fn main() {
     setup_logging(&matches);
 
     debug!("reading automata from stdin");
-    let mut stream =
-        automata::hoa::IntoDeterministicHoaAutomatonStream::new(std::io::stdin().lock());
+    let stream = automata::hoa::IntoDeterministicHoaAutomatonStream::new(std::io::stdin().lock());
 
     match matches.subcommand() {
         Some(("todpa", _sub_matches)) => {
             debug!("converting input automata into DPAs");
 
-            while let Some(aut) = stream.next() {
+            for aut in stream {
                 debug!("read deterministic automaton with {} states", aut.size());
 
                 let start = std::time::Instant::now();
