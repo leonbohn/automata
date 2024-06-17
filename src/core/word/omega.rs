@@ -1,6 +1,5 @@
-use std::fmt::Debug;
-
 use itertools::Itertools;
+use std::fmt::Debug;
 
 use crate::prelude::*;
 
@@ -366,7 +365,10 @@ impl<S: Symbol> ReducedOmegaWord<S> {
         spoke: Spoke,
         cycle: Cycle,
     ) -> Self {
-        assert!(!cycle.is_empty());
+        assert!(
+            !cycle.is_empty(),
+            "ultimately periodic words cannot have empty cycle"
+        );
 
         // see how far we can roll the the loop index back.
         let roll_in = (0..spoke.len())
@@ -382,12 +384,21 @@ impl<S: Symbol> ReducedOmegaWord<S> {
         let mut representation = spoke.collect_vec();
         representation.truncate(spoke.len().saturating_sub(roll_in));
         let loop_index = representation.len();
+        representation.extend(loop_representation);
 
-        representation.extend(deduplicate(cycle.collect_vec()));
-        Self {
+        let out = Self {
             word: representation,
             loop_index,
+        };
+        if cfg!(debug_assertions) {
+            for (i, a) in spoke.symbols().enumerate() {
+                assert_eq!(out.nth(i), Some(a));
+            }
+            for (i, a) in cycle.symbols().enumerate() {
+                assert_eq!(out.nth(spoke.len() + i), Some(a));
+            }
         }
+        out
     }
 
     /// Returns a reference to the underlying raw representation.
