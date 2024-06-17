@@ -43,8 +43,13 @@ where
     C: Deterministic<EdgeColor = bool>,
 {
     /// Performs a streamlining operation akin to [`DPA::streamlined`].
-    pub fn streamlined(&self) -> DBA<C::Alphabet> {
-        self.map_edge_colors(|c| if c { 0 } else { 1 })
+    pub fn streamlined(&self) -> DBA<C::Alphabet>
+    where
+        C: IntoTs + Clone,
+    {
+        self.clone()
+            .map_edge_colors(|c| if c { 0 } else { 1 })
+            .with_initial(self.initial)
             .into_dpa()
             .streamlined()
             .map_edge_colors(|c| {

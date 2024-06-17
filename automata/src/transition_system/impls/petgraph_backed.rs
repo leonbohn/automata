@@ -441,7 +441,7 @@ impl<A: Alphabet, Q: Color, C: Color> Deterministic for GraphTs<A, Q, C, true> {
         Self: Sized,
         EdgeColor<Self>: std::hash::Hash + Eq,
     {
-        self
+        todo!()
     }
     fn collect_graphts_deterministic_pointed(
         self,
@@ -452,7 +452,7 @@ impl<A: Alphabet, Q: Color, C: Color> Deterministic for GraphTs<A, Q, C, true> {
     where
         Self: Pointed,
     {
-        (self.collect_dts(), 0)
+        todo!()
     }
 }
 

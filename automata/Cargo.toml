@@ -37,10 +37,9 @@ bit-set = "0.5"
 clap = { version = "4.5", optional = true }
 rand_distr = { version = "0.4.3", optional = true }
 
-# default backend
-petgraph = { git = "https://github.com/leonbohn/petgraph", default-features = false, features = [
+petgraph = { path = "../../petgraph", default-features = false, optional = true, features = [
     "stable_graph",
-] }
+] } # default backend
 # experimental backend sometime?
 # gryf = { git = "https://github.com/pnevyk/gryf", rev = "1efd3a2", optional = true }
 
@@ -50,3 +49,4 @@ random = ["dep:rand_distr"]
 hoa = ["dep:hoars"]
 graphviz = ["dep:tempfile"]
 implementations = []
+petgraph = ["dep:petgraph"]

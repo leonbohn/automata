@@ -35,14 +35,13 @@ pub type MooreMachine<A = CharAlphabet, Q = Int, C = Void, D = DTS<A, Q, C>> =
 pub type IntoMooreMachine<D> =
     MooreMachine<<D as TransitionSystem>::Alphabet, StateColor<D>, EdgeColor<D>, D>;
 
-impl<C> IntoMooreMachine<C>
+impl<M> IntoMooreMachine<M>
 where
-    C: Deterministic,
-    StateColor<C>: Color,
+    M: IntoTs<EdgeColor: Color> + Deterministic,
 {
     /// Decomposes `self` into a sequence of DFAs, where the i-th DFA accepts all words which
     /// produce a color less than or equal to i.
-    pub fn decompose_dfa(&self) -> Vec<DFA<C::Alphabet>>
+    pub fn decompose_dfa(&self) -> Vec<DFA<M::Alphabet>>
     where
         StateColor<Self>: Ord,
     {
@@ -54,25 +53,24 @@ where
     }
 
     /// Builds a DFA that accepts all words which emit a color less than or equal to `color`.
-    pub fn color_or_below_dfa(&self, color: C::StateColor) -> DFA<C::Alphabet>
+    pub fn color_or_below_dfa(&self, color: M::StateColor) -> DFA<M::Alphabet>
     where
         StateColor<Self>: Ord,
     {
         self.map_state_colors(|o| o <= color)
             .erase_edge_colors()
             .with_initial(self.initial)
-            .into_dfa()
-            .minimize()
             .collect_dfa()
+            .minimize()
     }
 
     /// Pushes the state colors onto the outgoing edges of `self` and collects the resulting
     /// transition system into a new [`MealyMachine`].
     pub fn push_colors_to_outgoing_edges(
         &self,
-    ) -> MealyMachine<C::Alphabet, C::StateColor, C::StateColor>
+    ) -> MealyMachine<M::Alphabet, M::StateColor, M::StateColor>
     where
-        C::StateColor: Clone,
+        M::StateColor: Clone,
     {
         self.map_edge_colors_full(|p, _a, _c, _q| {
             self.state_color(p)
@@ -85,12 +83,12 @@ where
 
     /// Runs the given `input` word in self. If the run is successful, the color of the state that it reaches
     /// is emitted (wrapped in a `Some`). For unsuccessful runs, `None` is returned.
-    pub fn map<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> Option<C::StateColor> {
+    pub fn map<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> Option<M::StateColor> {
         self.reached_state_color_from(self.initial, input)
     }
 
     /// Obtains a vec containing the possible colors emitted by `self` (without duplicates).
-    pub fn color_range(&self) -> Vec<C::StateColor>
+    pub fn color_range(&self) -> Vec<M::StateColor>
     where
         StateColor<Self>: Color,
     {
@@ -106,9 +104,9 @@ where
     /// Returns true if `self` is bisimilar to `other`, i.e. if the two moore machines
     /// produce the same output for each finite word. This is done by checking whether
     /// [`Self::witness_non_bisimilarity`] returns `None`.
-    pub fn bisimilar<M>(&self, other: M) -> bool
+    pub fn bisimilar<N>(&self, other: N) -> bool
     where
-        M: Congruence<Alphabet = C::Alphabet, StateColor = C::StateColor>,
+        N: Congruence<Alphabet = M::Alphabet, StateColor = M::StateColor>,
         StateColor<Self>: Color,
     {
         self.witness_non_bisimilarity(other).is_none()
@@ -117,9 +115,9 @@ where
     /// Returns a witness for the non-bisimilarity of `self` and `other`, i.e. a finite word
     /// that produces different outputs in the two moore machines. If the two machines are
     /// bisimilar, `None` is returned.
-    pub fn witness_non_bisimilarity<M>(&self, other: M) -> Option<Vec<SymbolOf<Self>>>
+    pub fn witness_non_bisimilarity<N>(&self, other: N) -> Option<Vec<SymbolOf<Self>>>
     where
-        M: Congruence<Alphabet = C::Alphabet, StateColor = C::StateColor>,
+        N: Congruence<Alphabet = M::Alphabet, StateColor = M::StateColor>,
         StateColor<Self>: Color,
     {
         let other_initial = other.initial();

@@ -123,6 +123,7 @@ where
     ) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
+        D: Clone + IntoTs,
     {
         let minimized = crate::minimization::partition_refinement::mealy_partition_refinement(
             self.normalized(),
@@ -204,13 +205,11 @@ where
     /// Builds the complement of `self`, i.e. the DPA that accepts the complement of the language
     /// accepted by `self`. This is a cheap operation as it only requires to increment all edge
     /// colors by one.
-    pub fn complement(
-        self,
-    ) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>> {
+    pub fn complement(self) -> DPA<D::Alphabet> {
         let initial = self.initial;
         self.map_edge_colors(|c| c + 1)
             .with_initial(initial)
-            .into_dpa()
+            .collect_dpa()
     }
 
     /// Gives a witness for the fact that `left` and `right` are not language-equivalent. This is
@@ -226,8 +225,8 @@ where
         }
 
         self.with_initial(p)
-            .into_dpa()
-            .witness_inequivalence(&self.with_initial(q).into_dpa())
+            .collect_dpa()
+            .witness_inequivalence(&self.with_initial(q).collect_dpa())
     }
 
     /// Computes a [`Partition`] of the state indices of `self` such that any two states in the
@@ -264,8 +263,8 @@ where
                 if self
                     .as_ref()
                     .with_initial(*p)
-                    .into_dpa()
-                    .language_equivalent(&self.as_ref().with_initial(q).into_dpa())
+                    .collect_dpa()
+                    .language_equivalent(&self.as_ref().with_initial(q).collect_dpa())
                 {
                     trace!(
                         "it is language equivalent to {p:?}, adding it to the equivalence class",
@@ -430,12 +429,17 @@ where
     pub fn normalized(&self) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
+        D: Clone + IntoTs,
         // StateColor<Self>: Eq + Hash + Clone + Ord,
     {
         let start = std::time::Instant::now();
 
-        let mut ts = self.collect_dts();
-        let (out, out_initial) = self.with_initial(self.initial).collect_dts_pointed();
+        let mut ts = self.ts.clone().into_dts();
+        let (out, out_initial) = self
+            .ts
+            .clone()
+            .with_initial(self.initial)
+            .into_dts_and_initial();
 
         let mut recoloring = Vec::new();
         let mut remove_states = Vec::new();
@@ -558,7 +562,7 @@ where
                 c
             })
             .with_initial(out_initial)
-            .collect_dpa();
+            .into_dpa();
 
         info!("normalizing DPA took {} μs", start.elapsed().as_micros());
 
@@ -583,7 +587,7 @@ mod tests {
                 (1, 'b', 1, 1),
             ])
             .into_dts_with_initial(0)
-            .collect_dpa();
+            .into_dpa();
         let normalized = dpa.normalized();
         assert!(normalized.language_equivalent(&dpa));
 
@@ -634,7 +638,7 @@ mod tests {
                     (1, 'b', 0, 0),
                 ])
                 .into_dts_with_initial(0)
-                .collect_dpa(),
+                .into_dpa(),
             DTS::builder()
                 .default_color(())
                 .with_transitions([
@@ -646,19 +650,19 @@ mod tests {
                     (2, 'b', 5, 2),
                 ])
                 .into_dts_with_initial(0)
-                .collect_dpa(),
+                .into_dpa(),
         ];
         let bad = [
             DTS::builder()
                 .default_color(())
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 0, 0)])
                 .into_dts_with_initial(0)
-                .collect_dpa(),
+                .into_dpa(),
             DTS::builder()
                 .default_color(())
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 2, 0)])
                 .into_dts_with_initial(0)
-                .collect_dpa(),
+                .into_dpa(),
             DTS::builder()
                 .default_color(())
                 .with_transitions([
@@ -668,7 +672,7 @@ mod tests {
                     (1, 'b', 3, 1),
                 ])
                 .into_dts_with_initial(0)
-                .collect_dpa(),
+                .into_dpa(),
         ];
 
         let l = &good[0];
@@ -707,12 +711,12 @@ mod tests {
             .default_color(())
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 2, 0)])
             .into_dts_with_initial(0)
-            .collect_dpa();
+            .into_dpa();
         let aomega = DTS::builder()
             .default_color(())
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
             .into_dts_with_initial(0)
-            .collect_dpa();
+            .into_dpa();
         assert!(univ.includes(&aomega));
         assert!(!univ.included_in(&aomega));
     }
@@ -727,7 +731,7 @@ mod tests {
                 (1, 'b', 0, 1),
             ])
             .into_dpa(0);
-        let a = (&dpa).with_initial(1).into_dpa();
+        let a = (&dpa).with_initial(1).collect_dpa();
         assert!(!dpa.language_equivalent(&a));
 
         let cong = RightCongruence::from_pointed(dpa.prefix_congruence());

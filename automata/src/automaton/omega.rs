@@ -127,17 +127,17 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
                 .ts
                 .map_edge_colors(|mask| mask.as_priority())
                 .with_initial(self.initial)
-                .collect_dpa(),
+                .into_dpa(),
             OmegaAcceptanceCondition::Buchi => self
                 .ts
                 .map_edge_colors(|mask| if mask.as_bool() { 0 } else { 1 })
                 .with_initial(self.initial)
-                .collect_dpa(),
+                .into_dpa(),
             OmegaAcceptanceCondition::CoBuchi => self
                 .ts
                 .map_edge_colors(|mask| if mask.as_bool() { 1 } else { 0 })
                 .with_initial(self.initial)
-                .collect_dpa(),
+                .into_dpa(),
             OmegaAcceptanceCondition::MaxParity(low, high) => {
                 let k = (high - low) + if low % 2 == 0 { 0 } else { 1 };
                 let to_new = |mask: AcceptanceMask| {
@@ -151,7 +151,7 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
                 self.ts
                     .map_edge_colors(to_new)
                     .with_initial(self.initial)
-                    .collect_dpa()
+                    .into_dpa()
             }
             OmegaAcceptanceCondition::Rabin => todo!(),
             OmegaAcceptanceCondition::Streett => todo!(),

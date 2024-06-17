@@ -139,7 +139,7 @@ mod tests {
                 (2, 'b', 0, 0),
             ])
             .into_dts_with_initial(0)
-            .collect_mealy();
+            .into_mealy();
         let mm2: MealyMachine = DTS::builder()
             .default_color(Void)
             .with_transitions([
@@ -151,7 +151,7 @@ mod tests {
                 (2, 'b', 1, 0),
             ])
             .into_dts_with_initial(0)
-            .collect_mealy();
+            .into_mealy();
         let _mm3: MealyMachine = DTS::builder()
             .default_color(Void)
             .with_transitions([
@@ -163,7 +163,7 @@ mod tests {
                 (2, 'b', 0, 2),
             ])
             .into_dts_with_initial(0)
-            .collect_mealy();
+            .into_mealy();
 
         assert_eq!(mm1.witness_inequivalence(&mm2), Some(vec!['b', 'b', 'b']))
     }

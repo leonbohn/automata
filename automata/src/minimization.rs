@@ -34,6 +34,6 @@ where
     /// Minimizes `self` using Hopcroft's partition refinement algorithm.
     pub fn minimize(self) -> DFA<D::Alphabet> {
         let min = partition_refinement::moore_partition_refinement(self);
-        min.collect_dfa()
+        min.into_dfa()
     }
 }

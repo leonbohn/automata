@@ -8,12 +8,111 @@ use super::LinkedListTransitionSystem;
 /// next and previous edge in the list of edges leaving the source state.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct LinkedListTransitionSystemEdge<E, C> {
-    pub(super) prev: Option<usize>,
+    pub(super) out_prev: Option<usize>,
+    pub(super) in_prev: Option<usize>,
     pub(super) source: usize,
     pub(super) target: usize,
     pub(super) color: C,
     pub(super) expression: E,
-    pub(super) next: Option<usize>,
+    pub(super) out_next: Option<usize>,
+    pub(super) in_next: Option<usize>,
+}
+
+impl<E, C> LinkedListTransitionSystemEdge<E, C> {
+    pub fn map<CC: Color, F>(self, f: F) -> LinkedListTransitionSystemEdge<E, CC>
+    where
+        F: FnOnce(usize, E, C, usize) -> (E, CC),
+    {
+        let (expression, color) = f(self.source, self.expression, self.color, self.target);
+        LinkedListTransitionSystemEdge {
+            out_prev: self.out_prev,
+            source: self.source,
+            target: self.target,
+            color,
+            expression,
+            out_next: self.out_next,
+            in_prev: self.in_prev,
+            in_next: self.in_next,
+        }
+    }
+    /// Creates a new edge with the given source, expression, color and target. The pointers
+    /// to the next and previous edge are set to `None`.
+    pub fn new(source: DefaultIdType, expression: E, color: C, target: DefaultIdType) -> Self {
+        Self {
+            out_prev: None,
+            in_next: None,
+            source: source.try_into().unwrap(),
+            target: target.try_into().unwrap(),
+            color,
+            expression,
+            out_next: None,
+            in_prev: None,
+        }
+    }
+
+    /// Consumes `self` and applies the given function `f` to obtain a new color which is then
+    /// combined with the remaining fields to form a recolored edge.
+    pub fn recolor<D, F: Fn(C) -> D>(self, f: F) -> LinkedListTransitionSystemEdge<E, D> {
+        LinkedListTransitionSystemEdge {
+            out_prev: self.out_prev,
+            source: self.source,
+            target: self.target,
+            color: f(self.color),
+            expression: self.expression,
+            out_next: self.out_next,
+            in_next: self.in_next,
+            in_prev: self.in_prev,
+        }
+    }
+}
+
+impl<E, C, I> PartialEq<(I, E, C, I)> for LinkedListTransitionSystemEdge<E, C>
+where
+    I: ScalarIndexType,
+    E: PartialEq,
+    C: PartialEq,
+{
+    fn eq(&self, other: &(I, E, C, I)) -> bool {
+        self.source == other.0.into_usize()
+            && self.expression == other.1
+            && self.color == other.2
+            && self.target == other.3.into_usize()
+    }
+}
+impl<E, C, I> PartialEq<(I, E, C, I)> for &LinkedListTransitionSystemEdge<E, C>
+where
+    I: ScalarIndexType,
+    E: PartialEq,
+    C: PartialEq,
+{
+    fn eq(&self, other: &(I, E, C, I)) -> bool {
+        self.source == other.0.into_usize()
+            && self.expression == other.1
+            && self.color == other.2
+            && self.target == other.3.into_usize()
+    }
+}
+impl<E, I, C> PartialEq<(I, E, I)> for LinkedListTransitionSystemEdge<E, C>
+where
+    I: ScalarIndexType,
+    E: PartialEq,
+{
+    fn eq(&self, other: &(I, E, I)) -> bool {
+        self.source == other.0.into_usize()
+            && self.expression == other.1
+            && self.target == other.2.into_usize()
+    }
+}
+impl<E, I> PartialEq<(I, E, I)> for &LinkedListTransitionSystemEdge<E, Void>
+where
+    I: ScalarIndexType,
+    E: PartialEq,
+{
+    fn eq(&self, other: &(I, E, I)) -> bool {
+        self.source == other.0.into_usize()
+            && self.expression == other.1
+            && self.target == other.2.into_usize()
+    }
 }
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool>
@@ -24,17 +123,17 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool>
         self,
     ) -> crate::transition_system::EdgeTuple<LinkedListTransitionSystem<A, Q, C, DET>> {
         (
-            self.source,
+            self.source.try_into().unwrap(),
             self.expression.clone(),
             self.color.clone(),
-            self.target,
+            self.target.try_into().unwrap(),
         )
     }
 }
 
-impl<'a, E, C: Clone> IsEdge<'a, E, usize, C> for &'a LinkedListTransitionSystemEdge<E, C> {
-    fn target(&self) -> usize {
-        self.target
+impl<'a, E, C: Clone> IsEdge<'a, E, DefaultIdType, C> for &'a LinkedListTransitionSystemEdge<E, C> {
+    fn target(&self) -> DefaultIdType {
+        self.target.try_into().unwrap()
     }
 
     fn color(&self) -> C {
@@ -45,35 +144,7 @@ impl<'a, E, C: Clone> IsEdge<'a, E, usize, C> for &'a LinkedListTransitionSystem
         &self.expression
     }
 
-    fn source(&self) -> usize {
-        self.source
-    }
-}
-
-impl<E, C> LinkedListTransitionSystemEdge<E, C> {
-    /// Creates a new edge with the given source, expression, color and target. The pointers
-    /// to the next and previous edge are set to `None`.
-    pub fn new(source: usize, expression: E, color: C, target: usize) -> Self {
-        Self {
-            prev: None,
-            source,
-            target,
-            color,
-            expression,
-            next: None,
-        }
-    }
-
-    /// Consumes `self` and applies the given function `f` to obtain a new color which is then
-    /// combined with the remaining fields to form a recolored edge.
-    pub fn recolor<D, F: Fn(C) -> D>(self, f: F) -> LinkedListTransitionSystemEdge<E, D> {
-        LinkedListTransitionSystemEdge {
-            prev: self.prev,
-            source: self.source,
-            target: self.target,
-            color: f(self.color),
-            expression: self.expression,
-            next: self.next,
-        }
+    fn source(&self) -> DefaultIdType {
+        self.source.try_into().unwrap()
     }
 }
