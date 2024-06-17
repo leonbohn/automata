@@ -19,5 +19,5 @@ Cargo.lock
 samples/*
 !samples/*.smpl
 
-
+.venv
 .perf
