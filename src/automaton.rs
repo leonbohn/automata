@@ -62,7 +62,7 @@ pub struct Automaton<
     const OMEGA: bool = false,
     const DET: bool = true,
 > {
-    ts: D,
+    pub(crate) ts: D,
     initial: D::StateIndex,
     acceptance: Z,
 }
@@ -461,6 +461,19 @@ where
     }
 }
 
+impl<A, Z, Q, C, D, const OMEGA: bool> From<(D, StateIndex<D>)> for Automaton<A, Z, Q, C, D, OMEGA>
+where
+    A: Alphabet,
+    D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,
+    Z: Default,
+    Q: Clone,
+    C: Clone,
+{
+    fn from((ts, initial): (D, StateIndex<D>)) -> Self {
+        Self::from_parts(ts, initial)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
@@ -528,15 +541,15 @@ mod tests {
         assert!(dfa.accepts("ababab"));
         assert!(!dfa.accepts("a"));
 
-        let notdfa = dfa.as_ref().negation().into_dfa();
+        let notdfa = dfa.as_ref().negation().collect_dfa();
         assert!(!notdfa.accepts("ababab"));
         assert!(notdfa.accepts("a"));
 
-        let intersection = dfa.as_ref().intersection(&notdfa).into_dfa();
+        let intersection = dfa.as_ref().intersection(&notdfa).collect_dfa();
         assert!(!intersection.accepts("ababab"));
         assert!(!intersection.accepts("a"));
 
-        let union = dfa.as_ref().union(&notdfa).into_dfa();
+        let union = dfa.as_ref().union(&notdfa).collect_dfa();
         assert!(union.accepts("ababab"));
         assert!(union.accepts("a"));
     }

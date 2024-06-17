@@ -6,34 +6,153 @@ use super::{LinkedListTransitionSystem, LinkedListTransitionSystemEdge};
 /// Stores information characterizing a state in a non-deterministic transition system, see [`NTS`].
 /// It stores a color and a pointer to the index of the first edge leaving the state.
 #[derive(Clone, Debug)]
-pub struct LinkedListTransitionSystemState<Q> {
-    pub(super) color: Q,
-    pub(super) first_edge: Option<usize>,
+pub enum LinkedListTransitionSystemState<Q> {
+    Occupied(Q, Option<usize>, Option<usize>),
+    Vacant(Option<usize>, Option<usize>),
 }
+use tracing::warn;
+use LinkedListTransitionSystemState::*;
 
 impl<Q> LinkedListTransitionSystemState<Q> {
+    pub fn map_occupied<QQ: Color, F>(self, f: F) -> LinkedListTransitionSystemState<QQ>
+    where
+        F: FnOnce(Q) -> QQ,
+    {
+        match self {
+            Vacant(prev, next) => Vacant(prev, next),
+            Occupied(color, first_out_edge, first_in_edge) => {
+                Occupied(f(color), first_out_edge, first_in_edge)
+            }
+        }
+    }
+
     /// Create a new state with the given color.
     pub fn new(color: Q) -> Self {
-        Self {
-            color,
-            first_edge: None,
+        Self::Occupied(color, None, None)
+    }
+
+    pub fn color(&self) -> Option<&Q> {
+        self.occupation().map(|c| c.0)
+    }
+
+    pub fn into_color(self) -> Option<Q> {
+        match self {
+            Occupied(c, _, _) => Some(c),
+            Vacant(_, _) => None,
+        }
+    }
+
+    pub fn is_occupied(&self) -> bool {
+        matches!(self, Occupied(_, _, _))
+    }
+
+    pub fn is_vacant(&self) -> bool {
+        matches!(self, Vacant(_, _))
+    }
+
+    pub fn occupation(&self) -> Option<(&Q, Option<usize>, Option<usize>)> {
+        match self {
+            Occupied(color, first_out_edge, first_in_edge) => {
+                Some((color, *first_out_edge, *first_in_edge))
+            }
+            Vacant(_, _) => None,
+        }
+    }
+
+    pub fn vacancy(&self) -> Option<(Option<usize>, Option<usize>)> {
+        match self {
+            Vacant(prev, next) => Some((*prev, *next)),
+            Occupied(_, _, _) => None,
+        }
+    }
+
+    pub fn first_out_edge(&self) -> Option<usize> {
+        self.occupation()?.1
+    }
+
+    pub fn set_first_out_edge(&mut self, first_edge: Option<usize>) {
+        match self {
+            Occupied(_, next_out, _) => *next_out = first_edge,
+            Vacant(_, _) => panic!("cannot set next edge on vacant state"),
+        }
+    }
+
+    pub fn first_in_edge(&self) -> Option<usize> {
+        self.occupation()?.2
+    }
+
+    pub fn set_first_in_edge(&mut self, first_edge: Option<usize>) {
+        match self {
+            Occupied(_, _, next_in) => *next_in = first_edge,
+            Vacant(_, _) => panic!("cannot set next edge on vacant state"),
+        }
+    }
+
+    pub fn set_color(&mut self, color: Q) {
+        match self {
+            Occupied(c, _, _) => *c = color,
+            Vacant(_, _) => panic!("cannot set color on vacant state"),
         }
     }
 
     /// Applies the given recoloring function to produce a new [`LinkedListTransitionSystemState`] with color `C`.
     /// This method consumes `self`.
     pub fn recolor<C, F: Fn(Q) -> C>(self, f: F) -> LinkedListTransitionSystemState<C> {
-        LinkedListTransitionSystemState {
-            color: f(self.color),
-            first_edge: self.first_edge,
+        match self {
+            Vacant(prev, next) => Vacant(prev, next),
+            Occupied(color, first_out_edge, first_in_edge) => {
+                Occupied(f(color), first_out_edge, first_in_edge)
+            }
+        }
+    }
+
+    pub fn vacate(&mut self, prev: Option<usize>, next: Option<usize>) -> Option<Q> {
+        let mut e = Self::Vacant(prev, next);
+        std::mem::swap(self, &mut e);
+
+        if let Vacant(p, n) = e {
+            warn!("overwriting {p:?} with {prev:?} and {n:?} with {next:?}");
+        }
+        e.into_color()
+    }
+
+    pub fn set_next_vacancy(&mut self, next: Option<usize>) {
+        match self {
+            Occupied(_, _, _) => panic!("attempted to set next vacancy on existing state"),
+            Vacant(_, n) => *n = next,
+        }
+    }
+    pub fn set_prev_vacancy(&mut self, prev: Option<usize>) {
+        match self {
+            Occupied(_, _, _) => panic!("attempted to set prev vacancy on existing state"),
+            Vacant(p, n) => *p = prev,
         }
     }
 
     pub(super) fn edges_from_iter<'a, E, C>(
         &self,
         array: &'a [LinkedListTransitionSystemEdge<E, C>],
-    ) -> NTSEdgesFromIter<'a, E, C> {
-        NTSEdgesFromIter::new(array, self.first_edge)
+    ) -> Option<NTSEdgesFromIter<'a, E, C>> {
+        Some(NTSEdgesFromIter::new(array, self.occupation()?.1))
+    }
+
+    pub(super) fn zip_prepend<X>(self, x: X) -> LinkedListTransitionSystemState<(X, Q)> {
+        match self {
+            Vacant(prev, next) => Vacant(prev, next),
+            Occupied(color, first_out_edge, first_in_edge) => {
+                Occupied((x, color), first_out_edge, first_in_edge)
+            }
+        }
+    }
+}
+impl<Q, X> LinkedListTransitionSystemState<(X, Q)> {
+    pub(super) fn unzip(self) -> LinkedListTransitionSystemState<Q> {
+        match self {
+            Vacant(prev, next) => Vacant(prev, next),
+            Occupied((_, color), first_out_edge, first_in_edge) => {
+                Occupied(color, first_out_edge, first_in_edge)
+            }
+        }
     }
 }
 
@@ -49,7 +168,7 @@ impl<'a, E, C> Iterator for NTSEdgesFromIter<'a, E, C> {
         let idx = self.current?;
         assert!(idx < self.edges.len());
         let e = &self.edges[idx];
-        self.current = e.next;
+        self.current = e.out_next;
         Some(e)
     }
 }

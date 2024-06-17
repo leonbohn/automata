@@ -1,9 +1,6 @@
-use std::hash::Hash;
-
 use itertools::Itertools;
 
 use crate::math::Map;
-use crate::math::Set;
 
 use crate::prelude::*;
 
@@ -15,7 +12,6 @@ use super::operations::ProductTransition;
 use super::operations::RestrictByStateIndex;
 use super::operations::StateIndexFilter;
 use super::path::Lasso;
-use super::sproutable::{IndexedAlphabet, Sproutable};
 use super::Path;
 
 pub type FiniteRunResult<A, Idx, Q, C> = Result<Path<A, Idx, Q, C>, Path<A, Idx, Q, C>>;
@@ -505,189 +501,6 @@ pub trait Deterministic: TransitionSystem {
         self.finite_run_from(origin, word).ok().map(|p| p.reached())
     }
 
-    /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
-    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
-    #[cfg(not(feature = "linked_list_ts"))]
-    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>
-    where
-        Self: Sized,
-        EdgeColor<Self>: Hash + Eq,
-    {
-        self.collect_graphts_deterministic()
-    }
-
-    /// Collects `self` into a new [`DTS`] over the same alphabet and with the same colors. This is used, for example, after a chain of
-    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
-    #[cfg(not(feature = "linked_list_ts"))]
-    #[allow(clippy::type_complexity)]
-    fn collect_dts_pointed(
-        self,
-    ) -> (
-        DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
-        DefaultIdType,
-    )
-    where
-        Self: Sized + Pointed,
-        EdgeColor<Self>: Hash + Eq,
-    {
-        self.collect_graphts_deterministic_pointed()
-    }
-
-    /// Collects `self` into a new [`LinkedListTransitionSystem`] over the same alphabet. This is used, for example, after a chain of
-    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
-    ///
-    /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
-    #[cfg(feature = "implementations")]
-    fn collect_linked_list_deterministic(
-        self,
-    ) -> LinkedListTransitionSystem<Self::Alphabet, Self::StateColor, Self::EdgeColor> {
-        let (ts, _map) = LinkedListTransitionSystem::sprout_from_ts_with_bijection(self);
-        ts
-    }
-
-    /// Collects `self` into a new [`LinkedListTransitionSystem`] over the same alphabet, while also returning the
-    /// index of the state corresponding to the old initial state.
-    /// This is used, for example, after a chain of  manipulations on a transition system,
-    /// to obtain a condensed version that is then faster to work with.
-    ///
-    /// By default, the implementation is naive and slow, it simply inserts all states one
-    /// after the other and subsequently inserts all transitions, see
-    /// [`Deterministic::collect_linked_list_deterministic`] for details.
-    #[allow(clippy::type_complexity)]
-    #[cfg(feature = "implementations")]
-    fn collect_linked_list_deterministic_pointed(
-        self,
-    ) -> (
-        LinkedListTransitionSystem<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
-        usize,
-    )
-    where
-        Self: Pointed,
-    {
-        let old_initial = self.initial();
-        let (ts, map) = LinkedListTransitionSystem::sprout_from_ts_with_bijection(self);
-        (
-            ts,
-            *map.get_by_left(&old_initial)
-                .expect("Initial state did not get collected"),
-        )
-    }
-
-    /// Collects `self` into a new [`EdgeLists`] over the same alphabet. This is used, for example, after a chain of
-    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
-    /// This method additionally also returns the initial state of the collected TS.
-    ///
-    /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_linked_list_deterministic`] for details.
-    #[cfg(feature = "implementations")]
-    fn collect_edge_lists_deterministic_pointed(self) -> (IntoEdgeLists<Self>, DefaultIdType)
-    where
-        EdgeColor<Self>: Hash + Eq,
-        Self: Pointed,
-    {
-        let old_initial = self.initial();
-        let (ts, map) = EdgeLists::sprout_from_ts_with_bijection(self);
-        (
-            ts,
-            *map.get_by_left(&old_initial)
-                .expect("Initial state did not get collected"),
-        )
-    }
-
-    /// Collects `self` into a new [`GraphTs`] over the same alphabet. This is used, for example, after a chain of
-    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
-    ///
-    /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    fn collect_graphts_deterministic(
-        self,
-    ) -> GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true> {
-        let (ts, _map) = GraphTs::sprout_from_ts_with_bijection(self);
-        ts
-    }
-
-    /// Collects `self` into a new [`GraphTs`] over the same alphabet. This is used, for example, after a chain of
-    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
-    /// This method additionally also returns the initial state of the collected TS.
-    ///
-    /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    #[allow(clippy::type_complexity)]
-    fn collect_graphts_deterministic_pointed(
-        self,
-    ) -> (
-        GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true>,
-        StateIndex<GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true>>,
-    )
-    where
-        Self: Pointed,
-    {
-        let old_initial = self.initial();
-        let (ts, map) = GraphTs::sprout_from_ts_with_bijection(self);
-        (
-            ts,
-            *map.get_by_left(&old_initial)
-                .expect("Initial state did not get collected"),
-        )
-    }
-
-    /// Collects `self` into a new [`EdgeLists`] over the same alphabet. This is used, for example, after a chain of
-    /// manipulations on a transition system, to obtain a condensed version that is then faster to work with.
-    ///
-    /// By default, the implementation is naive and slow, it simply inserts all states one after the other and
-    /// subsequently inserts all transitions, see [`Deterministic::collect_dts`] for details.
-    #[cfg(feature = "implementations")]
-    fn collect_edge_lists_deterministic(self) -> IntoEdgeLists<Self>
-    where
-        EdgeColor<Self>: Hash + Eq,
-    {
-        let (ts, _map) = EdgeLists::sprout_from_ts_with_bijection(self);
-        ts
-    }
-
-    /// Collects `self` into a new transition system. This procedure also completes the collected transition
-    /// system with a sink (a state that cannot be left) and for each state of the ts that does not have an
-    /// outgoing transition on some symbol, a new transition into the sink is added.
-    ///
-    /// # Example
-    /// ```
-    /// use automata::prelude::*;
-    ///
-    /// let ts = TSBuilder::without_colors().with_edges([(0, 'a', 1), (1, 'b', 0)]).into_dts();
-    /// let (collected, initial) = ts.with_initial(0).collect_complete_pointed(Void, Void);
-    /// assert_eq!(collected.size(), 3);
-    ///
-    /// assert_eq!(collected.reached_state_index_from(0, "b"), collected.reached_state_index_from(0, "aa"));
-    /// ```
-    #[allow(clippy::type_complexity)]
-    fn collect_complete_pointed(
-        &self,
-        sink_state_color: StateColor<Self>,
-        sink_edge_color: Self::EdgeColor,
-    ) -> (
-        DTS<Self::Alphabet, StateColor<Self>, Self::EdgeColor>,
-        DefaultIdType,
-    )
-    where
-        Self: Pointed,
-        Self::Alphabet: IndexedAlphabet,
-    {
-        let (mut ts, initial) = self.collect_dts_pointed();
-        if !ts.is_complete() {
-            let sink = ts.add_state(sink_state_color);
-            for q in 0..ts.size() {
-                let q = DefaultIdType::from_usize(q);
-                for sym in self.alphabet().universe() {
-                    if ts.edge(q, sym).is_none() {
-                        ts.add_edge((q, ts.make_expression(sym), sink_edge_color.clone(), sink));
-                    }
-                }
-            }
-        }
-        (ts, initial)
-    }
-
     /// Returns true if `self` is accessible, meaning every state is reachable from the initial state.
     /// This is done by counting whether the number of minimal representatives matches the number of states.
     fn is_accessible(&self) -> bool
@@ -695,24 +508,6 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
     {
         self.size() == self.minimal_representatives().count()
-    }
-
-    /// Collects into a transition system of type `Ts`, but only considers states that
-    /// are reachable from the initial state. Naturally, this means that `self` must
-    /// be a pointed transition system.
-    #[allow(clippy::type_complexity)]
-    fn trim_collect_pointed(
-        &self,
-    ) -> (
-        crate::transition_system::DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
-        DefaultIdType,
-    )
-    where
-        Self: Pointed,
-    {
-        let reachable_indices = self.reachable_state_indices().collect::<Set<_>>();
-        let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
-        restricted.collect_dts_pointed()
     }
 
     /// Compute the escape prefixes of a set of omega words on a transition system.
@@ -731,46 +526,6 @@ pub trait Deterministic: TransitionSystem {
                     .map(|path| w.prefix(path.len() + 1).as_string())
             })
             .unique()
-    }
-
-    /// Consumes and turns `self` into a [`DFA`] while using the given `initial` state.
-    fn into_dfa_with_initial(self, initial: Self::StateIndex) -> IntoDFA<Self>
-    where
-        Self: Deterministic<StateColor = bool>,
-    {
-        Automaton::from_parts(self, initial)
-    }
-
-    /// Consumes and turns `self` into a [`DPA`] while using the given `initial` state.
-    fn into_dpa_with_initial(self, initial: Self::StateIndex) -> IntoDPA<Self>
-    where
-        Self: Deterministic<EdgeColor = Int>,
-    {
-        Automaton::from_parts(self, initial)
-    }
-
-    /// Consumes and turns `self` into a [`DBA`] while using the given `initial` state.
-    fn into_dba_with_initial(self, initial: Self::StateIndex) -> IntoDBA<Self>
-    where
-        Self: Deterministic<EdgeColor = bool>,
-    {
-        Automaton::from_parts(self, initial)
-    }
-
-    /// Consumes and turns `self` into a [`MooreMachine`] while using the given `initial` state.
-    fn into_moore_with_initial(self, initial: Self::StateIndex) -> IntoMooreMachine<Self>
-    where
-        StateColor<Self>: Color,
-    {
-        Automaton::from_parts(self, initial)
-    }
-
-    /// Consumes and turns `self` into a [`MealyMachine`] while using the given `initial` state.
-    fn into_mealy_with_initial(self, initial: Self::StateIndex) -> IntoMealyMachine<Self>
-    where
-        EdgeColor<Self>: Color,
-    {
-        Automaton::from_parts(self, initial)
     }
 }
 

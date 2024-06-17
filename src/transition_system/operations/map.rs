@@ -9,6 +9,105 @@ pub struct MapEdges<Ts, F> {
     f: F,
 }
 
+impl<Ts, F> MapEdges<Ts, F> {
+    /// Create a new instance of `Self`.
+    pub fn new(ts: Ts, f: F) -> Self {
+        Self { ts, f }
+    }
+
+    /// Returns a reference to the function with which the edge colors are mapped.
+    pub fn f(&self) -> &F {
+        &self.f
+    }
+
+    /// Returns a reference to the underlying transition system.
+    pub fn ts(&self) -> &Ts {
+        &self.ts
+    }
+
+    /// Decomposes self.
+    pub fn into_parts(self) -> (Ts, F) {
+        (self.ts, self.f)
+    }
+}
+impl<Ts, D, F> TransitionSystem for MapEdges<Ts, F>
+where
+    Ts: TransitionSystem,
+    D: Color,
+    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
+{
+    type StateIndex = Ts::StateIndex;
+
+    type StateColor = Ts::StateColor;
+
+    type EdgeColor = D;
+
+    type EdgeRef<'this> = MappedEdge<Ts::StateIndex, Ts::EdgeRef<'this>, &'this F, Ts::EdgeColor>
+    where
+        Self: 'this;
+
+    type EdgesFromIter<'this> = MapEdgesSuccessorsIter<'this, Ts::StateIndex, Ts::EdgesFromIter<'this>, F, Ts::EdgeColor>
+    where
+        Self: 'this;
+
+    type StateIndices<'this> = Ts::StateIndices<'this> where Self: 'this;
+
+    type Alphabet = Ts::Alphabet;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        self.ts().alphabet()
+    }
+
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        self.ts().state_indices()
+    }
+
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+        self.ts().state_color(state)
+    }
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        Some(MapEdgesSuccessorsIter {
+            it: self.ts().edges_from(state)?,
+            source: state,
+            f: self.f(),
+            _old_color: PhantomData,
+        })
+    }
+}
+impl<D, Ts, F> Pointed for MapEdges<Ts, F>
+where
+    D: Color,
+    Ts: TransitionSystem + Pointed,
+    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
+{
+    fn initial(&self) -> Self::StateIndex {
+        self.ts.initial()
+    }
+}
+
+impl<Ts, D, F> PredecessorIterable for MapEdges<Ts, F>
+where
+    D: Color,
+    Ts: PredecessorIterable,
+    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
+{
+    type PreEdgeRef<'this> = MappedPreEdge<Ts::StateIndex, Ts::PreEdgeRef<'this>, &'this F, Ts::EdgeColor>
+    where
+        Self: 'this;
+
+    type EdgesToIter<'this>  = MappedEdgesToIter<'this, Ts::StateIndex, Ts::EdgesToIter<'this>, F, Ts::EdgeColor>
+    where
+        Self: 'this;
+
+    fn predecessors(&self, index: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
+        Some(MappedEdgesToIter::new(
+            self.ts().predecessors(index).unwrap(),
+            index,
+            self.f(),
+        ))
+    }
+}
+
 /// Counterpart to [`MappedTransition`] but for predecessors, i.e. for pre-transitions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MappedPreEdge<Idx, T, F, C> {
@@ -86,29 +185,6 @@ where
     }
 }
 
-impl<Ts, D, F> PredecessorIterable for MapEdges<Ts, F>
-where
-    D: Color,
-    Ts: PredecessorIterable,
-    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
-{
-    type PreEdgeRef<'this> = MappedPreEdge<Ts::StateIndex, Ts::PreEdgeRef<'this>, &'this F, Ts::EdgeColor>
-    where
-        Self: 'this;
-
-    type EdgesToIter<'this>  = MappedEdgesToIter<'this, Ts::StateIndex, Ts::EdgesToIter<'this>, F, Ts::EdgeColor>
-    where
-        Self: 'this;
-
-    fn predecessors(&self, index: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
-        Some(MappedEdgesToIter::new(
-            self.ts().predecessors(index).unwrap(),
-            index,
-            self.f(),
-        ))
-    }
-}
-
 /// Iterator over the successors of a transition system whose colors are mapped by some function.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MapEdgesSuccessorsIter<'a, Idx, I, F, C> {
@@ -179,78 +255,6 @@ where
 
     fn expression(&self) -> &'ts E {
         self.transition.expression()
-    }
-}
-
-impl<Ts, D, F> TransitionSystem for MapEdges<Ts, F>
-where
-    Ts: TransitionSystem,
-    D: Color,
-    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
-{
-    type StateIndex = Ts::StateIndex;
-
-    type StateColor = Ts::StateColor;
-
-    type EdgeColor = D;
-
-    type EdgeRef<'this> = MappedEdge<Ts::StateIndex, Ts::EdgeRef<'this>, &'this F, Ts::EdgeColor>
-    where
-        Self: 'this;
-
-    type EdgesFromIter<'this> = MapEdgesSuccessorsIter<'this, Ts::StateIndex, Ts::EdgesFromIter<'this>, F, Ts::EdgeColor>
-    where
-        Self: 'this;
-
-    type StateIndices<'this> = Ts::StateIndices<'this> where Self: 'this;
-
-    type Alphabet = Ts::Alphabet;
-
-    fn alphabet(&self) -> &Self::Alphabet {
-        self.ts().alphabet()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts().state_indices()
-    }
-
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        self.ts().state_color(state)
-    }
-    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        Some(MapEdgesSuccessorsIter {
-            it: self.ts().edges_from(state)?,
-            source: state,
-            f: self.f(),
-            _old_color: PhantomData,
-        })
-    }
-}
-
-impl<Ts, F> MapEdges<Ts, F> {
-    /// Create a new instance of `Self`.
-    pub fn new(ts: Ts, f: F) -> Self {
-        Self { ts, f }
-    }
-
-    /// Returns a reference to the function with which the edge colors are mapped.
-    pub fn f(&self) -> &F {
-        &self.f
-    }
-
-    /// Returns a reference to the underlying transition system.
-    pub fn ts(&self) -> &Ts {
-        &self.ts
-    }
-}
-impl<D, Ts, F> Pointed for MapEdges<Ts, F>
-where
-    D: Color,
-    Ts: TransitionSystem + Pointed,
-    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
-{
-    fn initial(&self) -> Self::StateIndex {
-        self.ts.initial()
     }
 }
 

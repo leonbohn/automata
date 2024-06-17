@@ -16,6 +16,7 @@ pub trait ScalarIndexType:
     }
     /// Converts an index of a [`petgraph::stable_graph::StableGraph`] into an instance of the
     /// implementing type.
+    #[cfg(feature = "petgraph")]
     fn from_pg_index(n: petgraph::stable_graph::NodeIndex<Self>) -> Self
     where
         Self: petgraph::stable_graph::IndexType,
@@ -24,6 +25,7 @@ pub trait ScalarIndexType:
     }
     /// Converts `self` into a [`petgraph::stable_graph::NodeIndex`] which can be used to access
     /// a node in a [`petgraph::stable_graph::StableGraph`].
+    #[cfg(feature = "petgraph")]
     fn into_pg_index(self) -> petgraph::stable_graph::NodeIndex<Self>
     where
         Self: petgraph::stable_graph::IndexType,

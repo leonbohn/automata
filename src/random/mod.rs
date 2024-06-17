@@ -58,7 +58,7 @@ pub fn generate_random_dfa(symbols: usize, probability: f64) -> DFA {
     let (ts, initial) = generate_random_ts(symbols, probability);
     ts.map_state_colors(|_| thread_rng().gen_bool(probability))
         .with_initial(initial)
-        .collect_dfa()
+        .into_dfa()
 }
 
 /// Generate a random deterministic transition system of size `size` by randomly drawing transitions.
@@ -98,7 +98,7 @@ pub fn generate_random_dba(symbols: usize, size: usize, lambda: f64) -> DBA {
     // draw acceptance condition
     dts.map_edge_colors(|_| draw_priority(2, lambda) == 0)
         .with_initial(initial)
-        .collect_dba()
+        .into_dba()
 }
 
 /// Works as [`generate_random_ts_sized`], but returns a [`DPA`] instead by randomly
@@ -114,7 +114,7 @@ pub fn generate_random_dpa(symbols: usize, size: usize, num_prios: Int, lambda: 
     // draw acceptance condition
     dts.map_edge_colors(|_| draw_priority(num_prios, lambda))
         .with_initial(initial)
-        .collect_dpa()
+        .into_dpa()
 }
 
 /// Randomly draw a priority in range [0,num_prios) from continuous Bernoulli distribution

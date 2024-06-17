@@ -84,8 +84,8 @@ pub trait Sproutable: TransitionSystem {
     /// add any edges and the type can therefore not be inferred.
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex;
 
-    /// Adds a new edge to the transition system. Returns an [`TransitionSystem::EdgeRef`] pointing to the added
-    /// edge or `None` if the edge could not be added.
+    /// Adds a new edge to the transition system. Returns an [`EdgeTuple`] consisting of the overwritten
+    /// edge if it existed, or `None` otherwise.
     ///
     /// The details of the edge are given as a type that implements [`IntoEdgeTuple`]. This allows
     /// for a more flexible way of adding edges, as the method can be called with a tuple, a struct

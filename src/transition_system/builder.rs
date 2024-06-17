@@ -347,7 +347,7 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     ) -> RightCongruence<CharAlphabet, Q, C> {
         self.into_dts()
             .with_initial(initial)
-            .collect_right_congruence()
+            .into_right_congruence()
     }
     /// Build a deterministic transition system from `self` and set the given `initial` state as the
     /// designated initial state of the output object. Panics if `self` is not deterministic.
@@ -374,7 +374,7 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
 impl TSBuilder<bool, Void, true> {
     /// Tries to turn `self` into a deterministic finite automaton. Panics if `self` is not deterministic.
     pub fn into_dfa(self, initial: DefaultIdType) -> DFA<CharAlphabet> {
-        self.into_dts().with_initial(initial).collect_dfa()
+        self.into_dts().with_initial(initial).into_dfa()
     }
 }
 
@@ -384,7 +384,7 @@ impl TSBuilder<Void, bool, true> {
         self.default_color(Void)
             .into_dts()
             .with_initial(initial)
-            .collect_dba()
+            .into_dba()
     }
 }
 
@@ -394,7 +394,7 @@ impl TSBuilder<Void, Int, true> {
         self.default_color(Void)
             .into_dts()
             .with_initial(initial)
-            .collect_dpa()
+            .into_dpa()
     }
 
     /// Builds a Mealy machine from `self`. Panics if `self` is not deterministic.
@@ -402,14 +402,14 @@ impl TSBuilder<Void, Int, true> {
         self.default_color(Void)
             .into_dts()
             .with_initial(initial)
-            .collect_mealy()
+            .into_mealy()
     }
 }
 
 impl TSBuilder<Int, Void, true> {
     /// Builds a Moore machine from `self`. Panics if `self` is not deterministic.
     pub fn into_moore(self, initial: DefaultIdType) -> MooreMachine<CharAlphabet> {
-        self.into_dts().with_initial(initial).collect_moore()
+        self.into_dts().with_initial(initial).into_moore()
     }
 }
 
@@ -424,6 +424,6 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
             .with_initial(initial)
             .erase_state_colors()
             .erase_edge_colors()
-            .collect_right_congruence()
+            .into_right_congruence()
     }
 }

@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
-use crate::{math::Set, prelude::*, transition_system::Shrinkable, Void};
+use crate::{math::Set, prelude::*};
 use itertools::Itertools;
 
 mod linked_state;
@@ -10,7 +10,327 @@ pub use linked_state::{
 
 mod linked_edge;
 pub use linked_edge::LinkedListTransitionSystemEdge;
-use tracing::trace;
+use tracing::{trace, warn};
+
+/// Represents a non-deterministic transition system. It stores an [`Alphabet`], a list of [`LinkedListTransitionSystemState`]s and a list of [`LinkedListTransitionSystemEdge`]s.
+#[derive(Clone)]
+pub struct LinkedListTransitionSystem<
+    A: Alphabet = CharAlphabet,
+    Q = Void,
+    C = Void,
+    const DET: bool = true,
+> {
+    alphabet: A,
+    states: Vec<LinkedListTransitionSystemState<Q>>,
+    edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
+    vacant: Option<usize>,
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSystem<A, Q, C, DET> {
+    pub fn zip_state_indices(self) -> LinkedListTransitionSystem<A, (DefaultIdType, Q), C, DET> {
+        LinkedListTransitionSystem {
+            alphabet: self.alphabet,
+            edges: self.edges,
+            states: self
+                .states
+                .into_iter()
+                .enumerate()
+                .map(|(i, s)| s.zip_prepend(ScalarIndexType::from_usize(i)))
+                .collect(),
+            vacant: self.vacant,
+        }
+    }
+
+    pub fn linked_map_states<QQ: Color, StateF>(
+        self,
+        state_f: StateF,
+    ) -> LinkedListTransitionSystem<A, QQ, C, DET>
+    where
+        StateF: Fn(StateIndex<Self>, Q) -> QQ,
+    {
+        self.linked_map(state_f, |_q, a: <A as Alphabet>::Expression, c, _p| (a, c))
+    }
+
+    pub fn linked_map_edges<CC: Color, EdgeF>(
+        self,
+        edge_f: EdgeF,
+    ) -> LinkedListTransitionSystem<A, Q, CC, DET>
+    where
+        EdgeF: Fn(
+            StateIndex<Self>,
+            EdgeExpression<Self>,
+            EdgeColor<Self>,
+            StateIndex<Self>,
+        ) -> (EdgeExpression<Self>, CC),
+    {
+        self.linked_map(|_idx, c| c, edge_f)
+    }
+
+    pub fn linked_map<QQ: Color, CC: Color, StateF, EdgeF>(
+        self,
+        state_f: StateF,
+        edge_f: EdgeF,
+    ) -> LinkedListTransitionSystem<A, QQ, CC, DET>
+    where
+        StateF: Fn(StateIndex<Self>, Q) -> QQ,
+        EdgeF: Fn(
+            StateIndex<Self>,
+            EdgeExpression<Self>,
+            EdgeColor<Self>,
+            StateIndex<Self>,
+        ) -> (EdgeExpression<Self>, CC),
+    {
+        LinkedListTransitionSystem {
+            alphabet: self.alphabet,
+            states: self
+                .states
+                .into_iter()
+                .enumerate()
+                .map(|(i, s)| s.map_occupied(|c| state_f(ScalarIndexType::from_usize(i), c)))
+                .collect(),
+            edges: self
+                .edges
+                .into_iter()
+                .map(|e| {
+                    e.map(|q, e, c, p| {
+                        edge_f(
+                            ScalarIndexType::from_usize(q),
+                            e,
+                            c,
+                            ScalarIndexType::from_usize(p),
+                        )
+                    })
+                })
+                .collect(),
+            vacant: self.vacant,
+        }
+    }
+
+    /// This removes a state from the NTS and returns the color of the removed state.
+    /// This method also removes any incoming edges to this state.
+    pub(crate) fn linked_remove_state(&mut self, state: usize) -> Option<Q> {
+        if state >= self.states.len() {
+            warn!("tried to remove state {state} which is out of range");
+            return None;
+        }
+        if self.states[state].is_vacant() {
+            warn!("cannot remove vacant state {state}");
+            return None;
+        }
+
+        // TODO: can we do this more efficiently?
+        while let Some(out_edge) = self.first_out_edge(state) {
+            self.swap_remove_edge(out_edge);
+        }
+        while let Some(in_edge) = self.first_in_edge(state) {
+            self.swap_remove_edge(in_edge);
+        }
+
+        self.vacate_state_index(state)
+    }
+
+    fn vacate_state_index(&mut self, state: usize) -> Option<Q> {
+        assert_eq!(self.first_in_edge(state), None);
+        assert_eq!(self.first_out_edge(state), None);
+
+        let out = self.states[state].vacate(self.vacant, None);
+        if let Some(prev) = self.vacant {
+            self.states[prev].set_next_vacancy(Some(state));
+        }
+        self.vacant = Some(state);
+
+        out
+    }
+
+    fn swap_remove_edge(
+        &mut self,
+        id: usize,
+    ) -> Option<LinkedListTransitionSystemEdge<A::Expression, C>> {
+        if id >= self.edges.len() {
+            warn!("tried to remove edge {id} which is not in rante");
+            return None;
+        }
+
+        if let Some(in_prev) = self.edges[id].in_prev {
+            self.edges[in_prev].in_next = self.edges[id].in_next;
+        } else {
+            // there is no predecessor, so we should update the first_out_edge
+            assert_eq!(
+                self.states[self.edges[id].target].first_out_edge(),
+                Some(id)
+            );
+            self.states
+                .get_mut(self.edges[id].target)
+                .unwrap()
+                .set_first_out_edge(self.edges[id].in_next);
+        }
+        if let Some(in_next) = self.edges[id].in_next {
+            self.edges[in_next].in_prev = self.edges[id].in_prev;
+        }
+
+        if let Some(out_prev) = self.edges[id].out_prev {
+            self.edges[out_prev].out_next = self.edges[id].out_next;
+        } else {
+            // there is no predecessor, so we should update the first_out_edge
+            assert_eq!(self.states[self.edges[id].target].first_in_edge(), Some(id));
+            self.states
+                .get_mut(self.edges[id].target)
+                .unwrap()
+                .set_first_in_edge(self.edges[id].out_next);
+        }
+
+        if let Some(out_next) = self.edges[id].out_next {
+            self.edges[out_next].out_prev = self.edges[id].out_prev;
+        }
+
+        Some(self.edges.swap_remove(id))
+    }
+
+    fn out_edge_position(
+        &self,
+        from: usize,
+        matcher: impl Matcher<A::Expression>,
+    ) -> Option<usize> {
+        let mut idx = self.states.get(from)?.first_out_edge()?;
+        loop {
+            // FIXME: Make this be a match
+            if matcher.matches((&self.edges[idx]).expression()) {
+                return Some(idx);
+            }
+            idx = self.edges[idx].out_next?;
+        }
+    }
+
+    fn in_edge_position(&self, matcher: impl Matcher<A::Expression>, to: usize) -> Option<usize> {
+        let mut idx = self.states.get(to)?.first_in_edge()?;
+        loop {
+            // FIXME: Make this be a match
+            if matcher.matches((&self.edges[idx]).expression()) {
+                return Some(idx);
+            }
+            idx = self.edges[idx].in_next?;
+        }
+    }
+
+    /// Builds a new non-deterministic transition system for the given alphabet with a specified capacity.
+    pub fn with_capacity(alphabet: A, cap: usize) -> Self {
+        Self {
+            alphabet,
+            states: Vec::with_capacity(cap),
+            edges: Vec::with_capacity(cap),
+            vacant: None,
+        }
+    }
+
+    /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
+    pub fn into_deterministic(self) -> LinkedListTransitionSystem<A, Q, C> {
+        match self.try_into_deterministic() {
+            Ok(ts) => ts,
+            Err(ts) => {
+                tracing::error!("Tried to convert non-deterministic transition system to deterministic one\n{:?}", ts);
+                panic!("This transition system is not deterministic");
+            }
+        }
+    }
+
+    /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
+    pub fn try_into_deterministic(self) -> Result<LinkedListTransitionSystem<A, Q, C, true>, Self> {
+        if DET {
+            if !self.is_deterministic() {
+                tracing::error!("Tried to convert non-deterministic transition system to deterministic one\n{:?}", self);
+                panic!("This transition system is not deterministic");
+            }
+            Ok(recast(self))
+        } else if self.is_deterministic() {
+            Ok(recast(self))
+        } else {
+            Err(self)
+        }
+    }
+
+    pub fn into_nondeterministic(self) -> LinkedListNondeterministic<A, Q, C> {
+        recast(self)
+    }
+
+    fn first_out_edge(&self, idx: usize) -> Option<usize> {
+        self.states.get(idx)?.first_out_edge()
+    }
+
+    fn first_in_edge(&self, idx: usize) -> Option<usize> {
+        self.states.get(idx)?.first_in_edge()
+    }
+
+    fn last_out_edge(&self, idx: usize) -> Option<usize> {
+        let mut current = self.states.get(idx)?.first_out_edge()?;
+        loop {
+            assert!(
+                current < self.edges.len(),
+                "Edge with id {current} does not exist"
+            );
+            if let Some(x) = self.edges[current].out_next {
+                current = x;
+            } else {
+                return Some(current);
+            }
+        }
+    }
+
+    fn last_in_edge(&self, idx: usize) -> Option<usize> {
+        let mut current = self.states.get(idx)?.first_in_edge()?;
+        loop {
+            assert!(
+                current < self.edges.len(),
+                "Edge with id {current} does not exist"
+            );
+            if let Some(x) = self.edges[current].in_next {
+                current = x;
+            } else {
+                return Some(current);
+            }
+        }
+    }
+
+    /// Builds a new [`NTS`] from its constituent parts.
+    ///
+    /// This assumes that no vacant entries exist!
+    pub fn from_parts(
+        alphabet: A,
+        states: Vec<LinkedListTransitionSystemState<Q>>,
+        edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
+    ) -> Self {
+        debug_assert!(states.iter().all(|s| s.is_occupied()));
+        Self {
+            alphabet,
+            states,
+            edges,
+            vacant: None,
+        }
+    }
+
+    /// Decomposes `self` into a tuple of its constituents.
+    pub fn into_parts(self) -> IntoLinkedListNondeterministic<Self> {
+        (self.alphabet, self.states, self.edges)
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color>
+    LinkedListTransitionSystem<A, (X, Q), C, DET>
+{
+    pub fn unzip_state_color(self) -> LinkedListTransitionSystem<A, Q, C, DET> {
+        LinkedListTransitionSystem {
+            alphabet: self.alphabet,
+            edges: self.edges,
+            states: self.states.into_iter().map(|q| q.unzip()).collect(),
+            vacant: self.vacant,
+        }
+    }
+
+    pub fn position_by_first(self, first: X) -> Option<usize> {
+        self.states
+            .iter()
+            .position(|s| s.is_occupied() && s.occupation().unwrap().0 .0.eq(&first))
+    }
+}
 
 /// Type alias for the constituent parts of an [`NTS`] with the same associated types as the
 /// transition sytem `D`.
@@ -34,19 +354,6 @@ pub type CollectLinkedList<Ts, const DET: bool = true> = LinkedListTransitionSys
     DET,
 >;
 
-/// Represents a non-deterministic transition system. It stores an [`Alphabet`], a list of [`LinkedListTransitionSystemState`]s and a list of [`LinkedListTransitionSystemEdge`]s.
-#[derive(Clone)]
-pub struct LinkedListTransitionSystem<
-    A: Alphabet = CharAlphabet,
-    Q = Void,
-    C = Void,
-    const DET: bool = true,
-> {
-    alphabet: A,
-    states: Vec<LinkedListTransitionSystemState<Q>>,
-    edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
-}
-
 impl<A: Alphabet, Q: Color, C: Color> Deterministic for LinkedListTransitionSystem<A, Q, C> {}
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable
@@ -56,48 +363,63 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable
         let id = self.states.len();
         let state = LinkedListTransitionSystemState::new(color);
         self.states.push(state);
-        id
+        id.try_into().unwrap()
     }
     fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
-        if index >= self.states.len() {
+        if index >= self.states.len().try_into().unwrap() {
             panic!(
                 "Index {index} is out of bounds, there are only {} states",
                 self.states.len()
             );
         }
-        self.states[index].color = color;
+        self.states[index.into_usize()].set_color(color);
     }
 
-    fn add_edge<E>(&mut self, t: E) -> Option<Self::EdgeRef<'_>>
+    fn add_edge<E>(&mut self, t: E) -> Option<crate::transition_system::EdgeTuple<Self>>
     where
         E: IntoEdgeTuple<Self>,
     {
         let (q, a, c, p) = t.into_edge_tuple();
 
-        if DET
-            && self
-                .edges_from(q)
-                .unwrap()
-                .any(|e| e.expression().overlaps(&a))
-        {
-            return None;
+        let mut out = None;
+        if DET {
+            if let Some(pos) = self.out_edge_position(q.into_usize(), &a) {
+                trace!("found previously existing edge {pos} in deterministic automaton");
+                let out = Some(self.swap_remove_edge(pos));
+            }
         }
 
         let mut edge = LinkedListTransitionSystemEdge::new(q, a, c, p);
         let edge_id = self.edges.len();
 
-        if let Some(last_edge_id) = self.last_edge(q) {
-            assert!(last_edge_id < self.edges.len());
-            assert!(self.edges[last_edge_id].next.is_none());
-            self.edges[last_edge_id].next = Some(edge_id);
-            edge.prev = Some(last_edge_id);
+        let q = q.try_into().unwrap();
+        let p = p.try_into().unwrap();
+        assert!(q < self.states.len());
+        assert!(p < self.states.len());
+        if let Some(first_out) = self.first_out_edge(q) {
+            assert!(first_out < self.edges.len());
+            assert!(self.edges[first_out].out_prev.is_none());
+
+            self.edges[first_out].out_prev = Some(edge_id);
+            edge.out_next = Some(first_out);
         } else {
-            assert!(self.states[q].first_edge.is_none());
-            self.states[q].first_edge = Some(edge_id);
+            assert!(self.states[q].first_out_edge().is_none());
         }
+        self.states[q].set_first_out_edge(Some(edge_id));
+
+        if let Some(first_in) = self.first_in_edge(p) {
+            assert!(first_in < self.edges.len());
+            assert!(self.edges[first_in].in_prev.is_none());
+
+            self.edges[first_in].in_prev = Some(edge_id);
+            edge.in_next = Some(first_in);
+        } else {
+            assert!(self.states[p].first_in_edge().is_none());
+        }
+        self.states[p].set_first_in_edge(Some(edge_id));
 
         self.edges.push(edge);
-        Some(self.edges.last().expect("We just added one element!"))
+        out
     }
 }
 
@@ -110,8 +432,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
         let mut out = vec![];
-        while let Some(pos) = self.edge_position(from, &matcher) {
-            let edge = self.remove_edge(from, pos);
+        let from = from.into_usize();
+        while let Some(pos) = self.out_edge_position(from, &matcher) {
+            let edge = self.swap_remove_edge(pos).expect("unable to remove edge");
             out.push(IntoEdgeTuple::<Self>::into_edge_tuple(edge));
         }
         Some(out)
@@ -177,167 +500,10 @@ impl<Q, C, const DET: bool> LinkedListTransitionSystem<CharAlphabet, Q, C, DET> 
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSystem<A, Q, C, DET> {
-    pub(crate) fn nts_remove_edge(
-        &mut self,
-        from: usize,
-        on: &EdgeExpression<Self>,
-    ) -> Option<(C, usize)> {
-        let pos = self.edge_position(from, on)?;
-        let (color, target) = (self.edges[pos].color.clone(), self.edges[pos].target);
-        self.remove_edge(from, pos);
-        Some((color, target))
-    }
-
-    pub(crate) fn nts_remove_transitions(
-        &mut self,
-        from: usize,
-        on: SymbolOf<Self>,
-    ) -> Set<(EdgeExpression<Self>, C, usize)>
-    where
-        C: Hash + Eq,
-    {
-        let mut set = Set::default();
-        let mut current = self.first_edge(from);
-        let mut to_remove = Vec::new();
-        while let Some(idx) = current {
-            let edge = &self.edges[idx];
-            if edge.expression.symbols().contains(&on) {
-                set.insert((edge.expression.clone(), edge.color.clone(), edge.target));
-                to_remove.push((from, idx));
-            }
-            current = edge.next;
-        }
-        for (from, idx) in to_remove {
-            self.remove_edge(from, idx);
-        }
-        set
-    }
-
-    /// This removes a state from the NTS and returns the color of the removed state.
-    /// This method also removes any incoming edges to this state.
-    pub(crate) fn nts_remove_state(&mut self, state: usize) -> Option<Q> {
-        unimplemented!("This method is not yet implemented")
-    }
-
-    fn edge_position(&self, from: usize, matcher: impl Matcher<A::Expression>) -> Option<usize> {
-        let mut idx = self.states.get(from)?.first_edge?;
-        loop {
-            // FIXME: Make this be a match
-            if matcher.matches((&self.edges[idx]).expression()) {
-                return Some(idx);
-            }
-            idx = self.edges[idx].next?;
-        }
-    }
-    fn remove_edge(
-        &mut self,
-        from: usize,
-        idx: usize,
-    ) -> &LinkedListTransitionSystemEdge<A::Expression, C> {
-        assert!(idx < self.edges.len());
-
-        let pred = self.edges[idx].prev;
-        let succ = self.edges[idx].next;
-
-        if self.states[from].first_edge == Some(idx) {
-            assert!(pred.is_none());
-            self.states[from].first_edge = succ;
-        } else {
-            assert!(
-                pred.is_some(),
-                "This must exist, otherwise we would be first edge"
-            );
-            if succ.is_some() {
-                self.edges[succ.unwrap()].prev = pred;
-            }
-            self.edges[pred.unwrap()].next = succ;
-        }
-
-        &self.edges[idx]
-    }
-
-    /// Builds a new non-deterministic transition system for the given alphabet with a specified capacity.
-    pub fn with_capacity(alphabet: A, cap: usize) -> Self {
-        Self {
-            alphabet,
-            states: Vec::with_capacity(cap),
-            edges: Vec::with_capacity(cap),
-        }
-    }
-
-    /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
-    pub fn into_deterministic(self) -> LinkedListTransitionSystem<A, Q, C> {
-        match self.try_into_deterministic() {
-            Ok(ts) => ts,
-            Err(ts) => {
-                tracing::error!("Tried to convert non-deterministic transition system to deterministic one\n{:?}", ts);
-                panic!("This transition system is not deterministic");
-            }
-        }
-    }
-
-    /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
-    pub fn try_into_deterministic(self) -> Result<LinkedListTransitionSystem<A, Q, C, true>, Self> {
-        if DET {
-            if !self.is_deterministic() {
-                tracing::error!("Tried to convert non-deterministic transition system to deterministic one\n{:?}", self);
-                panic!("This transition system is not deterministic");
-            }
-            Ok(recast(self))
-        } else if self.is_deterministic() {
-            Ok(recast(self))
-        } else {
-            Err(self)
-        }
-    }
-
-    pub fn into_nondeterministic(self) -> LinkedListNondeterministic<A, Q, C> {
-        recast(self)
-    }
-
-    fn first_edge(&self, idx: usize) -> Option<usize> {
-        self.states.get(idx)?.first_edge
-    }
-
-    fn last_edge(&self, idx: usize) -> Option<usize> {
-        let mut current = self.states.get(idx)?.first_edge?;
-        loop {
-            assert!(
-                current < self.edges.len(),
-                "Edge with id {current} does not exist"
-            );
-            if let Some(x) = self.edges[current].next {
-                current = x;
-            } else {
-                return Some(current);
-            }
-        }
-    }
-
-    /// Builds a new [`NTS`] from its constituent parts.
-    pub fn from_parts(
-        alphabet: A,
-        states: Vec<LinkedListTransitionSystemState<Q>>,
-        edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
-    ) -> Self {
-        Self {
-            alphabet,
-            states,
-            edges,
-        }
-    }
-
-    /// Decomposes `self` into a tuple of its constituents.
-    pub fn into_parts(self) -> IntoLinkedListNondeterministic<Self> {
-        (self.alphabet, self.states, self.edges)
-    }
-}
-
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
-    type StateIndex = usize;
+    type StateIndex = DefaultIdType;
 
     type StateColor = Q;
 
@@ -351,7 +517,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     where
         Self: 'this;
 
-    type StateIndices<'this> = std::ops::Range<usize>
+    type StateIndices<'this> = LinkedStateIndices<'this, Q>
     where
         Self: 'this;
 
@@ -362,22 +528,42 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     }
 
     fn state_indices(&self) -> Self::StateIndices<'_> {
-        0..self.states.len()
+        LinkedStateIndices(&self.states, 0)
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        Some(NTSEdgesFromIter::new(&self.edges, self.first_edge(state)))
+        Some(NTSEdgesFromIter::new(
+            &self.edges,
+            self.first_out_edge(state.into_usize()),
+        ))
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        if state >= self.states.len() {
+        if state.into_usize() >= self.states.len() {
             panic!(
                 "index {state} is out of bounds, there are only {} states",
                 self.states.len()
             );
         }
-        assert!(state < self.states.len());
-        self.states.get(state).map(|x| x.color.clone())
+        assert!(state.into_usize() < self.states.len());
+        self.states
+            .get(state.into_usize())
+            .map(|x| x.color().unwrap().clone())
+    }
+}
+
+pub struct LinkedStateIndices<'ts, Q: Color>(&'ts [LinkedListTransitionSystemState<Q>], usize);
+
+impl<'ts, Q: Color> Iterator for LinkedStateIndices<'ts, Q> {
+    type Item = DefaultIdType;
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(state) = self.0.get(self.1) {
+            self.1 += 1;
+            if state.is_occupied() {
+                return Some(ScalarIndexType::from_usize(self.1 - 1));
+            }
+        }
+        None
     }
 }
 
@@ -389,6 +575,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A>
             alphabet,
             states: vec![],
             edges: vec![],
+            vacant: None,
         }
     }
 
@@ -397,6 +584,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A>
             alphabet: from,
             states: Vec::with_capacity(size_hint),
             edges: vec![],
+            vacant: None,
         }
     }
 }
@@ -413,9 +601,12 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
         Self: 'this;
 
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
-        assert!(state < self.states.len());
+        assert!(state.into_usize() < self.states.len());
 
-        Some(LinkedListTransitionSystemEdgesToIter::new(self, state))
+        Some(LinkedListTransitionSystemEdgesToIter::new(
+            self,
+            state.into_usize(),
+        ))
     }
 }
 
@@ -428,15 +619,20 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const 
         }
 
         self.states.iter().zip(other.states.iter()).all(|(x, y)| {
-            if x.color != y.color {
+            if x.is_vacant() || y.is_vacant() {
+                return false;
+            }
+            if x.color() != y.color() {
                 return false;
             }
             let edges = x
                 .edges_from_iter(&self.edges)
+                .expect("the state exists")
                 .map(|e| (&e.expression, &e.color, e.target))
                 .collect::<Set<_>>();
 
             y.edges_from_iter(&other.edges)
+                .expect("state exists")
                 .all(|e| edges.contains(&(&e.expression, &e.color, e.target)))
         })
     }
@@ -454,7 +650,10 @@ impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color, const DET: bool> std::fm
         writeln!(f, "alphabet: {:?}", self.alphabet)?;
         for (i, state) in self.states.iter().enumerate() {
             writeln!(f, "state {}: {:?}", i, state)?;
-            for edge in self.edges_from(i).unwrap() {
+            for edge in self
+                .edges_from(<StateIndex<Self> as ScalarIndexType>::from_usize(i))
+                .unwrap()
+            {
                 writeln!(f, "  {:?}", edge)?;
             }
         }
@@ -472,17 +671,25 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
         alphabet,
         states,
         edges,
+        vacant,
     } = ts;
     LinkedListTransitionSystem {
         alphabet,
         states,
         edges,
+        vacant,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::TSBuilder;
+    use automata_core::alphabet::CharAlphabet;
+
+    use crate::{
+        prelude::{Deterministic, ForAlphabet, Sproutable, TSBuilder},
+        transition_system::LinkedListDeterministic,
+        TransitionSystem,
+    };
 
     #[test]
     fn dts_equality() {
@@ -505,5 +712,26 @@ mod tests {
             ])
             .into_dts();
         assert!(first == second, "equality should disregard order of edges");
+    }
+
+    #[test]
+    fn remove_edge() {
+        let mut ts = LinkedListDeterministic::for_alphabet(CharAlphabet::of_size(2));
+
+        ts.add_state(0);
+        ts.add_state(1);
+        ts.add_edge((0, 'a', 1));
+        ts.add_edge((1, 'a', 0));
+        ts.add_edge((0, 'b', 0));
+        ts.add_edge((1, 'b', 1));
+
+        assert!(ts.swap_remove_edge(0).is_some());
+        assert_eq!(ts.successor_index(0, 'a'), None);
+
+        assert_eq!(ts.add_edge((0, 'a', 0)), None);
+        assert_eq!(
+            ts.reachable_state_indices_from(0).collect::<Vec<_>>(),
+            vec![0]
+        );
     }
 }
