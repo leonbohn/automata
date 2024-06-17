@@ -85,7 +85,7 @@ impl<S: Symbol, W: LinearWord<S> + ?Sized> LinearWord<S> for &W {
 /// Stores a reference to the iterated word as well as a start and end position. When `next` is called,
 /// we check if the start position is strictly smaller than the end position, and if so, we return the symbol at
 /// the start position and increment it. Otherwise, we return `None`.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ConsumingInfixIterator<'a, S: Symbol, W: LinearWord<S>> {
     word: &'a W,
     start: usize,
@@ -161,5 +161,13 @@ mod tests {
         let w = upw!("a", "bbbb");
         let ww = upw!("ab", "b");
         assert_eq!(w.prefix(6).collect_vec(), ww.prefix(6).collect_vec());
+    }
+
+    #[test_log::test]
+    fn bug_upw() {
+        let first = upw!("baa", "ba");
+        assert_eq!(first, upw!("ba", "ab"));
+        let second = upw!("bab", "ab");
+        assert_eq!(second, upw!("ba"));
     }
 }
