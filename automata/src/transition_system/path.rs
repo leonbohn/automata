@@ -11,7 +11,7 @@ use crate::prelude::*;
 /// the symbol that is taken and the color of the transition. The path also stores the colors of all states
 /// that are visited by the path. Finally, we store the index of the state that is reached by the path separately.
 /// This is done to allow for efficient extension of the path. Also we know that there can be no empty paths.
-#[derive(Clone, PartialEq, Hash)]
+#[derive(Clone, PartialEq, Hash, Eq)]
 pub struct Path<A: Alphabet, Idx, Q, C> {
     end: Idx,
     state_colors: Vec<Q>,
@@ -263,7 +263,7 @@ impl<A: Alphabet, Idx: IndexType, Q: Show, C: Show> Show for Path<A, Idx, Q, C> 
 }
 
 /// A lasso represents an infinite path, which after it ends loops back to some previous position.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Lasso<A: Alphabet, Idx, Q, C> {
     base: Path<A, Idx, Q, C>,
     cycle: Path<A, Idx, Q, C>,
