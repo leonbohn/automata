@@ -147,7 +147,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
         ts
     }
 
-    /// Creates an instance of a non-deterministic [`GraphTs`] from `self`.
+    /// Creates an instance of a non-deterministic [`TS`] from `self`.
     pub fn into_ts<const DOUT: bool>(self) -> TS<CharAlphabet, Q, C, DOUT> {
         let alphabet =
             CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));

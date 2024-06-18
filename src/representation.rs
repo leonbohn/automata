@@ -10,6 +10,7 @@ impl<T: TransitionSystem> StateColored<StateColor<T>> for T {}
 pub trait EdgeColored<C: Color = Int> {}
 impl<T: TransitionSystem> EdgeColored<EdgeColor<T>> for T {}
 
+#[allow(clippy::type_complexity)]
 pub trait CollectTs: TransitionSystem {
     fn collect_dts(&self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
         self.collect_dts_preserving().unzip_state_color()
@@ -45,7 +46,6 @@ pub trait CollectTs: TransitionSystem {
     /// Collects into a transition system of type `Ts`, but only considers states that
     /// are reachable from the initial state. Naturally, this means that `self` must
     /// be a pointed transition system.
-    #[allow(clippy::type_complexity)]
     fn trim_collect_pointed(
         &self,
     ) -> (
@@ -102,6 +102,7 @@ pub trait CollectTs: TransitionSystem {
 }
 impl<Ts: TransitionSystem> CollectTs for Ts {}
 
+#[allow(clippy::type_complexity)]
 pub trait IntoTs: TransitionSystem {
     fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
         self.into_dts_preserving().unzip_state_color()
@@ -131,7 +132,6 @@ pub trait IntoTs: TransitionSystem {
         (preserving.unzip_state_color(), new_initial)
     }
 
-    #[allow(clippy::type_complexity)]
     fn into_dts_preserving(
         self,
     ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>>;
