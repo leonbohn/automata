@@ -5,7 +5,7 @@ use super::{LinkedListTransitionSystem, LinkedListTransitionSystemEdge};
 
 /// Stores information characterizing a state in a non-deterministic transition system, see [`NTS`].
 /// It stores a color and a pointer to the index of the first edge leaving the state.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum LinkedListTransitionSystemState<Q> {
     Occupied(Q, Option<usize>, Option<usize>),
     Vacant(Option<usize>, Option<usize>),
@@ -202,6 +202,17 @@ impl<'a, E, C, const DET: bool> LinkedListTransitionSystemEdgesToIter<'a, E, C, 
         Self {
             edges: nts.edges.iter(),
             target,
+        }
+    }
+}
+
+impl<Q: Debug> Debug for LinkedListTransitionSystemState<Q> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Vacant(prev, next) => write!(f, "Vacant[{:?}|{:?}]", prev, next),
+            Occupied(c, first_out, first_in) => {
+                write!(f, "Occupied[out:{first_out:?}|in:{first_in:?}]")
+            }
         }
     }
 }

@@ -6,7 +6,7 @@ use super::LinkedListTransitionSystem;
 /// Represents an edge in a non-deterministic transition system, see [`NTS`]. It stores a color, an
 /// expression, as well as a source and target state index. Moreover, it stores the indices of the
 /// next and previous edge in the list of edges leaving the source state.
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct LinkedListTransitionSystemEdge<E, C> {
     pub(super) out_prev: Option<usize>,
     pub(super) in_prev: Option<usize>,
@@ -35,6 +35,25 @@ impl<E, C> LinkedListTransitionSystemEdge<E, C> {
             in_next: self.in_next,
         }
     }
+
+    pub fn borrowed_tuple<Idx: ScalarIndexType>(&self) -> (Idx, &E, &C, Idx) {
+        (
+            Idx::from_usize(self.source),
+            &self.expression,
+            &self.color,
+            Idx::from_usize(self.target),
+        )
+    }
+
+    pub fn into_tuple<Idx: ScalarIndexType>(self) -> (Idx, E, C, Idx) {
+        (
+            Idx::from_usize(self.source),
+            self.expression,
+            self.color,
+            Idx::from_usize(self.target),
+        )
+    }
+
     /// Creates a new edge with the given source, expression, color and target. The pointers
     /// to the next and previous edge are set to `None`.
     pub fn new(source: DefaultIdType, expression: E, color: C, target: DefaultIdType) -> Self {
@@ -146,5 +165,22 @@ impl<'a, E, C: Clone> IsEdge<'a, E, DefaultIdType, C> for &'a LinkedListTransiti
 
     fn source(&self) -> DefaultIdType {
         self.source.try_into().unwrap()
+    }
+}
+
+impl<E: Debug, C: Debug> Debug for LinkedListTransitionSystemEdge<E, C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "LinkedEdge {{ {} --{:?}|{:?}--> {}   out[{:?}|{:?}], in[{:?}|{:?}] }}",
+            self.source,
+            self.expression,
+            self.color,
+            self.target,
+            self.out_prev,
+            self.out_next,
+            self.in_prev,
+            self.in_next
+        )
     }
 }

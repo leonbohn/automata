@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
-use crate::{math::Set, prelude::*};
+use crate::{math::Set, prelude::*, transition_system::EdgeTuple};
 use itertools::Itertools;
 
 mod linked_state;
@@ -142,10 +142,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         out
     }
 
-    fn swap_remove_edge(
-        &mut self,
-        id: usize,
-    ) -> Option<LinkedListTransitionSystemEdge<A::Expression, C>> {
+    fn swap_remove_edge(&mut self, id: usize) -> Option<EdgeTuple<Self>> {
         if id >= self.edges.len() {
             warn!("tried to remove edge {id} which is not in rante");
             return None;
@@ -154,15 +151,12 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         if let Some(in_prev) = self.edges[id].in_prev {
             self.edges[in_prev].in_next = self.edges[id].in_next;
         } else {
-            // there is no predecessor, so we should update the first_out_edge
-            assert_eq!(
-                self.states[self.edges[id].target].first_out_edge(),
-                Some(id)
-            );
+            // there is no predecessor, so we should update the first_in_edge
+            assert_eq!(self.states[self.edges[id].target].first_in_edge(), Some(id));
             self.states
                 .get_mut(self.edges[id].target)
                 .unwrap()
-                .set_first_out_edge(self.edges[id].in_next);
+                .set_first_in_edge(self.edges[id].in_next);
         }
         if let Some(in_next) = self.edges[id].in_next {
             self.edges[in_next].in_prev = self.edges[id].in_prev;
@@ -172,18 +166,72 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
             self.edges[out_prev].out_next = self.edges[id].out_next;
         } else {
             // there is no predecessor, so we should update the first_out_edge
-            assert_eq!(self.states[self.edges[id].target].first_in_edge(), Some(id));
+            assert_eq!(
+                self.states[self.edges[id].source].first_out_edge(),
+                Some(id)
+            );
             self.states
-                .get_mut(self.edges[id].target)
+                .get_mut(self.edges[id].source)
                 .unwrap()
-                .set_first_in_edge(self.edges[id].out_next);
+                .set_first_out_edge(self.edges[id].out_next);
         }
 
         if let Some(out_next) = self.edges[id].out_next {
             self.edges[out_next].out_prev = self.edges[id].out_prev;
         }
 
-        Some(self.edges.swap_remove(id))
+        // fix pointers if edge that is swapped in was first in list
+        let swapped_in = self.edges.len() - 1;
+        if let Some(prev) = self.edges[swapped_in].in_prev {
+            self.edges[prev].in_next = Some(id);
+        } else {
+            let q = self.edges[swapped_in].target;
+            assert!(q < self.states.len());
+            self.states[q].set_first_in_edge(Some(id));
+        }
+        if let Some(prev) = self.edges[swapped_in].out_prev {
+            self.edges[prev].out_next = Some(id)
+        } else {
+            let q = self.edges[swapped_in].source;
+            assert!(q < self.states.len());
+            self.states[q].set_first_out_edge(Some(id));
+        }
+
+        if let Some(next) = self.edges[swapped_in].in_next {
+            assert!(self.edges[next].in_prev.is_some());
+            self.edges[next].in_prev = Some(id)
+        }
+        if let Some(next) = self.edges[swapped_in].out_next {
+            assert!(self.edges[next].out_prev.is_some());
+            self.edges[next].out_prev = Some(id)
+        }
+
+        Some(self.edges.swap_remove(id).into_tuple())
+    }
+
+    /// Applies the given function `f` to every edge and removes those for which `true` is
+    /// returned.
+    pub fn filter_swap_remove_edges<F>(&mut self, f: F) -> Vec<EdgeTuple<Self>>
+    where
+        F: Fn(StateIndex<Self>, &EdgeExpression<Self>, &EdgeColor<Self>, StateIndex<Self>) -> bool,
+    {
+        let mut i = 0;
+        let mut removed = vec![];
+        while i < self.edges.len() {
+            let (q, e, c, p) = self.edges[i].borrowed_tuple();
+            if !f(q, e, c, p) {
+                // we keep the edge and go to next one
+                i += 1;
+                continue;
+            }
+            // we do not keep the edge. swap remove it and do not increment
+            // i as the swapped in edge needs to be checked as well.
+            removed.push(
+                self.swap_remove_edge(i)
+                    .expect("should be able to remove edge that exists"),
+            );
+        }
+        removed
     }
 
     fn out_edge_position(
@@ -428,19 +476,18 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
 {
     fn remove_edges_from_matching(
         &mut self,
-        from: StateIndex<Self>,
+        source: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        let mut out = vec![];
-        let from = from.into_usize();
-        while let Some(pos) = self.out_edge_position(from, &matcher) {
-            let edge = self.swap_remove_edge(pos).expect("unable to remove edge");
-            out.push(IntoEdgeTuple::<Self>::into_edge_tuple(edge));
+        let id = source.into_usize();
+        if id >= self.states.len() || self.states[id].is_vacant() {
+            trace!("cannot remove edges from state that does not exist");
+            return None;
         }
-        Some(out)
+        Some(self.filter_swap_remove_edges(|q, e, _, _| q == source && matcher.matches(e)))
     }
     fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        todo!()
+        self.linked_remove_state(state.into_usize())
     }
 
     fn remove_edges_between_matching(
@@ -449,7 +496,19 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
         target: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        todo!()
+        let id = source.into_usize();
+        if id >= self.states.len() || self.states[id].is_vacant() {
+            trace!("cannot remove edges from state that does not exist");
+            return None;
+        }
+        let id = target.into_usize();
+        if id >= self.states.len() || self.states[id].is_vacant() {
+            trace!("cannot remove edges to state that does not exist");
+            return None;
+        }
+        Some(self.filter_swap_remove_edges(|q, e, _, p| {
+            q == source && p == target && matcher.matches(e)
+        }))
     }
 
     fn remove_edges_between(
@@ -457,21 +516,41 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
         source: StateIndex<Self>,
         target: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        todo!()
+        let id = source.into_usize();
+        if id >= self.states.len() || self.states[id].is_vacant() {
+            trace!("cannot remove edges from state that does not exist");
+            return None;
+        }
+        let id = target.into_usize();
+        if id >= self.states.len() || self.states[id].is_vacant() {
+            trace!("cannot remove edges to state that does not exist");
+            return None;
+        }
+        Some(self.filter_swap_remove_edges(|q, _, _, p| q == source && p == target))
     }
 
     fn remove_edges_from(
         &mut self,
         source: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        todo!()
+        let id = source.into_usize();
+        if id >= self.states.len() || self.states[id].is_vacant() {
+            trace!("cannot remove edges from state that does not exist");
+            return None;
+        }
+        Some(self.filter_swap_remove_edges(|q, _, _, _| q == source))
     }
 
     fn remove_edges_to(
         &mut self,
         target: StateIndex<Self>,
     ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
-        todo!()
+        let id = target.into_usize();
+        if id >= self.states.len() || self.states[id].is_vacant() {
+            trace!("cannot remove edges to state that does not exist");
+            return None;
+        }
+        Some(self.filter_swap_remove_edges(|_, _, _, p| p == target))
     }
 }
 
@@ -649,13 +728,10 @@ impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color, const DET: bool> std::fm
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "alphabet: {:?}", self.alphabet)?;
         for (i, state) in self.states.iter().enumerate() {
-            writeln!(f, "state {}: {:?}", i, state)?;
-            for edge in self
-                .edges_from(<StateIndex<Self> as ScalarIndexType>::from_usize(i))
-                .unwrap()
-            {
-                writeln!(f, "  {:?}", edge)?;
-            }
+            writeln!(f, "Q[{i}]: {state:?}")?;
+        }
+        for (i, edge) in self.edges.iter().enumerate() {
+            writeln!(f, "E[{i}]: {edge:?}")?;
         }
         Ok(())
     }
