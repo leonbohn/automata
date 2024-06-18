@@ -4,10 +4,10 @@ use itertools::Itertools;
 
 use crate::prelude::{Show, Symbol};
 
-use super::{omega::OmegaIteration, Concat, LinearWord, PeriodicOmegaWord};
+use super::{omega::OmegaIteration, Concat, PeriodicOmegaWord, Word};
 
 /// A finite word is a [`LinearWord`] that has a finite length.
-pub trait FiniteWord<S>: LinearWord<S> {
+pub trait FiniteWord<S>: Word<S> {
     /// Type for an iterator over the symbols making up the word.
     type Symbols<'this>: Iterator<Item = S>
     where
@@ -18,7 +18,7 @@ pub trait FiniteWord<S>: LinearWord<S> {
 
     /// Appends the given [`LinearWord`] to the end of this word. Note, that the appended
     /// suffix may be finite or infinite.
-    fn append<W: LinearWord<S>>(self, suffix: W) -> Concat<Self, W>
+    fn append<W: Word<S>>(self, suffix: W) -> Concat<Self, W>
     where
         Self: Sized,
     {
@@ -143,7 +143,8 @@ impl<S: Symbol, const N: usize> FiniteWord<S> for [S; N] {
     }
 }
 
-impl<S: Symbol, const N: usize> LinearWord<S> for [S; N] {
+impl<S: Symbol, const N: usize> Word<S> for [S; N] {
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<S> {
         self.get(position).cloned()
     }
@@ -164,7 +165,8 @@ impl<S: Symbol, Fw: FiniteWord<S> + ?Sized> FiniteWord<S> for &Fw {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for VecDeque<S> {
+impl<S: Symbol> Word<S> for VecDeque<S> {
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {
             Some(self[position])
@@ -188,7 +190,8 @@ impl<S: Symbol> FiniteWord<S> for VecDeque<S> {
     }
 }
 
-impl LinearWord<char> for str {
+impl Word<char> for str {
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<char> {
         self.chars().nth(position)
     }
@@ -209,7 +212,8 @@ impl FiniteWord<char> for str {
     }
 }
 
-impl LinearWord<char> for String {
+impl Word<char> for String {
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<char> {
         self.chars().nth(position)
     }
@@ -237,7 +241,8 @@ impl FiniteWord<char> for String {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for Vec<S> {
+impl<S: Symbol> Word<S> for Vec<S> {
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {
             Some(self[position])
@@ -267,7 +272,8 @@ impl<S: Symbol> FiniteWord<S> for Vec<S> {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for [S] {
+impl<S: Symbol> Word<S> for [S] {
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {
             Some(self[position])

@@ -2,14 +2,15 @@ use std::hash::Hash;
 
 use crate::prelude::Symbol;
 
-use super::{FiniteWord, LinearWord, OmegaWord};
+use super::{FiniteWord, OmegaWord, Word};
 
 /// Concatenates two words. This operation is really only sensible when the first word
 /// is of finite length.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Concat<X, Y>(pub X, pub Y);
 
-impl<S: Symbol, X: FiniteWord<S>, Y: LinearWord<S>> LinearWord<S> for Concat<X, Y> {
+impl<S: Symbol, X: FiniteWord<S>, Y: Word<S>> Word<S> for Concat<X, Y> {
+    const FINITE: bool = Y::FINITE;
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.0.len() {
             self.0.nth(position)

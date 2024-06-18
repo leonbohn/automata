@@ -21,7 +21,9 @@ pub use self::skip::Infix;
 
 /// A linear word is a word that can be indexed by a `usize`. This is the case for both finite and
 /// infinite words.
-pub trait LinearWord<S>: Hash + Eq {
+pub trait Word<S>: Hash + Eq {
+    const FINITE: bool;
+
     /// Returns the symbol at the given `position` in `self`, if it exists.
     fn nth(&self, position: usize) -> Option<S>;
 
@@ -74,7 +76,8 @@ pub trait LinearWord<S>: Hash + Eq {
     }
 }
 
-impl<S: Symbol, W: LinearWord<S> + ?Sized> LinearWord<S> for &W {
+impl<S: Symbol, W: Word<S> + ?Sized> Word<S> for &W {
+    const FINITE: bool = W::FINITE;
     fn nth(&self, position: usize) -> Option<S> {
         W::nth(self, position)
     }
@@ -86,20 +89,21 @@ impl<S: Symbol, W: LinearWord<S> + ?Sized> LinearWord<S> for &W {
 /// we check if the start position is strictly smaller than the end position, and if so, we return the symbol at
 /// the start position and increment it. Otherwise, we return `None`.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct ConsumingInfixIterator<'a, S: Symbol, W: LinearWord<S>> {
+pub struct ConsumingInfixIterator<'a, S: Symbol, W: Word<S>> {
     word: &'a W,
     start: usize,
     end: usize,
     _marker: std::marker::PhantomData<S>,
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for ConsumingInfixIterator<'a, S, W> {
+impl<'a, S: Symbol, W: Word<S>> Word<S> for ConsumingInfixIterator<'a, S, W> {
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<S> {
         self.word.nth(self.start + position)
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> Iterator for ConsumingInfixIterator<'a, S, W> {
+impl<'a, S: Symbol, W: Word<S>> Iterator for ConsumingInfixIterator<'a, S, W> {
     type Item = S;
     fn next(&mut self) -> Option<Self::Item> {
         if self.start < self.end {
@@ -112,7 +116,7 @@ impl<'a, S: Symbol, W: LinearWord<S>> Iterator for ConsumingInfixIterator<'a, S,
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> ConsumingInfixIterator<'a, S, W> {
+impl<'a, S: Symbol, W: Word<S>> ConsumingInfixIterator<'a, S, W> {
     /// Creates a new [`ConsumingInfixIterator`] object from a reference to a word and a start and end position.
     pub fn new(word: &'a W, start: usize, end: usize) -> Self {
         Self {
@@ -154,7 +158,7 @@ macro_rules! upw {
 
 #[cfg(test)]
 mod tests {
-    use crate::word::{FiniteWord, LinearWord};
+    use crate::word::{FiniteWord, Word};
 
     #[test]
     fn macro_upw() {

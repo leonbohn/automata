@@ -35,7 +35,6 @@ pub mod prelude {
     pub use crate::alphabet::{Alphabet, CharAlphabet, Expression, Matcher, Symbol};
     pub use crate::upw;
     pub use crate::word::{
-        self, FiniteWord, LinearWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord,
-        ReducedOmegaWord,
+        self, FiniteWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, Word,
     };
 }

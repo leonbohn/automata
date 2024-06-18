@@ -2,19 +2,19 @@ use std::marker::PhantomData;
 
 use crate::prelude::Symbol;
 
-use super::{ConsumingInfixIterator, FiniteWord, LinearWord, OmegaWord, ReducedOmegaWord};
+use super::{ConsumingInfixIterator, FiniteWord, OmegaWord, Word};
 
 /// A suffix of a [`LinearWord`] which skips a fixed number of symbols. If the underlying
 /// word is infinite, the suffix is also infinite. If the underlying word is finite, the suffix
 /// is also finite.
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
-pub struct Skip<'a, S, W: LinearWord<S>> {
+pub struct Skip<'a, S, W: Word<S>> {
     sequence: &'a W,
     offset: usize,
     _marker: std::marker::PhantomData<S>,
 }
 
-impl<'a, S, W: LinearWord<S>> Skip<'a, S, W> {
+impl<'a, S, W: Word<S>> Skip<'a, S, W> {
     /// Creates a new suffix, which skips the first `offset` symbols of the given sequence.
     pub fn new(sequence: &'a W, offset: usize) -> Self {
         Self {
@@ -25,7 +25,8 @@ impl<'a, S, W: LinearWord<S>> Skip<'a, S, W> {
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Skip<'a, S, W> {
+impl<'a, S: Symbol, W: Word<S>> Word<S> for Skip<'a, S, W> {
+    const FINITE: bool = W::FINITE;
     fn nth(&self, position: usize) -> Option<S> {
         self.sequence.nth(self.offset + position)
     }
@@ -52,7 +53,8 @@ impl<'a, S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Skip<'a, S, W> {
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
 pub struct Rotated<W>(pub W, pub usize);
 
-impl<S: Symbol, W: FiniteWord<S>> LinearWord<S> for Rotated<W> {
+impl<S: Symbol, W: FiniteWord<S>> Word<S> for Rotated<W> {
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<S> {
         self.0.nth((position + self.1) % self.0.len())
     }
@@ -170,14 +172,14 @@ impl<'a, S: Symbol, W: OmegaWord<S>> OmegaWord<S> for Skip<'a, S, W> {
 /// original word. It is specified by a starting position and a length, and stores a reference
 /// to the underlying word.
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
-pub struct Infix<'a, S, W: LinearWord<S> + ?Sized> {
+pub struct Infix<'a, S, W: Word<S> + ?Sized> {
     sequence: &'a W,
     offset: usize,
     length: usize,
     _marker: std::marker::PhantomData<S>,
 }
 
-impl<'a, S, W: LinearWord<S> + ?Sized> Infix<'a, S, W> {
+impl<'a, S, W: Word<S> + ?Sized> Infix<'a, S, W> {
     /// Creates a new suffix, which skips the first `offset` symbols of the given sequence.
     pub fn new(sequence: &'a W, offset: usize, length: usize) -> Self {
         Self {
@@ -189,7 +191,8 @@ impl<'a, S, W: LinearWord<S> + ?Sized> Infix<'a, S, W> {
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Infix<'a, S, W> {
+impl<'a, S: Symbol, W: Word<S>> Word<S> for Infix<'a, S, W> {
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.length {
             self.sequence.nth(self.offset + position)
@@ -199,7 +202,7 @@ impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Infix<'a, S, W> {
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> FiniteWord<S> for Infix<'a, S, W> {
+impl<'a, S: Symbol, W: Word<S>> FiniteWord<S> for Infix<'a, S, W> {
     type Symbols<'this> = ConsumingInfixIterator<'this, S, W>
     where
         Self: 'this;
@@ -226,7 +229,7 @@ mod tests {
 
     use crate::{
         upw,
-        word::{FiniteWord, LinearWord, OmegaWord, ReducedOmegaWord},
+        word::{FiniteWord, OmegaWord, ReducedOmegaWord, Word},
     };
 
     #[test]

@@ -72,7 +72,8 @@ impl<T: TransitionSystem> std::ops::DerefMut for MinimalRepresentative<T> {
     }
 }
 
-impl<T: TransitionSystem> LinearWord<SymbolOf<T>> for MinimalRepresentative<T> {
+impl<T: TransitionSystem> Word<SymbolOf<T>> for MinimalRepresentative<T> {
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<SymbolOf<T>> {
         self.0.get(position).copied()
     }
