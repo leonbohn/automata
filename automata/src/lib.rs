@@ -37,7 +37,7 @@ pub mod prelude {
             impls::DefaultIdType,
             operations::{DefaultIfMissing, Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
-            run::{FiniteRun, OmegaRun},
+            run::{FiniteRunResult, OmegaRunResult},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, ForAlphabet,
             IndexType, IntoEdgeTuple, IsEdge, Path, ScalarIndexType, Shrinkable, Sproutable,
             StateColor, StateIndex, SymbolOf, TSBuilder, TransitionSystem,

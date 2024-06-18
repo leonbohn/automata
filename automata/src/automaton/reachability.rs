@@ -23,7 +23,7 @@ impl<C> Semantics<bool, C> for ReachabilityCondition {
 impl<C> FiniteSemantics<bool, C> for ReachabilityCondition {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
-        R: FiniteRun<StateColor = bool, EdgeColor = C>,
+        R: FiniteRunResult<StateColor = bool, EdgeColor = C>,
     {
         run.state_colors()
             .and_then(|colors| colors.last())

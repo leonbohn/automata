@@ -86,8 +86,15 @@ pub trait TransitionSystem: Sized {
     where
         Self: 'this;
 
+    /// Returns an iterator over the transitions that start in the given `state`. If the state does
+    /// not exist, `None` is returned.
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>>;
+
     /// Returns a reference to the alphabet of `self`.
     fn alphabet(&self) -> &Self::Alphabet;
+
+    /// Returns an iterator over the state indices of `self`.
+    fn state_indices(&self) -> Self::StateIndices<'_>;
 
     /// Calls the [`Alphabet::universe`] method on the alphabet of `self`, returning
     /// an iterator of all symbols.
@@ -101,9 +108,6 @@ pub trait TransitionSystem: Sized {
     fn state_indices_vec(&self) -> Vec<Self::StateIndex> {
         self.state_indices().collect()
     }
-
-    /// Returns an iterator over the state indices of `self`.
-    fn state_indices(&self) -> Self::StateIndices<'_>;
 
     /// Returns true if the transition system has no states.
     fn is_stateless(&self) -> bool {
@@ -182,10 +186,6 @@ pub trait TransitionSystem: Sized {
     {
         self.edge_colors().unique()
     }
-
-    /// Returns an iterator over the transitions that start in the given `state`. If the state does
-    /// not exist, `None` is returned.
-    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>>;
 
     /// Returns an iterator over all transitions that start in the given `state` and whose expression
     /// matches the given `sym`. If the state does not exist, `None` is returned.

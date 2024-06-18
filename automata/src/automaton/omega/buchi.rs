@@ -19,7 +19,7 @@ impl<Q> Semantics<Q, bool> for BuchiCondition {
 impl<Q> OmegaSemantics<Q, bool> for BuchiCondition {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
-        R: OmegaRun<StateColor = Q, EdgeColor = bool>,
+        R: OmegaRunResult<StateColor = Q, EdgeColor = bool>,
     {
         run.recurring_edge_colors_iter()
             .map(|mut colors| colors.any(|b| b))

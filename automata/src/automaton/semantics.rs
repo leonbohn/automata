@@ -47,7 +47,7 @@ pub trait FiniteSemantics<Q, C>: Semantics<Q, C> {
     /// Compute the output for the given finite run.
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
-        R: FiniteRun<StateColor = Q, EdgeColor = C>;
+        R: FiniteRunResult<StateColor = Q, EdgeColor = C>;
 }
 
 /// This trait is implemented by acceptance conditions for omega words.
@@ -56,5 +56,5 @@ pub trait OmegaSemantics<Q, C>: Semantics<Q, C> {
     /// Compute the output for the given omega run.
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
-        R: OmegaRun<StateColor = Q, EdgeColor = C>;
+        R: OmegaRunResult<StateColor = Q, EdgeColor = C>;
 }
