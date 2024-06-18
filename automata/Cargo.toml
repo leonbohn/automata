@@ -27,8 +27,8 @@ bimap = { workspace = true }
 rand = { workspace = true }
 
 automata-core = { version = "0.1.0", path = "../automata-core" }
-
 hoars = { version = "0.2.0", optional = true, path = "../hoars" }
+
 tabled = { version = "0.15", features = ["ansi"] }
 owo-colors = "4.0"
 test-log = { version = "0.2", features = ["trace"] }
@@ -37,16 +37,9 @@ bit-set = "0.5"
 clap = { version = "4.5", optional = true }
 rand_distr = { version = "0.4.3", optional = true }
 
-petgraph = { path = "../../petgraph", default-features = false, optional = true, features = [
-    "stable_graph",
-] } # default backend
-# experimental backend sometime?
-# gryf = { git = "https://github.com/pnevyk/gryf", rev = "1efd3a2", optional = true }
-
 [features]
 default = ["hoa", "graphviz", "random"]
 random = ["dep:rand_distr"]
 hoa = ["dep:hoars"]
 graphviz = ["dep:tempfile"]
 implementations = []
-petgraph = ["dep:petgraph"]
