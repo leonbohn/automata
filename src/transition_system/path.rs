@@ -187,7 +187,7 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
         )
     }
 
-    /// Returns an iterator over the transitions in the form (src, symbol, target, color)
+    /// Returns an iterator over the transitions in the form (src, symbol, color, target)
     pub fn transitions(&self) -> impl Iterator<Item = Edge<A::Symbol, Idx, C>> + '_ {
         if let Some(last) = self.transitions.last() {
             Either::Left(
@@ -207,7 +207,7 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
         }
     }
 
-    /// Consumes `self` and returns an iterator over the transitions in the form (src, symbol, target, color)
+    /// Consumes `self` and returns an iterator over the transitions in the form (src, symbol, color, target)
     pub fn into_transitions(self) -> impl Iterator<Item = Edge<A::Symbol, Idx, C>> {
         if let Some(last) = self.transitions.last().cloned() {
             Either::Left(
