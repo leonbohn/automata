@@ -7,7 +7,7 @@ use itertools::Itertools;
 
 use crate::prelude::*;
 
-use super::LinearWord;
+use super::Word;
 
 /// Represents the normalization of an [`OmegaWord`] with regard to a transition system `T`. For an ultimately periodic word
 /// `ux^ω`, we say that `T` is normalized if `u` and `ux` lead to the same state in `T`, which means that `x` loops on the state
@@ -76,7 +76,8 @@ impl<S: Symbol> NormalizedOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for NormalizedOmegaWord<S> {
+impl<S: Symbol> Word<S> for NormalizedOmegaWord<S> {
+    const FINITE: bool = false;
     fn nth(&self, position: usize) -> Option<S> {
         self.upw.nth(position)
     }

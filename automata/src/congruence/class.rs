@@ -57,7 +57,8 @@ impl<S: Symbol> std::fmt::Display for Class<S> {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for Class<S> {
+impl<S: Symbol> Word<S> for Class<S> {
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<S> {
         self.0.get(position).cloned()
     }

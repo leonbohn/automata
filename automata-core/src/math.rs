@@ -8,6 +8,7 @@ use std::{collections::BTreeSet, hash::Hash};
 
 pub use indexmap::map;
 pub use indexmap::set;
+pub use indexmap::Equivalent;
 
 /// Type alias for sets, we use this to hide which type of `HashSet` we are actually using.
 pub type Set<S> = indexmap::IndexSet<S>;
