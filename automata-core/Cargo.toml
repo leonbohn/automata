@@ -1,10 +1,11 @@
 [package]
 name = "automata-core"
 version = "0.1.0"
+
+license = "MIT or Apache-2.0"
 edition = "2021"
-license.workspace = true
-homepage.workspace = true
-authors.workspace = true
+homepage = "https://github.com/leonbohn/automata"
+authors = ["León Bohn <bohn@lics.rwth-aachen.de>"]
 
 [dependencies]
 tracing = { workspace = true }
