@@ -78,7 +78,7 @@ impl<Q, C: Color + Ord> Semantics<Q, C> for RabinCondition<C> {
 impl<Q, C: Color + Ord> OmegaSemantics<Q, C> for RabinCondition<C> {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
-        R: OmegaRun<StateColor = Q, EdgeColor = C>,
+        R: OmegaRunResult<StateColor = Q, EdgeColor = C>,
     {
         let Some(colors) = run.recurring_edge_colors_iter() else {
             return false;

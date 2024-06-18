@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::prelude::Symbol;
 
-use super::{ConsumingInfixIterator, FiniteWord, LinearWord, OmegaWord, ReducedOmegaWord};
+use super::{ConsumingInfixIterator, FiniteWord, OmegaWord, ReducedOmegaWord, Word};
 
 /// A suffix of a [`LinearWord`] which skips a fixed number of symbols. If the underlying
 /// word is infinite, the suffix is also infinite. If the underlying word is finite, the suffix

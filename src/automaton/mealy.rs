@@ -52,8 +52,8 @@ where
     /// is taken wrapped in `Some`. If no successful run on `input` is possible, the function returns `None`.
     pub fn map<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> Option<EdgeColor<C>> {
         self.finite_run_from(self.initial, input)
-            .ok()
-            .and_then(|r| r.last_transition_color().cloned())
+            .edge_colors()?
+            .last()?
     }
 
     /// Returns a vector over all colors that can be emitted.

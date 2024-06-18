@@ -70,7 +70,7 @@ impl<Q, C: Color + Ord> Semantics<Q, C> for MullerCondition<C> {
 impl<Q, C: Color + Ord> OmegaSemantics<Q, C> for MullerCondition<C> {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
-        R: OmegaRun<StateColor = Q, EdgeColor = C>,
+        R: OmegaRunResult<StateColor = Q, EdgeColor = C>,
     {
         let Some(inf) = run
             .recurring_edge_colors_iter()

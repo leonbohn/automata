@@ -40,7 +40,7 @@ impl<Q> Semantics<Q, Int> for MinEvenParityCondition {
 impl<Q> OmegaSemantics<Q, Int> for MinEvenParityCondition {
     fn evaluate<R>(&self, run: R) -> Self::Output
     where
-        R: OmegaRun<StateColor = Q, EdgeColor = Int>,
+        R: OmegaRunResult<StateColor = Q, EdgeColor = Int>,
     {
         run.recurring_edge_colors_iter()
             .and_then(|colors| colors.min())
