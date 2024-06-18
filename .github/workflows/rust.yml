@@ -4,7 +4,7 @@ on:
   pull_request:
     branches:
       - '*'
-        
+
 jobs:
   check_build:
     name: Verify correct building
@@ -31,10 +31,9 @@ jobs:
     name: Run tests, verify documentation and formatting
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@main
-      - name: Setup Rust toolchain with caching
-        uses: brndnmtthws/rust-action@v1
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --no-self-update
+      - uses: Swatinem/rust-cache@v2
       - name: Verify correct formatting
         run: cargo fmt --all --check
       - name: Ensure that clippy is happy

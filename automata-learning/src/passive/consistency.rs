@@ -66,7 +66,7 @@ where
             let is_consistent = pos_sets_new.iter().any(|s| s.is_subset(&neg_union)).not();
             (is_consistent, pos_sets_new, neg_sets_new)
         } else {
-            // bad pair was found when runnning sample words on transition system
+            // bad pair was found when running sample words on transition system
             (false, pos_sets, neg_sets)
         }
     }
@@ -368,25 +368,20 @@ where
             (Err(path), w) => {
                 let reached = path.reached();
                 let escape_str = w.skip(path.len());
-                Either::Right((reached, escape_str))
+                Either::Right((reached, escape_str.reduced()))
             }
         });
-    let (neg_successful, neg_escaping): (Vec<_>, Vec<_>) = sample
-        .negative_words()
-        .map(|w| (ts.omega_run(w), w))
-        .partition_map(|r| match r {
-            (Ok(v), _) => Either::Left(v),
-            (Err(path), w) => {
+
+    let mut neg_successful = Vec::default();
+    for (output, w) in sample.negative_words().map(|w| (ts.omega_run(w), w)) {
+        match output {
+            Ok(v) => neg_successful.push(v),
+            Err(path) => {
                 let reached = path.reached();
-                let escape_str = w.skip(path.len());
-                Either::Right((reached, escape_str))
-            }
-        });
-    // reject if a pair escaping from the same state with the same escape string is found
-    for (pos_reached, pos_esc_str) in pos_escaping {
-        for (neg_reached, neg_esc_str) in &neg_escaping {
-            if pos_reached == *neg_reached && pos_esc_str.equals(neg_esc_str) {
-                return None;
+                let escape_prefix = w.skip(path.len()).reduced();
+                if pos_escaping.contains(&(reached, escape_prefix)) {
+                    return None;
+                }
             }
         }
     }

@@ -111,6 +111,12 @@ pub trait OmegaWord<S>: LinearWord<S> {
     fn cycle_length(&self) -> usize {
         self.cycle().len()
     }
+
+    /// Gives the length of the spoke of the word, so the number of symbols before the loop
+    /// is entered.
+    fn spoke_length(&self) -> usize {
+        self.spoke().len()
+    }
 }
 
 impl<S: Symbol, W: OmegaWord<S>> OmegaWord<S> for &W {
