@@ -117,7 +117,7 @@ mod tests {
             .into_dts();
         assert_eq!(
             ts.predecessors(0).unwrap().collect::<Vec<_>>(),
-            vec![(2u32, 'a', 0u32), (1, 'a', 0), (0, 'b', 0)]
+            vec![(0, 'b', 0), (1, 'a', 0), (2u32, 'a', 0u32)]
         );
     }
 }

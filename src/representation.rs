@@ -41,7 +41,27 @@ pub trait CollectTs: TransitionSystem {
     fn collect_dts_preserving(
         &self,
     ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
-        todo!()
+        let mut out = DTS::for_alphabet_size_hint(self.alphabet().clone(), self.size());
+        let mut map = math::Map::default();
+
+        for (q, c) in self.state_indices_with_color() {
+            map.insert(q, out.add_state((q, c)));
+        }
+        for q in self.state_indices() {
+            for e in self.edges_from(q).unwrap() {
+                out.add_edge((
+                    *map.get(&e.source()).unwrap(),
+                    e.expression().clone(),
+                    e.color(),
+                    *map.get(&e.target()).unwrap(),
+                ));
+            }
+        }
+
+        debug_assert_eq!(self.size(), out.size());
+        out.verify_state();
+
+        out
     }
     /// Collects into a transition system of type `Ts`, but only considers states that
     /// are reachable from the initial state. Naturally, this means that `self` must
@@ -62,34 +82,39 @@ pub trait CollectTs: TransitionSystem {
 
     fn collect_dfa(&self) -> DFA<Self::Alphabet>
     where
-        Self: Pointed,
+        Self: Pointed<StateColor = bool>,
     {
-        todo!()
+        let (ts, initial) = self.erase_edge_colors().collect_dts_and_initial();
+        DFA::from_parts(ts, initial)
     }
 
     fn collect_moore(&self) -> MooreMachine<Self::Alphabet, StateColor<Self>>
     where
         Self: Pointed,
     {
-        todo!()
+        let (ts, initial) = self.erase_edge_colors().collect_dts_and_initial();
+        MooreMachine::from_parts(ts, initial)
     }
     fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
     where
         Self: Pointed,
     {
-        todo!()
+        let (ts, initial) = self.collect_dts_and_initial();
+        MealyMachine::from_parts(ts, initial)
     }
     fn collect_dba(&self) -> DBA<Self::Alphabet>
     where
-        Self: Pointed,
+        Self: Pointed<EdgeColor = bool>,
     {
-        todo!()
+        let (ts, initial) = self.erase_state_colors().collect_dts_and_initial();
+        DBA::from_parts(ts, initial)
     }
     fn collect_dpa(&self) -> DPA<Self::Alphabet>
     where
-        Self: Pointed,
+        Self: Pointed<EdgeColor = Int>,
     {
-        todo!()
+        let (ts, initial) = self.erase_state_colors().collect_dts_and_initial();
+        DPA::from_parts(ts, initial)
     }
     fn collect_right_congruence(
         &self,
@@ -97,7 +122,8 @@ pub trait CollectTs: TransitionSystem {
     where
         Self: Pointed,
     {
-        todo!()
+        let (ts, initial) = self.collect_dts_and_initial();
+        RightCongruence::from_parts(ts, initial)
     }
 }
 impl<Ts: TransitionSystem> CollectTs for Ts {}
@@ -134,7 +160,9 @@ pub trait IntoTs: TransitionSystem {
 
     fn into_dts_preserving(
         self,
-    ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>>;
+    ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
+        self.collect_dts_preserving()
+    }
 
     fn into_moore(self) -> MooreMachine<Self::Alphabet, StateColor<Self>>
     where
@@ -237,76 +265,53 @@ mod impl_into_ts {
     use super::*;
 
     impl<A: Alphabet, Q: Color, C: Color> IntoTs for DTS<A, Q, C> {
-        fn into_dts_preserving(
-            self,
-        ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), C> {
-            self.zip_state_indices()
-        }
-        fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, C> {
-            self
-        }
+        // fn into_dts_preserving(
+        //     self,
+        // ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), C> {
+        //     self.zip_state_indices()
+        // }
+        // fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, C> {
+        //     self
+        // }
     }
     impl<T: IntoTs, C: Color, F> IntoTs for operations::MapEdgeColor<T, F>
     where
         F: Fn(EdgeColor<T>) -> C,
     {
-        fn into_dts_preserving(self) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<T>), C> {
-            let (ts, f) = self.into_parts();
-            ts.into_dts_preserving()
-                .linked_map_edges(|_, e, c, _| (e, f(c)))
-        }
-        fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
-            let (ts, f) = self.into_parts();
-            ts.into_dts().linked_map_edges(|_, e, c, _| (e, f(c)))
-        }
+        // fn into_dts_preserving(self) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<T>), C> {
+        //     let (ts, f) = self.into_parts();
+        //     ts.into_dts_preserving()
+        //         .linked_map_edges(|_, e, c, _| (e, f(c)))
+        // }
+        // fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
+        //     let (ts, f) = self.into_parts();
+        //     ts.into_dts().linked_map_edges(|_, e, c, _| (e, f(c)))
+        // }
     }
     impl<T: IntoTs, Q: Color, F> IntoTs for MapStateColor<T, F>
     where
         T: TransitionSystem,
         F: Fn(T::StateColor) -> Q,
     {
-        fn into_dts(self) -> DTS<Self::Alphabet, Q, EdgeColor<Self>> {
-            let (ts, f) = self.into_parts();
-            ts.into_dts().linked_map_states(|_, c| f(c))
-        }
-        fn into_dts_preserving(
-            self,
-        ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
-            let (ts, f) = self.into_parts();
-            ts.into_dts_preserving()
-                .linked_map_states(|_, (i, c)| (i, f(c)))
-        }
+        // fn into_dts(self) -> DTS<Self::Alphabet, Q, EdgeColor<Self>> {
+        //     let (ts, f) = self.into_parts();
+        //     ts.into_dts().linked_map_states(|_, c| f(c))
+        // }
+        // fn into_dts_preserving(
+        //     self,
+        // ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
+        //     let (ts, f) = self.into_parts();
+        //     ts.into_dts_preserving()
+        //         .linked_map_states(|_, (i, c)| (i, f(c)))
+        // }
     }
-    impl<T: IntoTs, F> IntoTs for operations::RestrictByStateIndex<T, F>
-    where
-        F: operations::StateIndexFilter<T::StateIndex>,
+    impl<T: IntoTs, F> IntoTs for operations::RestrictByStateIndex<T, F> where
+        F: operations::StateIndexFilter<T::StateIndex>
     {
-        fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
-            self.into_dts_preserving().unzip_state_color()
-        }
-        fn into_dts_preserving(
-            self,
-        ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
-            // let (ts, f) = self.into_parts();
-            // ts.into_dts_preserving()
-            //     .graphts_restrict_states(|_, (i, _)| f.is_unmasked(*i))
-            todo!()
-        }
     }
     impl<Ts: IntoTs, P: operations::ProvidesStateColor<Ts::StateIndex>> IntoTs
         for operations::WithStateColor<Ts, P>
     {
-        fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
-            self.into_dts_preserving().unzip_state_color()
-        }
-        fn into_dts_preserving(
-            self,
-        ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
-            // let (ts, p) = self.into_parts();
-            // ts.into_dts_preserving()
-            //     .graphts_map_state_color(|(i, _)| (i, p.state_color(i)))
-            todo!()
-        }
     }
     impl<T, D, F> IntoTs for operations::MapEdges<T, F>
     where
@@ -314,11 +319,6 @@ mod impl_into_ts {
         D: Color,
         F: Fn(StateIndex<T>, &EdgeExpression<T>, EdgeColor<T>, StateIndex<T>) -> D,
     {
-        fn into_dts_preserving(
-            self,
-        ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
-            todo!()
-        }
     }
 
     impl<L, R> IntoTs for operations::MatchingProduct<L, R>
@@ -329,25 +329,12 @@ mod impl_into_ts {
         L::StateColor: Clone,
         R::StateColor: Clone,
     {
-        fn into_dts_preserving(
-            self,
-        ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
-            todo!()
-        }
     }
     impl<Z, D, const OMEGA: bool> IntoTs
         for Automaton<D::Alphabet, Z, StateColor<D>, EdgeColor<D>, D, OMEGA>
     where
         D: IntoTs,
     {
-        fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
-            self.ts.into_dts()
-        }
-        fn into_dts_preserving(
-            self,
-        ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
-            self.ts.into_dts_preserving()
-        }
     }
 }
 

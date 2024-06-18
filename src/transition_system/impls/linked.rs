@@ -180,30 +180,40 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
             self.edges[out_next].out_prev = self.edges[id].out_prev;
         }
 
-        // fix pointers if edge that is swapped in was first in list
         let swapped_in = self.edges.len() - 1;
-        if let Some(prev) = self.edges[swapped_in].in_prev {
-            self.edges[prev].in_next = Some(id);
-        } else {
-            let q = self.edges[swapped_in].target;
-            assert!(q < self.states.len());
-            self.states[q].set_first_in_edge(Some(id));
-        }
-        if let Some(prev) = self.edges[swapped_in].out_prev {
-            self.edges[prev].out_next = Some(id)
-        } else {
-            let q = self.edges[swapped_in].source;
-            assert!(q < self.states.len());
-            self.states[q].set_first_out_edge(Some(id));
-        }
+        if swapped_in != id {
+            // fix pointers if edge that is swapped in was first in list
+            if let Some(prev) = self.edges[swapped_in].in_prev {
+                self.edges[prev].in_next = Some(id);
+            } else {
+                let q = self.edges[swapped_in].target;
+                assert!(q < self.states.len());
+                self.states[q].set_first_in_edge(Some(id));
+            }
+            if let Some(prev) = self.edges[swapped_in].out_prev {
+                self.edges[prev].out_next = Some(id)
+            } else {
+                let q = self.edges[swapped_in].source;
+                assert!(q < self.states.len());
+                self.states[q].set_first_out_edge(Some(id));
+            }
 
-        if let Some(next) = self.edges[swapped_in].in_next {
-            assert!(self.edges[next].in_prev.is_some());
-            self.edges[next].in_prev = Some(id)
-        }
-        if let Some(next) = self.edges[swapped_in].out_next {
-            assert!(self.edges[next].out_prev.is_some());
-            self.edges[next].out_prev = Some(id)
+            if let Some(next) = self.edges[swapped_in].in_next {
+                if self.edges[next].in_prev.is_none() {
+                    panic!(
+                        "unacceptable state of linked list, no in_prev stored for {next}\n{self:?}"
+                    );
+                }
+                self.edges[next].in_prev = Some(id)
+            }
+            if let Some(next) = self.edges[swapped_in].out_next {
+                if self.edges[next].out_prev.is_none() {
+                    panic!(
+                    "unacceptable state of linked list, no out_prev stored for {next}\n{self:?}"
+                );
+                }
+                self.edges[next].out_prev = Some(id)
+            }
         }
 
         Some(self.edges.swap_remove(id).into_tuple())
@@ -359,6 +369,44 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
     pub fn into_parts(self) -> IntoLinkedListNondeterministic<Self> {
         (self.alphabet, self.states, self.edges)
     }
+
+    #[cfg(debug_assertions)]
+    pub(crate) fn verify_state(&self) {
+        for i in 0..self.states.len() {
+            if let Some((_, first_out, first_in)) = self.states[i].occupation() {
+                if let Some(first_out) = first_out {
+                    assert!(first_out < self.edges.len());
+                }
+                if let Some(first_in) = first_in {
+                    assert!(first_in < self.edges.len());
+                }
+            }
+        }
+        for i in 0..self.edges.len() {
+            if let Some(in_prev) = self.edges[i].in_prev {
+                assert!(in_prev < self.edges.len());
+                assert_eq!(self.edges[in_prev].in_next, Some(i));
+                assert_eq!(self.edges[in_prev].target, self.edges[i].target);
+            }
+            if let Some(out_prev) = self.edges[i].out_prev {
+                assert!(out_prev < self.edges.len());
+                assert_eq!(self.edges[out_prev].out_next, Some(i));
+                assert_eq!(self.edges[out_prev].source, self.edges[i].source);
+            }
+            if let Some(in_next) = self.edges[i].in_next {
+                assert!(in_next < self.edges.len());
+                assert_eq!(self.edges[in_next].in_prev, Some(i));
+                assert_eq!(self.edges[in_next].target, self.edges[i].target);
+            }
+            if let Some(out_next) = self.edges[i].out_next {
+                assert!(out_next < self.edges.len());
+                assert_eq!(self.edges[out_next].out_prev, Some(i));
+                assert_eq!(self.edges[out_next].source, self.edges[i].source);
+            }
+        }
+    }
+    #[cfg(not(debug_assertions))]
+    pub(crate) fn verify_state(&self) {}
 }
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color>
@@ -433,7 +481,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable
         if DET {
             if let Some(pos) = self.out_edge_position(q.into_usize(), &a) {
                 trace!("found previously existing edge {pos} in deterministic automaton");
-                let out = Some(self.swap_remove_edge(pos));
+                out = Some(self.swap_remove_edge(pos).unwrap());
             }
         }
 
