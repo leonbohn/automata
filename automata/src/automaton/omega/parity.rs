@@ -494,7 +494,7 @@ where
                     for state in scc.iter() {
                         for edge in ts.edges_from(*state).unwrap() {
                             trace!(
-                                "recolouring and removing {state:?} --{}|{}--> {:?} with priority {}",
+                                "recoloring and removing {state:?} --{}|{}--> {:?} with priority {}",
                                 edge.expression().show(),
                                 edge.color().show(),
                                 edge.target(),
@@ -550,6 +550,7 @@ where
             }
         }
 
+        trace!("computation done, building output automaton");
         let ret = out
             .map_edge_colors_full(|q, e, _, _| {
                 let Some(c) = recoloring
@@ -764,6 +765,7 @@ mod tests {
                 (2, 'b', 0, 2),
             ])
             .into_dpa(0);
+
         let normalized = dpa.normalized();
         assert_eq!(normalized.last_edge_color("aaa"), 0);
         assert_eq!(normalized.last_edge_color("aa"), 0);

@@ -65,7 +65,7 @@ where
     type StateColor = Ts::StateColor;
     type EdgeRef<'this> = Ts::EdgeRef<'this> where Self: 'this;
     type EdgesFromIter<'this> = RestrictedEdgesFromIter<'this, Ts, F> where Self: 'this;
-    type StateIndices<'this> = Ts::StateIndices<'this> where Self: 'this;
+    type StateIndices<'this> = RestrictedStateIndices<'this, Ts, F> where Self: 'this;
 
     type Alphabet = Ts::Alphabet;
 
@@ -73,11 +73,16 @@ where
         self.ts().alphabet()
     }
     fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts().state_indices()
+        RestrictedStateIndices {
+            it: self.ts().state_indices(),
+            filter: &self.filter,
+        }
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        assert!((self.filter()).is_unmasked(state));
+        if (self.filter()).is_masked(state) {
+            return None;
+        }
         self.ts().state_color(state)
     }
 
@@ -157,6 +162,24 @@ impl<Ts: TransitionSystem, F> RestrictByStateIndex<Ts, F> {
     }
 }
 
+/// Adapts an iterator of state indices to filter out those that are masked
+/// by a filter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RestrictedStateIndices<'a, Ts: TransitionSystem + 'a, F> {
+    filter: &'a F,
+    it: Ts::StateIndices<'a>,
+}
+
+impl<'a, Ts: TransitionSystem + 'a, F> Iterator for RestrictedStateIndices<'a, Ts, F>
+where
+    F: StateIndexFilter<Ts::StateIndex>,
+{
+    type Item = StateIndex<Ts>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.it.find(|q| self.filter.is_unmasked(*q))
+    }
+}
+
 /// Iterator over the edges of a transition system that are restricted by a filter function.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RestrictedEdgesFromIter<'a, Ts: TransitionSystem + 'a, F> {
@@ -212,13 +235,13 @@ impl<'a, Ts: PredecessorIterable + 'a, F> RestrictedEdgesToIter<'a, Ts, F> {
 /// Takes a transition system and restricts the the possible edge colors. For this, we assume that the colors
 /// can be ordered and we are given a minimal and maximal allowed color.
 #[derive(Clone, Debug)]
-pub struct ColorRestricted<D: TransitionSystem> {
+pub struct EdgeColorRestricted<D: TransitionSystem> {
     ts: D,
     min: D::EdgeColor,
     max: D::EdgeColor,
 }
 
-impl<D: Congruence> Pointed for ColorRestricted<D>
+impl<D: Congruence> Pointed for EdgeColorRestricted<D>
 where
     EdgeColor<D>: Ord,
 {
@@ -227,7 +250,7 @@ where
     }
 }
 
-impl<D: TransitionSystem> TransitionSystem for ColorRestricted<D>
+impl<D: TransitionSystem> TransitionSystem for EdgeColorRestricted<D>
 where
     EdgeColor<D>: Ord,
 {
@@ -273,7 +296,7 @@ where
     }
 }
 
-impl<D: PredecessorIterable<EdgeColor = usize>> PredecessorIterable for ColorRestricted<D> {
+impl<D: PredecessorIterable<EdgeColor = usize>> PredecessorIterable for EdgeColorRestricted<D> {
     type PreEdgeRef<'this> = D::PreEdgeRef<'this>
     where
         Self: 'this;
@@ -291,7 +314,7 @@ impl<D: PredecessorIterable<EdgeColor = usize>> PredecessorIterable for ColorRes
     }
 }
 
-impl<D> Deterministic for ColorRestricted<D>
+impl<D> Deterministic for EdgeColorRestricted<D>
 where
     D: Deterministic,
     EdgeColor<D>: Ord,
@@ -312,7 +335,7 @@ where
 }
 
 /// Adapted iterator giving the edges from a state in a transition system that are restricted by a
-/// color range. See [`ColorRestricted`] for more information.
+/// color range. See [`EdgeColorRestricted`] for more information.
 pub struct ColorRestrictedEdgesFrom<'a, D: TransitionSystem> {
     _phantom: PhantomData<&'a D>,
     it: D::EdgesFromIter<'a>,
@@ -333,7 +356,7 @@ where
 }
 
 /// Adapted iterator giving the edges to a state in a transition system that are restricted by a
-/// color range. See [`ColorRestricted`] for more information.
+/// color range. See [`EdgeColorRestricted`] for more information.
 pub struct ColorRestrictedEdgesTo<'a, D: PredecessorIterable> {
     _phantom: PhantomData<&'a D>,
     it: D::EdgesToIter<'a>,
@@ -365,7 +388,7 @@ where
     }
 }
 
-impl<D: TransitionSystem> ColorRestricted<D> {
+impl<D: TransitionSystem> EdgeColorRestricted<D> {
     /// Returns a reference to the underlying transition system.
     pub fn ts(&self) -> &D {
         &self.ts
