@@ -21,12 +21,6 @@ pub type OmegaRunResult<A, Idx, Q, C> = Result<Lasso<A, Idx, Q, C>, Path<A, Idx,
 /// each possible input symbol from the alphabet, there is at most one transition. Under the hood, this
 /// trait simply calls [`TransitionSystem::edges_from`] and checks whether there is at most one edge
 /// for each symbol. If there is more than one edge, the methods of this trait panic.
-///
-/// # Implementaiton
-/// This trait contains mostly convenience functions and provides default implementations. To ensure
-/// performance, the [`Self::collect_dts`] function and any other collectors for different types of
-/// transition system implementations should be overridden. By default, they simply insert states
-/// and edges one by one and are therefore horribly inefficient.
 pub trait Deterministic: TransitionSystem {
     /// Attempts to find the first edge that matches the given `matcher` from the given `state`. If no
     /// suitable transition exists, `None` is returned. If more than one edge matches the expression, the
