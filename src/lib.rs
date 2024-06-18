@@ -7,14 +7,15 @@
 pub mod prelude {
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type TS<A = CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
-        GraphTs<A, Q, C, DET>;
+        LinkedListTransitionSystem<A, Q, C, DET>;
     /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
     pub type DTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, true>;
     /// Points to the default implementation of [`TransitionSystem`] in the case where it is
     /// **now known to be** [`Deterministic`].
     pub type NTS<A = CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, false>;
 
-    pub use super::transition_system::impls::pg::{petgraph, GraphTs};
+    #[cfg(feature = "petgraph")]
+    pub use super::transition_system::impls::petgraph_backed::{petgraph, GraphTs};
     pub use super::{
         automaton::{
             Automaton, BuchiCondition, DeterministicOmegaAutomaton, FiniteSemantics,
@@ -28,6 +29,8 @@ pub mod prelude {
             CollectRightCongruence, Congruence, IntoRightCongruence, MinimalRepresentative,
             RightCongruence,
         },
+        representation::CollectTs,
+        representation::IntoTs,
         transition_system::operations,
         transition_system::{
             dot::Dottable,
@@ -55,6 +58,7 @@ pub mod prelude {
     }
     #[cfg(feature = "hoa")]
     pub use crate::hoa::WriteHoa;
+    use crate::transition_system::LinkedListTransitionSystem;
 }
 
 pub use automata_core::math;
@@ -68,6 +72,10 @@ pub use transition_system::{Pointed, TransitionSystem};
 /// Defines automata and common types of combinations of transition system with acceptance condition.
 #[allow(clippy::upper_case_acronyms)]
 pub mod automaton;
+
+/// Defines different representations of automata as mappings between an input and
+/// an output alphabet.
+pub mod representation;
 
 /// Defines congruence relations and congruence classes.
 pub mod congruence;

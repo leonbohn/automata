@@ -56,10 +56,7 @@ where
     /// assert!(!DFA::from_ts(&ts, [1]).accepts("a"));
     /// assert!(!DFA::from_ts(ts, []).accepts("a"));
     /// ```
-    pub fn from_ts(
-        ts: D,
-        accepting_states: impl IntoIterator<Item = D::StateIndex>,
-    ) -> IntoDFA<operations::WithStateColor<D, operations::DefaultIfMissing<D::StateIndex, bool>>>
+    pub fn from_ts(ts: D, accepting_states: impl IntoIterator<Item = D::StateIndex>) -> Self
     where
         D: Pointed,
     {
@@ -67,14 +64,8 @@ where
             .into_iter()
             .map(|idx| (idx, true))
             .collect();
-        ts.with_state_color(DefaultIfMissing::new(accepting, false))
-            .into_dfa()
+        DFA::from(ts.with_state_color(DefaultIfMissing::new(accepting, false)))
     }
-}
-
-impl<A: Alphabet, C, D: TransitionSystem<StateColor = bool, EdgeColor = C, Alphabet = A>>
-    DFA<A, C, D>
-{
 }
 
 impl<D> IntoDFA<D>
@@ -134,7 +125,7 @@ where
         self.ts_product(other)
             .map_state_colors(|(a, b)| a || b)
             .with_initial(ProductIndex(self.initial, other_initial))
-            .into_dfa()
+            .collect_dfa()
     }
 
     /// Computes the intersection of `self` with the given `other` object (that can be viewed as a DFA) through
@@ -150,7 +141,7 @@ where
         self.ts_product(other)
             .map_state_colors(|(a, b)| a && b)
             .with_initial(ProductIndex(self.initial, other_initial))
-            .into_dfa()
+            .collect_dfa()
     }
 
     /// Computes the negation of `self` by swapping accepting and non-accepting states.
@@ -159,7 +150,7 @@ where
     ) -> IntoDFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + '_> {
         self.map_state_colors(|x| !x)
             .with_initial(self.initial)
-            .into_dfa()
+            .collect_dfa()
     }
 
     /// Attempts to separate the state `left` from the state `right` by finding a word that leads to different colors.

@@ -12,7 +12,7 @@ use tracing::{debug, info, trace};
 
 use crate::{math::Map, math::Partition, prelude::*};
 
-/// Computes the maximal bisimulation of the given [`MealyLike`] deterministic machine. The returned
+/// Computes the maximal bisimulation of the given something that behaves like a mealy machine. The returned
 /// partition is a [`Partition`] of the state indices, where any states in the same class of the
 /// returned partition are pairwise bisimilar. This means for any *non-empty* input, they produce
 /// the same sequence of outputs.
@@ -202,7 +202,7 @@ where
         })
         // TODO: Should we not get rid of the edge colors entirely?
         .erase_edge_colors()
-        .collect_dts_pointed();
+        .collect_dts_and_initial();
     debug!(
         "Collecting into Moore machine took {} microseconds",
         start.elapsed().as_micros()

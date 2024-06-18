@@ -2,8 +2,10 @@
 #![allow(missing_docs)]
 use crate::prelude::*;
 
-pub(crate) mod pg;
-pub use pg::{petgraph, GraphTs, GraphTsNeighborsIter};
+#[cfg(feature = "petgraph")]
+pub(crate) mod petgraph_backed;
+#[cfg(feature = "petgraph")]
+pub use petgraph_backed::{petgraph, GraphTs, GraphTsNeighborsIter};
 
 #[cfg(feature = "implementations")]
 pub(crate) mod edge_lists;
@@ -11,9 +13,8 @@ pub(crate) mod edge_lists;
 pub use edge_lists::{
     EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, IntoEdgeLists, MutableTsState,
 };
-#[cfg(feature = "implementations")]
+
 pub(crate) mod linked;
-#[cfg(feature = "implementations")]
 pub use linked::{
     CollectLinkedList, IntoLinkedListNondeterministic, LinkedListDeterministic,
     LinkedListNondeterministic, LinkedListTransitionSystem, LinkedListTransitionSystemEdge,

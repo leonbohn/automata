@@ -147,4 +147,9 @@ impl<Ts: TransitionSystem, P: ProvidesStateColor<Ts::StateIndex>> WithStateColor
     pub fn new(ts: Ts, provider: P) -> Self {
         Self { ts, provider }
     }
+
+    /// Decomposes `self` into its constituent parts.
+    pub fn into_parts(self) -> (Ts, P) {
+        (self.ts, self.provider)
+    }
 }

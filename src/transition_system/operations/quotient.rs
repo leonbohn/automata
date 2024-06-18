@@ -64,12 +64,12 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
 
     /// Extracts the underlying right congruence by erasing the state and edge colors and then collecting
     /// into a [`RightCongruence`].
-    pub fn underlying_right_congruence(self, _ts: &Ts) -> RightCongruence<Ts::Alphabet>
+    pub fn underlying_right_congruence(&self) -> RightCongruence<Ts::Alphabet>
     where
-        Ts: Deterministic + Pointed,
+        Ts: Deterministic + Pointed + CollectTs,
     {
-        self.erase_edge_colors()
-            .erase_state_colors()
+        self.erase_state_colors()
+            .erase_edge_colors()
             .collect_right_congruence()
     }
 

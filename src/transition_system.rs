@@ -371,8 +371,8 @@ pub trait TransitionSystem: Sized {
         self,
         min: Self::EdgeColor,
         max: Self::EdgeColor,
-    ) -> operations::ColorRestricted<Self> {
-        operations::ColorRestricted::new(self, min, max)
+    ) -> operations::EdgeColorRestricted<Self> {
+        operations::EdgeColorRestricted::new(self, min, max)
     }
 
     /// Restricts the state indices with the given function. This means that only the states for
