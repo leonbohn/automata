@@ -100,7 +100,7 @@ impl<T: TransitionSystem + Show> Show for MinimalRepresentative<T> {
 
 /// Gives lazy acceess to the minimal representatives of a [`RightCongruence`]. This is used
 /// to avoid recomputing the minimal representatives of a congruence multiple times.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LazyMinimalRepresentatives<T: TransitionSystem>(
     OnceCell<BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>>,
 );
