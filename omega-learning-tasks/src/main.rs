@@ -7,6 +7,7 @@ use std::{
     path::PathBuf,
     time::{Duration, SystemTime},
 };
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
 use automata::{
     automaton::InfiniteWordAutomaton,
@@ -16,8 +17,19 @@ use automata::{
 };
 use automata_learning::passive::{sprout::sprout, OmegaSample};
 use math::set::IndexSet;
+use tracing::{debug, info, warn};
 
 fn main() {
+    // initialize logger
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .pretty()
+                .with_writer(std::io::stderr)
+                .with_filter(tracing_subscriber::filter::LevelFilter::INFO),
+        )
+        .init();
+
     let args: Vec<String> = env::args().collect();
     if args.contains(&"gen".to_string()) {
         // (re)generate tasks
@@ -64,25 +76,41 @@ pub fn run_sprout() {
         .enumerate()
         .for_each(|(i, sample)| {
             let dir = &task_dirs[i];
-            println!("Task {}", i);
-            println!("\tName: {:?}", dir.to_string_lossy());
+            info!("task {i} \"{:?}\"", dir.to_string_lossy());
             // check if task was already computed
             if dir.join("result.csv").exists() {
-                println!("\tAlready computed. Skip.");
+                info!("Already computed. Skip.");
                 return;
             }
-            println!("\tStart learner.");
+            debug!("starting learner for task {i}");
             let time = SystemTime::now();
             if dir.to_string_lossy().contains("dba") {
-                let learned = sprout(sample, BuchiCondition);
+                let Ok(learned) = sprout(sample, BuchiCondition) else {
+                    warn!("exceeded timeout on task {i}: {:?}", dir.to_string_lossy());
+                    return;
+                };
                 let elapsed = time.elapsed().unwrap();
-                print!("\tLearning took {} ms", elapsed.as_millis());
+                info!(
+                    "task {i} \"{:?}\" learning took {} ms",
+                    dir.to_string_lossy(),
+                    elapsed.as_millis()
+                );
                 export_automaton(format!("{}/learned.hoa", dir.to_str().unwrap()), &learned);
                 export_sprout_result(dir, &learned, elapsed);
             } else {
-                let learned = sprout(sample, MinEvenParityCondition);
+                let Ok(learned) = sprout(sample, MinEvenParityCondition) else {
+                    warn!(
+                        "exceeded timeout on task {i} \"{:?}\"",
+                        dir.to_string_lossy()
+                    );
+                    return;
+                };
                 let elapsed = time.elapsed().unwrap();
-                print!("\tLearning took {} ms", elapsed.as_millis());
+                info!(
+                    "task {i} \"{:?}\" learning took {} ms",
+                    dir.to_string_lossy(),
+                    elapsed.as_millis()
+                );
                 export_automaton(format!("{}/learned.hoa", dir.to_str().unwrap()), &learned);
                 export_sprout_result(dir, &learned, elapsed);
             }
