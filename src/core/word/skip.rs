@@ -135,7 +135,7 @@ impl<'a, S: Symbol, W: OmegaWord<S>> OmegaWord<S> for Skip<'a, S, W> {
                 .skip(self.offset)
                 .chain(self.cycle().symbols())
                 .collect();
-            ReducedOmegaWord::from_raw_parts(representation, self.cycle_length() - self.offset)
+            ReducedOmegaWord::from_raw_parts(representation, self.spoke_length() - self.offset)
         }
     }
 
