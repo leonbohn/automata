@@ -135,7 +135,10 @@ impl<'a, S: Symbol, W: OmegaWord<S>> OmegaWord<S> for Skip<'a, S, W> {
                 .skip(self.offset)
                 .chain(self.cycle().symbols())
                 .collect();
-            ReducedOmegaWord::from_raw_parts(representation, self.spoke_length() - self.offset)
+            ReducedOmegaWord::from_raw_parts(
+                representation,
+                self.sequence.spoke_length() - self.offset,
+            )
         }
     }
 
@@ -231,6 +234,11 @@ mod tests {
         let fw = "abcde".to_string();
         assert_eq!(fw.infix(1, 3).collect_vec(), vec!['b', 'c', 'd']);
         assert_eq!(fw.infix(1, 3).as_string(), "bcd".to_string());
+    }
+
+    #[test]
+    fn skip_to_reduced_omega_word() {
+        assert_eq!(upw!("bbb", "a").skip(2).reduced(), upw!("b", "a"));
     }
 
     #[test]
