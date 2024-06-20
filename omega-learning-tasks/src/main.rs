@@ -17,7 +17,7 @@ use automata::{
 };
 use automata_learning::passive::{sprout::sprout, OmegaSample};
 use math::set::IndexSet;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 fn main() {
     // initialize logger
@@ -25,16 +25,17 @@ fn main() {
         .with(
             tracing_subscriber::fmt::layer()
                 .pretty()
+                .with_writer(std::io::stdout)
                 .with_writer(std::io::stderr)
                 .with_filter(tracing_subscriber::filter::LevelFilter::INFO),
         )
         .init();
+    info!("logging initialized.");
 
     let args: Vec<String> = env::args().collect();
-    if args.contains(&"bench".to_string()) {}
     if args.contains(&"gen".to_string()) {
         // (re)generate tasks
-        println!("Start generating learning tasks");
+        info!("Start generating learning tasks");
         let automata_sizes = vec![8];
         let automata_per_size = 10;
         let train_sizes = vec![100];
@@ -51,7 +52,7 @@ fn main() {
         );
     }
     if args.contains(&"sprout".to_string()) {
-        println!("Running sprout learner on all tasks");
+        info!("Running sprout learner on all tasks");
         run_sprout();
     }
     println!("Done");
@@ -77,13 +78,13 @@ pub fn run_sprout() {
         .enumerate()
         .for_each(|(i, sample)| {
             let dir = &task_dirs[i];
-            info!("task {i} \"{:?}\"", dir.to_string_lossy());
             // check if task was already computed
             if dir.join("result.csv").exists() {
-                info!("Already computed. Skip.");
+                info!("already done for task {i} {:?}", dir.to_string_lossy());
                 return;
             }
-            debug!("starting learner for task {i}");
+
+            info!("starting learner for task {i} {:?}", dir.to_string_lossy());
             let time = SystemTime::now();
             if dir.to_string_lossy().contains("dba") {
                 let Ok(learned) = sprout(sample, BuchiCondition) else {
