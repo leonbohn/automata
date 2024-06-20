@@ -221,6 +221,12 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
             Either::Right(std::iter::empty())
         }
     }
+
+    /// Consumes `self` and returns an iterator over the triggers (i.e. state-symbol pairs)
+    /// that are taken.
+    pub fn into_triggers(self) -> impl Iterator<Item = (Idx, A::Symbol)> {
+        self.transitions.into_iter().map(|(q, a, _)| (q, a))
+    }
 }
 
 impl<A: Alphabet, Idx: IndexType, Q: std::fmt::Debug, C: std::fmt::Debug> std::fmt::Debug
@@ -325,6 +331,12 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Lasso<A, Idx, Q, C> {
     /// as tuples of the form (src, smbol, target, color)
     pub fn into_recurrent_transitions(self) -> impl Iterator<Item = Edge<A::Symbol, Idx, C>> {
         self.cycle.into_transitions()
+    }
+
+    /// Consumes `self` and returns an iterator over the triggers (i.e. state-symbol pairs)
+    /// that are taken infinitely often.
+    pub fn into_recurrent_triggers(self) -> impl Iterator<Item = (Idx, A::Symbol)> {
+        self.cycle.into_triggers()
     }
 }
 

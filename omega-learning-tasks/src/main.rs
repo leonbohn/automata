@@ -31,12 +31,13 @@ fn main() {
         .init();
 
     let args: Vec<String> = env::args().collect();
+    if args.contains(&"bench".to_string()) {}
     if args.contains(&"gen".to_string()) {
         // (re)generate tasks
         println!("Start generating learning tasks");
-        let automata_sizes = vec![4, 8, 16];
+        let automata_sizes = vec![8];
         let automata_per_size = 10;
-        let train_sizes = vec![100, 1000, 10000];
+        let train_sizes = vec![100];
         let test_size = 10000;
         let num_sets = 5;
         let lambda = 0.95;
