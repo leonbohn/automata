@@ -137,9 +137,7 @@ where
         &self,
         input: W,
     ) -> Option<EdgeColor<Self>> {
-        self.finite_run(input)
-            .ok()
-            .and_then(|r| r.last_transition_color().cloned())
+        self.finite_run(input).last_transition_color()
     }
 
     /// Computes the least and greatest edge color that appears on any edge of the automaton.

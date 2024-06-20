@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use word::Skip;
 
 use crate::prelude::*;
 use crate::transition_system::run::OmegaRun;
@@ -444,17 +445,13 @@ pub trait Deterministic: TransitionSystem {
     fn escape_prefixes<'a, W>(
         &self,
         words: impl Iterator<Item = &'a W>,
-    ) -> impl Iterator<Item = String>
+    ) -> impl Iterator<Item = Vec<SymbolOf<Self>>>
     where
         W: OmegaWord<SymbolOf<Self>> + 'a,
         Self: Pointed,
     {
         words
-            .filter_map(|w| {
-                self.omega_run(w)
-                    .err()
-                    .map(|path| w.prefix(path.len() + 1).as_string())
-            })
+            .filter_map(|w| self.omega_run(w).escape_prefix())
             .unique()
     }
 }
@@ -566,6 +563,6 @@ mod tests {
 
         assert!(ts
             .escape_prefixes(words.iter())
-            .eq(vec![String::from("aa"), String::from("b")].into_iter()));
+            .eq(vec![vec!['a', 'a'], vec!['b']].into_iter()));
     }
 }

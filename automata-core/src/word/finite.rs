@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::prelude::{Show, Symbol};
 
-use super::{omega::OmegaIteration, Concat, PeriodicOmegaWord, Word};
+use super::{omega::OmegaIteration, Concat, PeriodicOmegaWord, Repeat, Word};
 
 /// A finite word is a [`LinearWord`] that has a finite length.
 pub trait FiniteWord<S>: Word<S> {
@@ -59,6 +59,14 @@ pub trait FiniteWord<S>: Word<S> {
     /// Collects the symbols making up `self` into a [`VecDeque`].
     fn collect_deque(&self) -> VecDeque<S> {
         VecDeque::from(self.collect_vec())
+    }
+
+    fn repeat(self, times: usize) -> Repeat<S, Self>
+    where
+        Self: Sized,
+        S: Symbol,
+    {
+        Repeat::new(self, times)
     }
 
     /// Builds the [`PeriodicOmegaWord`] word that is the omega power of this word, i.e. if
