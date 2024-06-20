@@ -25,9 +25,7 @@ impl<C> FiniteSemantics<bool, C> for ReachabilityCondition {
     where
         R: FiniteRunResult<StateColor = bool, EdgeColor = C>,
     {
-        run.state_colors()
-            .and_then(|colors| colors.last())
-            .unwrap_or(false)
+        run.reached_color().unwrap_or(false)
     }
 }
 

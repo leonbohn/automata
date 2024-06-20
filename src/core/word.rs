@@ -17,6 +17,9 @@ pub use finite::FiniteWord;
 mod omega;
 pub use omega::{OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, ReducedParseError};
 
+mod repeat;
+pub use repeat::Repeat;
+
 pub use self::skip::Infix;
 
 /// A linear word is a word that can be indexed by a `usize`. This is the case for both finite and
