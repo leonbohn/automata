@@ -490,8 +490,14 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable
 
         let q = q.try_into().unwrap();
         let p = p.try_into().unwrap();
-        assert!(q < self.states.len());
-        assert!(p < self.states.len());
+        assert!(
+            q < self.states.len(),
+            "cannot add edge from non-existent state {q:?}"
+        );
+        assert!(
+            p < self.states.len(),
+            "cannot add edge to non-existent state {q:?}"
+        );
         if let Some(first_out) = self.first_out_edge(q) {
             assert!(first_out < self.edges.len());
             assert!(self.edges[first_out].out_prev.is_none());
