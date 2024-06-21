@@ -1,8 +1,6 @@
 use itertools::Itertools;
-use word::Skip;
 
 use crate::prelude::*;
-use crate::transition_system::run::OmegaRun;
 
 use super::operations::MapEdgeColor;
 use super::operations::MapEdges;
@@ -11,7 +9,12 @@ use super::operations::MatchingProduct;
 use super::operations::ProductTransition;
 use super::operations::RestrictByStateIndex;
 use super::operations::StateIndexFilter;
-use super::run::FiniteRun;
+use super::run::FiniteObserver;
+use super::run::FiniteRunOutput;
+use super::run::InfiniteObserver;
+use super::run::InfiniteRunOutput;
+use super::run::Run;
+use super::run::StateSet;
 
 /// A marker tait indicating that a [`TransitionSystem`] is deterministic, meaning for every state and
 /// each possible input symbol from the alphabet, there is at most one transition. Under the hood, this
@@ -138,9 +141,11 @@ pub trait Deterministic: TransitionSystem {
     /// to inspect the path, e.g. to find out which state was reached or which transitions were taken.
     /// For more information, see [`crate::prelude::Path`].
     #[allow(clippy::type_complexity)]
-    fn finite_run<W: FiniteWord<SymbolOf<Self>>>(&self, word: W) -> FiniteRun<'_, Self, W>
+    fn finite_run<W, O>(&self, word: W) -> FiniteRunOutput<Self, W, O>
     where
         Self: Pointed,
+        O: FiniteObserver<Self>,
+        W: FiniteWord<SymbolOf<Self>>,
     {
         self.finite_run_from(self.initial(), word)
     }
@@ -151,12 +156,43 @@ pub trait Deterministic: TransitionSystem {
     /// - [`Err`] if the run is unsuccessful, meaning a symbol is encountered for which no
     /// transition exists.
     #[allow(clippy::type_complexity)]
-    fn finite_run_from<W>(&self, origin: StateIndex<Self>, word: W) -> FiniteRun<'_, Self, W>
+    fn finite_run_from<W, O>(
+        &self,
+        origin: StateIndex<Self>,
+        word: W,
+    ) -> FiniteRunOutput<Self, W, O>
     where
         Self: Sized,
         W: FiniteWord<SymbolOf<Self>>,
+        O: FiniteObserver<Self>,
     {
-        FiniteRun::new(self, origin, word)
+        Run::<_, _, true, O>::new_finite(self, origin, word).evaluate()
+    }
+
+    /// Runs the given `word` on the transition system, starting in the initial state.
+    #[allow(clippy::type_complexity)]
+    fn omega_run<W, O>(&self, word: W) -> InfiniteRunOutput<Self, W, O>
+    where
+        W: OmegaWord<SymbolOf<Self>>,
+        Self: Pointed,
+        O: InfiniteObserver<Self>,
+    {
+        self.omega_run_from(self.initial(), word)
+    }
+
+    /// Runs the given `word` on the transition system, starting from `state`.
+    #[allow(clippy::type_complexity)]
+    fn omega_run_from<W, O>(
+        &self,
+        origin: StateIndex<Self>,
+        word: W,
+    ) -> InfiniteRunOutput<Self, W, O>
+    where
+        W: OmegaWord<SymbolOf<Self>>,
+        O: InfiniteObserver<Self>,
+    {
+        assert!(!word.cycle().is_empty(), "word must be infinite");
+        Run::<Self, W, false, O>::new_infinite(self, origin, word).evaluate()
     }
 
     /// Runs the given `word` from the `origin` state. If the run is successful, the function returns the indices
@@ -165,9 +201,9 @@ pub trait Deterministic: TransitionSystem {
         &self,
         origin: StateIndex<Self>,
         word: W,
-    ) -> Option<impl Iterator<Item = Self::StateIndex>> {
-        self.omega_run_from(origin, word)
-            .recurring_state_indices_iter()
+    ) -> Option<math::Set<StateIndex<Self>>> {
+        self.omega_run_from::<_, StateSet<Self>>(origin, word)
+            .into_output()
     }
 
     /// Returns an iterator over the state indices that are visited infinitely often when running the given `word`
@@ -175,7 +211,7 @@ pub trait Deterministic: TransitionSystem {
     fn recurrent_state_indices<W: OmegaWord<SymbolOf<Self>>>(
         &self,
         word: W,
-    ) -> Option<impl Iterator<Item = Self::StateIndex>>
+    ) -> Option<math::Set<StateIndex<Self>>>
     where
         Self: Pointed,
     {
@@ -321,26 +357,6 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed,
     {
         self.last_edge_color_from(self.initial(), word)
-    }
-
-    /// Runs the given `word` on the transition system, starting in the initial state.
-    #[allow(clippy::type_complexity)]
-    fn omega_run<W>(&self, word: W) -> OmegaRun<Self>
-    where
-        W: OmegaWord<SymbolOf<Self>>,
-        Self: Pointed,
-    {
-        self.omega_run_from(self.initial(), word)
-    }
-
-    /// Runs the given `word` on the transition system, starting from `state`.
-    #[allow(clippy::type_complexity)]
-    fn omega_run_from<W>(&self, origin: StateIndex<Self>, word: W) -> OmegaRun<Self>
-    where
-        W: OmegaWord<SymbolOf<Self>>,
-    {
-        assert!(!word.cycle().is_empty(), "word must be infinite");
-        OmegaRun::new(self, origin, word.reduced())
     }
 
     /// Returns a string representation of the transition table of the transition system.

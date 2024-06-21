@@ -3,6 +3,157 @@ use std::marker::PhantomData;
 
 use crate::prelude::*;
 
+pub trait FiniteObserver<T: TransitionSystem>: Sized {
+    type Output;
+    fn current(&self) -> &Self::Output;
+    fn begin(ts: &T, state: StateIndex<T>) -> Self;
+    fn observe(&mut self, ts: &T, state: StateIndex<T>, sym: SymbolOf<T>) -> Option<StateIndex<T>>;
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct NoObserver;
+impl<T: Deterministic> FiniteObserver<T> for NoObserver {
+    type Output = ();
+    fn current(&self) -> &Self::Output {
+        &()
+    }
+    fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
+        NoObserver
+    }
+    fn observe(&mut self, ts: &T, state: StateIndex<T>, sym: SymbolOf<T>) -> Option<StateIndex<T>> {
+        ts.successor_index(state, sym)
+    }
+}
+
+pub struct ReachedState<Idx>(Idx);
+impl<T: Deterministic> FiniteObserver<T> for ReachedState<StateIndex<T>> {
+    type Output = StateIndex<T>;
+    fn current(&self) -> &Self::Output {
+        &self.0
+    }
+    fn begin(_ts: &T, state: StateIndex<T>) -> Self {
+        Self(state)
+    }
+    fn observe(&mut self, ts: &T, state: StateIndex<T>, sym: SymbolOf<T>) -> Option<StateIndex<T>> {
+        self.0 = ts.successor_index(state, sym)?;
+        Some(self.0)
+    }
+}
+pub struct ReachedColor<Q>(Q);
+impl<T: Deterministic> FiniteObserver<T> for ReachedColor<StateColor<T>> {
+    type Output = StateColor<T>;
+    fn current(&self) -> &Self::Output {
+        &self.0
+    }
+    fn begin(ts: &T, state: StateIndex<T>) -> Self {
+        Self(ts.state_color(state).unwrap())
+    }
+    fn observe(&mut self, ts: &T, state: StateIndex<T>, sym: SymbolOf<T>) -> Option<StateIndex<T>> {
+        let succ = ts.successor_index(state, sym)?;
+        self.0 = ts.state_color(succ).unwrap();
+        Some(succ)
+    }
+}
+
+pub struct LeastStateColor<Q>(Q);
+impl<T: Deterministic> FiniteObserver<T> for LeastStateColor<StateColor<T>> {
+    type Output = StateColor<T>;
+    fn current(&self) -> &Self::Output {
+        &self.0
+    }
+    fn begin(ts: &T, state: StateIndex<T>) -> Self {
+        Self(ts.state_color(state).unwrap())
+    }
+    fn observe(&mut self, ts: &T, state: StateIndex<T>, sym: SymbolOf<T>) -> Option<StateIndex<T>> {
+        let succ = ts.successor_index(state, sym)?;
+        self.0 = std::cmp::min(ts.state_color(succ).unwrap(), self.0);
+        Some(succ)
+    }
+}
+impl<T: Deterministic> InfiniteObserver<T> for LeastStateColor<StateColor<T>>
+where
+    StateColor<T>: Default + Ord,
+{
+    fn loop_back(seq: &[Self::Output], ts: &T, time: usize) -> Self::Output {
+        seq[time..].iter().min()
+    }
+}
+
+pub struct LeastEdgeColor<C>(C);
+impl<T: Deterministic> FiniteObserver<T> for LeastEdgeColor<EdgeColor<T>>
+where
+    EdgeColor<T>: Default,
+{
+    type Output = EdgeColor<T>;
+    fn current(&self) -> &Self::Output {
+        &self.0
+    }
+    fn begin(ts: &T, state: StateIndex<T>) -> Self {
+        Self(Default::default())
+    }
+    fn observe(&mut self, ts: &T, state: StateIndex<T>, sym: SymbolOf<T>) -> Option<StateIndex<T>> {
+        let e = ts.transition(state, sym)?;
+        self.0 = std::cmp::min(e.color(), self.0);
+        Some(e.target())
+    }
+}
+impl<T: Deterministic> InfiniteObserver<T> for LeastEdgeColor<EdgeColor<T>>
+where
+    EdgeColor<T>: Default + Ord,
+{
+    fn loop_back(seq: &[Self::Output], ts: &T, time: usize) -> Self::Output {
+        seq[time..].iter().min()
+    }
+}
+
+pub struct StateSet<T: TransitionSystem>(math::Set<StateIndex<T>>);
+impl<T: Deterministic> FiniteObserver<T> for StateSet<T> {
+    type Output = Self;
+    fn begin(ts: &T, state: StateIndex<T>) -> Self {
+        Self(math::Set::from_iter([state]))
+    }
+    fn current(&self) -> &Self::Output {
+        &self.0
+    }
+    fn observe(&mut self, ts: &T, state: StateIndex<T>, sym: SymbolOf<T>) -> Option<StateIndex<T>> {
+        let successor_index = ts.successor_index(state, sym)?;
+        self.0.push(successor_index);
+        Some(successor_index)
+    }
+}
+impl<T: Deterministic> InfiniteObserver<T> for StateSet<T> {
+    fn loop_back(seq: &[Self::Output], ts: &T, time: usize) -> Self::Output {
+        seq[time..].iter().fold(math::Set::default(), |acc, x| {
+            acc.extend(x);
+            acc
+        })
+    }
+}
+pub struct StateColorSet<T: TransitionSystem>(math::Set<StateColor<T>>);
+impl<T: Deterministic> FiniteObserver<T> for StateColorSet<T> {
+    type Output = Self;
+    fn begin(ts: &T, state: StateIndex<T>) -> Self {
+        let start = ts.state_color(state).unwrap();
+        Self(math::Set::from_iter([start]))
+    }
+    fn current(&self) -> &Self::Output {
+        &self.0
+    }
+    fn observe(&mut self, ts: &T, state: StateIndex<T>, sym: SymbolOf<T>) -> Option<StateIndex<T>> {
+        let t = ts.transition(state, sym)?;
+        self.0.push(t.color());
+        Some(t.target())
+    }
+}
+impl<T: Deterministic> InfiniteObserver<T> for StateColorSet<T> {
+    fn loop_back(seq: &[Self::Output], ts: &T, time: usize) -> Self::Output {
+        seq[time..].iter().fold(math::Set::default(), |acc, x| {
+            acc.extend(x);
+            acc
+        })
+    }
+}
+
 pub trait RunResult: Sized {
     /// The type of the state colors.
     type StateColor: Color;
@@ -12,319 +163,207 @@ pub trait RunResult: Sized {
     type StateIndex: IndexType;
     /// The type of symbol over which the input word operates.
     type Symbol: Symbol;
+    // fn reduced<R:
 }
 
-pub struct FiniteRun<'ts, T: TransitionSystem, W: Word<SymbolOf<T>>> {
+pub struct Run<
+    'ts,
+    T: Deterministic,
+    W: Word<SymbolOf<T>>,
+    const FINITE: bool,
+    O: FiniteObserver<T> = NoObserver,
+> {
     ts: &'ts T,
     start: StateIndex<T>,
     word: W,
+    observer: PhantomData<O>,
 }
 
-impl<'ts, T: Deterministic, W: Word<SymbolOf<T>>> FiniteRun<'ts, T, W> {
-    pub fn new(ts: &'ts T, start: StateIndex<T>, word: W) -> Self {
-        Self { ts, start, word }
+pub struct EscapePrefix<W> {
+    word: W,
+    length: usize,
+}
+
+impl<W> EscapePrefix<W> {
+    pub fn new(word: W, length: usize) -> Self {
+        Self { word, length }
     }
-    /// Evaluates the run. If successful, the reached state index is returned.
-    /// If unsuccessful, the exit state and length of escape prefix is returned.
-    pub fn evaluate(&self) -> Result<StateIndex<T>, (StateIndex<T>, usize)> {
+    pub fn with_word<V>(self, word: V) -> EscapePrefix<V> {
+        EscapePrefix {
+            word,
+            length: self.length,
+        }
+    }
+    pub fn with_length(self, len: usize) -> Self {
+        Self {
+            word: self.word,
+            length: len,
+        }
+    }
+}
+
+pub enum FiniteRunOutput<T: TransitionSystem, W: Word<SymbolOf<T>>, O: FiniteObserver<T>> {
+    Reached(StateIndex<T>, O::Output),
+    Failed(StateIndex<T>, EscapePrefix<W>),
+}
+
+impl<T: TransitionSystem, W: Word<SymbolOf<T>>, O: FiniteObserver<T>> FiniteRunOutput<T, W, O> {
+    fn escape_state(&self) -> Option<StateIndex<T>> {
+        match self {
+            FiniteRunOutput::Reached(_, _) => None,
+            FiniteRunOutput::Failed(state, _) => Some(*state),
+        }
+    }
+    fn escape_prefix(&self) -> Option<&EscapePrefix<W>> {
+        match self {
+            FiniteRunOutput::Reached(_, _) => None,
+            FiniteRunOutput::Failed(_state, ep) => Some(ep),
+        }
+    }
+    fn into_reached_state(self) -> Option<StateIndex<T>> {
+        match self {
+            FiniteRunOutput::Reached(r, _) => Some(r),
+            _ => None,
+        }
+    }
+    fn into_output(self) -> Option<O::Output> {
+        match self {
+            FiniteRunOutput::Reached(_, o) => Some(o),
+            _ => None,
+        }
+    }
+}
+
+pub enum InfiniteRunOutput<T: TransitionSystem, W: OmegaWord<SymbolOf<T>>, O: InfiniteObserver<T>> {
+    Successful(O::Output),
+    Failed(StateIndex<T>, EscapePrefix<W>),
+}
+
+impl<T: TransitionSystem, W: OmegaWord<SymbolOf<T>>, O: InfiniteObserver<T>>
+    InfiniteRunOutput<T, W, O>
+{
+    pub fn into_output(self) -> Option<O::Output> {
+        match self {
+            Self::Successful(o) => Some(o),
+            _ => None,
+        }
+    }
+    pub fn into_escape_state(self) -> Option<StateIndex<T>> {
+        match self {
+            Self::Failed(state, _phantom) => Some(state),
+            _ => None,
+        }
+    }
+    pub fn into_escape_prefix(self) -> Option<EscapePrefix<W>> {
+        match self {
+            Self::Failed(_, ep) => Some(ep),
+            _ => None,
+        }
+    }
+}
+
+impl<'ts, T: Deterministic, W: Word<SymbolOf<T>>, const FINITE: bool, O: FiniteObserver<T>>
+    RunResult for Run<'ts, T, W, FINITE, O>
+{
+    type StateColor = StateColor<T>;
+    type EdgeColor = EdgeColor<T>;
+    type StateIndex = StateIndex<T>;
+    type Symbol = SymbolOf<T>;
+}
+
+impl<'ts, T: Deterministic, W: FiniteWord<SymbolOf<T>>, O: FiniteObserver<T>>
+    Run<'ts, T, W, true, O>
+{
+    pub fn new_finite(ts: &'ts T, start: StateIndex<T>, word: W) -> Run<'ts, T, W, true, O> {
+        Run {
+            ts,
+            start,
+            word,
+            observer: PhantomData,
+        }
+    }
+    pub fn evaluate(self) -> FiniteRunOutput<T, W, O> {
         let mut taken = 0;
+        let mut observer = O::begin(self.ts, self.start);
         let mut current = self.start;
+
         while let Some(sym) = self.word.nth(taken) {
             taken += 1;
-            if let Some(next) = self.ts.successor_index(current, sym) {
+            if let Some(next) = observer.observe(self.ts, current, sym) {
                 current = next;
             } else {
-                return Err((current, taken));
+                return FiniteRunOutput::Failed(
+                    current,
+                    EscapePrefix {
+                        word: self.word,
+                        length: taken,
+                    },
+                );
             }
         }
-        Ok(current)
+        FiniteRunOutput::Reached(current, observer.current())
     }
 }
 
-impl<'ts, T: TransitionSystem, W: Word<SymbolOf<T>>> RunResult for FiniteRun<'ts, T, W> {
-    type StateColor = StateColor<T>;
-    type EdgeColor = EdgeColor<T>;
-    type StateIndex = StateIndex<T>;
-    type Symbol = SymbolOf<T>;
+pub trait InfiniteObserver<T: TransitionSystem>: FiniteObserver<T> {
+    fn loop_back(seq: &[Self::Output], ts: &T, time: usize) -> Self::Output;
+}
+impl<T: Deterministic> InfiniteObserver<T> for NoObserver {
+    fn loop_back(_seq: &[Self::Output], _ts: &T, _time: usize) -> Self::Output {}
 }
 
-impl<'ts, T: Deterministic, W: FiniteWord<SymbolOf<T>>> FiniteRunResult for FiniteRun<'ts, T, W> {
-    fn state_colors(self) -> Option<impl Iterator<Item = Option<Self::StateColor>>> {
-        if !self.ts.contains_state_index(self.start) {
-            None
-        } else {
-            Some(FiniteRunner::<&T, W, OutputStateColor>::new(
-                self.ts, self.word, self.start,
-            ))
-        }
-    }
-
-    fn edge_colors(self) -> Option<impl Iterator<Item = Option<Self::EdgeColor>>> {
-        if !self.ts.contains_state_index(self.start) {
-            None
-        } else {
-            Some(FiniteRunner::<&T, W, OutputEdgeColor>::new(
-                self.ts, self.word, self.start,
-            ))
-        }
-    }
-
-    fn successful_indices(self) -> Option<impl Iterator<Item = Self::StateIndex>> {
-        if !self.ts.contains_state_index(self.start) {
-            None
-        } else {
-            Some(FiniteRunner::<&T, W, OutputStateIndex, true>::new(
-                self.ts, self.word, self.start,
-            ))
-        }
-    }
-
-    fn indices(self) -> Option<impl Iterator<Item = Option<Self::StateIndex>>> {
-        if !self.ts.contains_state_index(self.start) {
-            None
-        } else {
-            Some(FiniteRunner::<&T, W, OutputStateIndex>::new(
-                self.ts, self.word, self.start,
-            ))
-        }
-    }
-
-    fn successful(&self) -> bool {
-        self.ts.contains_state_index(self.start)
-            && FiniteRunner::<&T, &W, OutputStateIndex>::new(self.ts, &self.word, self.start)
-                .all(|o| o.is_some())
-    }
-}
-
-pub struct OutputStateIndex;
-pub struct OutputStateColor;
-pub struct OutputEdgeColor;
-pub struct OutputReachedState;
-
-pub struct FiniteRunner<
-    T: Deterministic,
-    W: FiniteWord<SymbolOf<T>>,
-    X,
-    const SUCCESSFUL: bool = false,
-> {
-    ts: T,
-    word: W,
-    state: Option<StateIndex<T>>,
-    pos: usize,
-    _phantom: PhantomData<X>,
-}
-
-impl<T: Deterministic, W: FiniteWord<SymbolOf<T>>, X, const SUCCESSFUL: bool>
-    FiniteRunner<T, W, X, SUCCESSFUL>
+impl<'ts, T: Deterministic, W: OmegaWord<SymbolOf<T>>, O: InfiniteObserver<T>>
+    Run<'ts, T, W, false, O>
 {
-    pub fn new(ts: T, word: W, state: StateIndex<T>) -> Self {
-        Self {
+    pub fn new_infinite(ts: &'ts T, start: StateIndex<T>, word: W) -> Run<'ts, T, W, false, O> {
+        Run {
             ts,
+            start,
             word,
-            state: Some(state),
-            pos: 0,
-            _phantom: PhantomData,
+            observer: PhantomData,
         }
     }
-}
-
-mod impl_iterators {
-    use super::*;
-    impl<T: Deterministic, W: FiniteWord<SymbolOf<T>>> Iterator
-        for FiniteRunner<T, W, OutputStateIndex, false>
-    {
-        type Item = Option<StateIndex<T>>;
-        fn next(&mut self) -> Option<Self::Item> {
-            let out = self.state?;
-            let Some(sym) = self.word.nth(self.pos) else {
-                self.state = None;
-                return Some(Some(out));
-            };
-            let Some(successor) = self.ts.successor_index(out, sym) else {
-                return Some(None);
-            };
-            self.state = Some(successor);
-            self.pos += 1;
-            Some(Some(out))
-        }
-    }
-    impl<T: Deterministic, W: FiniteWord<SymbolOf<T>>> Iterator
-        for FiniteRunner<T, W, OutputStateIndex, true>
-    {
-        type Item = StateIndex<T>;
-        fn next(&mut self) -> Option<Self::Item> {
-            let out = self.state?;
-            let Some(sym) = self.word.nth(self.pos) else {
-                self.state = None;
-                return Some(out);
-            };
-            let Some(successor) = self.ts.successor_index(out, sym) else {
-                panic!("assumed successful run, but is not");
-            };
-            self.state = Some(successor);
-            self.pos += 1;
-            Some(out)
-        }
-    }
-
-    impl<T: Deterministic, W: FiniteWord<SymbolOf<T>>> Iterator
-        for FiniteRunner<T, W, OutputStateColor, false>
-    {
-        type Item = Option<StateColor<T>>;
-        fn next(&mut self) -> Option<Self::Item> {
-            let out = self
-                .ts
-                .state_color(self.state?)
-                .expect("state should have a color");
-            let Some(sym) = self.word.nth(self.pos) else {
-                self.state = None;
-                return Some(Some(out));
-            };
-            let Some(successor) = self.ts.successor_index(self.state.unwrap(), sym) else {
-                return Some(None);
-            };
-            self.state = Some(successor);
-            self.pos += 1;
-            Some(Some(out))
-        }
-    }
-
-    impl<T: Deterministic, W: FiniteWord<SymbolOf<T>>> Iterator
-        for FiniteRunner<T, W, OutputEdgeColor, false>
-    {
-        type Item = Option<EdgeColor<T>>;
-        fn next(&mut self) -> Option<Self::Item> {
-            let q = self.state?;
-            let sym = self.word.nth(self.pos)?;
-            self.pos += 1;
-
-            let Some(edge) = self.ts.edge(q, sym) else {
-                return Some(None);
-            };
-            self.state = Some(edge.target());
-            Some(Some(edge.color()))
-        }
-    }
-}
-
-/// A run is a sequence of states and edges that is consistent with the transition system.
-/// Implementors of this trait represent such a run.
-pub trait FiniteRunResult: RunResult {
-    /// Returns an iterator over the state colors.
-    fn state_colors(self) -> Option<impl Iterator<Item = Option<Self::StateColor>>>;
-    /// Returns an iterator over the edge colors.
-    fn edge_colors(self) -> Option<impl Iterator<Item = Option<Self::EdgeColor>>>;
-    /// Returns an iterator over the state indices.
-    fn indices(self) -> Option<impl Iterator<Item = Option<Self::StateIndex>>>;
-    /// Returns whether the run is successful.
-    fn successful(&self) -> bool;
-
-    fn successful_indices(self) -> Option<impl Iterator<Item = Self::StateIndex>>;
-    fn reached_index(self) -> Option<Self::StateIndex> {
-        self.indices()?
-            .last()
-            .expect("at least origin state needs to be returned")
-    }
-    fn reached_color(self) -> Option<Self::StateColor> {
-        self.state_colors()?.last()?
-    }
-    fn last_transition_color(self) -> Option<Self::EdgeColor> {
-        self.edge_colors()?.last()?
-    }
-}
-
-pub struct OmegaRun<'ts, T: Deterministic> {
-    ts: &'ts T,
-    word: ReducedOmegaWord<SymbolOf<T>>,
-    origin: StateIndex<T>,
-}
-
-impl<'ts, T: Deterministic> RunResult for OmegaRun<'ts, T> {
-    type StateColor = StateColor<T>;
-    type EdgeColor = EdgeColor<T>;
-    type StateIndex = StateIndex<T>;
-    type Symbol = SymbolOf<T>;
-}
-
-impl<'ts, T: Deterministic> OmegaRun<'ts, T> {
-    pub fn new(ts: &'ts T, origin: StateIndex<T>, word: ReducedOmegaWord<SymbolOf<T>>) -> Self {
-        Self { ts, word, origin }
-    }
-    /// Executes the run. If successful, returns a triple (loop_start, loop_index, loop_length). If
-    /// unsuccessful, returns a pair consisting of the exit state and the number of
-    /// symbols needed to encounter a missing transition (i.e. the length of the
-    /// escape prefix).
-    pub fn evaluate(&self) -> Result<(StateIndex<T>, usize, usize), (StateIndex<T>, usize)> {
+    pub fn evaluate(&self) -> InfiniteRunOutput<T, &W, O> {
         let spoke = self.word.spoke();
-        let current = self.ts.finite_run_from(self.origin, spoke).evaluate()?;
+        // first evaluate the finite run piece
+        let mut current = match self.ts.finite_run_from::<_, O>(self.start, spoke) {
+            FiniteRunOutput::Reached(r, _) => r,
+            FiniteRunOutput::Failed(state, ep) => {
+                return InfiniteRunOutput::Failed(state, ep.with_word(&self.word))
+            }
+        };
+
         let mut seen = math::Map::default();
         let mut iteration = 0;
         seen.insert(current, iteration);
+        let mut seq = vec![];
 
         let cycle = self.word.cycle();
         loop {
             iteration += 1;
-            match self.ts.finite_run_from(current, cycle).evaluate() {
-                Ok(reached) => {
+            match self.ts.finite_run_from::<_, O>(current, &cycle) {
+                FiniteRunOutput::Reached(reached, output) => {
                     if let Some(&prev_iteration) = seen.get(&reached) {
-                        let loop_index = spoke.len() + prev_iteration * cycle.len();
-                        let loop_length = (iteration - prev_iteration) * cycle.len();
-                        return Ok((reached, loop_index, loop_length));
+                        return InfiniteRunOutput::Successful(O::loop_back(
+                            &seq,
+                            self.ts,
+                            prev_iteration,
+                        ));
                     }
+                    seq.push(output)
                 }
-                Err((reached, len)) => {
-                    return Err((reached, spoke.len() + cycle.len() * (iteration - 1) + len))
+                FiniteRunOutput::Failed(reached, ep) => {
+                    return InfiniteRunOutput::Failed(
+                        reached,
+                        EscapePrefix {
+                            word: &self.word,
+                            length: self.word.spoke_length()
+                                + cycle.len() * (iteration - 1)
+                                + ep.length,
+                        },
+                    )
                 }
             }
         }
     }
-}
-
-impl<'ts, T: Deterministic> OmegaRunResult for OmegaRun<'ts, T> {
-    fn recurring_state_colors_iter(self) -> Option<impl Iterator<Item = Self::StateColor>> {
-        Some(std::iter::empty())
-    }
-
-    fn recurring_edge_colors_iter(self) -> Option<impl Iterator<Item = Self::EdgeColor>> {
-        Some(std::iter::empty())
-    }
-
-    fn recurring_state_indices_iter(self) -> Option<impl Iterator<Item = Self::StateIndex>> {
-        let spoke = self.word.spoke();
-        let current = self.ts.reached_state_index_from(self.origin, spoke)?;
-        let mut seen = math::Set::default();
-        let mut iteration = 0;
-        seen.insert(current);
-
-        let cycle = self.word.cycle();
-        while let Some(reached) = self.ts.reached_state_index_from(current, cycle) {
-            iteration += 1;
-            if !seen.insert(reached) {
-                let repeated = cycle.repeat(iteration);
-                let cycle_run = self
-                    .ts
-                    .finite_run_from(reached, repeated)
-                    .successful_indices();
-                return Some(cycle_run.expect("run should be successful!"));
-            }
-        }
-
-        None
-    }
-
-    fn escape_prefix(self) -> Option<Vec<Self::Symbol>> {
-        todo!()
-    }
-}
-
-/// A run is a sequence of states and edges that is consistent with the transition system.
-/// Implementors of this trait represent an infinite run.
-pub trait OmegaRunResult: RunResult {
-    /// Returns an iterator over the state colors.
-    fn recurring_state_colors_iter(self) -> Option<impl Iterator<Item = Self::StateColor>>;
-    /// Returns an iterator over the edge colors.
-    fn recurring_edge_colors_iter(self) -> Option<impl Iterator<Item = Self::EdgeColor>>;
-    /// Returns an iterator over the state indices.
-    fn recurring_state_indices_iter(self) -> Option<impl Iterator<Item = Self::StateIndex>>;
-    fn escape_prefix(self) -> Option<Vec<Self::Symbol>>;
 }
