@@ -1,5 +1,5 @@
 [workspace]
-members = ["automata", "automata-core", "automata-learning", "bin/*", "hoars", "omega-learning-tasks"]
+members = ["automata", "automata-core", "automata-learning", "bin/*", "hoars"]
 default-members = ["automata", "automata-*", "hoars", "bin/*"]
 exclude = ["python"]
 resolver = "2"
@@ -13,3 +13,5 @@ automata-core = { version = "0.1.0", path = "../automata-core" }
 indexmap = "2.2"
 bimap = "0.6"
 rand = "0.8.5"
+thiserror = "1.0"
+crossbeam-channel = "0.5.13"

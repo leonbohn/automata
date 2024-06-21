@@ -5,7 +5,7 @@ use std::{
 };
 
 use itertools::Itertools;
-use tracing::{info, trace};
+use tracing::trace;
 
 use crate::{automaton::InfiniteWordAutomaton, math::Partition, prelude::*};
 
@@ -565,7 +565,7 @@ where
             .with_initial(out_initial)
             .into_dpa();
 
-        info!("normalizing DPA took {} μs", start.elapsed().as_micros());
+        tracing::debug!("normalizing DPA took {} μs", start.elapsed().as_micros());
 
         debug_assert!(self.language_equivalent(&ret));
         ret

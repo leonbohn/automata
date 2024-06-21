@@ -1,12 +1,7 @@
 use csv::Writer;
 use itertools::{Either, Itertools};
 use rayon::prelude::*;
-use std::{
-    collections::HashMap,
-    env, fs,
-    path::PathBuf,
-    time::{Duration, SystemTime},
-};
+use std::{collections::HashMap, env, fs, path::PathBuf, time::Duration};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
 use automata::{
@@ -15,9 +10,12 @@ use automata::{
     prelude::*,
     random::{generate_random_dba, generate_random_dpa, generate_random_omega_words},
 };
-use automata_learning::passive::{sprout::sprout, OmegaSample};
+use automata_learning::passive::{
+    sprout::{sprout, SproutResult},
+    OmegaSample,
+};
 use math::set::IndexSet;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 fn main() {
     // initialize logger
@@ -30,15 +28,14 @@ fn main() {
                 .with_filter(tracing_subscriber::filter::LevelFilter::INFO),
         )
         .init();
-    info!("logging initialized.");
 
     let args: Vec<String> = env::args().collect();
     if args.contains(&"gen".to_string()) {
         // (re)generate tasks
         info!("Start generating learning tasks");
-        let automata_sizes = vec![8];
+        let automata_sizes = vec![4, 8, 16];
         let automata_per_size = 10;
-        let train_sizes = vec![100];
+        let train_sizes = vec![100, 1000, 10000];
         let test_size = 10000;
         let num_sets = 5;
         let lambda = 0.95;
@@ -62,6 +59,7 @@ pub fn run_sprout() {
     // load task directories
     let mut task_dirs = vec![];
     let entries = fs::read_dir("data/tasks").expect("No learning tasks available");
+
     for entry in entries.flatten() {
         if let Ok(file_type) = entry.file_type() {
             if file_type.is_dir() {
@@ -73,6 +71,7 @@ pub fn run_sprout() {
     }
     task_dirs
         .clone()
+        // .into_iter()
         .into_par_iter()
         .map(load_sample)
         .enumerate()
@@ -84,37 +83,92 @@ pub fn run_sprout() {
                 return;
             }
 
-            info!("starting learner for task {i} {:?}", dir.to_string_lossy());
-            let time = SystemTime::now();
             if dir.to_string_lossy().contains("dba") {
-                let Ok(learned) = sprout(sample, BuchiCondition) else {
-                    warn!("exceeded timeout on task {i}: {:?}", dir.to_string_lossy());
-                    return;
-                };
-                let elapsed = time.elapsed().unwrap();
+                let time = std::time::Instant::now();
                 info!(
-                    "task {i} \"{:?}\" learning took {} ms",
-                    dir.to_string_lossy(),
-                    elapsed.as_millis()
+                    "starting DBA learner for task {i} {:?}",
+                    dir.to_string_lossy()
                 );
-                export_automaton(format!("{}/learned.hoa", dir.to_str().unwrap()), &learned);
-                export_sprout_result(dir, &learned, elapsed);
+                match sprout(sample, BuchiCondition) {
+                    SproutResult::Successful(learned) => {
+                        let elapsed = time.elapsed();
+                        info!(
+                            "task {i} \"{:?}\" learning took {} ms",
+                            dir.to_string_lossy(),
+                            elapsed.as_millis()
+                        );
+                        export_automaton(
+                            format!("{}/learned.hoa", dir.to_str().unwrap()),
+                            &learned,
+                        );
+                        export_sprout_result(dir, &learned, elapsed);
+                    }
+                    SproutResult::Threshold(learned) => {
+                        let elapsed = time.elapsed();
+                        info!(
+                            "task {i} \"{:?}\" exceeded threshold after {} ms",
+                            dir.to_string_lossy(),
+                            elapsed.as_millis()
+                        );
+                        export_automaton(
+                            format!("{}/learned.hoa", dir.to_str().unwrap()),
+                            &learned,
+                        );
+                        export_sprout_result(dir, &learned, elapsed);
+                    }
+                    SproutResult::Timeout(partial) => {
+                        let elapsed = time.elapsed();
+                        info!(
+                            "exceeded timeout on task {i} with partial ts of size {}: {:?}",
+                            partial.size(),
+                            dir.to_string_lossy()
+                        );
+                        export_sprout_timeout(dir, partial, elapsed);
+                    }
+                }
             } else {
-                let Ok(learned) = sprout(sample, MinEvenParityCondition) else {
-                    warn!(
-                        "exceeded timeout on task {i} \"{:?}\"",
-                        dir.to_string_lossy()
-                    );
-                    return;
-                };
-                let elapsed = time.elapsed().unwrap();
+                let time = std::time::Instant::now();
                 info!(
-                    "task {i} \"{:?}\" learning took {} ms",
-                    dir.to_string_lossy(),
-                    elapsed.as_millis()
+                    "starting DPA learner for task {i} {:?}",
+                    dir.to_string_lossy()
                 );
-                export_automaton(format!("{}/learned.hoa", dir.to_str().unwrap()), &learned);
-                export_sprout_result(dir, &learned, elapsed);
+                match sprout(sample, MinEvenParityCondition) {
+                    SproutResult::Successful(learned) => {
+                        let elapsed = time.elapsed();
+                        info!(
+                            "task {i} \"{:?}\" learning took {} ms",
+                            dir.to_string_lossy(),
+                            elapsed.as_millis()
+                        );
+                        export_automaton(
+                            format!("{}/learned.hoa", dir.to_str().unwrap()),
+                            &learned,
+                        );
+                        export_sprout_result(dir, &learned, elapsed);
+                    }
+                    SproutResult::Threshold(learned) => {
+                        let elapsed = time.elapsed();
+                        info!(
+                            "task {i} \"{:?}\" exceeded threshold after {} ms",
+                            dir.to_string_lossy(),
+                            elapsed.as_millis()
+                        );
+                        export_automaton(
+                            format!("{}/learned.hoa", dir.to_str().unwrap()),
+                            &learned,
+                        );
+                        export_sprout_result(dir, &learned, elapsed);
+                    }
+                    SproutResult::Timeout(partial) => {
+                        let elapsed = time.elapsed();
+                        info!(
+                            "exceeded timeout on task {i} with partial ts of size {}: {:?}",
+                            partial.size(),
+                            dir.to_string_lossy()
+                        );
+                        export_sprout_timeout(dir, partial, elapsed);
+                    }
+                }
             }
         });
 }
@@ -468,6 +522,19 @@ pub fn export_settings(
     wtr.flush().unwrap();
 }
 
+pub fn export_sprout_timeout(
+    task_dir: &std::path::Path,
+    partial: impl Deterministic,
+    elapsed: Duration,
+) {
+    let mut wtr = Writer::from_path(task_dir.join("result.csv")).expect("creating file failed");
+    wtr.write_record(["abort_automaton_size", &partial.size().to_string()])
+        .unwrap();
+    wtr.write_record(["time_ms", &format!("{}", elapsed.as_millis())])
+        .unwrap();
+    wtr.flush().unwrap();
+}
+
 /// Score test set and export results
 pub fn export_sprout_result<Z, C>(
     task_dir: &std::path::Path,
@@ -477,6 +544,7 @@ pub fn export_sprout_result<Z, C>(
     Z: OmegaSemantics<Void, C, Output = bool>,
     C: Color,
 {
+    let start = std::time::Instant::now();
     // load test set
     let (test_pos, test_neg) = load_set(task_dir, "test.csv".to_string());
     let pos_count = test_pos.len();
@@ -535,4 +603,8 @@ pub fn export_sprout_result<Z, C>(
     wtr.write_record(["time_ms", &format!("{}", elapsed.as_millis())])
         .unwrap();
     wtr.flush().unwrap();
+    info!(
+        "exported sprout result in {} µs",
+        start.elapsed().as_micros()
+    );
 }
