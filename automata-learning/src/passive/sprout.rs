@@ -2,18 +2,34 @@ use automata::{math::Set, prelude::*, random, transition_system::path};
 use itertools::Itertools;
 use tracing::{info, warn};
 
-use std::{collections::HashSet, path::Iter};
+use std::{collections::HashSet, fmt::Debug, path::Iter};
 
 use crate::prefixtree::prefix_tree;
 
 use super::{consistency::ConsistencyCheck, OmegaSample};
+
+pub enum SproutError<A: ConsistencyCheck<WithInitial<DTS>>> {
+    Threshold(usize, A::Aut, WithInitial<DTS>),
+    Timeout(WithInitial<DTS>),
+}
+
+impl<A: ConsistencyCheck<WithInitial<DTS>>> Debug for SproutError<A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SproutError::Threshold(thresh, _default, ts) => {
+                write!(f, "exceeded threshold {thresh} with size {}", ts.size())
+            }
+            SproutError::Timeout(ts) => write!(f, "ran into timeout with ts of size {}", ts.size()),
+        }
+    }
+}
 
 /// gives a deterministic acc_type omega automaton that is consistent with the given sample
 /// implements the sprout passive learning algorithm for omega automata from <https://arxiv.org/pdf/2108.03735.pdf>
 pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
     sample: OmegaSample,
     acc_type: A,
-) -> Result<A::Aut, ()> {
+) -> Result<A::Aut, SproutError<A>> {
     let time_start = std::time::Instant::now();
 
     // make ts with initial state
@@ -41,14 +57,18 @@ pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
                 "task exceeded timeout, aborting with automaton of size {}",
                 ts.size()
             );
-            return Err(());
+            return Err(SproutError::Timeout(ts));
         }
         let u = escape_prefix[..escape_prefix.len() - 1].to_string();
         let a = escape_prefix.chars().last().expect("empty escape prefix");
         // check thresh
         if (u.len() as isize) - 1 > thresh {
             // compute default automaton
-            return Ok(acc_type.default_automaton(&sample));
+            return Err(SproutError::Threshold(
+                thresh as usize,
+                acc_type.default_automaton(&sample),
+                ts,
+            ));
         }
         // dbg!(u.len());
         let source = ts.finite_run(&u).unwrap().reached();
@@ -187,8 +207,8 @@ mod tests {
             .default_color(Void)
             .into_dba(0);
 
-        let res = sprout(sample, BuchiCondition).unwrap();
-        assert_eq!(res, dba);
+        let res = sprout(sample, BuchiCondition).err();
+        assert!(matches!(res.unwrap(), SproutError::Threshold(_, _, _)))
     }
 
     #[test]
@@ -263,7 +283,7 @@ mod tests {
             .into_dpa(0);
         dpa.complete_with_colors(Void, 1);
 
-        let res = sprout(sample, MinEvenParityCondition).unwrap();
-        assert_eq!(res, dpa);
+        let res = sprout(sample, MinEvenParityCondition).err();
+        assert!(matches!(res.unwrap(), SproutError::Threshold(_, _, _)))
     }
 }
