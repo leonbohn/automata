@@ -1,4 +1,4 @@
-use crate::{automaton::InfiniteWordAutomaton, prelude::*};
+use crate::{automaton::InfiniteWordAutomaton, prelude::*, transition_system::run};
 
 /// Defines the [`Semantics`] of a deterministic Büchi automaton (DBA),
 /// which is an acceptor of infinite words. It considers the set of
@@ -12,18 +12,11 @@ use crate::{automaton::InfiniteWordAutomaton, prelude::*};
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, Copy)]
 pub struct BuchiCondition;
 
-impl<Q> Semantics<Q, bool> for BuchiCondition {
+impl<T: Deterministic<EdgeColor = bool>> Semantics<T, true> for BuchiCondition {
+    type Observer = run::GreatestEdgeColor<T>;
     type Output = bool;
-}
-
-impl<Q> OmegaSemantics<Q, bool> for BuchiCondition {
-    fn evaluate<R>(&self, run: R) -> Self::Output
-    where
-        R: OmegaRunResult<StateColor = Q, EdgeColor = bool>,
-    {
-        run.recurring_edge_colors_iter()
-            .map(|mut colors| colors.any(|b| b))
-            .unwrap_or(false)
+    fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
+        observed.expect("need to take at least one edge")
     }
 }
 

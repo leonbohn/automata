@@ -48,14 +48,6 @@ where
         self.witness_inequivalence(other).is_none()
     }
 
-    /// Attempts to run the given finite word in `self`, returning the color of the last transition that
-    /// is taken wrapped in `Some`. If no successful run on `input` is possible, the function returns `None`.
-    pub fn map<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> Option<EdgeColor<C>> {
-        self.finite_run_from(self.initial, input)
-            .edge_colors()?
-            .last()?
-    }
-
     /// Returns a vector over all colors that can be emitted.
     pub fn color_range(&self) -> impl Iterator<Item = C::EdgeColor> + '_
     where

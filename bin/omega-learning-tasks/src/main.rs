@@ -11,11 +11,11 @@ use automata::{
     random::{generate_random_dba, generate_random_dpa, generate_random_omega_words},
 };
 use automata_learning::passive::{
-    sprout::{sprout, SproutResult},
+    sprout::{sprout, SproutError},
     OmegaSample,
 };
 use math::set::IndexSet;
-use tracing::{error, info, warn};
+use tracing::info;
 
 fn main() {
     // initialize logger
@@ -90,7 +90,7 @@ pub fn run_sprout() {
                     dir.to_string_lossy()
                 );
                 match sprout(sample, BuchiCondition) {
-                    SproutResult::Successful(learned) => {
+                    Ok(learned) => {
                         let elapsed = time.elapsed();
                         info!(
                             "task {i} \"{:?}\" learning took {} ms",
@@ -103,7 +103,7 @@ pub fn run_sprout() {
                         );
                         export_sprout_result(dir, &learned, elapsed);
                     }
-                    SproutResult::Threshold(learned) => {
+                    Err(SproutError::Threshold(_thres, learned)) => {
                         let elapsed = time.elapsed();
                         info!(
                             "task {i} \"{:?}\" exceeded threshold after {} ms",
@@ -116,7 +116,7 @@ pub fn run_sprout() {
                         );
                         export_sprout_result(dir, &learned, elapsed);
                     }
-                    SproutResult::Timeout(partial) => {
+                    Err(SproutError::Timeout(partial)) => {
                         let elapsed = time.elapsed();
                         info!(
                             "exceeded timeout on task {i} with partial ts of size {}: {:?}",
@@ -133,7 +133,7 @@ pub fn run_sprout() {
                     dir.to_string_lossy()
                 );
                 match sprout(sample, MinEvenParityCondition) {
-                    SproutResult::Successful(learned) => {
+                    Ok(learned) => {
                         let elapsed = time.elapsed();
                         info!(
                             "task {i} \"{:?}\" learning took {} ms",
@@ -146,7 +146,7 @@ pub fn run_sprout() {
                         );
                         export_sprout_result(dir, &learned, elapsed);
                     }
-                    SproutResult::Threshold(learned) => {
+                    Err(SproutError::Threshold(_thres, learned)) => {
                         let elapsed = time.elapsed();
                         info!(
                             "task {i} \"{:?}\" exceeded threshold after {} ms",
@@ -159,7 +159,7 @@ pub fn run_sprout() {
                         );
                         export_sprout_result(dir, &learned, elapsed);
                     }
-                    SproutResult::Timeout(partial) => {
+                    Err(SproutError::Timeout(partial)) => {
                         let elapsed = time.elapsed();
                         info!(
                             "exceeded timeout on task {i} with partial ts of size {}: {:?}",
@@ -390,7 +390,8 @@ pub fn label_set<Z, C>(
     set: &IndexSet<ReducedOmegaWord<char>>,
 ) -> Vec<(ReducedOmegaWord<char>, bool)>
 where
-    Z: OmegaSemantics<Void, C, Output = bool>,
+    Z: Semantics<DTS<CharAlphabet, Void, C>, true, Output = bool>,
+    Z::Observer: InfiniteObserver<DTS<CharAlphabet, Void, C>>,
     C: Color,
 {
     set.into_iter()
@@ -541,7 +542,8 @@ pub fn export_sprout_result<Z, C>(
     learned: &InfiniteWordAutomaton<CharAlphabet, Z, Void, C, true>,
     elapsed: Duration,
 ) where
-    Z: OmegaSemantics<Void, C, Output = bool>,
+    Z: Semantics<DTS<CharAlphabet, Void, C>, true, Output = bool>,
+    Z::Observer: InfiniteObserver<DTS<CharAlphabet, Void, C>>,
     C: Color,
 {
     let start = std::time::Instant::now();

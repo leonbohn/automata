@@ -1,9 +1,8 @@
-use std::collections::BTreeSet;
-
 use crate::automaton::InfiniteWordAutomaton;
 
 use crate::prelude::*;
 
+use itertools::Itertools;
 use math::Set;
 /// A deterministic Muller automaton (DMA) uses a [`MullerCondition`] to determine acceptance.
 /// Such a condition consists of a set of sets of colors. It considers an infinite run to
@@ -22,7 +21,7 @@ pub type IntoDMA<T> = DMA<<T as TransitionSystem>::Alphabet, StateColor<T>, Edge
 /// is satisfied by a set (usually the set of colors that appear infinitely often in a run),
 /// if it contains the set.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct MullerCondition<C: Color>(Set<BTreeSet<C>>);
+pub struct MullerCondition<C: Color>(Vec<Set<C>>);
 
 impl<C: Color + Ord> MullerCondition<C> {
     /// Builds a new instance from an iterator that yields iterators that yield colors
@@ -48,7 +47,7 @@ impl<C: Color + Ord> MullerCondition<C> {
 
     /// Returns `true` if the given `set` of colors satisfies this condition,
     /// i.e. if `self` contains `set`.
-    pub fn satisfied_by_set(&self, set: &BTreeSet<C>) -> bool {
+    pub fn satisfied_by_set(&self, set: &Set<C>) -> bool {
         self.0.contains(set)
     }
 
@@ -58,27 +57,20 @@ impl<C: Color + Ord> MullerCondition<C> {
     }
 
     /// Creates a new instance from a set of sets of colors.
-    pub fn new(sets: Set<BTreeSet<C>>) -> Self {
+    pub fn new(sets: Vec<Set<C>>) -> Self {
         Self(sets)
     }
 }
 
-impl<Q, C: Color + Ord> Semantics<Q, C> for MullerCondition<C> {
+impl<T: Deterministic> Semantics<T, true> for MullerCondition<EdgeColor<T>> {
+    type Observer = run::EdgeColorSet<T>;
     type Output = bool;
-}
-
-impl<Q, C: Color + Ord> OmegaSemantics<Q, C> for MullerCondition<C> {
-    fn evaluate<R>(&self, run: R) -> Self::Output
-    where
-        R: OmegaRunResult<StateColor = Q, EdgeColor = C>,
-    {
-        let Some(inf) = run
-            .recurring_edge_colors_iter()
-            .map(|x| x.collect::<BTreeSet<_>>())
-        else {
-            return false;
-        };
-        self.0.contains(&inf)
+    fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
+        println!(
+            "observed: {}",
+            observed.0.iter().map(|i| format!("{i:?}")).join(", ")
+        );
+        self.0.contains(&observed.0)
     }
 }
 
@@ -98,6 +90,7 @@ mod tests {
             .into_dts();
         let dra =
             DMA::from_parts_with_acceptance(ts, 0, MullerCondition::from_iter_iter([[0], [1]]));
+
         assert!(dra.accepts(upw!("a")));
         assert!(dra.accepts(upw!("b")));
         assert!(!dra.accepts(upw!("ba")));

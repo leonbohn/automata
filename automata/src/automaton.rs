@@ -23,10 +23,12 @@ pub use omega::{
 };
 
 mod with_initial;
+use run::{InfiniteObserver, Observer};
 pub use with_initial::{WithInitial, WithoutCondition};
 
-mod semantics;
-pub use semantics::{FiniteSemantics, OmegaSemantics, Semantics};
+/// Defines the semantics of automata, i.e. when something is accepted.
+pub mod semantics;
+pub use semantics::Semantics;
 
 mod deterministic;
 
@@ -172,23 +174,30 @@ impl<A, Z, Q, C, D> Automaton<A, Z, Q, C, D, false, true>
 where
     A: Alphabet,
     D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    Z: FiniteSemantics<StateColor<D>, EdgeColor<D>>,
+    Z: Semantics<D>,
     Q: Color,
     C: Color,
 {
     /// Returns whether the automaton accepts the given finite word.
     pub fn accepts<W: FiniteWord<SymbolOf<D>>>(&self, word: W) -> bool
     where
-        Z: FiniteSemantics<StateColor<D>, EdgeColor<D>, Output = bool>,
+        Z: Semantics<D, false, Output = bool>,
     {
-        self.transform(word)
+        let Some(output) = self.transform(word) else {
+            return false;
+        };
+        self.acceptance().evaluate(output)
     }
 
     /// Transforms the given finite word using the automaton, that means it returns
     /// the output of the acceptance condition on the run of the word.
-    pub fn transform<W: FiniteWord<SymbolOf<D>>>(&self, word: W) -> Z::Output {
-        self.acceptance
-            .evaluate(self.ts.finite_run_from(self.initial, word))
+    pub fn transform<W: FiniteWord<SymbolOf<D>>>(
+        &self,
+        word: W,
+    ) -> Option<<Z::Observer as Observer<D>>::Current> {
+        self.ts
+            .finite_run_from::<W, Z::Observer>(self.initial, word)
+            .into_output()
     }
 }
 
@@ -196,24 +205,31 @@ impl<A, Z, Q, C, D> Automaton<A, Z, Q, C, D, true, true>
 where
     A: Alphabet,
     D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    Z: OmegaSemantics<StateColor<D>, EdgeColor<D>>,
+    Z: Semantics<D, true>,
+    Z::Observer: InfiniteObserver<D>,
     Q: Color,
     C: Color,
 {
     /// Returns whether the automaton accepts the given omega word.
     pub fn accepts<W: OmegaWord<SymbolOf<D>>>(&self, word: W) -> bool
     where
-        Z: OmegaSemantics<StateColor<D>, EdgeColor<D>, Output = bool>,
+        Z: Semantics<D, true, Output = bool>,
     {
-        self.acceptance
-            .evaluate(self.ts.omega_run_from(self.initial, word))
+        let Some(output) = self.transform(word) else {
+            return false;
+        };
+        self.acceptance().evaluate(output)
     }
 
     /// Transforms the given omega word using the automaton, that means it returns
     /// the output of the acceptance condition on the run of the word.
-    pub fn transform<W: OmegaWord<SymbolOf<D>>>(&self, word: W) -> Z::Output {
-        self.acceptance
-            .evaluate(self.ts.omega_run_from(self.initial, word))
+    pub fn transform<W: OmegaWord<SymbolOf<D>>>(
+        &self,
+        word: W,
+    ) -> Option<<Z::Observer as Observer<D>>::Current> {
+        self.ts
+            .omega_run_from::<W, Z::Observer>(self.initial, word)
+            .into_output()
     }
 }
 
