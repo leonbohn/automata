@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, transition_system::run::Observer};
 /// This is the base trait for different types of semantics that are used by the
 /// [`Automaton`] struct for determining the output of a finite or infinite
 /// run. This can either be some arbitrary output in the case of a Moore or
@@ -36,25 +36,12 @@ use crate::prelude::*;
 /// This can actually be viewed as an instantiation of the [`MinEvenParityCondition`]
 /// semantics that a [`DPA`] uses, which outputs the least priority/color
 /// among those that are labels of edges taken infinitely often.
-pub trait Semantics<Q, C> {
+pub trait Semantics<T: TransitionSystem, const OMEGA: bool = false> {
     /// The type of output that this semantic produces.
     type Output;
-}
+    /// The observer whose output is used for computing the output.
+    type Observer: Observer<T>;
 
-/// This trait is implemented by acceptance conditions for finite words.
-/// See [`Semantics`] for more details.
-pub trait FiniteSemantics<Q, C>: Semantics<Q, C> {
     /// Compute the output for the given finite run.
-    fn evaluate<R>(&self, run: R) -> Self::Output
-    where
-        R: FiniteRunResult<StateColor = Q, EdgeColor = C>;
-}
-
-/// This trait is implemented by acceptance conditions for omega words.
-/// See [`Semantics`] documentation for more information.
-pub trait OmegaSemantics<Q, C>: Semantics<Q, C> {
-    /// Compute the output for the given omega run.
-    fn evaluate<R>(&self, run: R) -> Self::Output
-    where
-        R: OmegaRunResult<StateColor = Q, EdgeColor = C>;
+    fn evaluate(&self, observed: <Self::Observer as Observer<T>>::Current) -> Self::Output;
 }

@@ -71,21 +71,20 @@ impl<C: Color + Ord> RabinPair<C> {
     }
 }
 
-impl<Q, C: Color + Ord> Semantics<Q, C> for RabinCondition<C> {
+impl<T: Deterministic> Semantics<T, true> for RabinCondition<EdgeColor<T>>
+where
+    EdgeColor<T>: Color + Ord,
+{
     type Output = bool;
-}
-
-impl<Q, C: Color + Ord> OmegaSemantics<Q, C> for RabinCondition<C> {
-    fn evaluate<R>(&self, run: R) -> Self::Output
-    where
-        R: OmegaRunResult<StateColor = Q, EdgeColor = C>,
-    {
-        let Some(colors) = run.recurring_edge_colors_iter() else {
-            return false;
-        };
-        let colorset = colors.collect();
-
-        self.0.iter().any(|pair| pair.satisfied_by_set(&colorset))
+    type Observer = run::EdgeColorSet<T>;
+    fn evaluate(
+        &self,
+        observed: <Self::Observer as crate::transition_system::run::Observer<T>>::Current,
+    ) -> Self::Output {
+        let cur = observed.into_current().0;
+        self.0
+            .iter()
+            .any(|set| set.satisfied_by_iter(cur.iter().cloned()))
     }
 }
 

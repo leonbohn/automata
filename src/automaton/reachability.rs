@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, transition_system::run::ReachedStateColor};
 
 use self::operations::DefaultIfMissing;
 
@@ -16,16 +16,14 @@ impl std::fmt::Debug for ReachabilityCondition {
     }
 }
 
-impl<C> Semantics<bool, C> for ReachabilityCondition {
+impl<T: Deterministic<StateColor = bool>> Semantics<T, false> for ReachabilityCondition {
     type Output = bool;
-}
-
-impl<C> FiniteSemantics<bool, C> for ReachabilityCondition {
-    fn evaluate<R>(&self, run: R) -> Self::Output
-    where
-        R: FiniteRunResult<StateColor = bool, EdgeColor = C>,
-    {
-        run.reached_color().unwrap_or(false)
+    type Observer = ReachedStateColor<T>;
+    fn evaluate(
+        &self,
+        observed: <Self::Observer as crate::transition_system::run::Observer<T>>::Current,
+    ) -> Self::Output {
+        observed
     }
 }
 
