@@ -466,6 +466,20 @@ pub trait Deterministic: TransitionSystem {
         self.size() == self.minimal_representatives().count()
     }
 
+    /// Attempts to extract the escape prefix of running the given omega word.
+    fn omega_escape_prefix<W>(
+        &self,
+        word: W,
+    ) -> Option<run::EscapePrefix<ReducedOmegaWord<SymbolOf<Self>>>>
+    where
+        W: OmegaWord<SymbolOf<Self>>,
+        Self: Pointed,
+    {
+        self.omega_run::<W, run::NoObserver>(word)
+            .into_escape_prefix()
+            .map(|w| w.reduced())
+    }
+
     /// Compute the escape prefixes of a set of omega words on a transition system.
     fn escape_prefixes<'a, W>(
         &self,
