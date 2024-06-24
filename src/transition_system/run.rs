@@ -84,7 +84,6 @@ impl<'ts, T: Deterministic, W: FiniteWord<SymbolOf<T>>, O: Observer<T>> Run<'ts,
         let mut current = self.start;
 
         while let Some(sym) = self.word.nth(taken) {
-            taken += 1;
             if let Some(next) = observer.observe(self.ts, current, sym) {
                 current = next;
             } else {
@@ -96,6 +95,7 @@ impl<'ts, T: Deterministic, W: FiniteWord<SymbolOf<T>>, O: Observer<T>> Run<'ts,
                     },
                 );
             }
+            taken += 1;
         }
         FiniteRunOutput::Reached(current, observer.into_current())
     }
@@ -190,6 +190,13 @@ impl<W> EscapePrefix<W> {
             length: len,
         }
     }
+    pub fn suffix<S: Symbol>(self) -> ReducedOmegaWord<S>
+    where
+        W: OmegaWord<S>,
+    {
+        Word::skip(&self.word, self.length).reduced()
+    }
+
     pub fn reduced<S: Symbol>(self) -> EscapePrefix<ReducedOmegaWord<S>>
     where
         W: OmegaWord<S>,
