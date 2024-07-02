@@ -83,7 +83,7 @@ where
 
     /// Runs the given `input` word in self. If the run is successful, the color of the state that it reaches
     /// is emitted (wrapped in a `Some`). For unsuccessful runs, `None` is returned.
-    pub fn map<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> Option<M::StateColor> {
+    pub fn map<W: FiniteWord<Symbol = SymbolOf<Self>>>(&self, input: W) -> Option<M::StateColor> {
         self.reached_state_color_from(self.initial, input)
     }
 

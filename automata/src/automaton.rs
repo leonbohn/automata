@@ -179,7 +179,7 @@ where
     C: Color,
 {
     /// Returns whether the automaton accepts the given finite word.
-    pub fn accepts<W: FiniteWord<SymbolOf<D>>>(&self, word: W) -> bool
+    pub fn accepts<W: FiniteWord<Symbol = SymbolOf<D>>>(&self, word: W) -> bool
     where
         Z: Semantics<D, false, Output = bool>,
     {
@@ -191,7 +191,7 @@ where
 
     /// Transforms the given finite word using the automaton, that means it returns
     /// the output of the acceptance condition on the run of the word.
-    pub fn transform<W: FiniteWord<SymbolOf<D>>>(
+    pub fn transform<W: FiniteWord<Symbol = SymbolOf<D>>>(
         &self,
         word: W,
     ) -> Option<<Z::Observer as Observer<D>>::Current> {
@@ -211,7 +211,7 @@ where
     C: Color,
 {
     /// Returns whether the automaton accepts the given omega word.
-    pub fn accepts<W: OmegaWord<SymbolOf<D>>>(&self, word: W) -> bool
+    pub fn accepts<W: OmegaWord<Symbol = SymbolOf<D>>>(&self, word: W) -> bool
     where
         Z: Semantics<D, true, Output = bool>,
     {
@@ -223,7 +223,7 @@ where
 
     /// Transforms the given omega word using the automaton, that means it returns
     /// the output of the acceptance condition on the run of the word.
-    pub fn transform<W: OmegaWord<SymbolOf<D>>>(
+    pub fn transform<W: OmegaWord<Symbol = SymbolOf<D>>>(
         &self,
         word: W,
     ) -> Option<<Z::Observer as Observer<D>>::Current> {

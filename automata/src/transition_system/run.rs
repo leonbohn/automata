@@ -50,7 +50,7 @@ pub struct Triggers<T: TransitionSystem>(math::Set<(StateIndex<T>, SymbolOf<T>)>
 pub struct Run<
     'ts,
     T: Deterministic,
-    W: Word<SymbolOf<T>>,
+    W: Word<Symbol = SymbolOf<T>>,
     const FINITE: bool,
     O: Observer<T> = NoObserver,
 > {
@@ -60,8 +60,8 @@ pub struct Run<
     observer: PhantomData<O>,
 }
 
-impl<'ts, T: Deterministic, W: Word<SymbolOf<T>>, const FINITE: bool, O: Observer<T>> RunResult
-    for Run<'ts, T, W, FINITE, O>
+impl<'ts, T: Deterministic, W: Word<Symbol = SymbolOf<T>>, const FINITE: bool, O: Observer<T>>
+    RunResult for Run<'ts, T, W, FINITE, O>
 {
     type StateColor = StateColor<T>;
     type EdgeColor = EdgeColor<T>;
@@ -69,7 +69,9 @@ impl<'ts, T: Deterministic, W: Word<SymbolOf<T>>, const FINITE: bool, O: Observe
     type Symbol = SymbolOf<T>;
 }
 
-impl<'ts, T: Deterministic, W: FiniteWord<SymbolOf<T>>, O: Observer<T>> Run<'ts, T, W, true, O> {
+impl<'ts, T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>, O: Observer<T>>
+    Run<'ts, T, W, true, O>
+{
     pub fn new_finite(ts: &'ts T, start: StateIndex<T>, word: W) -> Run<'ts, T, W, true, O> {
         Run {
             ts,
@@ -104,7 +106,7 @@ impl<'ts, T: Deterministic, W: FiniteWord<SymbolOf<T>>, O: Observer<T>> Run<'ts,
     }
 }
 
-impl<'ts, T: Deterministic, W: OmegaWord<SymbolOf<T>>, O: InfiniteObserver<T>>
+impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserver<T>>
     Run<'ts, T, W, false, O>
 {
     pub fn new_infinite(ts: &'ts T, start: StateIndex<T>, word: W) -> Run<'ts, T, W, false, O> {
@@ -171,10 +173,11 @@ pub struct EscapePrefix<W> {
     length: usize,
 }
 
-impl<W> EscapePrefix<W> {
+impl<W: Word> EscapePrefix<W> {
     pub fn new(word: W, length: usize) -> Self {
         Self { word, length }
     }
+
     pub fn with_word<V>(self, word: V) -> EscapePrefix<V> {
         EscapePrefix {
             word,
@@ -192,29 +195,20 @@ impl<W> EscapePrefix<W> {
     }
     pub fn suffix<S: Symbol>(self) -> ReducedOmegaWord<S>
     where
-        W: OmegaWord<S>,
+        W: OmegaWord<Symbol = S>,
     {
         Word::skip(&self.word, self.length).reduced()
     }
 
-    pub fn reduced<S: Symbol>(self) -> EscapePrefix<ReducedOmegaWord<S>>
-    where
-        W: OmegaWord<S>,
-    {
-        EscapePrefix {
-            word: self.word.reduced(),
-            length: self.length,
-        }
-    }
-}
-impl<S: Symbol> EscapePrefix<ReducedOmegaWord<S>> {
-    pub fn escape_symbol(&self) -> S {
+    pub fn escape_symbol(&self) -> W::Symbol {
         self.word.nth(self.length).unwrap()
     }
 }
-impl<S: Symbol> Word<S> for EscapePrefix<ReducedOmegaWord<S>> {
+
+impl<W: Word> Word for EscapePrefix<W> {
+    type Symbol = W::Symbol;
     const FINITE: bool = true;
-    fn nth(&self, position: usize) -> Option<S> {
+    fn nth(&self, position: usize) -> Option<W::Symbol> {
         if position >= self.length {
             None
         } else {
@@ -222,15 +216,15 @@ impl<S: Symbol> Word<S> for EscapePrefix<ReducedOmegaWord<S>> {
         }
     }
 }
-impl<S: Symbol> FiniteWord<S> for EscapePrefix<ReducedOmegaWord<S>> {
-    type Symbols<'this> = EscapePrefixSymbols<'this, S> where Self: 'this;
+impl<W: Word> FiniteWord for EscapePrefix<W> {
+    type Symbols<'this> = EscapePrefixSymbols<'this, W> where Self: 'this;
     fn symbols(&self) -> Self::Symbols<'_> {
         EscapePrefixSymbols(self, 0)
     }
 }
-pub struct EscapePrefixSymbols<'a, S: Symbol>(&'a EscapePrefix<ReducedOmegaWord<S>>, usize);
-impl<'a, S: Symbol> Iterator for EscapePrefixSymbols<'a, S> {
-    type Item = S;
+pub struct EscapePrefixSymbols<'a, W: Word>(&'a EscapePrefix<W>, usize);
+impl<'a, W: Word> Iterator for EscapePrefixSymbols<'a, W> {
+    type Item = W::Symbol;
     fn next(&mut self) -> Option<Self::Item> {
         if self.1 >= self.0.length {
             None
@@ -241,7 +235,7 @@ impl<'a, S: Symbol> Iterator for EscapePrefixSymbols<'a, S> {
         }
     }
 }
-impl<S: Symbol> Ord for EscapePrefix<ReducedOmegaWord<S>> {
+impl<W: Word> Ord for EscapePrefix<W> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.length.cmp(&other.length).then(
             self.word
@@ -251,7 +245,7 @@ impl<S: Symbol> Ord for EscapePrefix<ReducedOmegaWord<S>> {
         )
     }
 }
-impl<S: Symbol> PartialOrd for EscapePrefix<ReducedOmegaWord<S>> {
+impl<W: Word> PartialOrd for EscapePrefix<W> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(&other))
     }
@@ -274,12 +268,12 @@ pub trait RunResult: Sized {
     // fn reduced<R:
 }
 
-pub enum FiniteRunOutput<T: TransitionSystem, W: Word<SymbolOf<T>>, O: Observer<T>> {
+pub enum FiniteRunOutput<T: TransitionSystem, W: Word<Symbol = SymbolOf<T>>, O: Observer<T>> {
     Reached(StateIndex<T>, O::Current),
     Failed(StateIndex<T>, EscapePrefix<W>),
 }
 
-impl<T: TransitionSystem, W: Word<SymbolOf<T>>, O: Observer<T>> FiniteRunOutput<T, W, O> {
+impl<T: TransitionSystem, W: Word<Symbol = SymbolOf<T>>, O: Observer<T>> FiniteRunOutput<T, W, O> {
     /// Returns the state from which the transition system is left.
     #[allow(unused)]
     fn escape_state(&self) -> Option<StateIndex<T>> {
@@ -310,12 +304,16 @@ impl<T: TransitionSystem, W: Word<SymbolOf<T>>, O: Observer<T>> FiniteRunOutput<
     }
 }
 
-pub enum InfiniteRunOutput<T: TransitionSystem, W: OmegaWord<SymbolOf<T>>, O: InfiniteObserver<T>> {
+pub enum InfiniteRunOutput<
+    T: TransitionSystem,
+    W: OmegaWord<Symbol = SymbolOf<T>>,
+    O: InfiniteObserver<T>,
+> {
     Successful(O::Current),
     Failed(StateIndex<T>, EscapePrefix<W>),
 }
 
-impl<T: TransitionSystem, W: OmegaWord<SymbolOf<T>>, O: InfiniteObserver<T>> Debug
+impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserver<T>> Debug
     for InfiniteRunOutput<T, W, O>
 where
     W: Debug,
@@ -331,7 +329,7 @@ where
     }
 }
 
-impl<T: TransitionSystem, W: OmegaWord<SymbolOf<T>>, O: InfiniteObserver<T>>
+impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserver<T>>
     InfiniteRunOutput<T, W, O>
 {
     pub fn is_successful(&self) -> bool {

@@ -339,7 +339,7 @@ where
             .map(|(word, profile)| (word.as_slice(), profile.into()))
     }
 
-    pub fn profile_for<W: FiniteWord<SymbolOf<Ts>>>(&self, word: W) -> Option<usize> {
+    pub fn profile_for<W: FiniteWord<Symbol = SymbolOf<Ts>>>(&self, word: W) -> Option<usize> {
         let (_tp, pe) = self.strings.iter().find(|(p, _e)| p.equals(&word))?;
         match pe {
             ProfileEntry::Profile(p) => Some(*p),
@@ -347,7 +347,7 @@ where
         }
     }
 
-    pub fn profile<W: FiniteWord<SymbolOf<Ts>>>(
+    pub fn profile<W: FiniteWord<Symbol = SymbolOf<Ts>>>(
         &self,
         word: W,
     ) -> &RunProfile<Ts::StateIndex, StateColor<Ts>, EdgeColor<Ts>> {

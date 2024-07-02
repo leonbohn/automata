@@ -76,14 +76,15 @@ impl<S: Symbol> NormalizedOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> Word<S> for NormalizedOmegaWord<S> {
+impl<S: Symbol> Word for NormalizedOmegaWord<S> {
+    type Symbol = S;
     const FINITE: bool = false;
     fn nth(&self, position: usize) -> Option<S> {
         self.upw.nth(position)
     }
 }
 
-impl<S: Symbol> OmegaWord<S> for NormalizedOmegaWord<S> {
+impl<S: Symbol> OmegaWord for NormalizedOmegaWord<S> {
     type Spoke<'this> = &'this [S]
     where
         Self: 'this;

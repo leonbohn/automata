@@ -747,7 +747,12 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const 
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn eq(&self, other: &Self) -> bool {
-        if self.alphabet != other.alphabet || self.states.len() != other.states.len() {
+        if self.alphabet != other.alphabet {
+            trace!("alphabets do not match");
+            return false;
+        }
+        if self.states.len() != other.states.len() {
+            trace!("number of states does not match");
             return false;
         }
 
