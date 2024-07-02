@@ -785,12 +785,21 @@ impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color, const DET: bool> std::fm
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "alphabet: {:?}", self.alphabet)?;
-        for (i, state) in self.states.iter().enumerate() {
-            writeln!(f, "Q[{i}]: {state:?}")?;
-        }
-        for (i, edge) in self.edges.iter().enumerate() {
-            writeln!(f, "E[{i}]: {edge:?}")?;
+        for q in self.state_indices() {
+            write!(f, "{q} : {:?} |", self.state_color(q).unwrap())?;
+            let Some(it) = self.edges_from(q) else {
+                continue;
+            };
+            for e in it {
+                write!(
+                    f,
+                    " {}/{:?}->{}",
+                    e.expression().show(),
+                    e.color(),
+                    e.target()
+                )?;
+            }
+            writeln!(f)?;
         }
         Ok(())
     }
