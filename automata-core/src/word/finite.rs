@@ -27,8 +27,20 @@ pub trait FiniteWord: Word {
 
     /// Checks if the given word is equal to this word. Note, that this operation only makes sense
     /// when both words are finite.
-    fn equals<W: FiniteWord<Symbol = Self::Symbol>>(&self, other: W) -> bool {
+    fn finite_word_equals<W: FiniteWord<Symbol = Self::Symbol>>(&self, other: W) -> bool {
+        assert!(W::FINITE);
         self.len() == other.len() && self.symbols().zip(other.symbols()).all(|(a, b)| a == b)
+    }
+
+    /// Compares the finite word self
+    fn length_lexicographic_ord<W: FiniteWord<Symbol = Self::Symbol>>(
+        &self,
+        other: W,
+    ) -> std::cmp::Ordering {
+        assert!(W::FINITE);
+        self.len()
+            .cmp(&other.len())
+            .then(self.symbols().cmp(other.symbols()))
     }
 
     /// Prepends the given `prefix` to the beginning of this word. This operation only works if

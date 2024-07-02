@@ -413,16 +413,7 @@ where
     C: Clone,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}\nacceptance\t\t{:?}\n{:?}",
-            match OMEGA {
-                true => "Omega word automaton",
-                false => "Finite word automaton",
-            },
-            self.acceptance,
-            self.ts
-        )
+        write!(f, "{:?}\n{:?}", self.acceptance, self.ts)
     }
 }
 

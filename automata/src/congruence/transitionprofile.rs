@@ -340,7 +340,10 @@ where
     }
 
     pub fn profile_for<W: FiniteWord<Symbol = SymbolOf<Ts>>>(&self, word: W) -> Option<usize> {
-        let (_tp, pe) = self.strings.iter().find(|(p, _e)| p.equals(&word))?;
+        let (_tp, pe) = self
+            .strings
+            .iter()
+            .find(|(p, _e)| p.finite_word_equals(&word))?;
         match pe {
             ProfileEntry::Profile(p) => Some(*p),
             ProfileEntry::Redirect(r) => Some(*r),

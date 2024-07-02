@@ -1,6 +1,8 @@
 #![allow(missing_docs)]
 use std::{fmt::Debug, marker::PhantomData};
 
+use word::Infix;
+
 use crate::prelude::*;
 
 pub trait Observer<T: TransitionSystem>: Sized {
@@ -86,18 +88,12 @@ impl<'ts, T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>, O: Observer<T>>
         let mut current = self.start;
 
         while let Some(sym) = self.word.nth(taken) {
+            taken += 1;
             if let Some(next) = observer.observe(self.ts, current, sym) {
                 current = next;
             } else {
-                return FiniteRunOutput::Failed(
-                    current,
-                    EscapePrefix {
-                        word: self.word,
-                        length: taken,
-                    },
-                );
+                return FiniteRunOutput::Failed(current, EscapePrefix::new(self.word, taken));
             }
-            taken += 1;
         }
         FiniteRunOutput::Reached(current, observer.into_current())
     }
@@ -149,13 +145,14 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
                     current = reached;
                 }
                 FiniteRunOutput::Failed(reached, ep) => {
-                    let length =
-                        self.word.spoke_length() + cycle.len() * (iteration - 1) + ep.length;
+                    let length = self.word.spoke_length()
+                        + cycle.len() * (iteration - 1)
+                        + ep.shortest_escaping_length;
                     return InfiniteRunOutput::Failed(
                         reached,
                         EscapePrefix {
                             word: self.word,
-                            length,
+                            shortest_escaping_length: length,
                         },
                     );
                 }
@@ -167,41 +164,52 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone)]
 pub struct EscapePrefix<W> {
-    pub word: W,
-    length: usize,
+    word: W,
+    shortest_escaping_length: usize,
 }
 
 impl<W: Word> EscapePrefix<W> {
     pub fn new(word: W, length: usize) -> Self {
-        Self { word, length }
+        assert!(length > 0);
+        Self {
+            word,
+            shortest_escaping_length: length,
+        }
+    }
+    pub fn as_prefix(&self) -> Infix<'_, W> {
+        self.word.prefix(self.shortest_escaping_length)
     }
 
     pub fn with_word<V>(self, word: V) -> EscapePrefix<V> {
         EscapePrefix {
             word,
-            length: self.length,
+            shortest_escaping_length: self.shortest_escaping_length,
         }
     }
     pub fn len(&self) -> usize {
-        self.length
+        self.shortest_escaping_length - 1
+    }
+    pub fn is_empty(&self) -> bool {
+        assert!(self.len() > 0);
+        false
     }
     pub fn with_length(self, len: usize) -> Self {
         Self {
             word: self.word,
-            length: len,
+            shortest_escaping_length: len,
         }
     }
     pub fn suffix<S: Symbol>(self) -> ReducedOmegaWord<S>
     where
         W: OmegaWord<Symbol = S>,
     {
-        Word::skip(&self.word, self.length).reduced()
+        Word::skip(&self.word, self.shortest_escaping_length).reduced()
     }
 
     pub fn escape_symbol(&self) -> W::Symbol {
-        self.word.nth(self.length).unwrap()
+        self.word.nth(self.shortest_escaping_length - 1).unwrap()
     }
 }
 
@@ -209,7 +217,7 @@ impl<W: Word> Word for EscapePrefix<W> {
     type Symbol = W::Symbol;
     const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
-        if position >= self.length {
+        if position + 1 >= self.shortest_escaping_length {
             None
         } else {
             self.word.nth(position)
@@ -226,7 +234,7 @@ pub struct EscapePrefixSymbols<'a, W: Word>(&'a EscapePrefix<W>, usize);
 impl<'a, W: Word> Iterator for EscapePrefixSymbols<'a, W> {
     type Item = W::Symbol;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.1 >= self.0.length {
+        if self.1 + 1 >= self.0.shortest_escaping_length {
             None
         } else {
             let out = self.0.nth(self.1).unwrap();
@@ -237,22 +245,34 @@ impl<'a, W: Word> Iterator for EscapePrefixSymbols<'a, W> {
 }
 impl<W: Word> Ord for EscapePrefix<W> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.length.cmp(&other.length).then(
-            self.word
-                .prefix(self.length)
-                .collect_vec()
-                .cmp(&other.word.prefix(self.length).collect_vec()),
-        )
+        self.length_lexicographic_ord(other)
+            .then(self.escape_symbol().cmp(&other.escape_symbol()))
     }
 }
 impl<W: Word> PartialOrd for EscapePrefix<W> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
+impl<W: Word> std::hash::Hash for EscapePrefix<W> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_prefix().hash(state)
+    }
+}
+
+impl<W: Word> PartialEq for EscapePrefix<W> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_prefix().finite_word_equals(other.as_prefix())
+    }
+}
+impl<W: Word> Eq for EscapePrefix<W> {}
 impl<W: Debug> Debug for EscapePrefix<W> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "escape prefix length {} of {:?}", self.length, self.word)
+        write!(
+            f,
+            "escape prefix length {} of {:?}",
+            self.shortest_escaping_length, self.word
+        )
     }
 }
 
@@ -335,6 +355,9 @@ impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserve
     pub fn is_successful(&self) -> bool {
         matches!(self, InfiniteRunOutput::Successful(_))
     }
+    pub fn is_escaping(&self) -> bool {
+        !self.is_successful()
+    }
     pub fn into_output(self) -> Option<O::Current> {
         match self {
             Self::Successful(o) => Some(o),
@@ -363,9 +386,7 @@ mod impls {
         fn current(&self) -> &Self::Current {
             &()
         }
-        fn into_current(self) -> Self::Current {
-            ()
-        }
+        fn into_current(self) -> Self::Current {}
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
             NoObserver
         }
@@ -540,7 +561,7 @@ mod impls {
             self
         }
         fn current(&self) -> &Self::Current {
-            &self
+            self
         }
         fn observe(
             &mut self,
@@ -636,7 +657,7 @@ mod impls {
             Self(math::Set::from_iter([start]))
         }
         fn current(&self) -> &Self::Current {
-            &self
+            self
         }
         fn into_current(self) -> Self::Current {
             self
@@ -667,7 +688,7 @@ mod impls {
             Self(math::Set::default())
         }
         fn current(&self) -> &Self::Current {
-            &self
+            self
         }
         fn into_current(self) -> Self::Current {
             self
@@ -772,5 +793,26 @@ mod impls {
                 acc
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use run::EscapePrefix;
+
+    use crate::prelude::*;
+    #[test_log::test]
+    fn run_escaping() {
+        let dts = TSBuilder::without_colors()
+            .with_transitions([(0, 'a', 1), (1, 'a', 0)])
+            .into_dts_with_initial(0);
+
+        let w0 = upw!("a");
+        assert_eq!(dts.omega_escape_prefix(&w0), None);
+        let w1 = upw!("a", "b");
+        assert_eq!(
+            dts.omega_escape_prefix(&w1),
+            Some(EscapePrefix::new(&w1, 2))
+        );
     }
 }
