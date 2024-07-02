@@ -72,14 +72,15 @@ impl<T: TransitionSystem> std::ops::DerefMut for MinimalRepresentative<T> {
     }
 }
 
-impl<T: TransitionSystem> Word<SymbolOf<T>> for MinimalRepresentative<T> {
+impl<T: TransitionSystem> Word for MinimalRepresentative<T> {
+    type Symbol = SymbolOf<T>;
     const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<SymbolOf<T>> {
         self.0.get(position).copied()
     }
 }
 
-impl<T: TransitionSystem> FiniteWord<SymbolOf<T>> for MinimalRepresentative<T> {
+impl<T: TransitionSystem> FiniteWord for MinimalRepresentative<T> {
     type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, SymbolOf<T>>>
     where
         Self: 'this;

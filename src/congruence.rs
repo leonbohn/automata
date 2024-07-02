@@ -41,7 +41,7 @@ pub trait Congruence: Deterministic + Pointed {
     /// ```
     fn normalize_upw(
         &self,
-        word: impl OmegaWord<SymbolOf<Self>>,
+        word: impl OmegaWord<Symbol = SymbolOf<Self>>,
     ) -> Option<word::NormalizedOmegaWord<SymbolOf<Self>>>
     where
         Self: Pointed,

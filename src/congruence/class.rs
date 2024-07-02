@@ -57,13 +57,14 @@ impl<S: Symbol> std::fmt::Display for Class<S> {
     }
 }
 
-impl<S: Symbol> Word<S> for Class<S> {
+impl<S: Symbol> Word for Class<S> {
+    type Symbol = S;
     const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<S> {
         self.0.get(position).cloned()
     }
 }
-impl<S: Symbol> FiniteWord<S> for Class<S> {
+impl<S: Symbol> FiniteWord for Class<S> {
     type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, S>>
     where
         Self: 'this,

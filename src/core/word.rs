@@ -24,14 +24,15 @@ pub use self::skip::Infix;
 
 /// A linear word is a word that can be indexed by a `usize`. This is the case for both finite and
 /// infinite words.
-pub trait Word<S>: Hash + Eq {
+pub trait Word: Hash + Eq {
+    type Symbol: Symbol;
     const FINITE: bool;
 
     /// Returns the symbol at the given `position` in `self`, if it exists.
-    fn nth(&self, position: usize) -> Option<S>;
+    fn nth(&self, position: usize) -> Option<Self::Symbol>;
 
     /// Returns the first symbol of `self`, if it exists.
-    fn first(&self) -> Option<S>
+    fn first(&self) -> Option<Self::Symbol>
     where
         Self: Sized,
     {
@@ -46,7 +47,7 @@ pub trait Word<S>: Hash + Eq {
     /// let word = "abcde".to_string();
     /// assert_eq!(word.infix(1, 3).as_string(), "bcd");
     /// ```
-    fn infix(&self, offset: usize, length: usize) -> Infix<'_, S, Self>
+    fn infix(&self, offset: usize, length: usize) -> Infix<'_, Self>
     where
         Self: Sized,
     {
@@ -54,7 +55,7 @@ pub trait Word<S>: Hash + Eq {
     }
 
     /// Constructs an [`Infix`] object, which is a finite prefix of `self` that has the given `length`.
-    fn prefix(&self, length: usize) -> Infix<'_, S, Self>
+    fn prefix(&self, length: usize) -> Infix<'_, Self>
     where
         Self: Sized,
     {
@@ -62,7 +63,7 @@ pub trait Word<S>: Hash + Eq {
     }
 
     /// Removes the first symbol of `self` and returns it together with the remaining suffix.
-    fn pop_first(&self) -> (S, skip::Skip<'_, S, Self>)
+    fn pop_first(&self) -> (Self::Symbol, skip::Skip<'_, Self>)
     where
         Self: Sized,
     {
@@ -71,7 +72,7 @@ pub trait Word<S>: Hash + Eq {
     }
 
     /// Creates an [`crate::word::Skip`] object, which is the suffix of `self` that starts at the given `offset`.
-    fn skip(&self, offset: usize) -> skip::Skip<'_, S, Self>
+    fn skip(&self, offset: usize) -> skip::Skip<'_, Self>
     where
         Self: Sized,
     {
@@ -79,9 +80,10 @@ pub trait Word<S>: Hash + Eq {
     }
 }
 
-impl<S: Symbol, W: Word<S> + ?Sized> Word<S> for &W {
+impl<W: Word + ?Sized> Word for &W {
+    type Symbol = W::Symbol;
     const FINITE: bool = W::FINITE;
-    fn nth(&self, position: usize) -> Option<S> {
+    fn nth(&self, position: usize) -> Option<W::Symbol> {
         W::nth(self, position)
     }
 }
@@ -92,22 +94,22 @@ impl<S: Symbol, W: Word<S> + ?Sized> Word<S> for &W {
 /// we check if the start position is strictly smaller than the end position, and if so, we return the symbol at
 /// the start position and increment it. Otherwise, we return `None`.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct ConsumingInfixIterator<'a, S: Symbol, W: Word<S>> {
+pub struct ConsumingInfixIterator<'a, W: Word> {
     word: &'a W,
     start: usize,
     end: usize,
-    _marker: std::marker::PhantomData<S>,
 }
 
-impl<'a, S: Symbol, W: Word<S>> Word<S> for ConsumingInfixIterator<'a, S, W> {
+impl<'a, W: Word> Word for ConsumingInfixIterator<'a, W> {
+    type Symbol = W::Symbol;
     const FINITE: bool = true;
-    fn nth(&self, position: usize) -> Option<S> {
+    fn nth(&self, position: usize) -> Option<W::Symbol> {
         self.word.nth(self.start + position)
     }
 }
 
-impl<'a, S: Symbol, W: Word<S>> Iterator for ConsumingInfixIterator<'a, S, W> {
-    type Item = S;
+impl<'a, W: Word> Iterator for ConsumingInfixIterator<'a, W> {
+    type Item = W::Symbol;
     fn next(&mut self) -> Option<Self::Item> {
         if self.start < self.end {
             let out = self.word.nth(self.start);
@@ -119,15 +121,10 @@ impl<'a, S: Symbol, W: Word<S>> Iterator for ConsumingInfixIterator<'a, S, W> {
     }
 }
 
-impl<'a, S: Symbol, W: Word<S>> ConsumingInfixIterator<'a, S, W> {
+impl<'a, W: Word> ConsumingInfixIterator<'a, W> {
     /// Creates a new [`ConsumingInfixIterator`] object from a reference to a word and a start and end position.
     pub fn new(word: &'a W, start: usize, end: usize) -> Self {
-        Self {
-            word,
-            start,
-            end,
-            _marker: std::marker::PhantomData,
-        }
+        Self { word, start, end }
     }
 }
 

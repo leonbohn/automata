@@ -1,28 +1,19 @@
-use std::marker::PhantomData;
-
-use crate::prelude::Symbol;
-
 use super::{FiniteWord, Word};
 
 #[derive(Debug, Eq, PartialEq, Hash)]
-pub struct Repeat<S: Symbol, W: FiniteWord<S>> {
+pub struct Repeat<W: FiniteWord> {
     word: W,
     times: usize,
-    _pd: PhantomData<S>,
 }
 
-impl<S: Symbol, W: FiniteWord<S>> Repeat<S, W> {
+impl<W: FiniteWord> Repeat<W> {
     pub fn new(word: W, times: usize) -> Self {
-        Self {
-            word,
-            times,
-            _pd: PhantomData,
-        }
+        Self { word, times }
     }
 }
 
-impl<S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Repeat<S, W> {
-    type Symbols<'this> = RepeatIter<'this, S, W>
+impl<W: FiniteWord> FiniteWord for Repeat<W> {
+    type Symbols<'this> = RepeatIter<'this, W>
     where
         Self: 'this;
 
@@ -31,15 +22,15 @@ impl<S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Repeat<S, W> {
             word: &self.word,
             times: self.times,
             pos: 0,
-            _pd: self._pd,
         }
     }
 }
 
-impl<S: Symbol, W: FiniteWord<S>> Word<S> for Repeat<S, W> {
+impl<W: FiniteWord> Word for Repeat<W> {
+    type Symbol = W::Symbol;
     const FINITE: bool = true;
 
-    fn nth(&self, position: usize) -> Option<S> {
+    fn nth(&self, position: usize) -> Option<W::Symbol> {
         if position < self.word.len() * self.times {
             Some(self.word.nth(position % self.word.len()).unwrap())
         } else {
@@ -49,15 +40,14 @@ impl<S: Symbol, W: FiniteWord<S>> Word<S> for Repeat<S, W> {
 }
 
 #[derive(Debug, Clone)]
-pub struct RepeatIter<'a, S: Symbol, W: FiniteWord<S>> {
+pub struct RepeatIter<'a, W: FiniteWord> {
     word: &'a W,
     times: usize,
-    _pd: PhantomData<S>,
     pos: usize,
 }
 
-impl<'a, S: Symbol, W: FiniteWord<S>> Iterator for RepeatIter<'a, S, W> {
-    type Item = S;
+impl<'a, W: FiniteWord> Iterator for RepeatIter<'a, W> {
+    type Item = W::Symbol;
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos < self.word.len() * self.times {
             let out = self.word.nth(self.pos % self.word.len()).unwrap();
