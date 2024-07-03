@@ -432,6 +432,7 @@ mod impls {
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
             NoObserver
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -448,15 +449,19 @@ mod impls {
 
     impl<T: Deterministic> Observer<T> for ReachedState<StateIndex<T>> {
         type Current = StateIndex<T>;
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             &self.0
         }
+        #[inline(always)]
         fn begin(_ts: &T, state: StateIndex<T>) -> Self {
             Self(state)
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -478,6 +483,7 @@ mod impls {
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
             Self(ts.state_color(state).unwrap())
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -500,6 +506,7 @@ mod impls {
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
             Self(None)
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -523,6 +530,7 @@ mod impls {
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
             Self(ts.state_color(state).unwrap())
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -561,6 +569,7 @@ mod impls {
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
             Self(None)
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -596,15 +605,19 @@ mod impls {
     }
     impl<T: Deterministic> Observer<T> for StateSet<T> {
         type Current = Self;
+        #[inline(always)]
         fn begin(_ts: &T, state: StateIndex<T>) -> Self {
             Self(math::Set::from_iter([state]))
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self
         }
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             self
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -636,6 +649,7 @@ mod impls {
         fn into_current(self) -> Self::Current {
             self.0
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -667,6 +681,7 @@ mod impls {
         fn into_current(self) -> Self::Current {
             self.0
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -704,6 +719,7 @@ mod impls {
         fn into_current(self) -> Self::Current {
             self
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -735,6 +751,7 @@ mod impls {
         fn into_current(self) -> Self::Current {
             self
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -771,6 +788,7 @@ mod impls {
         fn into_current(self) -> Self::Current {
             self.0
         }
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
@@ -814,6 +832,7 @@ mod impls {
             Self(math::Set::default())
         }
 
+        #[inline(always)]
         fn observe(
             &mut self,
             ts: &T,
