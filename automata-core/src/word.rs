@@ -17,16 +17,22 @@ pub use finite::FiniteWord;
 mod omega;
 pub use omega::{OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, ReducedParseError};
 
+mod repeat;
+pub use repeat::Repeat;
+
 pub use self::skip::Infix;
 
 /// A linear word is a word that can be indexed by a `usize`. This is the case for both finite and
 /// infinite words.
-pub trait LinearWord<S>: Hash + Eq {
+pub trait Word: Hash + Eq {
+    type Symbol: Symbol;
+    const FINITE: bool;
+
     /// Returns the symbol at the given `position` in `self`, if it exists.
-    fn nth(&self, position: usize) -> Option<S>;
+    fn nth(&self, position: usize) -> Option<Self::Symbol>;
 
     /// Returns the first symbol of `self`, if it exists.
-    fn first(&self) -> Option<S>
+    fn first(&self) -> Option<Self::Symbol>
     where
         Self: Sized,
     {
@@ -37,11 +43,11 @@ pub trait LinearWord<S>: Hash + Eq {
     ///
     /// # Example
     /// ```
-    /// use automata_core::word::{LinearWord, FiniteWord};
+    /// use automata_core::word::{Word, FiniteWord};
     /// let word = "abcde".to_string();
     /// assert_eq!(word.infix(1, 3).as_string(), "bcd");
     /// ```
-    fn infix(&self, offset: usize, length: usize) -> Infix<'_, S, Self>
+    fn infix(&self, offset: usize, length: usize) -> Infix<'_, Self>
     where
         Self: Sized,
     {
@@ -49,7 +55,7 @@ pub trait LinearWord<S>: Hash + Eq {
     }
 
     /// Constructs an [`Infix`] object, which is a finite prefix of `self` that has the given `length`.
-    fn prefix(&self, length: usize) -> Infix<'_, S, Self>
+    fn prefix(&self, length: usize) -> Infix<'_, Self>
     where
         Self: Sized,
     {
@@ -57,7 +63,7 @@ pub trait LinearWord<S>: Hash + Eq {
     }
 
     /// Removes the first symbol of `self` and returns it together with the remaining suffix.
-    fn pop_first(&self) -> (S, skip::Skip<'_, S, Self>)
+    fn pop_first(&self) -> (Self::Symbol, skip::Skip<'_, Self>)
     where
         Self: Sized,
     {
@@ -66,7 +72,7 @@ pub trait LinearWord<S>: Hash + Eq {
     }
 
     /// Creates an [`crate::word::Skip`] object, which is the suffix of `self` that starts at the given `offset`.
-    fn skip(&self, offset: usize) -> skip::Skip<'_, S, Self>
+    fn skip(&self, offset: usize) -> skip::Skip<'_, Self>
     where
         Self: Sized,
     {
@@ -74,33 +80,36 @@ pub trait LinearWord<S>: Hash + Eq {
     }
 }
 
-impl<S: Symbol, W: LinearWord<S> + ?Sized> LinearWord<S> for &W {
-    fn nth(&self, position: usize) -> Option<S> {
+impl<W: Word + ?Sized> Word for &W {
+    type Symbol = W::Symbol;
+    const FINITE: bool = W::FINITE;
+    fn nth(&self, position: usize) -> Option<W::Symbol> {
         W::nth(self, position)
     }
 }
 
-/// A type of iterator for infixes of [`LinearWord`]s. It is actually consumed by iteration.
+/// A type of iterator for infixes of [`Word`]s. It is actually consumed by iteration.
 ///
 /// Stores a reference to the iterated word as well as a start and end position. When `next` is called,
 /// we check if the start position is strictly smaller than the end position, and if so, we return the symbol at
 /// the start position and increment it. Otherwise, we return `None`.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct ConsumingInfixIterator<'a, S: Symbol, W: LinearWord<S>> {
+pub struct ConsumingInfixIterator<'a, W: Word> {
     word: &'a W,
     start: usize,
     end: usize,
-    _marker: std::marker::PhantomData<S>,
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for ConsumingInfixIterator<'a, S, W> {
-    fn nth(&self, position: usize) -> Option<S> {
+impl<'a, W: Word> Word for ConsumingInfixIterator<'a, W> {
+    type Symbol = W::Symbol;
+    const FINITE: bool = true;
+    fn nth(&self, position: usize) -> Option<W::Symbol> {
         self.word.nth(self.start + position)
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> Iterator for ConsumingInfixIterator<'a, S, W> {
-    type Item = S;
+impl<'a, W: Word> Iterator for ConsumingInfixIterator<'a, W> {
+    type Item = W::Symbol;
     fn next(&mut self) -> Option<Self::Item> {
         if self.start < self.end {
             let out = self.word.nth(self.start);
@@ -112,15 +121,10 @@ impl<'a, S: Symbol, W: LinearWord<S>> Iterator for ConsumingInfixIterator<'a, S,
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> ConsumingInfixIterator<'a, S, W> {
+impl<'a, W: Word> ConsumingInfixIterator<'a, W> {
     /// Creates a new [`ConsumingInfixIterator`] object from a reference to a word and a start and end position.
     pub fn new(word: &'a W, start: usize, end: usize) -> Self {
-        Self {
-            word,
-            start,
-            end,
-            _marker: std::marker::PhantomData,
-        }
+        Self { word, start, end }
     }
 }
 
@@ -135,12 +139,12 @@ impl<'a, S: Symbol, W: LinearWord<S>> ConsumingInfixIterator<'a, S, W> {
 /// ```
 /// use automata_core::prelude::*;
 /// let ultimately_periodic = upw!("ab", "bb"); // represents the ultimately periodic word `ab(bb)^𝜔`
-/// assert!(ultimately_periodic.spoke().equals("a")); // the spoke is normalized to just `a`
-/// assert!(ultimately_periodic.cycle().equals("b")); // while the loop normalizes to `b`
+/// assert!(ultimately_periodic.spoke().finite_word_equals("a")); // the spoke is normalized to just `a`
+/// assert!(ultimately_periodic.cycle().finite_word_equals("b")); // while the loop normalizes to `b`
 ///
 /// let periodic_word = upw!("bbbbb"); // we can also create a periodic omega word
 /// assert!(periodic_word.spoke().is_empty()); // which is normlalized to have an empty spoke
-/// assert!(periodic_word.cycle().equals("b")); // and a cycle that equals the omega iteration of `b`.
+/// assert!(periodic_word.cycle().finite_word_equals("b")); // and a cycle that equals the omega iteration of `b`.
 /// ```
 #[macro_export]
 macro_rules! upw {
@@ -154,7 +158,7 @@ macro_rules! upw {
 
 #[cfg(test)]
 mod tests {
-    use crate::word::{FiniteWord, LinearWord};
+    use crate::word::{FiniteWord, Word};
 
     #[test]
     fn macro_upw() {

@@ -5,7 +5,7 @@ use crate::priority_mapping::ClassifiesIdempotents;
 use super::PeriodicOmegaSample;
 
 impl<A: Alphabet> ClassifiesIdempotents<A> for PeriodicOmegaSample<A> {
-    fn classify(&self, class: impl FiniteWord<<A as Alphabet>::Symbol>) -> Option<bool> {
+    fn classify(&self, class: impl FiniteWord<Symbol = <A as Alphabet>::Symbol>) -> Option<bool> {
         self.classify(class.omega_power())
     }
 }
@@ -21,7 +21,7 @@ mod tests {
     #[ignore]
     fn classification() {
         let (alphabet, sample) = testing_larger_forc_sample();
-        let cong = sample.infer_prefix_congruence();
+        let cong = sample.infer_prefix_congruence().unwrap();
         let split = sample.split(&cong);
         let forc = split.infer_forc();
         let periodic = split.get(0).unwrap().to_periodic_sample();

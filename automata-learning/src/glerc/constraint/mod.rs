@@ -6,18 +6,11 @@ mod separability;
 
 use std::fmt::{Debug, Display};
 
-use automata::{
-    ts::{IntoParts, IntoStates, IntoTransitions},
-    Class, Pair, Predecessor, RightCongruence, Set, Str, Subword, Successor, Symbol, Transformer,
-    TransitionSystem, UltimatelyPeriodicWord, Word,
-};
+use automata::prelude::*;
 use itertools::Itertools;
 use tracing::trace;
 
-use crate::{
-    acceptance::AcceptanceError,
-    passive::{FiniteSample, OmegaSample, Sample},
-};
+use crate::passive::{FiniteSample, OmegaSample, Sample};
 
 pub use myhillnerode::MyhillNerodeConstraint;
 
@@ -80,7 +73,7 @@ impl<S: Symbol> ConflictConstraint<S> {
         let left = sample.positive_prefixes();
         let right = sample.negative_prefixes();
 
-        trace!(
+        debug!(
             "Took {} ms for constructing conflict constraint from omega sample.",
             time.elapsed().as_millis()
         );
@@ -95,7 +88,7 @@ impl<S: Symbol> ConflictConstraint<S> {
             )
             .into_ts();
 
-        trace!(
+        debug!(
             "Took {} ms for building restricted product.",
             time.elapsed().as_millis()
         );
@@ -106,7 +99,7 @@ impl<S: Symbol> ConflictConstraint<S> {
             .collect();
 
         // build the product restricted to final states
-        trace!(
+        debug!(
             "Took {} ms for computing on-cycle states.",
             time.elapsed().as_millis()
         );
@@ -117,7 +110,7 @@ impl<S: Symbol> ConflictConstraint<S> {
             .map(|pair| (pair.left().clone(), pair.right().clone()))
             .collect();
 
-        trace!(
+        debug!(
             "Took {} ms for computing conflicts.",
             time.elapsed().as_millis()
         );
@@ -138,7 +131,7 @@ impl<S: Symbol> ConflictConstraint<S> {
         let left = sample.positive_prefixes();
         let right = sample.negative_prefixes();
 
-        trace!(
+        debug!(
             "took {} ms, Building restricted product",
             time.elapsed().as_millis()
         );
@@ -153,7 +146,7 @@ impl<S: Symbol> ConflictConstraint<S> {
             )
             .into_ts();
 
-        trace!(
+        debug!(
             "took {} ms, Computing on-cycle states",
             time.elapsed().as_millis()
         );
@@ -164,7 +157,7 @@ impl<S: Symbol> ConflictConstraint<S> {
             .collect();
 
         // build the product restricted to final states
-        trace!(
+        debug!(
             "took {} ms, Computing conflicts",
             time.elapsed().as_millis()
         );
@@ -175,7 +168,7 @@ impl<S: Symbol> ConflictConstraint<S> {
             .map(|pair| (pair.left().clone(), pair.right().clone()))
             .collect();
 
-        trace!("took {} ms", time.elapsed().as_millis());
+        debug!("took {} ms", time.elapsed().as_millis());
         Self {
             left: left.into(),
             right: right.into(),

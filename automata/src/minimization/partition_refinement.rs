@@ -8,7 +8,7 @@
 use std::{collections::BTreeSet, time::Instant};
 
 use itertools::Itertools;
-use tracing::{debug, info, trace};
+use tracing::{debug, trace};
 
 use crate::{math::Map, math::Partition, prelude::*};
 
@@ -67,7 +67,7 @@ where
         }
     }
 
-    info!(
+    debug!(
         "computing greatest bisimulation for Mealy Machine took {} microseconds",
         start.elapsed().as_micros()
     );
@@ -102,7 +102,7 @@ where
             c[0].clone()
         })
         .collect_mealy();
-    info!(
+    debug!(
         "Collecting into Mealy machine took {} microseconds",
         start.elapsed().as_micros()
     );

@@ -1,16 +1,15 @@
+use super::{FiniteWord, OmegaWord, Word};
 use std::hash::Hash;
-
-use crate::prelude::Symbol;
-
-use super::{FiniteWord, LinearWord, OmegaWord};
 
 /// Concatenates two words. This operation is really only sensible when the first word
 /// is of finite length.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Concat<X, Y>(pub X, pub Y);
 
-impl<S: Symbol, X: FiniteWord<S>, Y: LinearWord<S>> LinearWord<S> for Concat<X, Y> {
-    fn nth(&self, position: usize) -> Option<S> {
+impl<X: FiniteWord, Y: Word<Symbol = X::Symbol>> Word for Concat<X, Y> {
+    type Symbol = X::Symbol;
+    const FINITE: bool = Y::FINITE;
+    fn nth(&self, position: usize) -> Option<X::Symbol> {
         if position < self.0.len() {
             self.0.nth(position)
         } else {
@@ -19,7 +18,7 @@ impl<S: Symbol, X: FiniteWord<S>, Y: LinearWord<S>> LinearWord<S> for Concat<X, 
     }
 }
 
-impl<S: Symbol, X: FiniteWord<S>, Y: FiniteWord<S>> FiniteWord<S> for Concat<X, Y> {
+impl<X: FiniteWord, Y: FiniteWord<Symbol = X::Symbol>> FiniteWord for Concat<X, Y> {
     type Symbols<'this> = std::iter::Chain<X::Symbols<'this>, Y::Symbols<'this>>
     where
         Self: 'this;
@@ -28,7 +27,7 @@ impl<S: Symbol, X: FiniteWord<S>, Y: FiniteWord<S>> FiniteWord<S> for Concat<X, 
         self.0.symbols().chain(self.1.symbols())
     }
 
-    fn collect_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<Self::Symbol> {
         let mut repr = self.0.collect_vec();
         repr.extend(self.1.symbols());
         repr
@@ -39,7 +38,7 @@ impl<S: Symbol, X: FiniteWord<S>, Y: FiniteWord<S>> FiniteWord<S> for Concat<X, 
     }
 }
 
-impl<S: Symbol, X: FiniteWord<S>, Y: OmegaWord<S>> OmegaWord<S> for Concat<X, Y> {
+impl<X: FiniteWord, Y: OmegaWord<Symbol = X::Symbol>> OmegaWord for Concat<X, Y> {
     type Spoke<'this> = Concat<&'this X, Y::Spoke<'this>>
     where
         Self: 'this;

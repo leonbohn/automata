@@ -35,7 +35,22 @@ pub mod prelude {
     pub use crate::alphabet::{Alphabet, CharAlphabet, Expression, Matcher, Symbol};
     pub use crate::upw;
     pub use crate::word::{
-        self, FiniteWord, LinearWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord,
-        ReducedOmegaWord,
+        self, FiniteWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, Word,
     };
+
+    pub mod logging {
+        pub fn init() {
+            tracing_subscriber::util::SubscriberInitExt::init(
+                tracing_subscriber::layer::SubscriberExt::with(
+                    tracing_subscriber::registry(),
+                    tracing_subscriber::Layer::with_filter(
+                        tracing_subscriber::fmt::layer()
+                            .pretty()
+                            .with_writer(std::io::stderr),
+                        tracing_subscriber::filter::EnvFilter::from_default_env(),
+                    ),
+                ),
+            )
+        }
+    }
 }

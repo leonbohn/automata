@@ -72,13 +72,15 @@ impl<T: TransitionSystem> std::ops::DerefMut for MinimalRepresentative<T> {
     }
 }
 
-impl<T: TransitionSystem> LinearWord<SymbolOf<T>> for MinimalRepresentative<T> {
+impl<T: TransitionSystem> Word for MinimalRepresentative<T> {
+    type Symbol = SymbolOf<T>;
+    const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<SymbolOf<T>> {
         self.0.get(position).copied()
     }
 }
 
-impl<T: TransitionSystem> FiniteWord<SymbolOf<T>> for MinimalRepresentative<T> {
+impl<T: TransitionSystem> FiniteWord for MinimalRepresentative<T> {
     type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, SymbolOf<T>>>
     where
         Self: 'this;
@@ -100,7 +102,7 @@ impl<T: TransitionSystem + Show> Show for MinimalRepresentative<T> {
 
 /// Gives lazy acceess to the minimal representatives of a [`RightCongruence`]. This is used
 /// to avoid recomputing the minimal representatives of a congruence multiple times.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LazyMinimalRepresentatives<T: TransitionSystem>(
     OnceCell<BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>>,
 );

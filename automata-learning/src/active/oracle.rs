@@ -19,7 +19,10 @@ pub trait Oracle {
     type Output: Color;
     fn alphabet(&self) -> &Self::Alphabet;
 
-    fn output<W: FiniteWord<<Self::Alphabet as Alphabet>::Symbol>>(&self, word: W) -> Self::Output;
+    fn output<W: FiniteWord<Symbol = <Self::Alphabet as Alphabet>::Symbol>>(
+        &self,
+        word: W,
+    ) -> Self::Output;
 
     fn equivalence<H>(
         &self,
@@ -42,28 +45,21 @@ where
 /// default color. Equivalence queries are perfomed by checking if the hypothesis produces the same output as the
 /// sample for all words in the sample.
 #[derive(Debug, Clone)]
-pub struct SampleOracle<A: Alphabet, W: LinearWord<A::Symbol>, C: Color> {
-    sample: Sample<A, W, C>,
-    default: C,
+pub struct SampleOracle<A: Alphabet, W: Word<Symbol = A::Symbol>> {
+    sample: Sample<A, W>,
+    default: bool,
 }
 
-impl<A: Alphabet, X: FiniteWord<A::Symbol>, C: Color> Oracle for SampleOracle<A, X, C> {
+impl<A: Alphabet, X: FiniteWord<Symbol = A::Symbol>> Oracle for SampleOracle<A, X> {
     type Alphabet = A;
 
-    type Output = C;
+    type Output = bool;
 
-    fn output<W: FiniteWord<<Self::Alphabet as Alphabet>::Symbol>>(&self, word: W) -> Self::Output {
-        self.sample
-            .words
-            .iter()
-            .find_map(|(k, v)| {
-                if word.equals(k) {
-                    Some(v.clone())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(self.default.clone())
+    fn output<W: FiniteWord<Symbol = <Self::Alphabet as Alphabet>::Symbol>>(
+        &self,
+        word: W,
+    ) -> Self::Output {
+        todo!()
     }
 
     fn equivalence<H>(
@@ -73,12 +69,7 @@ impl<A: Alphabet, X: FiniteWord<A::Symbol>, C: Color> Oracle for SampleOracle<A,
     where
         H: Hypothesis<Alphabet = Self::Alphabet, Output = Self::Output>,
     {
-        for (w, c) in &self.sample.words {
-            if !hypothesis.output(w).eq(c) {
-                return Err((w.into_vec(), c.clone()));
-            }
-        }
-        Ok(())
+        todo!()
     }
 
     fn alphabet(&self) -> &Self::Alphabet {
@@ -86,24 +77,24 @@ impl<A: Alphabet, X: FiniteWord<A::Symbol>, C: Color> Oracle for SampleOracle<A,
     }
 }
 
-impl<A: Alphabet, W: LinearWord<A::Symbol>, C: Color> SampleOracle<A, W, C> {
+impl<A: Alphabet, W: Word<Symbol = A::Symbol>> SampleOracle<A, W> {
     /// Returns a reference to the underlying alphabet, as provided by [`Sample::alphabet()`].
     pub fn alphabet(&self) -> &A {
         self.sample.alphabet()
     }
 }
 
-impl<A: Alphabet, W: FiniteWord<A::Symbol>, C: Color> SampleOracle<A, W, C> {
+impl<A: Alphabet, W: FiniteWord<Symbol = A::Symbol>> SampleOracle<A, W> {
     /// Creates a new instance of a [`SampleOracle`] with the given sample and default color.
-    pub fn new(sample: Sample<A, W, C>, default: C) -> Self {
+    pub fn new(sample: Sample<A, W>, default: bool) -> Self {
         Self { sample, default }
     }
 }
 
-impl<A: Alphabet, W: FiniteWord<A::Symbol>, C: Color> From<(Sample<A, W, C>, C)>
-    for SampleOracle<A, W, C>
+impl<A: Alphabet, W: FiniteWord<Symbol = A::Symbol>> From<(Sample<A, W>, bool)>
+    for SampleOracle<A, W>
 {
-    fn from((value, default): (Sample<A, W, C>, C)) -> Self {
+    fn from((value, default): (Sample<A, W>, bool)) -> Self {
         Self::new(value, default)
     }
 }
@@ -133,7 +124,7 @@ impl<A: Alphabet> Oracle for DFAOracle<A> {
         self.automaton.alphabet()
     }
 
-    fn output<W: FiniteWord<A::Symbol>>(&self, word: W) -> bool {
+    fn output<W: FiniteWord<Symbol = A::Symbol>>(&self, word: W) -> bool {
         self.automaton.accepts(word)
     }
 
@@ -159,9 +150,9 @@ impl<A: Alphabet, C: Color> Oracle for MealyOracle<A, C> {
     type Alphabet = A;
     type Output = C;
 
-    fn output<W: FiniteWord<A::Symbol>>(&self, word: W) -> C {
+    fn output<W: FiniteWord<Symbol = A::Symbol>>(&self, word: W) -> C {
         self.automaton
-            .map(word)
+            .last_edge_color(word)
             .or(self.default.clone())
             .expect("The oracle must be total!")
     }
@@ -215,7 +206,10 @@ where
         self.automaton.alphabet()
     }
 
-    fn output<W: FiniteWord<<Self::Alphabet as Alphabet>::Symbol>>(&self, word: W) -> Self::Output {
+    fn output<W: FiniteWord<Symbol = <Self::Alphabet as Alphabet>::Symbol>>(
+        &self,
+        word: W,
+    ) -> Self::Output {
         todo!()
     }
 
