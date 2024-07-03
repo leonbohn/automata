@@ -1,0 +1,60 @@
+#!/bin/bash
+set -e
+
+RESULTS_FILE=${1:-"benchmarks.txt"}
+commit_hashes=(
+    "48b84ff"
+    "650c51c"
+    # "7477525"
+)
+echo "Benchmarking for commit hashes: ${commit_hashes[@]}" > $RESULTS_FILE
+
+CARGO_TOML="$(pwd)/bench/Cargo.toml"
+
+# Function to update the Cargo.toml with a given commit hash
+update_cargo_toml() {
+  local commit_hash=$1
+  sed -i.bak "s/^automata = { .* }$/automata = { git = \"https:\/\/github.com\/leonbohn\/automata\", rev = \"$commit_hash\" }/" $CARGO_TOML
+}
+
+# Function to build the binary
+build_binary() {
+  local feature=$1
+  cargo build --release --features "commit_$feature" --manifest-path $CARGO_TOML 2>&1
+  if [ $? -ne 0 ]; then
+    echo -e "\033[31mBuild failed for commit $commit_hash\033[30m"
+    exit 1
+  fi
+}
+
+run_bench() {
+  echo "----------------BENCHMARKING $commit_hash----------------" >> $RESULTS_FILE
+  hyperfine --warmup 5 --ignore-failure --runs 10 "./bench/target/release/automata-benchmarks" | tee -a $RESULTS_FILE
+}
+
+# Clear previous results
+echo -e "\033[34mBenchmarking Results\033[0m" > $RESULTS_FILE
+
+# Loop over all commit hashes
+for i in "${!commit_hashes[@]}"; do
+  commit_hash=${commit_hashes[$i]}
+  echo -e "\033[34mProcessing commit $commit_hash...\033[0m"
+
+  # Update the Cargo.toml with the new commit hash
+  update_cargo_toml $commit_hash
+
+  # Build the binary
+  build_binary $i
+
+  # Run hyperfine to benchmark the binary
+  echo -e "\033[34mBenchmarking commit $commit_hash...\033[0m"
+  run_bench
+done
+
+sed -i.bak "s/^automata = { .* }$/automata = { path=\"..\/automata\" }/" $CARGO_TOML
+build_binary 2
+echo -e "\033[34mBenchmarking local...\033[0m"
+run_bench
+
+# Display the results
+cat $RESULTS_FILE

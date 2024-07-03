@@ -1,6 +1,6 @@
 use automata::prelude::*;
 
-fn main() {
+fn runs() {
     let ts = DTS::builder()
         .default_color(Void)
         .with_transitions([
@@ -30,12 +30,26 @@ fn main() {
     let mut size: u128 = 0;
     for i in 0..10000 {
         for word in &words {
+            #[cfg(feature = "commit_2")]
             let infset = ts
                 .recurrent_state_indices_from(i as u32 % 4, word)
                 .expect("alsdf");
-            // .collect::<math::Set<_>>();
+            #[cfg(feature = "commit_1")]
+            let infset = ts
+                .recurrent_state_indices_from(i as u32 % 4, word)
+                .expect("alsdf");
+            #[cfg(feature = "commit_0")]
+            let infset = ts
+                .recurrent_state_indices_from(i as u32 % 4, word)
+                .expect("alsdf")
+                .collect::<math::Set<_>>();
             size += infset.len() as u128;
+            size = size % 1337;
+            size += (4 << 2) ^ ((4815 + 1623) % 42)
         }
     }
-    println!("total size after 1000 executions: {size}");
+}
+
+fn main() {
+    runs()
 }
