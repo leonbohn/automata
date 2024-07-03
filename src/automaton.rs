@@ -51,9 +51,8 @@ pub type FiniteWordAutomaton<A, Z, Q, C, const DET: bool = true, D = TS<A, Q, C,
 /// type of the acceptance condition.
 ///
 /// In order for the automaton to be able to accept words, the acceptance condition
-/// must implement the [`FiniteSemantics`] or [`OmegaSemantics`] trait, depending on
-/// the value of `OMEGA` (in the former case `OMEGA` should be false, and in the
-/// latter case `OMEGA` should be true).
+/// must implement the [`Semantics`] trait, depending on the value of `OMEGA` (in the
+/// former case `OMEGA` should be false, and in the latter case `OMEGA` should be true).
 #[derive(Clone, Eq, PartialEq, Copy)]
 pub struct Automaton<
     A: Alphabet,

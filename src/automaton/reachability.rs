@@ -4,7 +4,7 @@ use self::operations::DefaultIfMissing;
 
 use super::{FiniteWordAutomaton, StatesWithColor};
 
-/// Defines the [`FiniteSemantics`] that are used by a deterministic finite automaton
+/// Defines the [`Semantics`] that are used by a deterministic finite automaton
 /// [`DFA`]. This leads to a [`FiniteWord`] being accepted if the state that it reaches
 /// is colored with `true`, and the word being rejected otherwise.
 #[derive(Clone, Copy, Default, Hash, Eq, PartialEq)]

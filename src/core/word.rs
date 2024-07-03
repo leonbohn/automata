@@ -43,7 +43,7 @@ pub trait Word: Hash + Eq {
     ///
     /// # Example
     /// ```
-    /// use automata_core::word::{LinearWord, FiniteWord};
+    /// use automata_core::word::{Word, FiniteWord};
     /// let word = "abcde".to_string();
     /// assert_eq!(word.infix(1, 3).as_string(), "bcd");
     /// ```
@@ -88,7 +88,7 @@ impl<W: Word + ?Sized> Word for &W {
     }
 }
 
-/// A type of iterator for infixes of [`LinearWord`]s. It is actually consumed by iteration.
+/// A type of iterator for infixes of [`Word`]s. It is actually consumed by iteration.
 ///
 /// Stores a reference to the iterated word as well as a start and end position. When `next` is called,
 /// we check if the start position is strictly smaller than the end position, and if so, we return the symbol at

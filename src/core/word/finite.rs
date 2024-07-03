@@ -6,7 +6,7 @@ use crate::prelude::{Show, Symbol};
 
 use super::{omega::OmegaIteration, Concat, PeriodicOmegaWord, Repeat, Word};
 
-/// A finite word is a [`LinearWord`] that has a finite length.
+/// A finite word is a [`Word`] that has a finite length.
 pub trait FiniteWord: Word {
     /// Type for an iterator over the symbols making up the word.
     type Symbols<'this>: Iterator<Item = Self::Symbol>
@@ -16,7 +16,7 @@ pub trait FiniteWord: Word {
     /// Returns an iterator over the symbols of the word.
     fn symbols(&self) -> Self::Symbols<'_>;
 
-    /// Appends the given [`LinearWord`] to the end of this word. Note, that the appended
+    /// Appends the given [`Word`] to the end of this word. Note, that the appended
     /// suffix may be finite or infinite.
     fn append<W: Word<Symbol = Self::Symbol>>(self, suffix: W) -> Concat<Self, W>
     where

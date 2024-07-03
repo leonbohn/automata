@@ -477,7 +477,7 @@ pub trait Deterministic: TransitionSystem {
     }
 
     /// Compute the escape prefixes of a set of omega words on a transition system.
-    fn escape_prefixes<W>(
+    fn omega_escape_prefixes<W>(
         &self,
         words: impl Iterator<Item = W>,
     ) -> impl Iterator<Item = run::EscapePrefix<W>>
@@ -594,6 +594,9 @@ mod tests {
             .default_color(Void)
             .into_dts_with_initial(0);
 
-        assert_eq!(ts.escape_prefixes(words.iter()).count(), 3);
+        assert!(ts.omega_escape_prefix(upw!("b")).is_some());
+        assert!(ts.omega_escape_prefix(upw!("b", "a")).is_some());
+        assert!(ts.omega_escape_prefix(upw!("a", "b")).is_none());
+        assert_eq!(ts.omega_escape_prefixes(words.iter()).count(), 3);
     }
 }
