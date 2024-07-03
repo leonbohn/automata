@@ -1,0 +1,9 @@
+[package]
+name = "bench-run"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# automata = { git = "https://github.com/leonbohn/automata", rev = "2607417" }
+automata = { git = "https://github.com/leonbohn/automata", rev = "3f6df51" }
+# automata = { path = "../automata/automata" }
