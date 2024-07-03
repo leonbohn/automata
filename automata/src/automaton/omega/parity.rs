@@ -46,15 +46,15 @@ where
     }
 }
 
-/// Defines an [`OmegaSemantics`] that outputs `true` if the *maximum* color/priority that
+/// Defines a [`Semantics`] that outputs `true` if the *maximum* color/priority that
 /// appears infinitely often is *even*. See also [`MinEvenParityCondition`].
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
 pub struct MaxEvenParityCondition;
-/// Defines an [`OmegaSemantics`] that outputs `true` if the *minimum* color/priority that
+/// Defines a [`Semantics`] that outputs `true` if the *minimum* color/priority that
 /// appears infinitely often is *odd*. See also [`MinEvenParityCondition`].
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
 pub struct MinOddParityCondition;
-/// Defines an [`OmegaSemantics`] that outputs `true` if the *maximum* color/priority that
+/// Defines a [`Semantics`] that outputs `true` if the *maximum* color/priority that
 /// appears infinitely often is *odd*. See also [`MinEvenParityCondition`].
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
 pub struct MaxOddParityCondition;
@@ -110,10 +110,10 @@ where
     ///     .with_transitions([(0, 'a', 0, 1), (0, 'b', 1, 1),
     ///                        (1, 'a', 0, 0), (1, 'b', 3, 0)])
     ///     .into_dpa(0);
-    /// assert_eq!(dpa.last_edge_color("ab"), 3);
+    /// assert_eq!(dpa.last_edge_color("ab"), Some(3));
     /// let streamlined = dpa.streamlined();
     /// assert_eq!(streamlined.size(), 1);
-    /// assert_eq!(streamlined.last_edge_color("ab"), 1)
+    /// assert_eq!(streamlined.last_edge_color("ab"), Some(1))
     /// ```
     pub fn streamlined(
         &self,

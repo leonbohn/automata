@@ -1,6 +1,6 @@
 use super::{ConsumingInfixIterator, FiniteWord, OmegaWord, ReducedOmegaWord, Word};
 
-/// A suffix of a [`LinearWord`] which skips a fixed number of symbols. If the underlying
+/// A suffix of a [`Word`] which skips a fixed number of symbols. If the underlying
 /// word is infinite, the suffix is also infinite. If the underlying word is finite, the suffix
 /// is also finite.
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
@@ -156,7 +156,7 @@ impl<'a, W: OmegaWord> OmegaWord for Skip<'a, W> {
     }
 }
 
-/// Represents an infix of a [`LinearWord`]. This is a finite word, which is a subsequence of the
+/// Represents an infix of a [`Word`]. This is a finite word, which is a subsequence of the
 /// original word. It is specified by a starting position and a length, and stores a reference
 /// to the underlying word.
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]

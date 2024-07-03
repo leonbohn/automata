@@ -31,7 +31,7 @@ pub mod prelude {
         representation::CollectTs,
         representation::IntoTs,
         transition_system::operations,
-        transition_system::run::{self, InfiniteObserver, Observer},
+        transition_system::run::{self, InfiniteObserver, Observer, Run},
         transition_system::{
             dot::Dottable,
             impls::DefaultIdType,
