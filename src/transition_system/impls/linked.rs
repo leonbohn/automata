@@ -490,8 +490,14 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable
 
         let q = q.try_into().unwrap();
         let p = p.try_into().unwrap();
-        assert!(q < self.states.len());
-        assert!(p < self.states.len());
+        assert!(
+            q < self.states.len(),
+            "cannot add edge from non-existent state {q:?}"
+        );
+        assert!(
+            p < self.states.len(),
+            "cannot add edge to non-existent state {q:?}"
+        );
         if let Some(first_out) = self.first_out_edge(q) {
             assert!(first_out < self.edges.len());
             assert!(self.edges[first_out].out_prev.is_none());
@@ -741,7 +747,12 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const 
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn eq(&self, other: &Self) -> bool {
-        if self.alphabet != other.alphabet || self.states.len() != other.states.len() {
+        if self.alphabet != other.alphabet {
+            trace!("alphabets do not match");
+            return false;
+        }
+        if self.states.len() != other.states.len() {
+            trace!("number of states does not match");
             return false;
         }
 
@@ -774,12 +785,21 @@ impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color, const DET: bool> std::fm
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "alphabet: {:?}", self.alphabet)?;
-        for (i, state) in self.states.iter().enumerate() {
-            writeln!(f, "Q[{i}]: {state:?}")?;
-        }
-        for (i, edge) in self.edges.iter().enumerate() {
-            writeln!(f, "E[{i}]: {edge:?}")?;
+        for q in self.state_indices() {
+            write!(f, "{q} : {:?} |", self.state_color(q).unwrap())?;
+            let Some(it) = self.edges_from(q) else {
+                continue;
+            };
+            for e in it {
+                write!(
+                    f,
+                    " {}/{:?}->{}",
+                    e.expression().show(),
+                    e.color(),
+                    e.target()
+                )?;
+            }
+            writeln!(f)?;
         }
         Ok(())
     }

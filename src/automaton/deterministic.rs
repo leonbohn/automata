@@ -11,8 +11,8 @@ where
     /// when starting from the initial state.
     pub fn congruent<W, V>(&self, word: W, other: V) -> bool
     where
-        W: FiniteWord<A::Symbol>,
-        V: FiniteWord<A::Symbol>,
+        W: FiniteWord<Symbol = A::Symbol>,
+        V: FiniteWord<Symbol = A::Symbol>,
     {
         self.reached_state_index(word).unwrap() == self.reached_state_index(other).unwrap()
     }

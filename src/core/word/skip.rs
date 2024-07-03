@@ -1,40 +1,33 @@
-use std::marker::PhantomData;
+use super::{ConsumingInfixIterator, FiniteWord, OmegaWord, ReducedOmegaWord, Word};
 
-use crate::prelude::Symbol;
-
-use super::{ConsumingInfixIterator, FiniteWord, LinearWord, OmegaWord, ReducedOmegaWord};
-
-/// A suffix of a [`LinearWord`] which skips a fixed number of symbols. If the underlying
+/// A suffix of a [`Word`] which skips a fixed number of symbols. If the underlying
 /// word is infinite, the suffix is also infinite. If the underlying word is finite, the suffix
 /// is also finite.
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
-pub struct Skip<'a, S, W: LinearWord<S>> {
+pub struct Skip<'a, W: Word> {
     sequence: &'a W,
     offset: usize,
-    _marker: std::marker::PhantomData<S>,
 }
 
-impl<'a, S, W: LinearWord<S>> Skip<'a, S, W> {
+impl<'a, W: Word> Skip<'a, W> {
     /// Creates a new suffix, which skips the first `offset` symbols of the given sequence.
     pub fn new(sequence: &'a W, offset: usize) -> Self {
-        Self {
-            sequence,
-            offset,
-            _marker: std::marker::PhantomData,
-        }
+        Self { sequence, offset }
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Skip<'a, S, W> {
-    fn nth(&self, position: usize) -> Option<S> {
+impl<'a, W: Word> Word for Skip<'a, W> {
+    type Symbol = W::Symbol;
+    const FINITE: bool = W::FINITE;
+    fn nth(&self, position: usize) -> Option<W::Symbol> {
         self.sequence.nth(self.offset + position)
     }
 }
 
-impl<'a, S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Skip<'a, S, W> {
+impl<'a, W: FiniteWord> FiniteWord for Skip<'a, W> {
     type Symbols<'this> = std::iter::Skip<W::Symbols<'this>> where Self: 'this;
 
-    fn collect_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<W::Symbol> {
         (self.offset..self.sequence.len())
             .map(|position| self.sequence.nth(position).unwrap())
             .collect()
@@ -52,32 +45,32 @@ impl<'a, S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Skip<'a, S, W> {
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
 pub struct Rotated<W>(pub W, pub usize);
 
-impl<S: Symbol, W: FiniteWord<S>> LinearWord<S> for Rotated<W> {
-    fn nth(&self, position: usize) -> Option<S> {
+impl<W: FiniteWord> Word for Rotated<W> {
+    type Symbol = W::Symbol;
+    const FINITE: bool = true;
+    fn nth(&self, position: usize) -> Option<W::Symbol> {
         self.0.nth((position + self.1) % self.0.len())
     }
 }
 
-pub struct RotatedIter<'a, S, W> {
+pub struct RotatedIter<'a, W> {
     rotated: &'a Rotated<W>,
     start: usize,
     position: usize,
-    _pd: PhantomData<S>,
 }
 
-impl<'a, S, W> RotatedIter<'a, S, W> {
+impl<'a, W> RotatedIter<'a, W> {
     pub fn new(rotated: &'a Rotated<W>, start: usize) -> Self {
         Self {
             rotated,
             start,
             position: 0,
-            _pd: PhantomData,
         }
     }
 }
 
-impl<'a, S: Symbol, W: FiniteWord<S>> Iterator for RotatedIter<'a, S, W> {
-    type Item = S;
+impl<'a, W: FiniteWord> Iterator for RotatedIter<'a, W> {
+    type Item = W::Symbol;
     fn next(&mut self) -> Option<Self::Item> {
         if self.position < self.rotated.len() {
             let out = self
@@ -92,14 +85,14 @@ impl<'a, S: Symbol, W: FiniteWord<S>> Iterator for RotatedIter<'a, S, W> {
     }
 }
 
-impl<S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Rotated<W> {
-    type Symbols<'this> = RotatedIter<'this, S, W> where Self: 'this;
+impl<W: FiniteWord> FiniteWord for Rotated<W> {
+    type Symbols<'this> = RotatedIter<'this, W> where Self: 'this;
 
     fn symbols(&self) -> Self::Symbols<'_> {
         RotatedIter::new(self, self.1)
     }
 
-    fn collect_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<W::Symbol> {
         self.symbols().collect()
     }
 
@@ -108,19 +101,16 @@ impl<S: Symbol, W: FiniteWord<S>> FiniteWord<S> for Rotated<W> {
     }
 }
 
-impl<'a, S: Symbol, W: OmegaWord<S>> OmegaWord<S> for Skip<'a, S, W> {
-    type Spoke<'this> = Infix<'this, S, W>
+impl<'a, W: OmegaWord> OmegaWord for Skip<'a, W> {
+    type Spoke<'this> = Infix<'this, W>
     where
         Self: 'this;
 
-    type Cycle<'this> = Infix<'this, S, W>
+    type Cycle<'this> = Infix<'this, W>
     where
         Self: 'this;
 
-    fn reduced(&self) -> crate::prelude::ReducedOmegaWord<S>
-    where
-        S: Symbol,
-    {
+    fn reduced(&self) -> crate::prelude::ReducedOmegaWord<W::Symbol> {
         if self.offset >= self.sequence.spoke_length() {
             let mut period = self.sequence.cycle_vec();
             period.rotate_left(
@@ -166,31 +156,31 @@ impl<'a, S: Symbol, W: OmegaWord<S>> OmegaWord<S> for Skip<'a, S, W> {
     }
 }
 
-/// Represents an infix of a [`LinearWord`]. This is a finite word, which is a subsequence of the
+/// Represents an infix of a [`Word`]. This is a finite word, which is a subsequence of the
 /// original word. It is specified by a starting position and a length, and stores a reference
 /// to the underlying word.
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
-pub struct Infix<'a, S, W: LinearWord<S> + ?Sized> {
+pub struct Infix<'a, W: Word + ?Sized> {
     sequence: &'a W,
     offset: usize,
     length: usize,
-    _marker: std::marker::PhantomData<S>,
 }
 
-impl<'a, S, W: LinearWord<S> + ?Sized> Infix<'a, S, W> {
+impl<'a, W: Word + ?Sized> Infix<'a, W> {
     /// Creates a new suffix, which skips the first `offset` symbols of the given sequence.
     pub fn new(sequence: &'a W, offset: usize, length: usize) -> Self {
         Self {
             sequence,
             offset,
             length,
-            _marker: std::marker::PhantomData,
         }
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Infix<'a, S, W> {
-    fn nth(&self, position: usize) -> Option<S> {
+impl<'a, W: Word> Word for Infix<'a, W> {
+    type Symbol = W::Symbol;
+    const FINITE: bool = true;
+    fn nth(&self, position: usize) -> Option<W::Symbol> {
         if position < self.length {
             self.sequence.nth(self.offset + position)
         } else {
@@ -199,8 +189,8 @@ impl<'a, S: Symbol, W: LinearWord<S>> LinearWord<S> for Infix<'a, S, W> {
     }
 }
 
-impl<'a, S: Symbol, W: LinearWord<S>> FiniteWord<S> for Infix<'a, S, W> {
-    type Symbols<'this> = ConsumingInfixIterator<'this, S, W>
+impl<'a, W: Word> FiniteWord for Infix<'a, W> {
+    type Symbols<'this> = ConsumingInfixIterator<'this, W>
     where
         Self: 'this;
 
@@ -208,7 +198,7 @@ impl<'a, S: Symbol, W: LinearWord<S>> FiniteWord<S> for Infix<'a, S, W> {
         ConsumingInfixIterator::new(self.sequence, self.offset, self.offset + self.length)
     }
 
-    fn collect_vec(&self) -> Vec<S> {
+    fn collect_vec(&self) -> Vec<W::Symbol> {
         (self.offset..(self.offset + self.length))
             .map(|position| self.sequence.nth(position).unwrap())
             .collect()
@@ -226,7 +216,7 @@ mod tests {
 
     use crate::{
         upw,
-        word::{FiniteWord, LinearWord, OmegaWord, ReducedOmegaWord},
+        word::{FiniteWord, OmegaWord, ReducedOmegaWord, Word},
     };
 
     #[test]

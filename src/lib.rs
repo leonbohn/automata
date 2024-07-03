@@ -18,12 +18,11 @@ pub mod prelude {
     pub use super::transition_system::impls::petgraph_backed::{petgraph, GraphTs};
     pub use super::{
         automaton::{
-            Automaton, BuchiCondition, DeterministicOmegaAutomaton, FiniteSemantics,
-            FiniteWordAutomaton, IntoDBA, IntoDFA, IntoDMA, IntoDPA, IntoDRA, IntoMealyMachine,
-            IntoMooreMachine, MealyMachine, MealySemantics, MinEvenParityCondition, MooreMachine,
-            MooreSemantics, MullerCondition, NondeterministicOmegaAutomaton,
-            OmegaAcceptanceCondition, OmegaAutomaton, OmegaSemantics, ReachabilityCondition,
-            Semantics, WithInitial, DBA, DFA, DMA, DPA,
+            Automaton, BuchiCondition, DeterministicOmegaAutomaton, FiniteWordAutomaton, IntoDBA,
+            IntoDFA, IntoDMA, IntoDPA, IntoDRA, IntoMealyMachine, IntoMooreMachine, MealyMachine,
+            MealySemantics, MinEvenParityCondition, MooreMachine, MooreSemantics, MullerCondition,
+            NondeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
+            ReachabilityCondition, Semantics, WithInitial, DBA, DFA, DMA, DPA,
         },
         congruence::{
             CollectRightCongruence, Congruence, IntoRightCongruence, MinimalRepresentative,
@@ -32,12 +31,12 @@ pub mod prelude {
         representation::CollectTs,
         representation::IntoTs,
         transition_system::operations,
+        transition_system::run::{self, InfiniteObserver, Observer, Run},
         transition_system::{
             dot::Dottable,
             impls::DefaultIdType,
             operations::{DefaultIfMissing, Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
-            run::{FiniteRun, OmegaRun},
             Deterministic, DeterministicEdgesFrom, Edge, EdgeColor, EdgeExpression, ForAlphabet,
             IndexType, IntoEdgeTuple, IsEdge, Path, ScalarIndexType, Shrinkable, Sproutable,
             StateColor, StateIndex, SymbolOf, TSBuilder, TransitionSystem,

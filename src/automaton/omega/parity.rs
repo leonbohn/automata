@@ -5,9 +5,11 @@ use std::{
 };
 
 use itertools::Itertools;
-use tracing::{info, trace};
+use tracing::trace;
 
-use crate::{automaton::InfiniteWordAutomaton, math::Partition, prelude::*};
+use crate::{
+    automaton::InfiniteWordAutomaton, math::Partition, prelude::*, transition_system::run,
+};
 
 /// A deterministic parity automaton (DPA). It uses a [`DTS`]
 /// as its transition system and an [`Int`] as its edge color.
@@ -33,31 +35,26 @@ pub type IntoDPA<T, Sem = MinEvenParityCondition> =
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
 pub struct MinEvenParityCondition;
 
-impl<Q> Semantics<Q, Int> for MinEvenParityCondition {
+impl<T> Semantics<T, true> for MinEvenParityCondition
+where
+    T: Deterministic<EdgeColor = Int>,
+{
     type Output = bool;
-}
-
-impl<Q> OmegaSemantics<Q, Int> for MinEvenParityCondition {
-    fn evaluate<R>(&self, run: R) -> Self::Output
-    where
-        R: OmegaRun<StateColor = Q, EdgeColor = Int>,
-    {
-        run.recurring_edge_colors_iter()
-            .and_then(|colors| colors.min())
-            .map(|x| x % 2 == 0)
-            .unwrap_or(false)
+    type Observer = run::EdgeColorLimit<T>;
+    fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
+        observed.expect("at least one edge is necessary!") % 2 == 0
     }
 }
 
-/// Defines an [`OmegaSemantics`] that outputs `true` if the *maximum* color/priority that
+/// Defines a [`Semantics`] that outputs `true` if the *maximum* color/priority that
 /// appears infinitely often is *even*. See also [`MinEvenParityCondition`].
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
 pub struct MaxEvenParityCondition;
-/// Defines an [`OmegaSemantics`] that outputs `true` if the *minimum* color/priority that
+/// Defines a [`Semantics`] that outputs `true` if the *minimum* color/priority that
 /// appears infinitely often is *odd*. See also [`MinEvenParityCondition`].
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
 pub struct MinOddParityCondition;
-/// Defines an [`OmegaSemantics`] that outputs `true` if the *maximum* color/priority that
+/// Defines a [`Semantics`] that outputs `true` if the *maximum* color/priority that
 /// appears infinitely often is *odd*. See also [`MinEvenParityCondition`].
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
 pub struct MaxOddParityCondition;
@@ -113,10 +110,10 @@ where
     ///     .with_transitions([(0, 'a', 0, 1), (0, 'b', 1, 1),
     ///                        (1, 'a', 0, 0), (1, 'b', 3, 0)])
     ///     .into_dpa(0);
-    /// assert_eq!(dpa.last_edge_color("ab"), 3);
+    /// assert_eq!(dpa.last_edge_color("ab"), Some(3));
     /// let streamlined = dpa.streamlined();
     /// assert_eq!(streamlined.size(), 1);
-    /// assert_eq!(streamlined.last_edge_color("ab"), 1)
+    /// assert_eq!(streamlined.last_edge_color("ab"), Some(1))
     /// ```
     pub fn streamlined(
         &self,
@@ -131,28 +128,11 @@ where
         DPA::from_pointed(minimized)
     }
 
-    /// Attempts to transform the given [`FiniteWord`] into a [`EdgeColor`]. This means that the
-    /// word is run through the automaton and the last transition color is returned.
-    pub fn try_last_edge_color<W: FiniteWord<SymbolOf<Self>>>(
-        &self,
-        input: W,
-    ) -> Option<EdgeColor<Self>> {
-        self.finite_run(input)
-            .ok()
-            .and_then(|r| r.last_transition_color().cloned())
-    }
-
     /// Computes the least and greatest edge color that appears on any edge of the automaton.
     /// If there are no edges, `(Int::MAX, 0)` is returned.
     pub fn low_and_high_priority(&self) -> (Int, Int) {
         self.edge_colors_unique()
             .fold((Int::MAX, 0), |(low, high), c| (low.min(c), high.max(c)))
-    }
-
-    /// Transforms the given [`FiniteWord`] into a [`EdgeColor`]. This simply calls [`Self::try_last_edge_color`]
-    /// and subsequently unwraps the result.
-    pub fn last_edge_color<W: FiniteWord<SymbolOf<Self>>>(&self, input: W) -> EdgeColor<Self> {
-        self.try_last_edge_color(input).expect("failed to map")
     }
 
     /// Gives a witness for the fact that the language accepted by `self` is not empty. This is
@@ -565,7 +545,7 @@ where
             .with_initial(out_initial)
             .into_dpa();
 
-        info!("normalizing DPA took {} μs", start.elapsed().as_micros());
+        tracing::debug!("normalizing DPA took {} μs", start.elapsed().as_micros());
 
         debug_assert!(self.language_equivalent(&ret));
         ret
@@ -593,7 +573,7 @@ mod tests {
         assert!(normalized.language_equivalent(&dpa));
 
         for (input, expected) in [("a", 0), ("b", 0), ("ba", 0), ("bb", 1)] {
-            assert_eq!(normalized.last_edge_color(input), expected)
+            assert_eq!(normalized.last_edge_color(input), Some(expected))
         }
         let _n = example_dpa().normalized();
     }
@@ -703,6 +683,8 @@ mod tests {
             ])
             .default_color(Void)
             .into_dpa(0);
+        let r = dpa.omega_run::<_, run::LeastEdgeColor<_>>(upw!("cabaca"));
+        println!("{r:?}");
         assert!(!dpa.accepts(upw!("cabaca")))
     }
 
@@ -767,8 +749,8 @@ mod tests {
             .into_dpa(0);
 
         let normalized = dpa.normalized();
-        assert_eq!(normalized.last_edge_color("aaa"), 0);
-        assert_eq!(normalized.last_edge_color("aa"), 0);
-        assert_eq!(normalized.last_edge_color("aab"), 0);
+        assert_eq!(normalized.last_edge_color("aaa"), Some(0));
+        assert_eq!(normalized.last_edge_color("aa"), Some(0));
+        assert_eq!(normalized.last_edge_color("aab"), Some(0));
     }
 }

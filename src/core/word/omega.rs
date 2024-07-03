@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
 use crate::prelude::*;
 
@@ -30,15 +30,15 @@ use crate::prelude::*;
 /// assert_eq!(word.loop_index(), 3);
 /// assert_eq!(word.cycle_length(), 3);
 /// ```
-pub trait OmegaWord<S>: LinearWord<S> {
+pub trait OmegaWord: Word {
     /// The type of finite word representing the spoke, i.e. the finite prefix of the word
     /// before the loop index.  
-    type Spoke<'this>: FiniteWord<S>
+    type Spoke<'this>: FiniteWord<Symbol = Self::Symbol>
     where
         Self: 'this;
     /// The type of finite word that represents the cycle of th omega word, i.e. the
     /// finite loop that is repeated infinitely often.
-    type Cycle<'this>: FiniteWord<S>
+    type Cycle<'this>: FiniteWord<Symbol = Self::Symbol>
     where
         Self: 'this;
 
@@ -53,13 +53,10 @@ pub trait OmegaWord<S>: LinearWord<S> {
     /// ```
     /// use automata_core::prelude::*;
     /// let word = upw!("abac", "acac");
-    /// assert!(word.spoke().equals("ab"));
-    /// assert!(word.cycle().equals("ac"));
+    /// assert!(word.spoke().finite_word_equals("ab"));
+    /// assert!(word.cycle().finite_word_equals("ac"));
     /// ```
-    fn reduced(&self) -> ReducedOmegaWord<S>
-    where
-        S: Symbol,
-    {
+    fn reduced(&self) -> ReducedOmegaWord<Self::Symbol> {
         ReducedOmegaWord::ultimately_periodic(self.spoke(), self.cycle())
     }
 
@@ -72,12 +69,10 @@ pub trait OmegaWord<S>: LinearWord<S> {
     /// let offset2 = word.skip(2);
     ///
     /// assert!(offset1 != offset2); // two different offsets are syntactically distinct
-    /// assert!(offset1.equals(offset2)); // but they are semantically equal
+    /// assert!(offset1.omega_word_equals(offset2)); // but they are semantically equal
     /// ```
-    fn equals<W: OmegaWord<S>>(&self, other: W) -> bool
-    where
-        S: Symbol,
-    {
+    fn omega_word_equals<W: OmegaWord<Symbol = Self::Symbol>>(&self, other: W) -> bool {
+        assert!(!W::FINITE);
         self.reduced() == other.reduced()
     }
 
@@ -88,13 +83,13 @@ pub trait OmegaWord<S>: LinearWord<S> {
 
     /// Returns a vector consisting of the symbols making up the cycle of `self`. This simply collects
     /// whatever symbols make up [`OmegaWord::cycle()`];
-    fn cycle_vec(&self) -> Vec<S> {
+    fn cycle_vec(&self) -> Vec<Self::Symbol> {
         self.cycle().into_vec()
     }
 
     /// Returns a vector consisting of the symbols making up the spoke of `self`. This simply collects
     /// whatever symbols make up [`OmegaWord::spoke()`];
-    fn spoke_vec(&self) -> Vec<S> {
+    fn spoke_vec(&self) -> Vec<Self::Symbol> {
         self.spoke().collect_vec()
     }
 
@@ -119,7 +114,7 @@ pub trait OmegaWord<S>: LinearWord<S> {
     }
 }
 
-impl<S: Symbol, W: OmegaWord<S>> OmegaWord<S> for &W {
+impl<W: OmegaWord> OmegaWord for &W {
     type Spoke<'this> = W::Spoke<'this>
     where
         Self: 'this;
@@ -205,9 +200,9 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     /// assert_eq!(word.cycle_length(), 3);
     /// assert_eq!(word.loop_index(), 0);
     /// assert!(word.spoke().is_empty());
-    /// assert!(word.cycle().equals("abc"));
+    /// assert!(word.cycle().finite_word_equals("abc"));
     /// ```
-    pub fn new<W: FiniteWord<S>>(word: W) -> Self {
+    pub fn new<W: FiniteWord<Symbol = S>>(word: W) -> Self {
         let mut representation = word.collect_vec();
         deduplicate_inplace(&mut representation);
         Self { representation }
@@ -219,14 +214,16 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for PeriodicOmegaWord<S> {
+impl<S: Symbol> Word for PeriodicOmegaWord<S> {
+    type Symbol = S;
+    const FINITE: bool = false;
     fn nth(&self, position: usize) -> Option<S> {
         self.representation
             .get(position % self.representation.len())
             .copied()
     }
 }
-impl<S: Symbol> OmegaWord<S> for PeriodicOmegaWord<S> {
+impl<S: Symbol> OmegaWord for PeriodicOmegaWord<S> {
     fn loop_index(&self) -> usize {
         0
     }
@@ -280,7 +277,9 @@ impl<S: Symbol> Show for ReducedOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> LinearWord<S> for ReducedOmegaWord<S> {
+impl<S: Symbol> Word for ReducedOmegaWord<S> {
+    type Symbol = S;
+    const FINITE: bool = false;
     fn nth(&self, position: usize) -> Option<S> {
         if position >= self.word.len() {
             let loop_position = (position - self.loop_index) % self.cycle_length();
@@ -290,7 +289,7 @@ impl<S: Symbol> LinearWord<S> for ReducedOmegaWord<S> {
         }
     }
 }
-impl<S: Symbol> OmegaWord<S> for ReducedOmegaWord<S> {
+impl<S: Symbol> OmegaWord for ReducedOmegaWord<S> {
     fn loop_index(&self) -> usize {
         self.loop_index
     }
@@ -320,7 +319,7 @@ impl<S: Symbol> ReducedOmegaWord<S> {
     /// let normalized = non_normalized.reduced();
     /// assert!(normalized.is_reduced()); // the normalization is normalized
     /// assert!(normalized != non_normalized); // they are not syntactically equal
-    /// assert!(normalized.equals(non_normalized)); // but they are semantically equal
+    /// assert!(normalized.omega_word_equals(non_normalized)); // but they are semantically equal
     /// ```
     pub fn is_reduced(&self) -> bool {
         self.reduced() == *self
@@ -335,7 +334,7 @@ impl<S: Symbol> ReducedOmegaWord<S> {
     }
 
     /// Creates a new reduced omega word from a finite word. The input is deduplicated.
-    pub fn periodic<W: FiniteWord<S>>(representation: W) -> Self {
+    pub fn periodic<W: FiniteWord<Symbol = S>>(representation: W) -> Self {
         let representation = deduplicate(representation.collect_vec());
         Self {
             word: representation,
@@ -367,7 +366,7 @@ impl<S: Symbol> ReducedOmegaWord<S> {
 
     /// Creates a new reduced omega word from a finite word representing the spoke and a finite
     /// word representing the cycle. The spoke must not be empty.
-    pub fn ultimately_periodic<Spoke: FiniteWord<S>, Cycle: FiniteWord<S>>(
+    pub fn ultimately_periodic<Spoke: FiniteWord<Symbol = S>, Cycle: FiniteWord<Symbol = S>>(
         spoke: Spoke,
         cycle: Cycle,
     ) -> Self {
@@ -447,15 +446,17 @@ impl TryFrom<&str> for ReducedOmegaWord<char> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Epsilon();
+pub struct Epsilon<S>(PhantomData<S>);
 
-impl<S: Symbol> LinearWord<S> for Epsilon {
+impl<S: Symbol> Word for Epsilon<S> {
+    type Symbol = S;
+    const FINITE: bool = true;
     fn nth(&self, _position: usize) -> Option<S> {
         None
     }
 }
 
-impl<S: Symbol> FiniteWord<S> for Epsilon {
+impl<S: Symbol> FiniteWord for Epsilon<S> {
     type Symbols<'this> = std::iter::Empty<S>
     where
         Self: 'this;
@@ -477,25 +478,24 @@ impl<S: Symbol> FiniteWord<S> for Epsilon {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct OmegaIteration<W>(W);
 
-impl<W> OmegaIteration<W> {
+impl<W: FiniteWord> OmegaIteration<W> {
     /// Iterate the given finite word `from`, panics if the word is empty.
-    pub fn new<S: Symbol>(from: W) -> Self
-    where
-        W: FiniteWord<S>,
-    {
+    pub fn new(from: W) -> Self {
         assert!(!from.is_empty(), "Cannot iterate an empty word");
         Self(from)
     }
 }
 
-impl<S: Symbol, W: FiniteWord<S>> LinearWord<S> for OmegaIteration<W> {
-    fn nth(&self, position: usize) -> Option<S> {
+impl<W: FiniteWord> Word for OmegaIteration<W> {
+    type Symbol = W::Symbol;
+    const FINITE: bool = false;
+    fn nth(&self, position: usize) -> Option<W::Symbol> {
         self.0.nth(position % self.0.len())
     }
 }
 
-impl<S: Symbol, W: FiniteWord<S>> OmegaWord<S> for OmegaIteration<W> {
-    type Spoke<'this> = Epsilon
+impl<W: FiniteWord> OmegaWord for OmegaIteration<W> {
+    type Spoke<'this> = Epsilon<W::Symbol>
     where
         Self: 'this;
 
@@ -504,7 +504,7 @@ impl<S: Symbol, W: FiniteWord<S>> OmegaWord<S> for OmegaIteration<W> {
         Self: 'this;
 
     fn spoke(&self) -> Self::Spoke<'_> {
-        Epsilon()
+        Epsilon(PhantomData)
     }
 
     fn cycle(&self) -> Self::Cycle<'_> {
@@ -566,7 +566,10 @@ impl<S: Show> Debug for PeriodicOmegaWord<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::word::{omega::deduplicate, ReducedOmegaWord};
+    use crate::{
+        prelude::*,
+        word::{omega::deduplicate, ReducedOmegaWord},
+    };
 
     use super::deduplicate_inplace;
 
@@ -600,5 +603,12 @@ mod tests {
             ReducedOmegaWord::ultimately_periodic("aaaaaaaaa", "a").word,
             vec!['a']
         );
+    }
+
+    #[test]
+    fn word_equality() {
+        let word = crate::upw!("abac", "acac");
+        assert!(word.spoke().finite_word_equals("ab"));
+        assert!(word.cycle().finite_word_equals("ac"));
     }
 }
