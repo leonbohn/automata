@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use alphabet::SimpleAlphabet;
 use itertools::Itertools;
 
 use crate::prelude::*;
@@ -132,6 +133,15 @@ impl Alphabet for CharAlphabet {
             .iter()
             .find(|c| c == &&symbol)
             .expect("symbol does not exist")
+    }
+}
+
+impl SimpleAlphabet for CharAlphabet {
+    fn express(&self, sym: Self::Symbol) -> &Self::Expression {
+        self.0
+            .iter()
+            .find(|c| c == &&sym)
+            .expect("cannot express unavailable symbol!")
     }
 }
 

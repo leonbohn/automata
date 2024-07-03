@@ -52,7 +52,7 @@ for i in "${!commit_hashes[@]}"; do
 done
 
 sed -i.bak "s/^automata = { .* }$/automata = { path=\"..\/automata\" }/" $CARGO_TOML
-build_binary 2
+build_binary 3
 echo -e "\033[34mBenchmarking local...\033[0m"
 run_bench
 

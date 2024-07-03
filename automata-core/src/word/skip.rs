@@ -111,11 +111,10 @@ impl<'a, W: OmegaWord> OmegaWord for Skip<'a, W> {
         Self: 'this;
 
     fn reduced(&self) -> crate::prelude::ReducedOmegaWord<W::Symbol> {
-        if self.offset >= self.sequence.spoke_length() {
+        if self.offset >= self.sequence.spoke_len() {
             let mut period = self.sequence.cycle_vec();
-            period.rotate_left(
-                (self.offset - self.sequence.spoke_length()) % self.sequence.cycle_length(),
-            );
+            period
+                .rotate_left((self.offset - self.sequence.spoke_len()) % self.sequence.cycle_len());
             ReducedOmegaWord::from_raw_parts(period, 0)
         } else {
             let representation: Vec<_> = self
@@ -127,7 +126,7 @@ impl<'a, W: OmegaWord> OmegaWord for Skip<'a, W> {
                 .collect();
             ReducedOmegaWord::from_raw_parts(
                 representation,
-                self.sequence.spoke_length() - self.offset,
+                self.sequence.spoke_len() - self.offset,
             )
         }
     }
@@ -144,13 +143,13 @@ impl<'a, W: OmegaWord> OmegaWord for Skip<'a, W> {
     fn cycle(&self) -> Self::Cycle<'_> {
         if self.offset < self.sequence.loop_index() {
             self.sequence
-                .infix(self.sequence.loop_index(), self.sequence.cycle_length())
+                .infix(self.sequence.loop_index(), self.sequence.cycle_len())
         } else {
             self.sequence.infix(
                 self.sequence.loop_index()
                     + (self.offset.saturating_sub(self.sequence.loop_index())
-                        % self.sequence.cycle_length()),
-                self.sequence.cycle_length(),
+                        % self.sequence.cycle_len()),
+                self.sequence.cycle_len(),
             )
         }
     }

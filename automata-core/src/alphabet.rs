@@ -60,6 +60,13 @@ pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show + Matcher<Self> {
     }
 }
 
+pub trait SimpleAlphabet: Alphabet
+where
+    Self: Alphabet<Expression = <Self as Alphabet>::Symbol>,
+{
+    fn express(&self, sym: Self::Symbol) -> &Self::Expression;
+}
+
 /// An alphabet abstracts a collection of [`Symbol`]s and complex [`Expression`]s over those.
 pub trait Alphabet: Clone + Debug {
     /// The type of symbols in this alphabet.

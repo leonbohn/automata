@@ -30,6 +30,10 @@ fn runs() {
     let mut size: u128 = 0;
     for i in 0..10000 {
         for word in &words {
+            #[cfg(feature = "commit_3")]
+            let infset = ts
+                .recurrent_state_indices_from(i as u32 % 4, word)
+                .expect("alsdf");
             #[cfg(feature = "commit_2")]
             let infset = ts
                 .recurrent_state_indices_from(i as u32 % 4, word)

@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-automata = { path="../automata" }
+automata = { path = "../automata" }
 
 [features]
 commit_0 = []
 commit_1 = []
 commit_2 = []
+commit_3 = []

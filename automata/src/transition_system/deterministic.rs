@@ -60,6 +60,31 @@ pub trait Deterministic: TransitionSystem {
         Some(first)
     }
 
+    fn fold_finite_from<X, Y, W, F, G>(
+        &self,
+        source: StateIndex<Self>,
+        init: X,
+        word: W,
+        func: F,
+        bail: G,
+    ) -> Result<X, Y>
+    where
+        W: AsRef<[SymbolOf<Self>]>,
+        F: Fn(&Self, &mut X, Self::EdgeRef<'_>),
+        G: Fn(&Self, X, StateIndex<Self>, SymbolOf<Self>) -> Y,
+    {
+        let mut current_state = source;
+        let mut current_x = init;
+        for sym in word.as_ref() {
+            let Some(e) = self.edge(current_state, sym) else {
+                return Err((bail)(self, current_x, current_state, *sym));
+            };
+            current_state = e.target();
+            (func)(self, &mut current_x, e);
+        }
+        Ok(current_x)
+    }
+
     /// Returns just the [`TransitionSystem::StateIndex`] of the successor that is reached on the given `symbol`
     /// from `state`. If no suitable transition exists, `None` is returned.
     ///
