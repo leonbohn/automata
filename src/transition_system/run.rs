@@ -33,21 +33,63 @@ pub struct EdgeColorLimit<T: TransitionSystem, const MAX: bool = false>(Option<E
 
 #[derive(Clone, Debug)]
 pub struct StateSet<T: TransitionSystem>(math::Set<StateIndex<T>>);
+impl<T: TransitionSystem> std::ops::Deref for StateSet<T> {
+    type Target = math::Set<StateIndex<T>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 pub struct StateSequence<T: TransitionSystem>(Vec<StateIndex<T>>);
+impl<T: TransitionSystem> std::ops::Deref for StateSequence<T> {
+    type Target = Vec<StateIndex<T>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 pub struct StateColorSequence<T: TransitionSystem>(Vec<StateColor<T>>);
+impl<T: TransitionSystem> std::ops::Deref for StateColorSequence<T> {
+    type Target = Vec<StateColor<T>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 pub struct StateColorSet<T: TransitionSystem>(math::Set<StateColor<T>>);
+impl<T: TransitionSystem> std::ops::Deref for StateColorSet<T> {
+    type Target = math::Set<StateColor<T>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Debug)]
 pub struct EdgeColorSet<T: TransitionSystem>(pub(crate) math::Set<EdgeColor<T>>);
+impl<T: TransitionSystem> std::ops::Deref for EdgeColorSet<T> {
+    type Target = math::Set<EdgeColor<T>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Debug)]
 pub struct EdgeColorSequence<T: TransitionSystem>(pub(crate) Vec<EdgeColor<T>>);
+impl<T: TransitionSystem> std::ops::Deref for EdgeColorSequence<T> {
+    type Target = Vec<EdgeColor<T>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Triggers<T: TransitionSystem>(math::Set<(StateIndex<T>, SymbolOf<T>)>);
+impl<T: TransitionSystem> std::ops::Deref for Triggers<T> {
+    type Target = math::Set<(StateIndex<T>, SymbolOf<T>)>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 pub struct Run<
     'ts,
