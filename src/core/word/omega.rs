@@ -103,14 +103,18 @@ pub trait OmegaWord: Word {
     /// infinitely often. Note that if the word is not normalized, then there might be a shorter
     /// representation of the cycle that is repeated, e.g. a cycle of `aaa` could also be
     /// represented by the cycle `a`.
-    fn cycle_length(&self) -> usize {
+    fn cycle_len(&self) -> usize {
         self.cycle().len()
     }
 
     /// Gives the length of the spoke of the word, so the number of symbols before the loop
     /// is entered.
-    fn spoke_length(&self) -> usize {
+    fn spoke_len(&self) -> usize {
         self.spoke().len()
+    }
+
+    fn combined_len(&self) -> usize {
+        self.cycle_len() + self.spoke_len()
     }
 }
 
@@ -282,7 +286,7 @@ impl<S: Symbol> Word for ReducedOmegaWord<S> {
     const FINITE: bool = false;
     fn nth(&self, position: usize) -> Option<S> {
         if position >= self.word.len() {
-            let loop_position = (position - self.loop_index) % self.cycle_length();
+            let loop_position = (position - self.loop_index) % self.cycle_len();
             self.word.nth(self.loop_index + loop_position)
         } else {
             self.word.nth(position)

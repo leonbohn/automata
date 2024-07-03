@@ -51,6 +51,8 @@ pub mod run;
 /// This module defines traits for dealing with predecessors in a transition system.
 pub mod predecessors;
 
+pub mod word_as_ts;
+
 /// Encapsulates the transition function δ of a (finite) transition system. This is the main trait that
 /// is used to query a transition system. Transitions are labeled with a [`Alphabet::Expression`], which
 /// determines on which [`Alphabet::Symbol`]s the transition can be taken. Additionally, every transition

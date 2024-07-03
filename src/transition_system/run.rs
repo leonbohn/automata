@@ -10,7 +10,12 @@ pub trait Observer<T: TransitionSystem>: Sized {
     fn current(&self) -> &Self::Current;
     fn into_current(self) -> Self::Current;
     fn begin(ts: &T, state: StateIndex<T>) -> Self;
-    fn observe(&mut self, ts: &T, state: StateIndex<T>, sym: SymbolOf<T>) -> Option<StateIndex<T>>;
+    fn observe_one(
+        &mut self,
+        ts: &T,
+        state: StateIndex<T>,
+        sym: SymbolOf<T>,
+    ) -> Option<StateIndex<T>>;
 }
 
 pub trait InfiniteObserver<T: TransitionSystem>: Observer<T> {
@@ -131,7 +136,7 @@ impl<'ts, T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>, O: Observer<T>>
 
         while let Some(sym) = self.word.nth(taken) {
             taken += 1;
-            if let Some(next) = observer.observe(self.ts, current, sym) {
+            if let Some(next) = observer.observe_one(self.ts, current, sym) {
                 current = next;
             } else {
                 return FiniteRunOutput::Failed(current, EscapePrefix::new(self.word, taken));
@@ -187,7 +192,7 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
                     current = reached;
                 }
                 FiniteRunOutput::Failed(reached, ep) => {
-                    let length = self.word.spoke_length()
+                    let length = self.word.spoke_len()
                         + cycle.len() * (iteration - 1)
                         + ep.shortest_escaping_length;
                     return InfiniteRunOutput::Failed(
@@ -433,7 +438,7 @@ mod impls {
             NoObserver
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -462,7 +467,7 @@ mod impls {
             self.0
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -484,7 +489,7 @@ mod impls {
             Self(ts.state_color(state).unwrap())
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -507,7 +512,7 @@ mod impls {
             Self(None)
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -531,7 +536,7 @@ mod impls {
             Self(ts.state_color(state).unwrap())
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -570,7 +575,7 @@ mod impls {
             Self(None)
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -618,7 +623,7 @@ mod impls {
             self
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -650,7 +655,7 @@ mod impls {
             self.0
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -682,7 +687,7 @@ mod impls {
             self.0
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -720,7 +725,7 @@ mod impls {
             self
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -752,7 +757,7 @@ mod impls {
             self
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -789,7 +794,7 @@ mod impls {
             self.0
         }
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -833,7 +838,7 @@ mod impls {
         }
 
         #[inline(always)]
-        fn observe(
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
