@@ -139,12 +139,12 @@ impl<'a, W: Word> ConsumingInfixIterator<'a, W> {
 /// ```
 /// use automata_core::prelude::*;
 /// let ultimately_periodic = upw!("ab", "bb"); // represents the ultimately periodic word `ab(bb)^𝜔`
-/// assert!(ultimately_periodic.spoke().equals("a")); // the spoke is normalized to just `a`
-/// assert!(ultimately_periodic.cycle().equals("b")); // while the loop normalizes to `b`
+/// assert!(ultimately_periodic.spoke().finite_word_equals("a")); // the spoke is normalized to just `a`
+/// assert!(ultimately_periodic.cycle().finite_word_equals("b")); // while the loop normalizes to `b`
 ///
 /// let periodic_word = upw!("bbbbb"); // we can also create a periodic omega word
 /// assert!(periodic_word.spoke().is_empty()); // which is normlalized to have an empty spoke
-/// assert!(periodic_word.cycle().equals("b")); // and a cycle that equals the omega iteration of `b`.
+/// assert!(periodic_word.cycle().finite_word_equals("b")); // and a cycle that equals the omega iteration of `b`.
 /// ```
 #[macro_export]
 macro_rules! upw {

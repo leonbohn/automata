@@ -53,8 +53,8 @@ pub trait OmegaWord: Word {
     /// ```
     /// use automata_core::prelude::*;
     /// let word = upw!("abac", "acac");
-    /// assert!(word.spoke().equals("ab"));
-    /// assert!(word.cycle().equals("ac"));
+    /// assert!(word.spoke().finite_word_equals("ab"));
+    /// assert!(word.cycle().finite_word_equals("ac"));
     /// ```
     fn reduced(&self) -> ReducedOmegaWord<Self::Symbol> {
         ReducedOmegaWord::ultimately_periodic(self.spoke(), self.cycle())
@@ -69,9 +69,10 @@ pub trait OmegaWord: Word {
     /// let offset2 = word.skip(2);
     ///
     /// assert!(offset1 != offset2); // two different offsets are syntactically distinct
-    /// assert!(offset1.equals(offset2)); // but they are semantically equal
+    /// assert!(offset1.omega_word_equals(offset2)); // but they are semantically equal
     /// ```
-    fn equals<W: OmegaWord<Symbol = Self::Symbol>>(&self, other: W) -> bool {
+    fn omega_word_equals<W: OmegaWord<Symbol = Self::Symbol>>(&self, other: W) -> bool {
+        assert!(!W::FINITE);
         self.reduced() == other.reduced()
     }
 
@@ -199,7 +200,7 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     /// assert_eq!(word.cycle_length(), 3);
     /// assert_eq!(word.loop_index(), 0);
     /// assert!(word.spoke().is_empty());
-    /// assert!(word.cycle().equals("abc"));
+    /// assert!(word.cycle().finite_word_equals("abc"));
     /// ```
     pub fn new<W: FiniteWord<Symbol = S>>(word: W) -> Self {
         let mut representation = word.collect_vec();
@@ -318,7 +319,7 @@ impl<S: Symbol> ReducedOmegaWord<S> {
     /// let normalized = non_normalized.reduced();
     /// assert!(normalized.is_reduced()); // the normalization is normalized
     /// assert!(normalized != non_normalized); // they are not syntactically equal
-    /// assert!(normalized.equals(non_normalized)); // but they are semantically equal
+    /// assert!(normalized.omega_word_equals(non_normalized)); // but they are semantically equal
     /// ```
     pub fn is_reduced(&self) -> bool {
         self.reduced() == *self
@@ -565,7 +566,10 @@ impl<S: Show> Debug for PeriodicOmegaWord<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::word::{omega::deduplicate, ReducedOmegaWord};
+    use crate::{
+        prelude::*,
+        word::{omega::deduplicate, ReducedOmegaWord},
+    };
 
     use super::deduplicate_inplace;
 
@@ -599,5 +603,12 @@ mod tests {
             ReducedOmegaWord::ultimately_periodic("aaaaaaaaa", "a").word,
             vec!['a']
         );
+    }
+
+    #[test]
+    fn word_equality() {
+        let word = crate::upw!("abac", "acac");
+        assert!(word.spoke().finite_word_equals("ab"));
+        assert!(word.cycle().finite_word_equals("ac"));
     }
 }
