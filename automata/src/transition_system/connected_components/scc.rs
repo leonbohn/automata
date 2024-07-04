@@ -424,10 +424,7 @@ mod tests {
         let first = sccs.first();
         println!("{:?}", first);
         assert_eq!(&transitions, first.interior_transitions());
-        assert_eq!(
-            first.interior_edge_colors(),
-            &Set::from_iter([0, 1, 2])
-        );
+        assert_eq!(first.interior_edge_colors(), &Set::from_iter([0, 1, 2]));
 
         let color_restricted = (&ts).edge_color_restricted(1, 2);
         let sccs = color_restricted.sccs();

@@ -51,7 +51,7 @@ for i in "${!commit_hashes[@]}"; do
 
   # Build the binary
   build_binary $i
-  flamegraph $i
+  # flamegraph $i
 
   # Run hyperfine to benchmark the binary
   echo -e "\033[34mBenchmarking commit $commit_hash...\033[0m"

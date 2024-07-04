@@ -20,7 +20,7 @@ use crate::prelude::*;
 /// # Equality testing
 /// Most implementors of `OmegaWord` should also implement `PartialEq`/`Eq`. Note, that this
 /// represents syntactical/structural equality. To test for syntactic equality (i.e. equality
-/// of the represented word itself), the method [`OmegaWord::equals()`] should be used. This
+/// of the represented word itself), the method [`OmegaWord::omega_word_equals()`] should be used. This
 /// method first normalizes the words in question and subsequently compares the loop and spoke.
 ///
 /// # Example
@@ -28,7 +28,7 @@ use crate::prelude::*;
 /// use automata_core::prelude::*;
 /// let word = upw!("abc", "def"); // represents abc(def)^𝜔 = abcdefdefdef...
 /// assert_eq!(word.loop_index(), 3);
-/// assert_eq!(word.cycle_length(), 3);
+/// assert_eq!(word.cycle_len(), 3);
 /// ```
 pub trait OmegaWord: Word {
     /// The type of finite word representing the spoke, i.e. the finite prefix of the word
@@ -201,7 +201,7 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     /// ```
     /// use automata_core::prelude::*;
     /// let word = upw!("abcabcabc");
-    /// assert_eq!(word.cycle_length(), 3);
+    /// assert_eq!(word.cycle_len(), 3);
     /// assert_eq!(word.loop_index(), 0);
     /// assert!(word.spoke().is_empty());
     /// assert!(word.cycle().finite_word_equals("abc"));

@@ -75,7 +75,9 @@ pub trait CollectTs: TransitionSystem {
     where
         Self: Pointed,
     {
-        let reachable_indices = self.reachable_state_indices().collect::<math::OrderedSet<_>>();
+        let reachable_indices = self
+            .reachable_state_indices()
+            .collect::<math::OrderedSet<_>>();
         let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
         restricted.collect_dts_and_initial()
     }
