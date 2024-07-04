@@ -101,8 +101,9 @@ impl<'a, Ts: TransitionSystem> PartialEq for SccDecomposition<'a, Ts> {
 
 #[cfg(test)]
 mod tests {
+    use math::Set;
+
     use crate::{
-        math::Set,
         prelude::*,
         transition_system::connected_components::{Scc, SccDecomposition},
     };

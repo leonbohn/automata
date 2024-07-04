@@ -5,14 +5,14 @@ use crate::prelude::*;
 #[derive(Clone)]
 pub struct FORC<A: Alphabet, Q: Color = Void, C: Color = Void> {
     pub(crate) leading: RightCongruence<A>,
-    pub(crate) progress: math::Map<DefaultIdType, RightCongruence<A, Q, C>>,
+    pub(crate) progress: math::OrderedMap<DefaultIdType, RightCongruence<A, Q, C>>,
 }
 
 impl<A: Alphabet, Q: Color, C: Color> FORC<A, Q, C> {
     /// Creates a new FORC with the given leading congruence and progress congruences.
     pub fn new(
         leading: RightCongruence<A>,
-        progress: math::Map<DefaultIdType, RightCongruence<A, Q, C>>,
+        progress: math::OrderedMap<DefaultIdType, RightCongruence<A, Q, C>>,
     ) -> Self {
         Self { leading, progress }
     }

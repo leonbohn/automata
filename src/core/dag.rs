@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, fmt::Debug};
 use itertools::Itertools;
 
 use crate::prelude::*;
-use math::Set;
+use math::OrderedSet;
 
 /// Represents a directed acyclic graph. The nodes have usize indices and are
 /// colored with some type `C`. The edges are represented as a vector of pairs
@@ -47,7 +47,7 @@ impl<C> Dag<C> {
 
     /// Masks the nodes given in the set and returns true iff all nodes are masked,
     /// i.e. no nodes are left unmasked.
-    pub fn masked_is_empty(&self, mask: &Set<usize>) -> bool {
+    pub fn masked_is_empty(&self, mask: &OrderedSet<usize>) -> bool {
         debug_assert!(mask.iter().all(|i| i < &self.nodes.len()));
         mask.len() == self.nodes.len()
     }
@@ -75,7 +75,7 @@ impl<C> Dag<C> {
     /// the nodes given in the set.
     pub fn masked_terminal_nodes<'a>(
         &'a self,
-        mask: &'a Set<usize>,
+        mask: &'a OrderedSet<usize>,
     ) -> impl Iterator<Item = usize> + 'a {
         (0..self.nodes.len()).filter(|i| {
             !mask.contains(i)
@@ -174,7 +174,7 @@ impl<C: Debug> Debug for Dag<C> {
 pub struct ReachableIter<'a, C> {
     dag: &'a Dag<C>,
     queue: BTreeSet<usize>,
-    seen: Set<usize>,
+    seen: OrderedSet<usize>,
 }
 
 impl<'a, C> Iterator for ReachableIter<'a, C> {
@@ -208,7 +208,7 @@ impl<'a, C> ReachableIter<'a, C> {
         Self {
             dag: ts,
             queue: BTreeSet::from([source]),
-            seen: Set::default(),
+            seen: OrderedSet::default(),
         }
     }
 }

@@ -42,7 +42,7 @@ pub trait CollectTs: TransitionSystem {
         &self,
     ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
         let mut out = DTS::for_alphabet_size_hint(self.alphabet().clone(), self.size());
-        let mut map = math::Map::default();
+        let mut map = math::OrderedMap::default();
 
         for (q, c) in self.state_indices_with_color() {
             map.insert(q, out.add_state((q, c)));
@@ -75,7 +75,7 @@ pub trait CollectTs: TransitionSystem {
     where
         Self: Pointed,
     {
-        let reachable_indices = self.reachable_state_indices().collect::<math::Set<_>>();
+        let reachable_indices = self.reachable_state_indices().collect::<math::OrderedSet<_>>();
         let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
         restricted.collect_dts_and_initial()
     }
