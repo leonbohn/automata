@@ -3,7 +3,6 @@ use crate::automaton::InfiniteWordAutomaton;
 use crate::prelude::*;
 
 use itertools::Itertools;
-use math::Set;
 /// A deterministic Muller automaton (DMA) uses a [`MullerCondition`] to determine acceptance.
 /// Such a condition consists of a set of sets of colors. It considers an infinite run to
 /// be accepting, if the set of colors that appear infinitely often in the run is an element
@@ -21,7 +20,7 @@ pub type IntoDMA<T> = DMA<<T as TransitionSystem>::Alphabet, StateColor<T>, Edge
 /// is satisfied by a set (usually the set of colors that appear infinitely often in a run),
 /// if it contains the set.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct MullerCondition<C: Color>(Vec<Set<C>>);
+pub struct MullerCondition<C: Color>(Vec<math::Set<C>>);
 
 impl<C: Color + Ord> MullerCondition<C> {
     /// Builds a new instance from an iterator that yields iterators that yield colors
@@ -47,7 +46,7 @@ impl<C: Color + Ord> MullerCondition<C> {
 
     /// Returns `true` if the given `set` of colors satisfies this condition,
     /// i.e. if `self` contains `set`.
-    pub fn satisfied_by_set(&self, set: &Set<C>) -> bool {
+    pub fn satisfied_by_set(&self, set: &math::Set<C>) -> bool {
         self.0.contains(set)
     }
 
@@ -57,7 +56,7 @@ impl<C: Color + Ord> MullerCondition<C> {
     }
 
     /// Creates a new instance from a set of sets of colors.
-    pub fn new(sets: Vec<Set<C>>) -> Self {
+    pub fn new(sets: Vec<math::Set<C>>) -> Self {
         Self(sets)
     }
 }

@@ -48,7 +48,7 @@ pub trait Congruence: Deterministic + Pointed {
     {
         let mut cur = self.reached_state_index(word.spoke())?;
         let mut count = 0;
-        let mut map = math::Map::default();
+        let mut map = math::OrderedMap::default();
         loop {
             match map.insert(cur, count) {
                 None => {

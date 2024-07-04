@@ -25,7 +25,7 @@ where
     Ts::StateColor: Accumulates,
 {
     alphabet: alphabet::Directional,
-    expressions: math::Map<SymbolOf<Self>, EdgeExpression<Self>>,
+    expressions: math::OrderedMap<SymbolOf<Self>, EdgeExpression<Self>>,
     m: TransitionMonoid<Ts>,
 }
 
@@ -33,7 +33,7 @@ where
 /// the transition profiles of the ts as nodes. See [`Cayley`] for more details.
 #[derive(Clone)]
 pub struct RightCayley<Ts: TransitionSystem + Pointed> {
-    expressions: math::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
+    expressions: math::OrderedMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
     m: TransitionMonoid<Ts>,
 }
 

@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
-use crate::{math::Set, prelude::*, transition_system::EdgeTuple};
+use crate::{math::OrderedSet, prelude::*, transition_system::EdgeTuple};
 use itertools::Itertools;
 
 mod linked_state;
@@ -767,7 +767,7 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const 
                 .edges_from_iter(&self.edges)
                 .expect("the state exists")
                 .map(|e| (&e.expression, &e.color, e.target))
-                .collect::<Set<_>>();
+                .collect::<math::Set<_>>();
 
             y.edges_from_iter(&other.edges)
                 .expect("state exists")

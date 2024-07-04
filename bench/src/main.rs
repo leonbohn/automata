@@ -29,24 +29,17 @@ fn runs() {
     ];
     let mut size: u128 = 0;
     for i in 0..10000 {
-        println!("ieration {i}");
         for word in &words {
             #[cfg(feature = "commit_3")]
-            let infset = ts
-                .recurrent_state_indices_from(i as u32 % 4, word)
-                .expect("alsdf");
+            let infset = ts.recurrent_state_indices_from(i as u32 % 4, word).unwrap();
             #[cfg(feature = "commit_2")]
-            let infset = ts
-                .recurrent_state_indices_from(i as u32 % 4, word)
-                .expect("alsdf");
+            let infset = ts.recurrent_state_indices_from(i as u32 % 4, word).unwrap();
             #[cfg(feature = "commit_1")]
-            let infset = ts
-                .recurrent_state_indices_from(i as u32 % 4, word)
-                .expect("alsdf");
+            let infset = ts.recurrent_state_indices_from(i as u32 % 4, word).unwrap();
             #[cfg(feature = "commit_0")]
             let infset = ts
                 .recurrent_state_indices_from(i as u32 % 4, word)
-                .expect("alsdf")
+                .unwrap()
                 .collect::<math::Set<_>>();
             size += infset.len() as u128;
             size = size % 1337;

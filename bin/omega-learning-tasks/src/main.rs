@@ -14,7 +14,6 @@ use automata_learning::passive::{
     sprout::{sprout, SproutError},
     OmegaSample,
 };
-use math::set::IndexSet;
 use tracing::info;
 
 fn main() {
@@ -368,8 +367,8 @@ pub fn generate_set(
     train_size: usize,
     test_size: usize,
 ) -> (
-    IndexSet<ReducedOmegaWord<char>>,
-    IndexSet<ReducedOmegaWord<char>>,
+    math::Set<ReducedOmegaWord<char>>,
+    math::Set<ReducedOmegaWord<char>>,
 ) {
     let alphabet = CharAlphabet::of_size(num_symbols);
     let mut training_set = generate_random_omega_words(
@@ -387,7 +386,7 @@ pub fn generate_set(
 /// Label a `set` of [`ReducedOmegaWord`]s with the result of the given automaton.
 pub fn label_set<Z, C>(
     aut: &InfiniteWordAutomaton<CharAlphabet, Z, Void, C, true>,
-    set: &IndexSet<ReducedOmegaWord<char>>,
+    set: &math::Set<ReducedOmegaWord<char>>,
 ) -> Vec<(ReducedOmegaWord<char>, bool)>
 where
     Z: Semantics<DTS<CharAlphabet, Void, C>, true, Output = bool>,
@@ -410,7 +409,7 @@ pub fn aut_name(aut_size: usize, aut_index: usize, acc_type: String) -> String {
 }
 
 /// Write the given set to the given `path` as csv
-pub fn export_set(file: String, set: &IndexSet<ReducedOmegaWord<char>>) {
+pub fn export_set(file: String, set: &math::Set<ReducedOmegaWord<char>>) {
     let mut wtr = Writer::from_path(file).expect("creating file failed");
     for w in set.iter() {
         wtr.write_record(&[

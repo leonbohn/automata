@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use math::Set;
+use math::OrderedSet;
 use std::marker::PhantomData;
 
 /// Abstracts the filtering of a transition system's state indices. This trait is implemented by
@@ -39,7 +39,7 @@ where
     }
 }
 
-impl<Idx> StateIndexFilter<Idx> for Set<Idx>
+impl<Idx> StateIndexFilter<Idx> for OrderedSet<Idx>
 where
     Idx: IndexType,
 {

@@ -1,10 +1,10 @@
 use std::{cell::RefCell, fmt::Debug};
 
-use crate::{math::Set, prelude::*, transition_system::edge::TransitionOwnedColor};
+use crate::{math::OrderedSet, prelude::*, transition_system::edge::TransitionOwnedColor};
 use itertools::Itertools;
 
 #[derive(Clone, Eq)]
-pub struct StateSet<Ts: TransitionSystem>(Set<Ts::StateIndex>);
+pub struct StateSet<Ts: TransitionSystem>(OrderedSet<Ts::StateIndex>);
 
 impl<Ts: TransitionSystem> Extend<Ts::StateIndex> for StateSet<Ts> {
     fn extend<T: IntoIterator<Item = Ts::StateIndex>>(&mut self, iter: T) {
@@ -20,12 +20,12 @@ impl<Ts: TransitionSystem> PartialEq for StateSet<Ts> {
 
 impl<Ts: TransitionSystem> Default for StateSet<Ts> {
     fn default() -> Self {
-        Self(Set::default())
+        Self(OrderedSet::default())
     }
 }
 
 impl<Ts: TransitionSystem> IntoIterator for StateSet<Ts> {
-    type IntoIter = math::set::IntoIter<Ts::StateIndex>;
+    type IntoIter = math::ordered_set::IntoIter<Ts::StateIndex>;
     type Item = Ts::StateIndex;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -34,13 +34,13 @@ impl<Ts: TransitionSystem> IntoIterator for StateSet<Ts> {
 
 impl<Ts: TransitionSystem> FromIterator<Ts::StateIndex> for StateSet<Ts> {
     fn from_iter<T: IntoIterator<Item = Ts::StateIndex>>(iter: T) -> Self {
-        Self(Set::from_iter(iter))
+        Self(OrderedSet::from_iter(iter))
     }
 }
 
 impl<Ts: TransitionSystem> StateSet<Ts> {
     pub fn singleton(q: Ts::StateIndex) -> Self {
-        Self(Set::from_iter([q]))
+        Self(OrderedSet::from_iter([q]))
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &'_ Ts::StateIndex> + '_ {
@@ -68,7 +68,7 @@ impl<Ts: TransitionSystem> std::fmt::Debug for StateSet<Ts> {
 pub struct SubsetConstruction<Ts: TransitionSystem> {
     ts: Ts,
     states: RefCell<Vec<StateSet<Ts>>>,
-    expressions: math::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
+    expressions: math::OrderedMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
 }
 
 impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {

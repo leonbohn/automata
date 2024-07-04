@@ -37,9 +37,9 @@ pub type GreatestEdgeColor<T> = EdgeColorLimit<T, true>;
 pub struct EdgeColorLimit<T: TransitionSystem, const MAX: bool = false>(Option<EdgeColor<T>>);
 
 #[derive(Clone, Debug)]
-pub struct StateSet<T: TransitionSystem>(pub(crate) math::Set<StateIndex<T>>);
+pub struct StateSet<T: TransitionSystem>(pub(crate) math::OrderedSet<StateIndex<T>>);
 impl<T: TransitionSystem> std::ops::Deref for StateSet<T> {
-    type Target = math::Set<StateIndex<T>>;
+    type Target = math::OrderedSet<StateIndex<T>>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -88,9 +88,9 @@ impl<T: TransitionSystem> std::ops::Deref for EdgeColorSequence<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Triggers<T: TransitionSystem>(math::Set<(StateIndex<T>, SymbolOf<T>)>);
+pub struct Triggers<T: TransitionSystem>(math::OrderedSet<(StateIndex<T>, SymbolOf<T>)>);
 impl<T: TransitionSystem> std::ops::Deref for Triggers<T> {
-    type Target = math::Set<(StateIndex<T>, SymbolOf<T>)>;
+    type Target = math::OrderedSet<(StateIndex<T>, SymbolOf<T>)>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -170,7 +170,7 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
             }
         };
 
-        let mut seen = math::Map::default();
+        let mut seen = math::OrderedMap::default();
         let mut iteration = 0;
         seen.insert(current, iteration);
         let mut seq = vec![];
@@ -634,7 +634,7 @@ mod impls {
         type Current = Self;
         #[inline(always)]
         fn begin(_ts: &T, state: StateIndex<T>) -> Self {
-            Self(math::Set::from_iter([state]))
+            Self(math::OrderedSet::from_iter([state]))
         }
         #[inline(always)]
         fn into_current(self) -> Self::Current {
@@ -866,7 +866,7 @@ mod impls {
     }
 
     impl<T: Deterministic> Observer<T> for Triggers<T> {
-        type Current = math::Set<(StateIndex<T>, SymbolOf<T>)>;
+        type Current = math::OrderedSet<(StateIndex<T>, SymbolOf<T>)>;
 
         #[inline(always)]
         fn current(&self) -> &Self::Current {
@@ -880,7 +880,7 @@ mod impls {
 
         #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
-            Self(math::Set::default())
+            Self(math::OrderedSet::default())
         }
 
         #[inline(always)]
@@ -901,10 +901,12 @@ mod impls {
             assert!(!seq.is_empty());
             assert!(time < seq.len());
 
-            seq[time..].iter().fold(math::Set::default(), |mut acc, x| {
-                acc.extend(x.iter().cloned());
-                acc
-            })
+            seq[time..]
+                .iter()
+                .fold(math::OrderedSet::default(), |mut acc, x| {
+                    acc.extend(x.iter().cloned());
+                    acc
+                })
         }
     }
 }
