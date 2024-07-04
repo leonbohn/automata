@@ -4,16 +4,21 @@ pub use bernoulli::{
     continuous_bernoulli_mean, sample_continuous_bernoulli,
 };
 
+use std::collections::BTreeMap;
 use std::{collections::BTreeSet, hash::Hash};
 
 pub use indexmap::map;
 pub use indexmap::set;
 pub use indexmap::Equivalent;
+pub use std::collections::btree_map as ordered_map;
+pub use std::collections::btree_set as ordered_set;
 
 /// Type alias for sets, we use this to hide which type of `HashSet` we are actually using.
+pub type OrderedSet<S> = BTreeSet<S>;
 pub type Set<S> = indexmap::IndexSet<S>;
 
 /// Type alias for maps, we use this to hide which type of `HashMap` we are actually using.
+pub type OrderedMap<K, V> = BTreeMap<K, V>;
 pub type Map<K, V> = indexmap::IndexMap<K, V>;
 
 /// Represents a bijective mapping between `L` and `R`, that is a mapping which associates

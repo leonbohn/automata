@@ -10,7 +10,7 @@ use std::{collections::BTreeSet, time::Instant};
 use itertools::Itertools;
 use tracing::{debug, trace};
 
-use crate::{math::Map, math::Partition, prelude::*};
+use crate::{math::Partition, prelude::*};
 
 /// Computes the maximal bisimulation of the given something that behaves like a mealy machine. The returned
 /// partition is a [`Partition`] of the state indices, where any states in the same class of the
@@ -28,7 +28,7 @@ where
 
     while let Some(set) = queue.pop() {
         for sym in mm.symbols() {
-            let mut splitter = Map::default();
+            let mut splitter = math::Map::default();
             for q in mm.state_indices() {
                 if let Some(t) = mm.edge(q, sym) {
                     if set.contains(&t.target()) {
@@ -122,7 +122,7 @@ where
 {
     let start = Instant::now();
 
-    let mut presplit: Map<_, _> = Map::default();
+    let mut presplit: math::Map<_, _> = math::Map::default();
     for (q, c) in mm.state_indices_with_color() {
         presplit.entry(c).or_insert(BTreeSet::default()).insert(q);
     }

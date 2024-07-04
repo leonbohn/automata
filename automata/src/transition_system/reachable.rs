@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use math::Set;
+use math::OrderedSet;
 use std::collections::{BTreeMap, VecDeque};
 
 /// Struct that can return the minimal representatives of a transition system. A minimal representative
@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, VecDeque};
 #[derive(Debug, Clone)]
 pub struct LengthLexicographicMinimalRepresentatives<'a, Ts: TransitionSystem> {
     ts: &'a Ts,
-    seen: Set<Ts::StateIndex>,
+    seen: OrderedSet<Ts::StateIndex>,
     queue: BTreeMap<MinimalRepresentative<Ts>, StateIndex<Ts>>,
 }
 
@@ -18,7 +18,7 @@ where
     Ts: TransitionSystem,
 {
     pub fn new(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
-        let seen = Set::from_iter([origin]);
+        let seen = OrderedSet::from_iter([origin]);
         let queue = [(MinimalRepresentative::new(vec![], origin), origin)]
             .into_iter()
             .collect();
@@ -56,7 +56,7 @@ where
 /// Allows iterating over the reachable states of a transition system.
 pub struct Reachable<'a, Ts: TransitionSystem, const FULL_EDGE: bool = false> {
     ts: &'a Ts,
-    seen: Set<Ts::StateIndex>,
+    seen: OrderedSet<Ts::StateIndex>,
     it: Ts::EdgesFromIter<'a>,
     queue: VecDeque<StateIndex<Ts>>,
 }
@@ -67,7 +67,7 @@ where
 {
     /// Creates a new iterator that will yield the reachable states of the transition system starting
     pub fn new(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
-        let mut seen = Set::with_capacity(ts.hint_size().0);
+        let mut seen = OrderedSet::new();
         seen.insert(origin);
         let mut queue = VecDeque::with_capacity(ts.hint_size().0);
         queue.push_front(origin);

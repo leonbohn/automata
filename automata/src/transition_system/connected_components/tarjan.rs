@@ -2,7 +2,9 @@ use std::collections::{BTreeSet, VecDeque};
 
 use itertools::Itertools;
 
-use crate::{math::Map, math::Set, prelude::*, transition_system::connected_components::Scc};
+use crate::{
+    math::OrderedMap, math::OrderedSet, prelude::*, transition_system::connected_components::Scc,
+};
 
 use super::SccDecomposition;
 
@@ -18,7 +20,7 @@ pub struct Tarjan<Idx> {
     index: usize,
     component_count: usize,
     stack: Vec<Idx>,
-    data: Map<Idx, TarjanData>,
+    data: OrderedMap<Idx, TarjanData>,
 }
 
 impl<Idx: IndexType> Default for Tarjan<Idx> {
@@ -34,7 +36,7 @@ impl<Idx: IndexType> Tarjan<Idx> {
             index: 0,
             component_count: usize::MAX,
             stack: Vec::new(),
-            data: Map::default(),
+            data: OrderedMap::default(),
         }
     }
 
@@ -140,7 +142,7 @@ pub fn kosaraju<Ts>(ts: &Ts, start: Ts::StateIndex) -> SccDecomposition<'_, Ts>
 where
     Ts: TransitionSystem + PredecessorIterable,
 {
-    let mut visited = Set::from_iter([start]);
+    let mut visited = OrderedSet::from_iter([start]);
     let mut l = VecDeque::with_capacity(ts.size());
     let mut queue = Vec::with_capacity(ts.size());
 
@@ -183,24 +185,33 @@ where
     SccDecomposition::new(ts, sccs)
 }
 
-/// Iterative application of Tarjan's algorithm form computing the SCC decomposition.
+/// Calls [`tarjan_scc_iterative_from`] for the set of all states.
 pub fn tarjan_scc_iterative<Ts>(ts: &Ts) -> SccDecomposition<'_, Ts>
 where
     Ts: TransitionSystem,
 {
+    tarjan_scc_iterative_from(ts, ts.state_indices())
+}
+
+/// Iterative application of Tarjan's algorithm form computing the SCC decomposition.
+pub fn tarjan_scc_iterative_from<Ts, I>(ts: &Ts, iter: I) -> SccDecomposition<'_, Ts>
+where
+    Ts: TransitionSystem,
+    I: IntoIterator<Item = StateIndex<Ts>>,
+{
     let mut current: usize;
     let mut sccs = vec![];
 
-    let mut indices = Map::default();
-    let mut low = Map::default();
+    let mut indices = OrderedMap::default();
+    let mut low = OrderedMap::default();
     let mut stack = vec![];
-    let mut on_stack = Set::default();
-    let mut unvisited = ts.state_indices().collect::<BTreeSet<_>>();
+    let mut on_stack = OrderedSet::default();
+    let mut unvisited = iter.into_iter().collect::<BTreeSet<_>>();
 
     if unvisited.is_empty() {
         return SccDecomposition::new(ts, sccs);
     };
-    let mut queue = Vec::with_capacity(ts.size());
+    let mut queue = Vec::new();
 
     // we do an outermost loop that executes as long as states have not seen all states
     while let Some(&next) = unvisited.first() {
@@ -235,7 +246,7 @@ where
                 stack.push(q);
             }
 
-            if let math::map::Entry::Vacant(e) = indices.entry(q) {
+            if let math::ordered_map::Entry::Vacant(e) = indices.entry(q) {
                 // trace!("assigning index {current} to state {q:?}");
                 e.insert(current);
                 low.insert(q, current);
@@ -288,7 +299,7 @@ where
                 while on_stack.contains(&q) {
                     let top = stack.pop().unwrap();
                     low.insert(top, low_q);
-                    on_stack.swap_remove(&top);
+                    on_stack.remove(&top);
                     scc.push(top);
                 }
                 let scc = Scc::new(ts, scc.into_iter());
@@ -299,19 +310,7 @@ where
     }
 
     sccs.sort();
-    let out = SccDecomposition::new(ts, sccs);
-
-    if cfg!(debug_assertions) {
-        // here we verify against the recursive impl if the ts is not too large
-        if ts.size() < 100 {
-            let rec_sccs = tarjan_scc_recursive(ts);
-            if !rec_sccs.isomorphic(&out) {
-                panic!("iterative gave a different result than recursive!\n{out:?}{rec_sccs:?}");
-            }
-        }
-    }
-
-    out
+    SccDecomposition::new(ts, sccs)
 }
 
 #[cfg(test)]

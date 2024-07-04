@@ -51,6 +51,9 @@ pub mod run;
 /// This module defines traits for dealing with predecessors in a transition system.
 pub mod predecessors;
 
+mod word_as_ts;
+pub use word_as_ts::WordTs;
+
 /// Encapsulates the transition function δ of a (finite) transition system. This is the main trait that
 /// is used to query a transition system. Transitions are labeled with a [`Alphabet::Expression`], which
 /// determines on which [`Alphabet::Symbol`]s the transition can be taken. Additionally, every transition
@@ -98,6 +101,7 @@ pub trait TransitionSystem: Sized {
 
     /// Calls the [`Alphabet::universe`] method on the alphabet of `self`, returning
     /// an iterator of all symbols.
+    #[inline(always)]
     fn symbols(&self) -> <Self::Alphabet as Alphabet>::Universe<'_> {
         self.alphabet().universe()
     }
@@ -105,6 +109,7 @@ pub trait TransitionSystem: Sized {
     /// Returns a vector of all state indices of `self`. By default, this is simply a helper
     /// calling to [`Self::state_indices`], but it can be overridden to provide a more
     /// efficient implementation.
+    #[inline(always)]
     fn state_indices_vec(&self) -> Vec<Self::StateIndex> {
         self.state_indices().collect()
     }
@@ -327,11 +332,13 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns `true` if and only if there exists at least one state.
+    #[inline(always)]
     fn is_empty(&self) -> bool {
         self.size() == 0
     }
 
     /// Returns true if and only if the given state `index` exists.
+    #[inline(always)]
     fn contains_state_index(&self, index: Self::StateIndex) -> bool {
         self.state_indices().contains(&index)
     }
@@ -340,6 +347,7 @@ pub trait TransitionSystem: Sized {
     /// returns the first such state that is found. There is no guarantee on the order in which the states
     /// are visited such that if more than one state with the given `color` exists, subsequent calls to
     /// this method may return different indices.
+    #[inline(always)]
     fn find_by_color(&self, color: &StateColor<Self>) -> Option<Self::StateIndex>
     where
         StateColor<Self>: Eq,
@@ -349,6 +357,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns true if and only if a state with the given `color` exists.
+    #[inline(always)]
     fn contains_state_color(&self, color: &StateColor<Self>) -> bool
     where
         StateColor<Self>: Eq,
@@ -357,6 +366,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Builds the [`operations::Quotient`] of `self` with regard to some given [`Partition`].
+    #[inline(always)]
     fn quotient(self, partition: Partition<Self::StateIndex>) -> operations::Quotient<Self>
     where
         Self: Sized,
@@ -367,6 +377,7 @@ pub trait TransitionSystem: Sized {
     /// Restricts the edges of `self` such that only transitions p --a|c--> q exist where
     /// `min` <= `c` <= `max`, i.e. all transitions where either `c` < `min` or `max` < `c`
     /// are discarded.
+    #[inline(always)]
     fn edge_color_restricted(
         self,
         min: Self::EdgeColor,
@@ -377,6 +388,7 @@ pub trait TransitionSystem: Sized {
 
     /// Restricts the state indices with the given function. This means that only the states for
     /// which the function returns `true` are kept, while all others are removed.
+    #[inline(always)]
     fn restrict_state_indices<F>(self, filter: F) -> operations::RestrictByStateIndex<Self, F>
     where
         Self: Sized,
@@ -389,6 +401,7 @@ pub trait TransitionSystem: Sized {
     /// [`Self::map_edge_colors()`] but allows for a more fine-grained control over the
     /// recoloring process, by giving access not only to the color itself, but also to
     /// the origin, target and expression of the respective edge.
+    #[inline(always)]
     fn map_edge_colors_full<D, F>(self, f: F) -> operations::MapEdges<Self, F>
     where
         F: Fn(Self::StateIndex, &EdgeExpression<Self>, Self::EdgeColor, Self::StateIndex) -> D,
@@ -400,6 +413,7 @@ pub trait TransitionSystem: Sized {
 
     /// Removes all coloring from `self`, giving a transition system that has edges and states
     /// colored with type [`Void`].
+    #[inline(always)]
     fn erase_colors(self) -> operations::EraseColors<Self>
     where
         Self: Sized,
@@ -408,6 +422,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Completely removes the edge coloring.
+    #[inline(always)]
     fn erase_edge_colors(self) -> operations::MapEdgeColor<Self, fn(Self::EdgeColor) -> Void>
     where
         Self: Sized,
@@ -416,6 +431,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Completely removes the state coloring.
+    #[inline(always)]
     fn erase_state_colors(self) -> operations::MapStateColor<Self, fn(Self::StateColor) -> Void>
     where
         Self: Sized,
@@ -424,6 +440,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Map the edge colors of `self` with the given function `f`.
+    #[inline(always)]
     fn map_edge_colors<D: Clone, F: Fn(Self::EdgeColor) -> D>(
         self,
         f: F,
@@ -448,6 +465,7 @@ pub trait TransitionSystem: Sized {
     /// assert_eq!(colored.reached_state_color("a"), Some(false));
     /// assert_eq!(colored.with_state_color(UniformColor(true)).reached_state_color("a"), Some(true));
     /// ```
+    #[inline(always)]
     fn with_state_color<P: ProvidesStateColor<Self::StateIndex>>(
         self,
         provider: P,
@@ -456,6 +474,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Map the state colors of `self` with the given function.
+    #[inline(always)]
     fn map_state_colors<D: Clone, F: Fn(Self::StateColor) -> D>(
         self,
         f: F,
@@ -474,8 +493,22 @@ pub trait TransitionSystem: Sized {
         self.map_state_colors(|_| true)
     }
 
+    /// Computes the [`connected_components::SccDecomposition`] of self, restricted
+    /// to the set of vertices that is given.
+    #[inline(always)]
+    fn reachable_sccs_from<I: IntoIterator<Item = StateIndex<Self>>>(
+        &self,
+        from: I,
+    ) -> connected_components::SccDecomposition<'_, Self>
+    where
+        Self: Sized,
+    {
+        connected_components::tarjan_scc_iterative_from(self, from)
+    }
+
     /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly
     /// connected components. Uses Tarjan's algorithm.
+    #[inline(always)]
     fn sccs(&self) -> connected_components::SccDecomposition<'_, Self>
     where
         Self: Sized,

@@ -1,4 +1,4 @@
-use crate::{math::Set, prelude::*};
+use crate::{math::OrderedSet, prelude::*};
 
 mod buchi;
 pub use buchi::*;
@@ -53,7 +53,7 @@ pub enum OmegaAcceptanceCondition {
 impl OmegaAcceptanceCondition {
     /// Returns true if and only if the condition is satisfied by the given set of
     /// [`AcceptanceMask`]s.
-    pub fn satisfied(&self, infset: &Set<AcceptanceMask>) -> bool {
+    pub fn satisfied(&self, infset: &OrderedSet<AcceptanceMask>) -> bool {
         match self {
             OmegaAcceptanceCondition::Parity(_low, _high) => infset
                 .iter()

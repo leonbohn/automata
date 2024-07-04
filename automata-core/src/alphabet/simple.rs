@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use alphabet::SimpleAlphabet;
 use itertools::Itertools;
 
 use crate::prelude::*;
@@ -120,7 +121,7 @@ impl Alphabet for CharAlphabet {
 
     #[inline(always)]
     fn search_edge<X>(
-        map: &math::Map<Self::Expression, X>,
+        map: &math::OrderedMap<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.get_key_value(&sym)
@@ -132,6 +133,15 @@ impl Alphabet for CharAlphabet {
             .iter()
             .find(|c| c == &&symbol)
             .expect("symbol does not exist")
+    }
+}
+
+impl SimpleAlphabet for CharAlphabet {
+    fn express(&self, sym: Self::Symbol) -> &Self::Expression {
+        self.0
+            .iter()
+            .find(|c| c == &&sym)
+            .expect("cannot express unavailable symbol!")
     }
 }
 
@@ -176,7 +186,7 @@ impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> Alphabet for Fi
     type Expression = S;
 
     fn search_edge<X>(
-        map: &math::Map<Self::Expression, X>,
+        map: &math::OrderedMap<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.get_key_value(&sym)
@@ -301,7 +311,7 @@ impl Alphabet for Directional {
     type Expression = InvertibleChar;
 
     fn search_edge<X>(
-        map: &math::Map<Self::Expression, X>,
+        map: &math::OrderedMap<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.get_key_value(&sym)

@@ -1,10 +1,10 @@
 use crate::prelude::*;
-use math::Set;
+use math::OrderedSet;
 use std::marker::PhantomData;
 
 /// Abstracts the filtering of a transition system's state indices. This trait is implemented by
 /// functions which take a state index and return a boolean value indicating whether the state index
-/// should be filtered out or not. It is also implemented by [`Vec`] and [`Set`] which are used to
+/// should be filtered out or not. It is also implemented by [`Vec`] and [`math::Set`] which are used to
 /// filter out state indices that are not contained in the vector or set.
 pub trait StateIndexFilter<Idx: IndexType> {
     /// This method is called to check whether an index should be present in a filtered transition
@@ -39,7 +39,7 @@ where
     }
 }
 
-impl<Idx> StateIndexFilter<Idx> for Set<Idx>
+impl<Idx> StateIndexFilter<Idx> for OrderedSet<Idx>
 where
     Idx: IndexType,
 {

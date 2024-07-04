@@ -349,7 +349,7 @@ impl<'a, RawTy: RawSymbolRepr> Iterator for PropExpressionSymbols<'a, RawTy> {
 pub struct PropAlphabet<RawTy: RawSymbolRepr = u32> {
     aps: Vec<String>,
     universal: PropExpression<RawTy>,
-    expressions: Arc<Mutex<math::Set<PropExpression<RawTy>>>>,
+    expressions: Arc<Mutex<math::OrderedSet<PropExpression<RawTy>>>>,
 }
 
 impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
@@ -359,7 +359,7 @@ impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
 
         let universal = PropExpression::<RawTy>::universal(aps.len() as u8);
         Self {
-            expressions: Arc::new(Mutex::new(math::Set::from_iter([universal.clone()]))),
+            expressions: Arc::new(Mutex::new(math::OrderedSet::from_iter([universal.clone()]))),
             universal,
             aps,
         }

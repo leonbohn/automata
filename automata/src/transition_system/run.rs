@@ -10,7 +10,12 @@ pub trait Observer<T: TransitionSystem>: Sized {
     fn current(&self) -> &Self::Current;
     fn into_current(self) -> Self::Current;
     fn begin(ts: &T, state: StateIndex<T>) -> Self;
-    fn observe(&mut self, ts: &T, state: StateIndex<T>, sym: SymbolOf<T>) -> Option<StateIndex<T>>;
+    fn observe_one(
+        &mut self,
+        ts: &T,
+        state: StateIndex<T>,
+        sym: SymbolOf<T>,
+    ) -> Option<StateIndex<T>>;
 }
 
 pub trait InfiniteObserver<T: TransitionSystem>: Observer<T> {
@@ -32,9 +37,9 @@ pub type GreatestEdgeColor<T> = EdgeColorLimit<T, true>;
 pub struct EdgeColorLimit<T: TransitionSystem, const MAX: bool = false>(Option<EdgeColor<T>>);
 
 #[derive(Clone, Debug)]
-pub struct StateSet<T: TransitionSystem>(math::Set<StateIndex<T>>);
+pub struct StateSet<T: TransitionSystem>(pub(crate) math::OrderedSet<StateIndex<T>>);
 impl<T: TransitionSystem> std::ops::Deref for StateSet<T> {
-    type Target = math::Set<StateIndex<T>>;
+    type Target = math::OrderedSet<StateIndex<T>>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -83,9 +88,9 @@ impl<T: TransitionSystem> std::ops::Deref for EdgeColorSequence<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Triggers<T: TransitionSystem>(math::Set<(StateIndex<T>, SymbolOf<T>)>);
+pub struct Triggers<T: TransitionSystem>(math::OrderedSet<(StateIndex<T>, SymbolOf<T>)>);
 impl<T: TransitionSystem> std::ops::Deref for Triggers<T> {
-    type Target = math::Set<(StateIndex<T>, SymbolOf<T>)>;
+    type Target = math::OrderedSet<(StateIndex<T>, SymbolOf<T>)>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -131,7 +136,7 @@ impl<'ts, T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>, O: Observer<T>>
 
         while let Some(sym) = self.word.nth(taken) {
             taken += 1;
-            if let Some(next) = observer.observe(self.ts, current, sym) {
+            if let Some(next) = observer.observe_one(self.ts, current, sym) {
                 current = next;
             } else {
                 return FiniteRunOutput::Failed(current, EscapePrefix::new(self.word, taken));
@@ -165,7 +170,7 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
             }
         };
 
-        let mut seen = math::Map::default();
+        let mut seen = math::OrderedMap::default();
         let mut iteration = 0;
         seen.insert(current, iteration);
         let mut seq = vec![];
@@ -187,7 +192,7 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
                     current = reached;
                 }
                 FiniteRunOutput::Failed(reached, ep) => {
-                    let length = self.word.spoke_length()
+                    let length = self.word.spoke_len()
                         + cycle.len() * (iteration - 1)
                         + ep.shortest_escaping_length;
                     return InfiniteRunOutput::Failed(
@@ -394,24 +399,29 @@ where
 impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserver<T>>
     InfiniteRunOutput<T, W, O>
 {
+    #[inline(always)]
     pub fn is_successful(&self) -> bool {
         matches!(self, InfiniteRunOutput::Successful(_))
     }
+    #[inline(always)]
     pub fn is_escaping(&self) -> bool {
         !self.is_successful()
     }
+    #[inline(always)]
     pub fn into_output(self) -> Option<O::Current> {
         match self {
             Self::Successful(o) => Some(o),
             _ => None,
         }
     }
+    #[inline(always)]
     pub fn into_escape_state(self) -> Option<StateIndex<T>> {
         match self {
             Self::Failed(state, _phantom) => Some(state),
             _ => None,
         }
     }
+    #[inline(always)]
     pub fn into_escape_prefix(self) -> Option<EscapePrefix<W>> {
         match self {
             Self::Failed(_, ep) => Some(ep),
@@ -425,14 +435,18 @@ mod impls {
 
     impl<T: Deterministic> Observer<T> for NoObserver {
         type Current = ();
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             &()
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {}
+        #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
             NoObserver
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -448,16 +462,20 @@ mod impls {
 
     impl<T: Deterministic> Observer<T> for ReachedState<StateIndex<T>> {
         type Current = StateIndex<T>;
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             &self.0
         }
+        #[inline(always)]
         fn begin(_ts: &T, state: StateIndex<T>) -> Self {
             Self(state)
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -469,16 +487,20 @@ mod impls {
     }
     impl<T: Deterministic> Observer<T> for ReachedStateColor<T> {
         type Current = StateColor<T>;
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             &self.0
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
         }
+        #[inline(always)]
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
             Self(ts.state_color(state).unwrap())
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -491,16 +513,20 @@ mod impls {
     }
     impl<T: Deterministic> Observer<T> for ReachedEdgeColor<T> {
         type Current = EdgeColor<T>;
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             self.0.as_ref().unwrap()
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0.unwrap()
         }
+        #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
             Self(None)
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -514,16 +540,20 @@ mod impls {
 
     impl<T: Deterministic<StateColor: Ord>> Observer<T> for LeastStateColor<StateColor<T>> {
         type Current = StateColor<T>;
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             &self.0
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
         }
+        #[inline(always)]
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
             Self(ts.state_color(state).unwrap())
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -538,6 +568,7 @@ mod impls {
     where
         StateColor<T>: Default + Ord,
     {
+        #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
             seq[time..]
                 .iter()
@@ -552,16 +583,20 @@ mod impls {
         EdgeColor<T>: Ord,
     {
         type Current = Option<EdgeColor<T>>;
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             &self.0
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
         }
+        #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
             Self(None)
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -584,6 +619,7 @@ mod impls {
     where
         EdgeColor<T>: Ord,
     {
+        #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
             seq[time..].iter().min().unwrap().clone()
         }
@@ -596,16 +632,20 @@ mod impls {
     }
     impl<T: Deterministic> Observer<T> for StateSet<T> {
         type Current = Self;
+        #[inline(always)]
         fn begin(_ts: &T, state: StateIndex<T>) -> Self {
-            Self(math::Set::from_iter([state]))
+            Self(math::OrderedSet::from_iter([state]))
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self
         }
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             self
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -617,6 +657,7 @@ mod impls {
         }
     }
     impl<T: Deterministic> InfiniteObserver<T> for StateSet<T> {
+        #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
             seq[time..].iter().fold(Default::default(), |mut acc, x| {
                 acc.0.extend(x.0.iter().cloned());
@@ -627,16 +668,20 @@ mod impls {
 
     impl<T: Deterministic> Observer<T> for StateSequence<T> {
         type Current = Vec<StateIndex<T>>;
+        #[inline(always)]
         fn begin(_ts: &T, state: StateIndex<T>) -> Self {
             Self(vec![state])
         }
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             &self.0
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -648,6 +693,7 @@ mod impls {
         }
     }
     impl<T: Deterministic> InfiniteObserver<T> for StateSequence<T> {
+        #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
             seq[time..].iter().fold(vec![], |mut acc, x| {
                 acc.extend(x);
@@ -658,16 +704,20 @@ mod impls {
 
     impl<T: Deterministic> Observer<T> for StateColorSequence<T> {
         type Current = Vec<StateColor<T>>;
+        #[inline(always)]
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
             Self(vec![ts.state_color(state).unwrap()])
         }
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             &self.0
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -679,6 +729,7 @@ mod impls {
         }
     }
     impl<T: Deterministic> InfiniteObserver<T> for StateColorSequence<T> {
+        #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
             seq[time..].iter().fold(vec![], |mut acc, x| {
                 acc.extend(x.iter().cloned());
@@ -694,17 +745,21 @@ mod impls {
     }
     impl<T: Deterministic> Observer<T> for StateColorSet<T> {
         type Current = Self;
+        #[inline(always)]
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
             let start = ts.state_color(state).unwrap();
             Self(math::Set::from_iter([start]))
         }
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             self
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -716,6 +771,7 @@ mod impls {
         }
     }
     impl<T: Deterministic> InfiniteObserver<T> for StateColorSet<T> {
+        #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
             seq[time..].iter().fold(Default::default(), |mut acc, x| {
                 acc.0.extend(x.0.iter().cloned());
@@ -726,16 +782,20 @@ mod impls {
 
     impl<T: Deterministic> Observer<T> for EdgeColorSet<T> {
         type Current = Self;
+        #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
             Self(math::Set::default())
         }
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             self
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -747,6 +807,7 @@ mod impls {
         }
     }
     impl<T: Deterministic> InfiniteObserver<T> for EdgeColorSet<T> {
+        #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
             Self(seq[time..].iter().fold(math::Set::default(), |mut acc, x| {
                 acc.extend(x.0.iter().cloned());
@@ -762,16 +823,20 @@ mod impls {
 
     impl<T: Deterministic> Observer<T> for EdgeColorSequence<T> {
         type Current = Vec<EdgeColor<T>>;
+        #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
             Self(vec![])
         }
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             &self.0
         }
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
         }
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -783,6 +848,7 @@ mod impls {
         }
     }
     impl<T: Deterministic> InfiniteObserver<T> for EdgeColorSequence<T> {
+        #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
             seq[time..].iter().fold(
                 Vec::with_capacity((seq.len() - time) * seq[time].len()),
@@ -800,21 +866,25 @@ mod impls {
     }
 
     impl<T: Deterministic> Observer<T> for Triggers<T> {
-        type Current = math::Set<(StateIndex<T>, SymbolOf<T>)>;
+        type Current = math::OrderedSet<(StateIndex<T>, SymbolOf<T>)>;
 
+        #[inline(always)]
         fn current(&self) -> &Self::Current {
             &self.0
         }
 
+        #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
         }
 
+        #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
-            Self(math::Set::default())
+            Self(math::OrderedSet::default())
         }
 
-        fn observe(
+        #[inline(always)]
+        fn observe_one(
             &mut self,
             ts: &T,
             state: StateIndex<T>,
@@ -826,14 +896,17 @@ mod impls {
         }
     }
     impl<T: Deterministic> InfiniteObserver<T> for Triggers<T> {
+        #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
             assert!(!seq.is_empty());
             assert!(time < seq.len());
 
-            seq[time..].iter().fold(math::Set::default(), |mut acc, x| {
-                acc.extend(x.iter().cloned());
-                acc
-            })
+            seq[time..]
+                .iter()
+                .fold(math::OrderedSet::default(), |mut acc, x| {
+                    acc.extend(x.iter().cloned());
+                    acc
+                })
         }
     }
 }

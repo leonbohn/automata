@@ -1,0 +1,17 @@
+[package]
+name = "automata-benchmarks"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+automata = { git = "https://github.com/leonbohn/automata", rev = "48b84ff" }
+# automata = { git = "https://github.com/leonbohn/automata", rev = "48b84ff" }
+
+[features]
+commit_0 = []
+commit_1 = []
+commit_2 = []
+commit_3 = []
+
+[profile.release]
+debug = true

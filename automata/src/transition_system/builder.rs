@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use crate::prelude::*;
 use itertools::Itertools;
-use math::Set;
+use math::OrderedSet;
 
 use super::IntoEdgeTuple;
 
@@ -26,7 +26,7 @@ use super::IntoEdgeTuple;
 ///     .into_dfa(0); // 0 is the initial state
 /// ```
 pub struct TSBuilder<Q = Void, C = Void, const DET: bool = true> {
-    symbols: Set<char>,
+    symbols: OrderedSet<char>,
     edges: Vec<(DefaultIdType, char, C, DefaultIdType)>,
     default: Option<Q>,
     colors: Vec<(DefaultIdType, Q)>,
@@ -36,7 +36,7 @@ impl<C, const DET: bool> TSBuilder<Void, C, DET> {
     /// Creates an empty instance of `Self`, where states are uncolored (have color [`Void`])
     pub fn without_state_colors() -> Self {
         TSBuilder {
-            symbols: Set::default(),
+            symbols: OrderedSet::default(),
             edges: vec![],
             default: Some(Void),
             colors: vec![],
@@ -47,7 +47,7 @@ impl<Q, const DET: bool> TSBuilder<Q, Void, DET> {
     /// Creates an empty instance of `Self`, where edges are uncolored (have color [`Void`])
     pub fn without_edge_colors() -> Self {
         TSBuilder {
-            symbols: Set::default(),
+            symbols: OrderedSet::default(),
             edges: vec![],
             default: None,
             colors: vec![],
@@ -60,7 +60,7 @@ impl<const DET: bool> TSBuilder<Void, Void, DET> {
     /// are colored [`Void`]).
     pub fn without_colors() -> Self {
         Self {
-            symbols: Set::default(),
+            symbols: OrderedSet::default(),
             edges: vec![],
             default: Some(Void),
             colors: vec![],
@@ -71,7 +71,7 @@ impl<const DET: bool> TSBuilder<Void, Void, DET> {
 impl<Q, C, const DET: bool> Default for TSBuilder<Q, C, DET> {
     fn default() -> Self {
         Self {
-            symbols: Set::default(),
+            symbols: OrderedSet::default(),
             edges: vec![],
             default: None,
             colors: vec![],
