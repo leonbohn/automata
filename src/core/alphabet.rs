@@ -60,6 +60,13 @@ pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show + Matcher<Self> {
     }
 }
 
+pub trait SimpleAlphabet: Alphabet
+where
+    Self: Alphabet<Expression = <Self as Alphabet>::Symbol>,
+{
+    fn express(&self, sym: Self::Symbol) -> &Self::Expression;
+}
+
 /// An alphabet abstracts a collection of [`Symbol`]s and complex [`Expression`]s over those.
 pub trait Alphabet: Clone + Debug {
     /// The type of symbols in this alphabet.
@@ -71,7 +78,7 @@ pub trait Alphabet: Clone + Debug {
     fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression;
 
     /// Returns a map from each symbol in the alphabet to the corresponding expression.
-    fn expression_map(&self) -> math::Map<Self::Symbol, Self::Expression> {
+    fn expression_map(&self) -> math::OrderedMap<Self::Symbol, Self::Expression> {
         self.universe()
             .map(|sym| (sym, self.make_expression(sym)))
             .collect()
@@ -90,7 +97,7 @@ pub trait Alphabet: Clone + Debug {
     /// be so easy. To allow for an optimization (i.e. just lookup the corresponding edge in a [`math::Map`]),
     /// we force alphabets to implement this method.
     fn search_edge<X>(
-        map: &math::Map<Self::Expression, X>,
+        map: &math::OrderedMap<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.iter().find_map(|(e, x)| {
@@ -134,7 +141,7 @@ impl<A: Alphabet> Alphabet for &A {
         A::make_expression(self, symbol)
     }
     fn search_edge<X>(
-        map: &math::Map<Self::Expression, X>,
+        map: &math::OrderedMap<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         A::search_edge(map, sym)

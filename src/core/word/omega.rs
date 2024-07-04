@@ -20,7 +20,7 @@ use crate::prelude::*;
 /// # Equality testing
 /// Most implementors of `OmegaWord` should also implement `PartialEq`/`Eq`. Note, that this
 /// represents syntactical/structural equality. To test for syntactic equality (i.e. equality
-/// of the represented word itself), the method [`OmegaWord::equals()`] should be used. This
+/// of the represented word itself), the method [`OmegaWord::omega_word_equals()`] should be used. This
 /// method first normalizes the words in question and subsequently compares the loop and spoke.
 ///
 /// # Example
@@ -28,7 +28,7 @@ use crate::prelude::*;
 /// use automata_core::prelude::*;
 /// let word = upw!("abc", "def"); // represents abc(def)^𝜔 = abcdefdefdef...
 /// assert_eq!(word.loop_index(), 3);
-/// assert_eq!(word.cycle_length(), 3);
+/// assert_eq!(word.cycle_len(), 3);
 /// ```
 pub trait OmegaWord: Word {
     /// The type of finite word representing the spoke, i.e. the finite prefix of the word
@@ -103,14 +103,18 @@ pub trait OmegaWord: Word {
     /// infinitely often. Note that if the word is not normalized, then there might be a shorter
     /// representation of the cycle that is repeated, e.g. a cycle of `aaa` could also be
     /// represented by the cycle `a`.
-    fn cycle_length(&self) -> usize {
+    fn cycle_len(&self) -> usize {
         self.cycle().len()
     }
 
     /// Gives the length of the spoke of the word, so the number of symbols before the loop
     /// is entered.
-    fn spoke_length(&self) -> usize {
+    fn spoke_len(&self) -> usize {
         self.spoke().len()
+    }
+
+    fn combined_len(&self) -> usize {
+        self.cycle_len() + self.spoke_len()
     }
 }
 
@@ -197,7 +201,7 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     /// ```
     /// use automata_core::prelude::*;
     /// let word = upw!("abcabcabc");
-    /// assert_eq!(word.cycle_length(), 3);
+    /// assert_eq!(word.cycle_len(), 3);
     /// assert_eq!(word.loop_index(), 0);
     /// assert!(word.spoke().is_empty());
     /// assert!(word.cycle().finite_word_equals("abc"));
@@ -282,7 +286,7 @@ impl<S: Symbol> Word for ReducedOmegaWord<S> {
     const FINITE: bool = false;
     fn nth(&self, position: usize) -> Option<S> {
         if position >= self.word.len() {
-            let loop_position = (position - self.loop_index) % self.cycle_length();
+            let loop_position = (position - self.loop_index) % self.cycle_len();
             self.word.nth(self.loop_index + loop_position)
         } else {
             self.word.nth(position)

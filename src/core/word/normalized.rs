@@ -63,7 +63,7 @@ impl<S: Symbol> NormalizedOmegaWord<S> {
                 .cycle()
                 .symbols()
                 .cycle()
-                .take(self.upw.cycle_length() * self.pre_loop_count),
+                .take(self.upw.cycle_len() * self.pre_loop_count),
         )
     }
 
@@ -72,7 +72,7 @@ impl<S: Symbol> NormalizedOmegaWord<S> {
             .cycle()
             .symbols()
             .cycle()
-            .take(self.upw.cycle_length() * self.loop_size)
+            .take(self.upw.cycle_len() * self.loop_size)
     }
 }
 

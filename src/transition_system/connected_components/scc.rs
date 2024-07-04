@@ -2,7 +2,7 @@ use std::{cell::OnceCell, collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use crate::prelude::*;
 use itertools::Itertools;
-use math::Set;
+use math::{OrderedSet, Set};
 
 type InteriorEdgeSet<Ts> = Set<(
     <Ts as TransitionSystem>::StateIndex,
@@ -279,11 +279,11 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         let ts = self.ts;
         debug_assert!(!self.is_empty());
 
-        let mut queue = math::Map::default();
+        let mut queue = math::OrderedMap::default();
         for (p, a, _, q) in self.interior_transitions() {
             queue
                 .entry(*p)
-                .or_insert_with(Set::default)
+                .or_insert_with(OrderedSet::default)
                 .insert((*a, *q));
         }
         if queue.is_empty() {
@@ -297,7 +297,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         while !queue.is_empty() {
             if queue.contains_key(&current) {
                 if queue.get(&current).unwrap().is_empty() {
-                    queue.swap_remove(&current);
+                    queue.remove(&current);
                     continue;
                 } else {
                     let (symbol, target) = *queue
@@ -308,10 +308,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                         .expect("We know this is non-empty");
                     debug_assert!(ts.has_transition(current, symbol, target));
 
-                    queue
-                        .get_mut(&current)
-                        .unwrap()
-                        .swap_remove(&(symbol, target));
+                    queue.get_mut(&current).unwrap().remove(&(symbol, target));
                     word.push(symbol);
                     current = target;
                 }
@@ -331,7 +328,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                     .unwrap_or_else(|| *queue.keys().next().unwrap());
                 debug_assert!(queue.contains_key(&q));
                 if queue.get(&q).unwrap().is_empty() {
-                    queue.swap_remove(&q);
+                    queue.remove(&q);
                     continue;
                 }
 
@@ -351,6 +348,11 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         }
 
         Some(word)
+    }
+
+    /// Returns an iterator over the state indices making up the scc.
+    pub fn state_indices(&self) -> std::collections::btree_set::Iter<'_, Ts::StateIndex> {
+        self.states.iter()
     }
 
     /// Returns the number of states in the SCC.

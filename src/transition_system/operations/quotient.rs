@@ -16,7 +16,7 @@ use crate::{math::Partition, prelude::*};
 #[derive(Debug, Clone)]
 pub struct Quotient<Ts: TransitionSystem> {
     ts: Ts,
-    expressions: math::Map<SymbolOf<Ts>, EdgeExpression<Ts>>,
+    expressions: math::OrderedMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
     partition: Partition<Ts::StateIndex>,
 }
 
@@ -210,7 +210,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
         origin: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let (states, colors): (math::Set<_>, Vec<_>) = self
+        let (states, colors): (math::OrderedSet<_>, Vec<_>) = self
             .class_iter_by_id(origin)?
             .filter_map(|q| {
                 self.ts.edge(q, &matcher).map(|tt| {
