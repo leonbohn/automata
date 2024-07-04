@@ -7,7 +7,7 @@ mod scc;
 pub use scc::Scc;
 
 mod tarjan;
-pub use tarjan::{kosaraju, tarjan_scc_iterative, tarjan_scc_recursive};
+pub use tarjan::{kosaraju, tarjan_scc_iterative, tarjan_scc_iterative_from, tarjan_scc_recursive};
 
 mod tarjan_dag;
 pub use tarjan_dag::TarjanDAG;
@@ -34,6 +34,22 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     /// non-empty decompositions.
     pub fn first(&self) -> &Scc<'a, Ts> {
         self.1.first().expect("At least one SCC must exist!")
+    }
+
+    /// Tries to find a nontrivial SCC and if it finds one, asserts that it is the only one.
+    pub fn singleton_nontrivial(&self) -> Option<&Scc<'a, Ts>> {
+        for i in 0..self.1.len() {
+            if self.1[i].is_trivial() || self.1[i].is_transient() {
+                continue;
+            }
+
+            for j in (i + 1)..self.1.len() {
+                assert!(self.1[j].is_transient() || self.1[j].is_trivial())
+            }
+
+            return Some(&self.1[i]);
+        }
+        None
     }
 
     /// Attepmts to find the index of a the SCC containing the given `state`. Returns this index if

@@ -353,6 +353,11 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         Some(word)
     }
 
+    /// Returns an iterator over the state indices making up the scc.
+    pub fn state_indices(&self) -> std::collections::btree_set::Iter<'_, Ts::StateIndex> {
+        self.states.iter()
+    }
+
     /// Returns the number of states in the SCC.
     pub fn len(&self) -> usize {
         self.states.len()
