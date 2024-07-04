@@ -1,19 +1,94 @@
 use automata_core::{
-    alphabet::{Alphabet, SimpleAlphabet},
+    alphabet::SimpleAlphabet,
     word::{FiniteWord, OmegaWord, Word},
 };
 
 use crate::TransitionSystem;
 
-use super::{edge::TransitionOwnedColor, EdgeColor};
+use super::{edge::TransitionOwnedColor, EdgeColor, PredecessorIterable};
 
+/// Treats a word as if it was a transition system.
+///
+/// For a finite word, this is equivalent to a transition system that is a chain.
+///
+/// For an infinite word, this is a transition system consisting of a spoke and
+/// an attached loop.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct WordTs<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>, const FINITE: bool> {
     alphabet: A,
     word: W,
 }
 
+impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> PredecessorIterable
+    for WordTs<A, W, false>
+{
+    type PreEdgeRef<'this>  = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
+    where
+        Self: 'this;
+
+    type EdgesToIter<'this> = std::iter::Once<Self::PreEdgeRef<'this>>
+    where
+        Self: 'this;
+
+    fn predecessors(
+        &self,
+        state: crate::prelude::StateIndex<Self>,
+    ) -> Option<Self::EdgesToIter<'_>> {
+        if state as usize >= self.word.len() || state == 0 {
+            return None;
+        }
+        let sym = self.word.nth((state - 1) as usize).unwrap();
+        Some(std::iter::once(TransitionOwnedColor::new(
+            state - 1,
+            self.alphabet.express(sym),
+            sym,
+            state,
+        )))
+    }
+}
+impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> PredecessorIterable
+    for WordTs<A, W, true>
+{
+    type PreEdgeRef<'this>  = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
+    where
+        Self: 'this;
+
+    type EdgesToIter<'this> = itertools::Either<std::iter::Once<Self::PreEdgeRef<'this>>, std::iter::Chain<std::iter::Once<Self::PreEdgeRef<'this>>, std::iter::Once<Self::PreEdgeRef<'this>>>>
+    where
+        Self: 'this;
+
+    fn predecessors(
+        &self,
+        state: crate::prelude::StateIndex<Self>,
+    ) -> Option<Self::EdgesToIter<'_>> {
+        if state as usize >= self.word.combined_len() || state == 0 {
+            return None;
+        }
+        let sym = self.word.nth((state - 1) as usize).unwrap();
+
+        let direct_pred = std::iter::once(TransitionOwnedColor::new(
+            state - 1,
+            self.alphabet.express(sym),
+            sym,
+            state,
+        ));
+        if state as usize != self.word.loop_index() {
+            Some(itertools::Either::Left(direct_pred))
+        } else {
+            Some(itertools::Either::Right(direct_pred.chain(
+                std::iter::once(TransitionOwnedColor::new(
+                    (self.word.combined_len() - 1) as u32,
+                    self.alphabet.express(sym),
+                    sym,
+                    state,
+                )),
+            )))
+        }
+    }
+}
+
 impl<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>, const FINITE: bool> WordTs<A, W, FINITE> {
+    /// Creates a new instance from a given alphabet and a word.
     pub fn new(alphabet: A, word: W) -> Self {
         Self { alphabet, word }
     }

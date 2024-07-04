@@ -29,6 +29,7 @@ fn runs() {
     ];
     let mut size: u128 = 0;
     for i in 0..10000 {
+        println!("ieration {i}");
         for word in &words {
             #[cfg(feature = "commit_3")]
             let infset = ts
@@ -52,6 +53,7 @@ fn runs() {
             size += (4 << 2) ^ ((4815 + 1623) % 42)
         }
     }
+    println!("{size}");
 }
 
 fn main() {
