@@ -33,6 +33,7 @@ impl<A: SimpleAlphabet, Q: Color, C: Color> Packed<A, Q, C> {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PackedEdge<A: SimpleAlphabet, C: Color> {
     source: Id,
     target: Id,
@@ -41,7 +42,7 @@ pub struct PackedEdge<A: SimpleAlphabet, C: Color> {
 }
 
 impl<A: SimpleAlphabet, C: Color> PackedEdge<A, C> {
-    pub fn new(source: Id, target: Id, expression: A::Expression, color: C) -> Self {
+    pub fn new(source: Id, expression: A::Expression, color: C, target: Id) -> Self {
         Self {
             source,
             target,
@@ -123,7 +124,7 @@ impl<'a, A: SimpleAlphabet, C: Color> Iterator for PackedEdgesFrom<'a, A, C> {
     type Item = &'a PackedEdge<A, C>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos < self.end {
-            assert!(self.end < self.array.len());
+            assert!(self.end <= self.array.len());
             self.pos += 1;
             Some(&self.array[self.pos - 1])
         } else {
@@ -134,8 +135,12 @@ impl<'a, A: SimpleAlphabet, C: Color> Iterator for PackedEdgesFrom<'a, A, C> {
 
 impl<'a, A: SimpleAlphabet, C: Color> PackedEdgesFrom<'a, A, C> {
     pub fn new(array: &'a [PackedEdge<A, C>], pos: usize, end: usize) -> Self {
-        assert!(end < array.len());
-        assert!(pos <= end);
+        if end > array.len() || pos > end {
+            panic!(
+                "invalid acces pos: {pos} end: {end} in length {} array\n{array:?}",
+                array.len()
+            );
+        }
         Self { array, end, pos }
     }
 }
