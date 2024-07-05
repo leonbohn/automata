@@ -34,7 +34,7 @@ flamegraph() {
 }
 
 run_bench() {
-  echo "----------------BENCHMARKING $commit_hash----------------" >> $RESULTS_FILE
+  echo "----------------BENCHMARKING $commit_hash (feature commit_$1)----------------" | tee $RESULTS_FILE
   hyperfine --warmup 5 --ignore-failure --runs 10 "./bench/target/release/automata-benchmarks" | tee -a $RESULTS_FILE
 }
 
@@ -55,7 +55,7 @@ for i in "${!commit_hashes[@]}"; do
 
   # Run hyperfine to benchmark the binary
   echo -e "\033[34mBenchmarking commit $commit_hash...\033[0m"
-  run_bench
+  run_bench $i
 done
 
 sed -i.bak "s/^automata = { .* }$/automata = { path=\"..\/automata\" }/" $CARGO_TOML

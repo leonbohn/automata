@@ -1,6 +1,9 @@
 use automata::prelude::*;
+#[cfg(feature = "commit_4")]
+use packed::{Id, Packed, PackedEdge};
 
 fn runs() {
+    #[cfg(not(feature = "commit_4"))]
     let ts = DTS::builder()
         .default_color(Void)
         .with_transitions([
@@ -15,6 +18,16 @@ fn runs() {
         ])
         .into_dts_with_initial(0);
 
+    #[cfg(feature = "commit_4")]
+    let ts = Packed::new(
+        CharAlphabet::of_size(2),
+        vec![Some(Void), Some(Void), Some(Void), Some(Void)],
+        [].into_iter()
+            .map(|(q, a, p)| PackedEdge::new(q, p, a, Void))
+            .collect(),
+    )
+    .with_initial(Id(0));
+
     let words = vec![
         upw!("abba"),
         upw!("babbabba", "bababbabbabbba"),
@@ -28,8 +41,10 @@ fn runs() {
         upw!("babbabba", "bababbabbabbbababbabaa"),
     ];
     let mut size: u128 = 0;
-    for i in 0..10000 {
+    for i in 0..50000 {
         for word in &words {
+            #[cfg(feature = "commit_4")]
+            let infset = ts.recurrent_state_indices_from(Id(i % 4), word).unwrap();
             #[cfg(feature = "commit_3")]
             let infset = ts.recurrent_state_indices_from(i as u32 % 4, word).unwrap();
             #[cfg(feature = "commit_2")]

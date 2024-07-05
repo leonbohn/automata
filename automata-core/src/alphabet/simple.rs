@@ -1,9 +1,23 @@
 use std::collections::VecDeque;
 
-use alphabet::SimpleAlphabet;
 use itertools::Itertools;
 
 use crate::prelude::*;
+
+pub trait SimpleAlphabet: Alphabet
+where
+    Self: Alphabet<Expression = <Self as Alphabet>::Symbol>,
+{
+    fn express(&self, sym: Self::Symbol) -> &Self::Expression;
+    fn try_nth(&self, pos: usize) -> Option<Self::Symbol>;
+    fn nth(&self, pos: usize) -> Self::Symbol {
+        self.try_nth(pos).unwrap()
+    }
+    fn try_position(&self, symbol: Self::Symbol) -> Option<usize>;
+    fn position(&self, symbol: Self::Symbol) -> usize {
+        self.try_position(symbol).unwrap()
+    }
+}
 
 /// Represents an alphabet where a [`Symbol`] is just a single `char`.
 ///
@@ -142,6 +156,14 @@ impl SimpleAlphabet for CharAlphabet {
             .iter()
             .find(|c| c == &&sym)
             .expect("cannot express unavailable symbol!")
+    }
+
+    fn try_nth(&self, pos: usize) -> Option<Self::Symbol> {
+        self.0.get(pos).cloned()
+    }
+
+    fn try_position(&self, symbol: Self::Symbol) -> Option<usize> {
+        self.0.iter().position(|x| symbol.eq(x))
     }
 }
 
