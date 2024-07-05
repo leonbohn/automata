@@ -91,9 +91,7 @@ impl<A: SimpleAlphabet, Q: Color, C: Color> TransitionSystem for Packed<A, Q, C>
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        let Some(c) = self.states.get(*state) else {
-            return None;
-        };
+        let c = self.states.get(*state)?;
         c.clone()
     }
 }
