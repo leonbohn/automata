@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use std::{fmt::Debug, marker::PhantomData};
+use thiserror::Error;
 
 use crate::prelude::*;
 
@@ -517,24 +518,17 @@ impl<W: FiniteWord> OmegaWord for OmegaIteration<W> {
 }
 
 /// Represents the types of errors that can occur when parsing a reduced word from a string.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Error)]
 pub enum ReducedParseError {
     /// The word is empty.
+    #[error("cannot parse an empty omega word")]
     Empty,
     /// The looping part of the word is empty.
+    #[error("the looping part of an omega word may not be empty")]
     EmptyLoop,
     /// The word contains too many commas, when it should contain at most one.
+    #[error("too many commas (more than one) in the omega word")]
     TooManyCommas,
-}
-
-impl std::fmt::Display for ReducedParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ReducedParseError::Empty => write!(f, "Word is empty"),
-            ReducedParseError::EmptyLoop => write!(f, "Looping part of word is empty"),
-            ReducedParseError::TooManyCommas => write!(f, "Too many commas in the word"),
-        }
-    }
 }
 
 impl<S: Show> Debug for ReducedOmegaWord<S> {

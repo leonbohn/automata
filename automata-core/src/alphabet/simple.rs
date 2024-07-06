@@ -60,11 +60,8 @@ impl FromIterator<char> for CharAlphabet {
 
 impl CharAlphabet {
     /// Creates a new [`CharAlphabet`] alphabet from an iterator over the symbols.
-    pub fn new<I>(symbols: I) -> Self
-    where
-        I: IntoIterator<Item = char>,
-    {
-        Self(symbols.into_iter().collect())
+    pub fn new(symbols: Vec<char>) -> Self {
+        Self(symbols)
     }
 }
 

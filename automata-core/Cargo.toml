@@ -15,5 +15,6 @@ itertools = { workspace = true }
 indexmap = { workspace = true }
 bimap = { workspace = true }
 rand = { workspace = true }
+thiserror = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
