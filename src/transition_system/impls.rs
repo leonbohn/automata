@@ -14,6 +14,8 @@ pub use edge_lists::{
     EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, IntoEdgeLists, MutableTsState,
 };
 
+pub mod packed;
+
 pub(crate) mod linked;
 pub use linked::{
     CollectLinkedList, IntoLinkedListNondeterministic, LinkedListDeterministic,

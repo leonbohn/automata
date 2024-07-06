@@ -25,6 +25,7 @@ where
     Idx: IndexType,
     F: Fn(Idx) -> bool,
 {
+    #[inline(always)]
     fn is_unmasked(&self, idx: Idx) -> bool {
         (self)(idx)
     }
@@ -34,6 +35,7 @@ impl<Idx> StateIndexFilter<Idx> for Vec<Idx>
 where
     Idx: IndexType,
 {
+    #[inline(always)]
     fn is_unmasked(&self, idx: Idx) -> bool {
         self.contains(&idx)
     }
@@ -43,6 +45,7 @@ impl<Idx> StateIndexFilter<Idx> for OrderedSet<Idx>
 where
     Idx: IndexType,
 {
+    #[inline(always)]
     fn is_unmasked(&self, idx: Idx) -> bool {
         self.contains(&idx)
     }

@@ -45,6 +45,7 @@ pub mod prelude {
     };
     pub use automata_core::prelude::*;
 
+    pub use super::transition_system::impls::packed;
     #[cfg(feature = "implementations")]
     pub use super::transition_system::{
         EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, LinkedListDeterministic,
