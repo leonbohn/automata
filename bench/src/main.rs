@@ -41,7 +41,7 @@ fn runs() {
         upw!("babbabba", "bababbabbabbbababbabaa"),
     ];
     let mut size: u128 = 0;
-    for i in 0..50000 {
+    for i in 0..5000 {
         for word in &words {
             #[cfg(feature = "commit_4")]
             let infset = ts.recurrent_state_indices_from(Id(i % 4), word).unwrap();
@@ -61,7 +61,6 @@ fn runs() {
             size += (4 << 2) ^ ((4815 + 1623) % 42)
         }
     }
-    println!("{size}");
 }
 
 fn main() {

@@ -65,7 +65,7 @@ impl<A: SimpleAlphabet, Q: Color, C: Color> TransitionSystem for Packed<A, Q, C>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = PackedEdgesFrom<'this, A, C>
+    type EdgesFromIter<'this> = std::slice::Iter<'this, PackedEdge<A, C>>
     where
         Self: 'this;
 
@@ -79,7 +79,7 @@ impl<A: SimpleAlphabet, Q: Color, C: Color> TransitionSystem for Packed<A, Q, C>
         };
         let start = *state * self.alphabet.size();
         let end = start + self.alphabet.size();
-        Some(PackedEdgesFrom::new(&self.edges, start, end))
+        Some(self.edges[start..end].iter())
     }
 
     fn alphabet(&self) -> &Self::Alphabet {
