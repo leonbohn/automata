@@ -136,10 +136,10 @@ pub trait IntoTs: TransitionSystem {
         self.into_dts_preserving().unzip_state_color()
     }
 
-    fn into_dts_and_initial(
+    fn into_dts_preserving_and_initial(
         self,
     ) -> (
-        DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>,
+        DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>>,
         DefaultIdType,
     )
     where
@@ -157,7 +157,20 @@ pub trait IntoTs: TransitionSystem {
                 }
             })
             .expect("old initial state did not exist");
-        (preserving.unzip_state_color(), new_initial)
+        (preserving, new_initial)
+    }
+
+    fn into_dts_and_initial(
+        self,
+    ) -> (
+        DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>,
+        DefaultIdType,
+    )
+    where
+        Self: Pointed,
+    {
+        let (preserving, initial) = self.into_dts_preserving_and_initial();
+        (preserving.unzip_state_color(), initial)
     }
 
     fn into_dts_preserving(
