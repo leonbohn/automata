@@ -173,8 +173,8 @@ macro_rules! impl_with_limits {
     ($($ty:ident),*) => {
         $(
             impl Lattice for $ty {
-                fn bottom() -> Self {  std::$ty::MIN }
-                fn top() -> Self {  std::$ty::MAX }
+                fn bottom() -> Self {  $ty::MIN }
+                fn top() -> Self {  $ty::MAX }
                 fn join(&self, other: &Self) -> Self {
                     std::cmp::max(*self, *other)
                 }
@@ -202,14 +202,14 @@ mod tests {
     fn lattice_ops() {
         use super::Lattice;
 
-        assert_eq!(true.join(&true), true);
-        assert_eq!(true.join(&false), true);
-        assert_eq!(false.join(&true), true);
-        assert_eq!(false.join(&false), false);
-        assert_eq!(true.meet(&true), true);
-        assert_eq!(true.meet(&false), false);
-        assert_eq!(false.meet(&true), false);
-        assert_eq!(false.meet(&false), false);
+        assert!(true.join(&true));
+        assert!(true.join(&false));
+        assert!(false.join(&true));
+        assert!(!false.join(&false));
+        assert!(true.meet(&true));
+        assert!(!true.meet(&false));
+        assert!(!false.meet(&true));
+        assert!(!false.meet(&false));
 
         assert_eq!(2.join(&7).meet(&0), 0);
     }

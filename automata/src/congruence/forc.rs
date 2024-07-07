@@ -65,7 +65,7 @@ impl<A: Alphabet + PartialEq, Q: Color + PartialEq, C: Color + PartialEq> Eq for
 
 impl<A: Alphabet, Q: Color, C: Color> std::fmt::Debug for FORC<A, Q, C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}\n{:?}", "leading congruence", self.leading())?;
+        write!(f, "{:?}", self.leading())?;
         let names = self.leading.acceptance().ensure_from(self.leading.ts(), 0);
         for (c, rc) in self.prc_iter() {
             let class_name = names.get_by_left(c).unwrap();
