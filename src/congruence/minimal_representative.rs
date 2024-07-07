@@ -121,18 +121,29 @@ impl<T: TransitionSystem> LazyMinimalRepresentatives<T> {
     }
 
     /// Ensures that the minimal representatives are computed and stored in the cache.
-    pub fn ensure(&self, ts: T)
+    pub fn ensure(&self, ts: &T) -> &BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>
     where
         T: Pointed,
     {
+        self.ensure_from(ts, ts.initial())
+    }
+
+    /// Ensures that the minimal representatives are computed and stored in the cache, and
+    /// considering `intitial` as the starting state.
+    pub fn ensure_from(
+        &self,
+        ts: &T,
+        initial: StateIndex<T>,
+    ) -> &BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>> {
         self.0.get_or_init(|| {
             let mut map = BiBTreeMap::new();
-            for mr in ts.minimal_representatives_from(ts.initial()) {
+            for mr in ts.minimal_representatives_from(initial) {
                 map.insert(mr.state_index(), mr);
             }
 
             map
         });
+        self.get()
     }
 }
 

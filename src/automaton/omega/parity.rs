@@ -42,7 +42,7 @@ where
     type Output = bool;
     type Observer = run::EdgeColorLimit<T>;
     fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
-        observed.expect("at least one edge is necessary!") % 2 == 0
+        observed % 2 == 0
     }
 }
 
