@@ -25,11 +25,17 @@ itertools = { workspace = true }
 indexmap = { workspace = true }
 bimap = { workspace = true }
 rand = { workspace = true }
+thiserror = { workspace = true }
 
 automata-core = { version = "0.1.0", path = "../automata-core" }
 hoars = { version = "0.2.0", optional = true, path = "../hoars" }
 
 tabled = { version = "0.15", features = ["ansi"] }
+
+layout-rs = { version = "0.1.2", optional = true }
+open = { version = "5.2.0", optional = true }
+base64 = { version = "0.22.1", optional = true }
+
 owo-colors = "4.0"
 test-log = { version = "0.2", features = ["trace"] }
 tempfile = { version = "3.10", optional = true }
@@ -41,5 +47,5 @@ rand_distr = { version = "0.4.3", optional = true }
 default = ["hoa", "graphviz", "random"]
 random = ["dep:rand_distr"]
 hoa = ["dep:hoars"]
-graphviz = ["dep:tempfile"]
+graphviz = ["dep:tempfile", "dep:open", "dep:base64", "dep:layout-rs"]
 implementations = []

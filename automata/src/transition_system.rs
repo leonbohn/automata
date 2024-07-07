@@ -803,10 +803,6 @@ impl<P: Pointed> Pointed for &mut P {
     }
 }
 
-/// This module deals with transforming a transition system (or similar) into a representation in the dot (graphviz) format.
-pub mod dot;
-pub use dot::Dottable;
-
 use self::operations::{ProvidesStateColor, WithStateColor};
 
 #[cfg(test)]
