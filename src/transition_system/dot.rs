@@ -25,7 +25,7 @@ fn sanitize_dot_ident(name: &str) -> String {
 pub trait Dottable: TransitionSystem {
     /// Compute the graphviz representation, for more information on the DOT format,
     /// see the [graphviz documentation](https://graphviz.org/doc/info/lang.html).
-    fn dot_representation<'a>(&'a self) -> String {
+    fn dot_representation(&self) -> String {
         let header = std::iter::once(format!(
             "digraph {} {{",
             self.dot_name().unwrap_or("A".to_string())
@@ -89,7 +89,7 @@ pub trait Dottable: TransitionSystem {
     /// the rendered image. This method is only available on the `graphviz` crate feature
     /// and makes use of temporary files.
     #[cfg(feature = "graphviz")]
-    fn render<'a>(&'a self) -> Result<Vec<u8>, std::io::Error> {
+    fn render(&self) -> Result<Vec<u8>, std::io::Error> {
         use std::io::{Read, Write};
 
         use tracing::trace;
@@ -125,7 +125,7 @@ pub trait Dottable: TransitionSystem {
     /// Attempts to render the object to a file with the given filename. This method
     /// is only available on the `graphviz` crate feature and makes use of temporary files.
     #[cfg(feature = "graphviz")]
-    fn render_to_file_name<'a>(&'a self, filename: &str) -> Result<(), std::io::Error> {
+    fn render_to_file_name(&self, filename: &str) -> Result<(), std::io::Error> {
         use std::io::{Read, Write};
         use tracing::trace;
 
@@ -169,7 +169,7 @@ pub trait Dottable: TransitionSystem {
     /// can be configured by setting the `IMAGE_VIEWER` environment variable. If it is not set,
     /// then the display command of ImageMagick will be used.
     #[cfg(feature = "graphviz")]
-    fn display_rendered<'a>(&'a self) -> Result<(), std::io::Error> {
+    fn display_rendered(&self) -> Result<(), std::io::Error> {
         display_png(self.render()?)?;
         Ok(())
     }
