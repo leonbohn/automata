@@ -119,7 +119,9 @@ where
 
     /// Returns a reference to the minimal representatives of the classes of the right congruence.
     pub fn minimal_representatives(&self) -> &LazyMinimalRepresentatives<D> {
-        self.acceptance()
+        let out = self.acceptance();
+        out.ensure_from(self.ts(), self.initial());
+        out
     }
 
     /// Verifies whether an element of `self` is  idempotent, i.e. if the mr of the indexed

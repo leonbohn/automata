@@ -64,20 +64,13 @@ impl<A: Alphabet + PartialEq, Q: Color + Eq, C: Color + Eq> PartialEq for FORC<A
 impl<A: Alphabet + PartialEq, Q: Color + PartialEq, C: Color + PartialEq> Eq for FORC<A, Q, C> {}
 
 impl<A: Alphabet, Q: Color, C: Color> std::fmt::Debug for FORC<A, Q, C> {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // use owo_colors::OwoColorize;
-        // write!(f, "{}\n{:?}", "LEADING".bold(), self.leading())?;
-        // for (c, rc) in self.prc_iter() {
-        //     let class_name = self.leading.class_name(*c).unwrap();
-        //     write!(
-        //         f,
-        //         "{} \"{}\"\n{:?}",
-        //         "PRC FOR CLASS ".bold(),
-        //         &class_name,
-        //         rc
-        //     )?;
-        // }
-        // Ok(())
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}\n{:?}", "leading congruence", self.leading())?;
+        let names = self.leading.acceptance().ensure_from(self.leading.ts(), 0);
+        for (c, rc) in self.prc_iter() {
+            let class_name = names.get_by_left(c).unwrap();
+            write!(f, "progress right congruence[{:?}]\n{:?}", &class_name, rc)?;
+        }
+        Ok(())
     }
 }

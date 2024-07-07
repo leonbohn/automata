@@ -106,9 +106,113 @@ pub trait Color: Clone + Eq + Hash + Debug {
 
 impl<T: Eq + Clone + Hash + Debug> Color for T {}
 
+/// Represents an ordered, finite set of colors.
+pub trait Lattice {
+    /// Gives an instance of the bottom, i.e. least possible color.
+    fn bottom() -> Self;
+    /// Gives an instance of the top, i.e. greatest possible color.
+    fn top() -> Self;
+    /// Joins the two colors, i.e. the least upper bound. Think of this
+    /// as a union operation for sets and as maximum for numbers
+    fn join(&self, other: &Self) -> Self;
+    /// Joins the two colors in place. See [`Lattice::join`].
+    fn join_assign(&mut self, other: &Self)
+    where
+        Self: Sized,
+    {
+        *self = self.join(other);
+    }
+    /// Computes the join of all colors in an iterator.
+    fn join_iter<'a>(iter: impl IntoIterator<Item = &'a Self>) -> Self
+    where
+        Self: 'a;
+    /// Meets the two colors, i.e. the greatest lower bound. Think of this
+    /// as a intersection operation for sets and as minimum for numbers
+    fn meet(&self, other: &Self) -> Self;
+    /// Meets the two colors in place. See [`Lattice::meet`].
+    fn meet_assign(&mut self, other: &Self)
+    where
+        Self: Sized,
+    {
+        *self = self.meet(other);
+    }
+    /// Computes the meet of all colors in an iterator.
+    fn meet_iter<'a>(iter: impl IntoIterator<Item = &'a Self>) -> Self
+    where
+        Self: 'a;
+}
+
+impl Lattice for bool {
+    fn bottom() -> Self {
+        false
+    }
+    fn top() -> Self {
+        true
+    }
+    fn join(&self, other: &Self) -> Self {
+        *self || *other
+    }
+    fn meet(&self, other: &Self) -> Self {
+        *self && *other
+    }
+    fn join_iter<'a>(iter: impl IntoIterator<Item = &'a Self>) -> Self
+    where
+        Self: 'a,
+    {
+        iter.into_iter().any(|x| *x)
+    }
+    fn meet_iter<'a>(iter: impl IntoIterator<Item = &'a Self>) -> Self
+    where
+        Self: 'a,
+    {
+        iter.into_iter().all(|x| *x)
+    }
+}
+
+macro_rules! impl_with_limits {
+    ($($ty:ident),*) => {
+        $(
+            impl Lattice for $ty {
+                fn bottom() -> Self {  std::$ty::MIN }
+                fn top() -> Self {  std::$ty::MAX }
+                fn join(&self, other: &Self) -> Self {
+                    std::cmp::max(*self, *other)
+                }
+                fn meet(&self, other: &Self) -> Self {
+                    std::cmp::min(*self, *other)
+                }
+                fn join_iter<'a>(iter: impl IntoIterator<Item = &'a Self>) -> Self where Self: 'a{
+                    iter.into_iter().max().cloned().unwrap_or(Self::bottom())
+                }
+                fn meet_iter<'a>(iter: impl IntoIterator<Item = &'a Self>) -> Self where Self: 'a{
+                    iter.into_iter().min().cloned().unwrap_or(Self::top())
+                }
+            }
+        )*
+    };
+}
+
+impl_with_limits!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
+
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
+
+    #[test]
+    fn lattice_ops() {
+        use super::Lattice;
+
+        assert_eq!(true.join(&true), true);
+        assert_eq!(true.join(&false), true);
+        assert_eq!(false.join(&true), true);
+        assert_eq!(false.join(&false), false);
+        assert_eq!(true.meet(&true), true);
+        assert_eq!(true.meet(&false), false);
+        assert_eq!(false.meet(&true), false);
+        assert_eq!(false.meet(&false), false);
+
+        assert_eq!(2.join(&7).meet(&0), 0);
+    }
 
     pub fn wiki_dfa() -> DFA<CharAlphabet> {
         TSBuilder::without_edge_colors()

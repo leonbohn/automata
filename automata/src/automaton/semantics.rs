@@ -1,3 +1,5 @@
+use run::{ReachedEdgeColor, ReachedStateColor};
+
 use crate::{prelude::*, transition_system::run::Observer};
 /// This is the base trait for different types of semantics that are used by the
 /// [`Automaton`] struct for determining the output of a finite or infinite
@@ -44,4 +46,20 @@ pub trait Semantics<T: TransitionSystem, const OMEGA: bool = false> {
 
     /// Compute the output for the given finite run.
     fn evaluate(&self, observed: <Self::Observer as Observer<T>>::Current) -> Self::Output;
+}
+
+impl<T: Deterministic> Semantics<T, false> for MealySemantics<EdgeColor<T>> {
+    type Output = EdgeColor<T>;
+    type Observer = ReachedEdgeColor<T>;
+    fn evaluate(&self, observed: <Self::Observer as Observer<T>>::Current) -> Self::Output {
+        observed
+    }
+}
+
+impl<T: Deterministic> Semantics<T, false> for MooreSemantics<StateColor<T>> {
+    type Output = StateColor<T>;
+    type Observer = ReachedStateColor<T>;
+    fn evaluate(&self, observed: <Self::Observer as Observer<T>>::Current) -> Self::Output {
+        observed
+    }
 }
