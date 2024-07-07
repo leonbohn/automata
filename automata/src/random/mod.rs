@@ -61,6 +61,34 @@ pub fn generate_random_dfa(symbols: usize, probability: f64) -> DFA {
         .into_dfa()
 }
 
+/// Calls [`generate_random_ts_sized`] and uses the returned transition system to build a
+/// [`MealyMachine`] with colors `0..=max_color`.
+pub fn generate_random_mealy(symbols: usize, max_color: usize, size: usize) -> MealyMachine {
+    let (ts, initial) = generate_random_ts_sized(symbols, size);
+    let mut mm = ts
+        .map_edge_colors(|_| thread_rng().gen_range(0..=max_color) as Int)
+        .with_initial(initial)
+        .into_mealy()
+        .minimize()
+        .into_mealy();
+    mm.trim();
+    mm
+}
+
+/// Calls [`generate_random_ts_sized`] and uses the returned transition system to build a
+/// [`MooreMachine`] with colors `0..=max_color`.
+pub fn generate_random_moore(symbols: usize, max_color: usize, size: usize) -> MooreMachine {
+    let (ts, initial) = generate_random_ts_sized(symbols, size);
+    let mut mm = ts
+        .map_state_colors(|_| thread_rng().gen_range(0..=max_color) as Int)
+        .with_initial(initial)
+        .into_moore()
+        .minimize()
+        .into_moore();
+    mm.trim();
+    mm
+}
+
 /// Generate a random deterministic transition system of size `size` by randomly drawing transitions.
 /// `symbols` determines the number of distinct symbols in the [`CharAlphabet`].
 /// The algorithm is as follows:
@@ -68,6 +96,7 @@ pub fn generate_random_dfa(symbols: usize, probability: f64) -> DFA {
 /// 2. For each state, for each symbol draw a target state and add the corresponding edge
 /// Note that depending on which state is chosen as the initial state, there may be unreachable states.
 pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, StateIndex<DTS>) {
+    assert!(size > 0);
     let alphabet = CharAlphabet::of_size(symbols);
     let mut dts = DTS::for_alphabet(alphabet.clone());
     // add states
@@ -83,6 +112,7 @@ pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, StateIndex
         }
     }
 
+    assert!(dts.contains_state_index(0));
     (dts, 0)
 }
 

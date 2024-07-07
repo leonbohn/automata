@@ -294,7 +294,14 @@ where
         &self,
         idx: Self::StateIndex,
     ) -> impl IntoIterator<Item = DotStateAttribute> {
-        vec![DotStateAttribute::Label(self.dot_state_ident(idx))]
+        if self.initial() == idx {
+            vec![DotStateAttribute::Label(format!(
+                "->{}",
+                self.dot_state_ident(idx)
+            ))]
+        } else {
+            vec![DotStateAttribute::Label(self.dot_state_ident(idx))]
+        }
     }
 
     fn dot_transition_attributes<'a>(
