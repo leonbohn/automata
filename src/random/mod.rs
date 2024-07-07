@@ -341,8 +341,7 @@ pub(crate) fn print_random_ts_benchmark(
 mod tests {
     use crate::{
         random::{draw_priority, CharAlphabet},
-        transition_system::Dottable,
-        TransitionSystem,
+        Dottable, TransitionSystem,
     };
     use automata_core::word;
     use std::collections::HashMap;
