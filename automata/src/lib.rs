@@ -28,12 +28,12 @@ pub mod prelude {
             CollectRightCongruence, Congruence, IntoRightCongruence, MinimalRepresentative,
             RightCongruence,
         },
+        dot::Dottable,
         representation::CollectTs,
         representation::IntoTs,
         transition_system::operations,
         transition_system::run::{self, InfiniteObserver, Observer, Run},
         transition_system::{
-            dot::Dottable,
             impls::DefaultIdType,
             operations::{DefaultIfMissing, Product, ProductIndex, UniformColor},
             predecessors::PredecessorIterable,
@@ -62,6 +62,7 @@ pub mod prelude {
 }
 
 pub use automata_core::math;
+use std::{fmt::Debug, hash::Hash};
 
 /// This module defines transition systems and successor functions and such.
 #[macro_use]
@@ -91,7 +92,9 @@ pub mod hoa;
 #[cfg(feature = "random")]
 pub mod random;
 
-use std::{fmt::Debug, hash::Hash};
+/// This module deals with transforming a transition system (or similar) into a representation in the dot (graphviz) format.
+pub mod dot;
+pub use dot::Dottable;
 
 /// A color is simply a type that can be used to color states or transitions.
 pub trait Color: Clone + Eq + Hash + Debug {
