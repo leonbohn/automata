@@ -185,18 +185,25 @@ pub trait Shrinkable: TransitionSystem {
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
-    #[test_log::test]
-    fn asdf() {
-        let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
-        let q0 = ts.add_state(true);
-        let q1 = ts.add_state(false);
+    #[test]
+    fn shrink_to_reachable() {
+        let mut ts = DTS::for_alphabet(CharAlphabet::of_size(1));
+        let q0 = ts.add_state(Void);
+        let q1 = ts.add_state(Void);
+        let q2 = ts.add_state(Void);
+        let q3 = ts.add_state(Void);
+        let q4 = ts.add_state(Void);
+        let q5 = ts.add_state(Void);
 
-        ts.add_edge((q0, 'a', q1));
-        ts.add_edge((q0, 'b', q1));
-        ts.add_edge((q1, 'a', q1));
+        ts.add_edge((q1, 'a', 2, q0));
+        ts.add_edge((q0, 'a', 2, q3));
+        ts.add_edge((q3, 'a', 0, q5));
+        ts.add_edge((q5, 'a', 3, q4));
+        ts.add_edge((q4, 'a', 3, q2));
+        ts.add_edge((q2, 'a', 0, q4));
 
-        assert_eq!(ts.remove_edges_to(q1).unwrap().len(), 3);
-        assert_eq!(ts.remove_edges_to(q0).unwrap().len(), 0);
-        assert_eq!(ts.remove_edges_to(2), None);
+        let mut mm = ts.with_initial(q0).collect_mealy();
+        mm.trim_from(q0);
+        assert_eq!(mm.size(), 5);
     }
 }

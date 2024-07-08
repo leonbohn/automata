@@ -2,7 +2,6 @@ use crate::automaton::InfiniteWordAutomaton;
 
 use crate::prelude::*;
 
-use itertools::Itertools;
 /// A deterministic Muller automaton (DMA) uses a [`MullerCondition`] to determine acceptance.
 /// Such a condition consists of a set of sets of colors. It considers an infinite run to
 /// be accepting, if the set of colors that appear infinitely often in the run is an element
@@ -65,10 +64,6 @@ impl<T: Deterministic> Semantics<T, true> for MullerCondition<EdgeColor<T>> {
     type Observer = run::EdgeColorSet<T>;
     type Output = bool;
     fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
-        println!(
-            "observed: {}",
-            observed.0.iter().map(|i| format!("{i:?}")).join(", ")
-        );
         self.0.contains(&observed.0)
     }
 }

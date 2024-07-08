@@ -16,7 +16,7 @@ impl<T: Deterministic<EdgeColor = bool>> Semantics<T, true> for BuchiCondition {
     type Observer = run::GreatestEdgeColor<T>;
     type Output = bool;
     fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
-        observed.expect("need to take at least one edge")
+        observed
     }
 }
 

@@ -216,7 +216,7 @@ mod tests {
 
     use super::moore_partition_refinement;
 
-    #[test_log::test]
+    #[test]
     fn partition_refinement_moore() {
         let dfa = wiki_dfa();
 
@@ -225,7 +225,7 @@ mod tests {
         assert!(p.bisimilar(dfa));
     }
 
-    #[test_log::test]
+    #[test]
     fn partition_refinement_mealy() {
         let mm = DTS::builder()
             .with_transitions([

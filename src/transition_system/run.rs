@@ -30,11 +30,16 @@ pub struct ReachedState<Idx>(Idx);
 pub struct ReachedEdgeColor<T: TransitionSystem>(Option<EdgeColor<T>>);
 #[derive(Debug, Clone)]
 pub struct ReachedStateColor<T: TransitionSystem>(StateColor<T>);
+
+pub type LeastStateColor<T> = StateColorLimit<T, false>;
+pub type GreatestStateColor<T> = StateColorLimit<T, true>;
 #[derive(Debug, Clone)]
-pub struct LeastStateColor<Q>(Q);
+pub struct StateColorLimit<T: TransitionSystem, const MAX: bool = false>(pub StateColor<T>);
+
 pub type LeastEdgeColor<T> = EdgeColorLimit<T, false>;
 pub type GreatestEdgeColor<T> = EdgeColorLimit<T, true>;
-pub struct EdgeColorLimit<T: TransitionSystem, const MAX: bool = false>(Option<EdgeColor<T>>);
+#[derive(Debug, Clone)]
+pub struct EdgeColorLimit<T: TransitionSystem, const MAX: bool = false>(pub EdgeColor<T>);
 
 #[derive(Clone, Debug)]
 pub struct StateSet<T: TransitionSystem>(pub(crate) math::OrderedSet<StateIndex<T>>);
@@ -431,6 +436,8 @@ impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserve
 }
 
 mod impls {
+    use crate::Lattice;
+
     use super::*;
 
     impl<T: Deterministic> Observer<T> for NoObserver {
@@ -537,8 +544,9 @@ mod impls {
             Some(e.target())
         }
     }
-
-    impl<T: Deterministic<StateColor: Ord>> Observer<T> for LeastStateColor<StateColor<T>> {
+    impl<T: Deterministic<StateColor: Lattice>, const MAX: bool> Observer<T>
+        for StateColorLimit<T, MAX>
+    {
         type Current = StateColor<T>;
         #[inline(always)]
         fn current(&self) -> &Self::Current {
@@ -560,11 +568,16 @@ mod impls {
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
             let succ = ts.successor_index(state, sym)?;
-            self.0 = std::cmp::min(ts.state_color(succ).unwrap(), self.0.clone());
+            if MAX {
+                self.0.join_assign(&ts.state_color(succ).unwrap());
+            } else {
+                self.0.meet_assign(&ts.state_color(succ).unwrap());
+            }
             Some(succ)
         }
     }
-    impl<T: Deterministic<StateColor: Ord>> InfiniteObserver<T> for LeastStateColor<StateColor<T>>
+    impl<T: Deterministic<StateColor: Lattice>, const MAX: bool> InfiniteObserver<T>
+        for StateColorLimit<T, MAX>
     where
         StateColor<T>: Default + Ord,
     {
@@ -580,9 +593,9 @@ mod impls {
 
     impl<T: Deterministic, const MAX: bool> Observer<T> for EdgeColorLimit<T, MAX>
     where
-        EdgeColor<T>: Ord,
+        EdgeColor<T>: Lattice,
     {
-        type Current = Option<EdgeColor<T>>;
+        type Current = EdgeColor<T>;
         #[inline(always)]
         fn current(&self) -> &Self::Current {
             &self.0
@@ -593,7 +606,11 @@ mod impls {
         }
         #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
-            Self(None)
+            Self(if MAX {
+                Lattice::bottom()
+            } else {
+                Lattice::top()
+            })
         }
         #[inline(always)]
         fn observe_one(
@@ -603,25 +620,26 @@ mod impls {
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
             let e = ts.edge(state, sym)?;
-            let mut new = e.color();
-            if let Some(old) = self.0.take() {
-                new = if MAX {
-                    std::cmp::max(new, old)
-                } else {
-                    std::cmp::min(new, old)
-                };
+            let new = e.color();
+            if MAX {
+                self.0.join_assign(&new)
+            } else {
+                self.0.meet_assign(&new)
             }
-            self.0 = Some(new);
             Some(e.target())
         }
     }
     impl<T: Deterministic, const MAX: bool> InfiniteObserver<T> for EdgeColorLimit<T, MAX>
     where
-        EdgeColor<T>: Ord,
+        EdgeColor<T>: Lattice,
     {
         #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            seq[time..].iter().min().unwrap().clone()
+            if MAX {
+                Lattice::join_iter(seq[time..].iter())
+            } else {
+                Lattice::meet_iter(seq[time..].iter())
+            }
         }
     }
 
@@ -916,7 +934,7 @@ mod tests {
     use run::EscapePrefix;
 
     use crate::prelude::*;
-    #[test_log::test]
+    #[test]
     fn run_escaping() {
         let dts = TSBuilder::without_colors()
             .with_transitions([(0, 'a', 1), (1, 'a', 0)])

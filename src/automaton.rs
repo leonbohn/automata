@@ -9,7 +9,7 @@ pub use moore::{IntoMooreMachine, MooreMachine, MooreSemantics};
 
 #[macro_use]
 mod mealy;
-pub use mealy::{IntoMealyMachine, MealyMachine, MealySemantics};
+pub use mealy::{IntoMealyMachine, MealyLike, MealyMachine, MealySemantics};
 
 mod reachability;
 pub use reachability::{IntoDFA, ReachabilityCondition, DFA};
@@ -31,6 +31,9 @@ pub mod semantics;
 pub use semantics::Semantics;
 
 mod deterministic;
+
+mod priority_mapping;
+pub use priority_mapping::{StateBasedWeakPriorityMapping, WeakPriorityMapping};
 
 /// Type alias for an omega word automaton, like [`DBA`], [`DMA`], [`DPA`] or [`DRA`].
 pub type InfiniteWordAutomaton<A, Z, Q, C, const DET: bool = true, D = TS<A, Q, C, DET>> =
@@ -504,7 +507,6 @@ mod tests {
         let dfa1 = &dfas[1];
         let dfa0 = &dfas[0];
 
-        println!("{:?}", dfa0);
         assert!(dfa1.accepts(""));
         assert!(dfa1.accepts("b"));
         assert!(!dfa0.accepts("b"));
@@ -527,9 +529,6 @@ mod tests {
         assert!(!dba.accepts(upw!("b")));
 
         assert!(!dba.is_empty());
-        // println!("{:?}", dba.give_word());
-
-        println!("{:?}", &dba);
     }
 
     #[test]

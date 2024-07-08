@@ -25,11 +25,7 @@ fn sanitize_dot_ident(name: &str) -> String {
 pub trait Dottable: TransitionSystem {
     /// Compute the graphviz representation, for more information on the DOT format,
     /// see the [graphviz documentation](https://graphviz.org/doc/info/lang.html).
-    fn dot_representation<'a>(&'a self) -> String
-    where
-        (String, StateColor<Self>): Show,
-        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
-    {
+    fn dot_representation(&self) -> String {
         let header = std::iter::once(format!(
             "digraph {} {{",
             self.dot_name().unwrap_or("A".to_string())
@@ -79,31 +75,21 @@ pub trait Dottable: TransitionSystem {
     fn dot_transition_attributes<'a>(
         &'a self,
         _t: Self::EdgeRef<'a>,
-    ) -> impl IntoIterator<Item = DotTransitionAttribute>
-    where
-        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
-    {
+    ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         []
     }
     fn dot_state_ident(&self, idx: Self::StateIndex) -> String;
     fn dot_state_attributes(
         &self,
         _idx: Self::StateIndex,
-    ) -> impl IntoIterator<Item = DotStateAttribute>
-    where
-        (String, StateColor<Self>): Show,
-    {
+    ) -> impl IntoIterator<Item = DotStateAttribute> {
         []
     }
     /// Renders the object visually (as PNG) and returns a vec of bytes/u8s encoding
     /// the rendered image. This method is only available on the `graphviz` crate feature
     /// and makes use of temporary files.
     #[cfg(feature = "graphviz")]
-    fn render<'a>(&'a self) -> Result<Vec<u8>, std::io::Error>
-    where
-        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
-        (String, StateColor<Self>): Show,
-    {
+    fn render(&self) -> Result<Vec<u8>, std::io::Error> {
         use std::io::{Read, Write};
 
         use tracing::trace;
@@ -139,11 +125,7 @@ pub trait Dottable: TransitionSystem {
     /// Attempts to render the object to a file with the given filename. This method
     /// is only available on the `graphviz` crate feature and makes use of temporary files.
     #[cfg(feature = "graphviz")]
-    fn render_to_file_name<'a>(&'a self, filename: &str) -> Result<(), std::io::Error>
-    where
-        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
-        (String, StateColor<Self>): Show,
-    {
+    fn render_to_file_name(&self, filename: &str) -> Result<(), std::io::Error> {
         use std::io::{Read, Write};
         use tracing::trace;
 
@@ -187,11 +169,7 @@ pub trait Dottable: TransitionSystem {
     /// can be configured by setting the `IMAGE_VIEWER` environment variable. If it is not set,
     /// then the display command of ImageMagick will be used.
     #[cfg(feature = "graphviz")]
-    fn display_rendered<'a>(&'a self) -> Result<(), std::io::Error>
-    where
-        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
-        (String, StateColor<Self>): Show,
-    {
+    fn display_rendered(&self) -> Result<(), std::io::Error> {
         display_png(self.render()?)?;
         Ok(())
     }
@@ -212,10 +190,7 @@ where
     fn dot_transition_attributes<'a>(
         &'a self,
         t: Self::EdgeRef<'a>,
-    ) -> impl IntoIterator<Item = DotTransitionAttribute>
-    where
-        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
-    {
+    ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         [DotTransitionAttribute::Label(t.expression().show())].into_iter()
     }
 
@@ -252,33 +227,30 @@ where
     fn dot_transition_attributes<'a>(
         &'a self,
         t: Self::EdgeRef<'a>,
-    ) -> impl IntoIterator<Item = DotTransitionAttribute>
-    where
-        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
-    {
-        [DotTransitionAttribute::Label(
-            (t.expression(), t.color()).show(),
-        )]
+    ) -> impl IntoIterator<Item = DotTransitionAttribute> {
+        [DotTransitionAttribute::Label(format!(
+            "{:?}|{:?}",
+            t.expression(),
+            t.color()
+        ))]
         .into_iter()
     }
 
     fn dot_state_attributes(
         &self,
         idx: Self::StateIndex,
-    ) -> impl IntoIterator<Item = DotStateAttribute>
-    where
-        (String, StateColor<Self>): Show,
-    {
-        vec![DotStateAttribute::Label(
-            (self.dot_state_ident(idx), self.state_color(idx).unwrap()).show(),
-        )]
+    ) -> impl IntoIterator<Item = DotStateAttribute> {
+        vec![DotStateAttribute::Label(format!(
+            "{}|{:?}",
+            self.dot_state_ident(idx),
+            self.state_color(idx).unwrap()
+        ))]
     }
 }
 
 impl<M> Dottable for IntoMooreMachine<M>
 where
     M: Deterministic,
-    StateColor<M>: Show,
 {
     fn dot_name(&self) -> Option<String> {
         Some("DPA".into())
@@ -287,13 +259,10 @@ where
     fn dot_state_attributes(
         &self,
         idx: Self::StateIndex,
-    ) -> impl IntoIterator<Item = DotStateAttribute>
-    where
-        (String, StateColor<Self>): Show,
-    {
+    ) -> impl IntoIterator<Item = DotStateAttribute> {
         let color = self
             .state_color(idx)
-            .map(|c| format!(" | {}", c.show()))
+            .map(|c| format!(" | {c:?}"))
             .unwrap_or("".to_string());
         vec![DotStateAttribute::Label(format!(
             "{}{color}",
@@ -304,10 +273,7 @@ where
     fn dot_transition_attributes<'a>(
         &'a self,
         t: Self::EdgeRef<'a>,
-    ) -> impl IntoIterator<Item = DotTransitionAttribute>
-    where
-        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
-    {
+    ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         vec![DotTransitionAttribute::Label(t.expression().show())]
     }
 
@@ -319,7 +285,6 @@ where
 impl<M> Dottable for IntoMealyMachine<M>
 where
     M: Deterministic,
-    EdgeColor<M>: Show,
 {
     fn dot_name(&self) -> Option<String> {
         Some("DPA".into())
@@ -329,20 +294,24 @@ where
         &self,
         idx: Self::StateIndex,
     ) -> impl IntoIterator<Item = DotStateAttribute> {
-        vec![DotStateAttribute::Label(self.dot_state_ident(idx))]
+        if self.initial() == idx {
+            vec![DotStateAttribute::Label(format!(
+                "->{}",
+                self.dot_state_ident(idx)
+            ))]
+        } else {
+            vec![DotStateAttribute::Label(self.dot_state_ident(idx))]
+        }
     }
 
     fn dot_transition_attributes<'a>(
         &'a self,
         t: Self::EdgeRef<'a>,
-    ) -> impl IntoIterator<Item = DotTransitionAttribute>
-    where
-        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
-    {
+    ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         vec![DotTransitionAttribute::Label(format!(
-            "{}|{}",
+            "{}|{:?}",
             t.expression().show(),
-            t.color().show()
+            t.color()
         ))]
     }
 
@@ -369,10 +338,7 @@ where
     fn dot_transition_attributes<'a>(
         &'a self,
         t: Self::EdgeRef<'a>,
-    ) -> impl IntoIterator<Item = DotTransitionAttribute>
-    where
-        (&'a EdgeExpression<Self>, EdgeColor<Self>): Show,
-    {
+    ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         vec![DotTransitionAttribute::Label(format!(
             "{}|{}",
             t.expression().show(),
@@ -635,7 +601,7 @@ mod tests {
 
     use super::Dottable;
 
-    #[test_log::test]
+    #[test]
     #[ignore]
     fn render_dfa() {
         let dfa = DTS::builder()
