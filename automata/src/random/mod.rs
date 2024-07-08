@@ -351,7 +351,7 @@ mod tests {
         generate_random_ts_sized, generate_random_words, print_random_ts_benchmark,
     };
 
-    #[test_log::test]
+    #[test]
     #[ignore]
     fn bench_random_ts() {
         let recips_of_2: Vec<_> = (1..=6).map(|i| 2usize.saturating_pow(i)).collect();

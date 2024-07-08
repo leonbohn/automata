@@ -14,7 +14,7 @@ use automata_learning::passive::{
     sprout::{sprout, SproutError},
     OmegaSample,
 };
-use tracing::info;
+use tracing::{info, warn};
 
 fn main() {
     // initialize logger
@@ -51,7 +51,7 @@ fn main() {
         info!("Running sprout learner on all tasks");
         run_sprout();
     }
-    println!("Done");
+    info!("Done");
 }
 
 pub fn run_sprout() {
@@ -65,7 +65,7 @@ pub fn run_sprout() {
                 task_dirs.push(entry.path());
             }
         } else {
-            println!("Couldn't get file type for {:?}", entry.path());
+            warn!("Couldn't get file type for {:?}", entry.path());
         }
     }
     task_dirs
@@ -208,7 +208,7 @@ pub fn generate_tasks(
     fs::create_dir_all("data/sets").unwrap();
 
     // generate DBAs
-    println!("generating DBAs");
+    info!("generating DBAs");
     let mut dbas = HashMap::new();
     for &size in automata_sizes.iter() {
         let mut auts = vec![];
@@ -221,7 +221,7 @@ pub fn generate_tasks(
     }
 
     // generate DPAs
-    println!("generating DPAs");
+    info!("generating DPAs");
     let mut dpas = HashMap::new();
     for &size in automata_sizes.iter() {
         let mut auts = vec![];
@@ -234,7 +234,7 @@ pub fn generate_tasks(
     }
 
     // generate train and test sets
-    println!("generating word sets");
+    info!("generating word sets");
     let mut sets_dba = HashMap::new();
     let mut sets_dpa = HashMap::new();
     for &aut_size in automata_sizes.iter() {
@@ -265,7 +265,7 @@ pub fn generate_tasks(
     }
 
     // label dba sets
-    println!("labelling dba sets");
+    info!("labelling dba sets");
     for &aut_size in automata_sizes.iter() {
         for (aut_index, dba) in dbas[&aut_size].iter().enumerate() {
             for &train_size in train_sizes.iter() {
@@ -291,7 +291,7 @@ pub fn generate_tasks(
     }
 
     // label dpa sets
-    println!("labelling dpa sets");
+    info!("labelling dpa sets");
     for &aut_size in automata_sizes.iter() {
         for (aut_index, dpa) in dpas[&aut_size].iter().enumerate() {
             for &train_size in train_sizes.iter() {

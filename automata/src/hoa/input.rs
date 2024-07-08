@@ -275,8 +275,6 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
                 if DET {
                     warn!("rejecting nondeterministic automaton");
                     return Err("Automaton is not deterministic".to_string());
-                } else {
-                    println!("is fine");
                 }
             }
         }
@@ -303,7 +301,7 @@ mod tests {
 
     use crate::{hoa::HoaString, TransitionSystem};
 
-    #[test_log::test]
+    #[test]
     fn hoa_tdba_with_abort_and_nondeterministic() {
         let raw_hoa = r#"
         HOA: v1

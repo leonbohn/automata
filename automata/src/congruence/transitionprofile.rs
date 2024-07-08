@@ -443,7 +443,6 @@ where
 #[cfg(test)]
 mod tests {
     use crate::congruence::TransitionMonoid;
-    use crate::prelude::*;
 
     #[test]
     fn tp_from_ts_time() {
@@ -454,11 +453,10 @@ mod tests {
 
         let start = std::time::Instant::now();
         let tps = TransitionMonoid::build(&dfa);
-        println!(
+        tracing::info!(
             "building transition monoid took {} microseconds",
             start.elapsed().as_micros()
         );
         assert_eq!(tps.elements(), 5);
-        println!("{}", Show::show(&tps));
     }
 }

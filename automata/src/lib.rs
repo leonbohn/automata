@@ -19,10 +19,10 @@ pub mod prelude {
     pub use super::{
         automaton::{
             Automaton, BuchiCondition, DeterministicOmegaAutomaton, FiniteWordAutomaton, IntoDBA,
-            IntoDFA, IntoDMA, IntoDPA, IntoDRA, IntoMealyMachine, IntoMooreMachine, MealyMachine,
-            MealySemantics, MinEvenParityCondition, MooreMachine, MooreSemantics, MullerCondition,
-            NondeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
-            ReachabilityCondition, Semantics, WithInitial, DBA, DFA, DMA, DPA,
+            IntoDFA, IntoDMA, IntoDPA, IntoDRA, IntoMealyMachine, IntoMooreMachine, MealyLike,
+            MealyMachine, MealySemantics, MinEvenParityCondition, MooreMachine, MooreSemantics,
+            MullerCondition, NondeterministicOmegaAutomaton, OmegaAcceptanceCondition,
+            OmegaAutomaton, ReachabilityCondition, Semantics, WithInitial, DBA, DFA, DMA, DPA,
         },
         congruence::{
             CollectRightCongruence, Congruence, IntoRightCongruence, MinimalRepresentative,

@@ -422,10 +422,8 @@ impl<S: Symbol> ReducedOmegaWord<S> {
     }
 }
 
-impl TryFrom<&str> for ReducedOmegaWord<char> {
-    type Error = ReducedParseError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+impl ReducedOmegaWord<char> {
+    pub fn try_from_str(value: &str) -> Result<Self, ReducedParseError> {
         match value.split_once(',') {
             None => {
                 if value.is_empty() {
@@ -574,7 +572,7 @@ mod tests {
     #[test]
     fn parse_reduced() {
         let repr = "abab";
-        let nupw = super::ReducedOmegaWord::try_from(repr).unwrap();
+        let nupw = super::ReducedOmegaWord::try_from_str(repr).unwrap();
         let mut start = vec!['a', 'b', 'a', 'b'];
         deduplicate_inplace(&mut start);
         assert_eq!(start, vec!['a', 'b']);

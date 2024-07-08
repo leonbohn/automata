@@ -317,6 +317,8 @@ where
 mod tests {
     use std::{collections::HashSet, time::Instant};
 
+    use tracing::debug;
+
     use crate::{
         connected_components::{tarjan::kosaraju, tarjan_scc_recursive},
         prelude::*,
@@ -340,28 +342,27 @@ mod tests {
 
         let rev = (&ts).reversed();
         let reachable = rev.reachable_state_indices_from(3).collect::<HashSet<_>>();
-        println!("{:?}", reachable);
+
         assert!(reachable.contains(&3));
         assert!(reachable.contains(&2));
 
         let start = Instant::now();
         let _sccs = kosaraju(&ts, ts.initial());
-        println!("Kosaraju took {} microseconds", start.elapsed().as_micros());
+        debug!("Kosaraju took {} microseconds", start.elapsed().as_micros());
 
         let start = Instant::now();
         let _sccs = tarjan_scc_recursive(&ts);
-        println!(
+        debug!(
             "Tarjan recursive took {} microseconds",
             start.elapsed().as_micros()
         );
 
         let start = Instant::now();
         let sccs = tarjan_scc_iterative(&ts);
-        println!(
+        debug!(
             "Tarjan iterative took {} microseconds",
             start.elapsed().as_micros()
         );
-
-        println!("{sccs:?}");
+        assert_eq!(*sccs, vec![vec![0], vec![1], vec![2, 3]]);
     }
 }
