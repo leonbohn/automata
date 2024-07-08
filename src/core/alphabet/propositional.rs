@@ -475,7 +475,7 @@ mod tests {
         assert_eq!(ps.show(), "10011".to_string());
     }
 
-    #[test_log::test]
+    #[test]
     fn prop_expression() {
         let pe = PropExpression::<u32>::new(3, "x_0 | (x_1 & x_2)");
 

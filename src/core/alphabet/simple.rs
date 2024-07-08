@@ -375,6 +375,6 @@ mod tests {
     fn bialphabet() {
         let alph = CharAlphabet::from_iter(['a', 'b', 'c']);
         let bi = Directional::from_alphabet(alph);
-        println!("{:?}", bi.universe().collect_vec())
+        assert_eq!(bi.universe().collect_vec().len(), 6);
     }
 }

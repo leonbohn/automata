@@ -557,7 +557,7 @@ mod tests {
     use super::DPA;
     use crate::prelude::*;
 
-    #[test_log::test]
+    #[test]
     fn normalize_dpa() {
         let dpa = DTS::builder()
             .default_color(Void)
@@ -607,7 +607,7 @@ mod tests {
         assert_eq!(d13.edges_from(0).unwrap().count(), 2);
     }
 
-    #[test_log::test]
+    #[test]
     fn dpa_equivalences() {
         let good = [
             DTS::builder()
@@ -664,7 +664,6 @@ mod tests {
 
         for g in &good {
             for b in &bad {
-                println!("GUT");
                 assert!(!g.language_equivalent(b));
             }
         }
@@ -683,8 +682,6 @@ mod tests {
             ])
             .default_color(Void)
             .into_dpa(0);
-        let r = dpa.omega_run::<_, run::LeastEdgeColor<_>>(upw!("cabaca"));
-        println!("{r:?}");
         assert!(!dpa.accepts(upw!("cabaca")))
     }
 
@@ -704,7 +701,7 @@ mod tests {
         assert!(!univ.included_in(&aomega));
     }
 
-    #[test_log::test]
+    #[test]
     fn dpa_equivalence_clases() {
         let dpa = DTS::builder()
             .with_transitions([
@@ -735,7 +732,7 @@ mod tests {
         assert_eq!(cong.size(), 1);
     }
 
-    #[test_log::test]
+    #[test]
     fn bug_normalized() {
         let dpa = TSBuilder::without_state_colors()
             .with_transitions([

@@ -185,7 +185,7 @@ pub trait Shrinkable: TransitionSystem {
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
-    #[test_log::test]
+    #[test]
     fn shrink_to_reachable() {
         let mut ts = DTS::for_alphabet(CharAlphabet::of_size(1));
         let q0 = ts.add_state(Void);

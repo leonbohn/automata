@@ -934,7 +934,7 @@ mod tests {
     use run::EscapePrefix;
 
     use crate::prelude::*;
-    #[test_log::test]
+    #[test]
     fn run_escaping() {
         let dts = TSBuilder::without_colors()
             .with_transitions([(0, 'a', 1), (1, 'a', 0)])

@@ -601,7 +601,7 @@ mod tests {
 
     use super::Dottable;
 
-    #[test_log::test]
+    #[test]
     #[ignore]
     fn render_dfa() {
         let dfa = DTS::builder()
