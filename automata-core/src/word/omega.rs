@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use std::{fmt::Debug, marker::PhantomData};
+use thiserror::Error;
 
 use crate::prelude::*;
 
@@ -421,10 +422,8 @@ impl<S: Symbol> ReducedOmegaWord<S> {
     }
 }
 
-impl TryFrom<&str> for ReducedOmegaWord<char> {
-    type Error = ReducedParseError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+impl ReducedOmegaWord<char> {
+    pub fn try_from_str(value: &str) -> Result<Self, ReducedParseError> {
         match value.split_once(',') {
             None => {
                 if value.is_empty() {
@@ -517,24 +516,17 @@ impl<W: FiniteWord> OmegaWord for OmegaIteration<W> {
 }
 
 /// Represents the types of errors that can occur when parsing a reduced word from a string.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Error)]
 pub enum ReducedParseError {
     /// The word is empty.
+    #[error("cannot parse an empty omega word")]
     Empty,
     /// The looping part of the word is empty.
+    #[error("the looping part of an omega word may not be empty")]
     EmptyLoop,
     /// The word contains too many commas, when it should contain at most one.
+    #[error("too many commas (more than one) in the omega word")]
     TooManyCommas,
-}
-
-impl std::fmt::Display for ReducedParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ReducedParseError::Empty => write!(f, "Word is empty"),
-            ReducedParseError::EmptyLoop => write!(f, "Looping part of word is empty"),
-            ReducedParseError::TooManyCommas => write!(f, "Too many commas in the word"),
-        }
-    }
 }
 
 impl<S: Show> Debug for ReducedOmegaWord<S> {
@@ -580,7 +572,7 @@ mod tests {
     #[test]
     fn parse_reduced() {
         let repr = "abab";
-        let nupw = super::ReducedOmegaWord::try_from(repr).unwrap();
+        let nupw = super::ReducedOmegaWord::try_from_str(repr).unwrap();
         let mut start = vec!['a', 'b', 'a', 'b'];
         deduplicate_inplace(&mut start);
         assert_eq!(start, vec!['a', 'b']);

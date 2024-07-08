@@ -2,7 +2,7 @@
 use itertools::Itertools;
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
-use crate::prelude::*;
+use crate::{prelude::*, Lattice};
 
 use super::FiniteWordAutomaton;
 
@@ -11,6 +11,9 @@ use super::FiniteWordAutomaton;
 /// no transitions at all.
 #[derive(Debug, Clone)]
 pub struct MealySemantics<C>(PhantomData<C>);
+
+pub trait MealyLike: TransitionSystem<EdgeColor: Lattice> + Deterministic + Pointed {}
+impl<T: TransitionSystem<EdgeColor: Lattice> + Deterministic + Pointed> MealyLike for T {}
 
 /// A Mealy machine is a transition system where each transition has an output. Thus, the output
 /// of running a Mealy machine on a word produces a sequence of outputs, one for each transition

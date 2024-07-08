@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::fmt::Debug;
 
-use crate::prelude::*;
+use crate::{prelude::*, Lattice};
 
 use super::FiniteWordAutomaton;
 
@@ -10,6 +10,9 @@ use super::FiniteWordAutomaton;
 /// produces the color of the initial state.
 #[derive(Debug, Clone)]
 pub struct MooreSemantics<Q>(std::marker::PhantomData<Q>);
+
+pub trait MooreLike: TransitionSystem<StateColor: Lattice> + Deterministic + Pointed {}
+impl<T: TransitionSystem<StateColor: Lattice> + Deterministic + Pointed> MooreLike for T {}
 
 /// A Moore machine is a transition system where each state has an output. Thus, the output
 /// of running a Moore machine on a word produces a sequence of outputs, one for each state

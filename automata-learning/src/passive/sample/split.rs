@@ -3,7 +3,7 @@ use itertools::Itertools;
 
 use crate::passive::dpainf::{dpainf, iteration_consistency_conflicts};
 
-use super::{OmegaSample, Sample};
+use super::{OmegaSample, SetSample};
 
 /// An [`OmegaSample`] restricted/split onto one [`Class`] of a [`RightCongruence`].
 #[derive(Clone)]
@@ -28,7 +28,7 @@ impl<'a, A: Alphabet> std::ops::DerefMut for ClassOmegaSample<'a, A> {
 }
 
 impl<'a, A: Alphabet> ClassOmegaSample<'a, A> {
-    /// Creates a new [`ClassOmegaSample`] from a [`RightCongruence`], a [`Class`] and a [`Sample`].
+    /// Creates a new [`ClassOmegaSample`] from a [`RightCongruence`], a [`Class`] and a [`SetSample`].
     pub fn new(
         congruence: &'a RightCongruence<A>,
         class: Class<A::Symbol>,
@@ -56,7 +56,7 @@ impl<'a, A: Alphabet> ClassOmegaSample<'a, A> {
         Self {
             congruence,
             class,
-            sample: Sample {
+            sample: SetSample {
                 alphabet,
                 positive: math::Set::default(),
                 negative: math::Set::default(),
@@ -117,8 +117,9 @@ impl<'a, A: Alphabet> SplitOmegaSample<'a, A> {
                         vec![],
                         // SeparatesIdempotents::new(split_sample.get(&c).expect("This must exist")),
                         false,
+                        None,
                     )
-                    .unwrap(),
+                    .expect("Unable to infer a FORC!"),
                 )
             })
             .collect_vec();

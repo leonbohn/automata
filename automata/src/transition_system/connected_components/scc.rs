@@ -58,12 +58,19 @@ impl<'a, Ts: TransitionSystem> std::ops::Deref for Scc<'a, Ts> {
     }
 }
 
+impl<'a, T: TransitionSystem> PartialEq<Vec<StateIndex<T>>> for Scc<'a, T> {
+    fn eq(&self, other: &Vec<StateIndex<T>>) -> bool {
+        self.states.iter().sorted().eq(other.iter().sorted())
+    }
+}
+
 impl<'a, Ts: TransitionSystem> PartialEq for Scc<'a, Ts> {
     fn eq(&self, other: &Self) -> bool {
         self.states == other.states
     }
 }
 impl<'a, Ts: TransitionSystem> Eq for Scc<'a, Ts> {}
+
 impl<'a, Ts: TransitionSystem> PartialOrd for Scc<'a, Ts> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
@@ -422,7 +429,7 @@ mod tests {
             .into_dts_with_initial(0);
         let sccs = ts.sccs();
         let first = sccs.first();
-        println!("{:?}", first);
+
         assert_eq!(&transitions, first.interior_transitions());
         assert_eq!(first.interior_edge_colors(), &Set::from_iter([0, 1, 2]));
 

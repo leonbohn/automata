@@ -213,7 +213,7 @@ impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
 mod tests {
     use crate::prelude::*;
 
-    #[test_log::test]
+    #[test]
     fn subset_construction() {
         let nts = NTS::builder()
             .default_color(false)

@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(w.prefix(6).collect_vec(), ww.prefix(6).collect_vec());
     }
 
-    #[test_log::test]
+    #[test]
     fn bug_upw() {
         let first = upw!("baa", "ba");
         assert_eq!(first, upw!("ba", "ab"));

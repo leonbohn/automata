@@ -1,8 +1,12 @@
-use automata::{prelude::*, transition_system::operations::MapStateColor};
+use std::cell::RefCell;
 
-use crate::passive::Sample;
+use automata::{prelude::*, transition_system::operations::MapStateColor, Lattice};
+use math::Set;
+use tracing::trace;
 
-use super::{Hypothesis, LStarHypothesis};
+use crate::passive::SetSample;
+
+use super::Hypothesis;
 
 pub type Counterexample<A, O> = (Vec<<A as Alphabet>::Symbol>, O);
 
@@ -26,7 +30,7 @@ pub trait Oracle {
 
     fn equivalence<H>(
         &self,
-        hypothesis: H,
+        hypothesis: &H,
     ) -> Result<(), Counterexample<Self::Alphabet, Self::Output>>
     where
         H: Hypothesis<Alphabet = Self::Alphabet, Output = Self::Output>;
@@ -40,13 +44,13 @@ where
     oracle.alphabet().into()
 }
 
-/// An oracle/minimally adequate teacher based on a [`Sample`]. It answers membership queries by looking up the
+/// An oracle/minimally adequate teacher based on a [`SetSample`]. It answers membership queries by looking up the
 /// word in the sample and returning the corresponding color. If the word is not in the sample, it returns the
 /// default color. Equivalence queries are perfomed by checking if the hypothesis produces the same output as the
 /// sample for all words in the sample.
 #[derive(Debug, Clone)]
 pub struct SampleOracle<A: Alphabet, W: Word<Symbol = A::Symbol>> {
-    sample: Sample<A, W>,
+    sample: SetSample<A, W>,
     default: bool,
 }
 
@@ -64,7 +68,7 @@ impl<A: Alphabet, X: FiniteWord<Symbol = A::Symbol>> Oracle for SampleOracle<A, 
 
     fn equivalence<H>(
         &self,
-        hypothesis: H,
+        hypothesis: &H,
     ) -> Result<(), Counterexample<Self::Alphabet, Self::Output>>
     where
         H: Hypothesis<Alphabet = Self::Alphabet, Output = Self::Output>,
@@ -78,7 +82,7 @@ impl<A: Alphabet, X: FiniteWord<Symbol = A::Symbol>> Oracle for SampleOracle<A, 
 }
 
 impl<A: Alphabet, W: Word<Symbol = A::Symbol>> SampleOracle<A, W> {
-    /// Returns a reference to the underlying alphabet, as provided by [`Sample::alphabet()`].
+    /// Returns a reference to the underlying alphabet, as provided by [`SetSample::alphabet()`].
     pub fn alphabet(&self) -> &A {
         self.sample.alphabet()
     }
@@ -86,15 +90,15 @@ impl<A: Alphabet, W: Word<Symbol = A::Symbol>> SampleOracle<A, W> {
 
 impl<A: Alphabet, W: FiniteWord<Symbol = A::Symbol>> SampleOracle<A, W> {
     /// Creates a new instance of a [`SampleOracle`] with the given sample and default color.
-    pub fn new(sample: Sample<A, W>, default: bool) -> Self {
+    pub fn new(sample: SetSample<A, W>, default: bool) -> Self {
         Self { sample, default }
     }
 }
 
-impl<A: Alphabet, W: FiniteWord<Symbol = A::Symbol>> From<(Sample<A, W>, bool)>
+impl<A: Alphabet, W: FiniteWord<Symbol = A::Symbol>> From<(SetSample<A, W>, bool)>
     for SampleOracle<A, W>
 {
-    fn from((value, default): (Sample<A, W>, bool)) -> Self {
+    fn from((value, default): (SetSample<A, W>, bool)) -> Self {
         Self::new(value, default)
     }
 }
@@ -130,61 +134,143 @@ impl<A: Alphabet> Oracle for DFAOracle<A> {
 
     fn equivalence<H>(
         &self,
-        hypothesis: H,
+        hypothesis: &H,
     ) -> Result<(), Counterexample<Self::Alphabet, Self::Output>>
     where
         H: Hypothesis<Alphabet = Self::Alphabet, Output = Self::Output>,
     {
-        todo!()
+        for mr in (&self.automaton)
+            .ts_product(hypothesis)
+            .minimal_representatives()
+        {
+            match (self.automaton.accepts(&mr), hypothesis.output(&mr)) {
+                (b, bb) if b != bb => return Err((mr.to_vec(), b)),
+                _ => (),
+            }
+        }
+        Ok(())
     }
 }
 
-/// An oracle based on a [`MealyMachine`].
 #[derive(Clone)]
-pub struct MealyOracle<A: Alphabet, C: Color = Int> {
-    automaton: MealyMachine<A, Void, C>,
-    default: Option<C>,
+pub struct MealyOracle<A: Alphabet, C: Color + Lattice = Int> {
+    mm: MealyMachine<A, Void, C>,
 }
 
-impl<A: Alphabet, C: Color> Oracle for MealyOracle<A, C> {
+impl<A: Alphabet, C: Color + Lattice> MealyOracle<A, C> {
+    pub fn new(mm: impl MealyLike<Alphabet = A, EdgeColor = C>) -> Self {
+        Self {
+            mm: mm.erase_state_colors().collect_mealy(),
+        }
+    }
+}
+
+impl<A: Alphabet, C: Color + Lattice> Oracle for MealyOracle<A, C> {
+    type Alphabet = A;
+
+    type Output = C;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        self.mm.alphabet()
+    }
+
+    fn output<W: FiniteWord<Symbol = <Self::Alphabet as Alphabet>::Symbol>>(
+        &self,
+        word: W,
+    ) -> Self::Output {
+        let Some(out) = self.mm.transform(&word) else {
+            panic!(
+                "unable to compute output for {:?}, as underlying Mealy machine is not complete",
+                word.as_string()
+            );
+        };
+        out
+    }
+
+    fn equivalence<H>(
+        &self,
+        hypothesis: &H,
+    ) -> Result<(), Counterexample<Self::Alphabet, Self::Output>>
+    where
+        H: Hypothesis<Alphabet = Self::Alphabet, Output = Self::Output>,
+    {
+        for mtr in (&self.mm)
+            .ts_product(hypothesis)
+            .minimal_transition_representatives()
+        {
+            let expected = self.output(&mtr);
+            if expected != hypothesis.output(&mtr) {
+                return Err((mtr.to_vec(), expected));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// An oracle based on a [`MealyMachine`], which additionally stores a default color that
+/// is returned if the word does not produce a color in the automaton.
+#[derive(Clone)]
+pub struct CompletingMealyOracle<A: Alphabet, C: Color = Int> {
+    automaton: MealyMachine<A, Void, C>,
+    default: C,
+    missed: RefCell<Set<Vec<A::Symbol>>>,
+}
+
+impl<A: Alphabet, C: Color> CompletingMealyOracle<A, C> {
+    /// Creates a new [`MealyOracle`] based on an instance of [`MealyMachine`].
+    pub fn new(automaton: impl Congruence<Alphabet = A, EdgeColor = C>, default: C) -> Self {
+        Self {
+            automaton: automaton.erase_state_colors().collect_mealy(),
+            default,
+            missed: RefCell::new(Set::default()),
+        }
+    }
+    pub fn alphabet(&self) -> &A {
+        self.automaton.alphabet()
+    }
+}
+
+impl<A: Alphabet, C: Color + Ord> Oracle for CompletingMealyOracle<A, C> {
     type Alphabet = A;
     type Output = C;
 
     fn output<W: FiniteWord<Symbol = A::Symbol>>(&self, word: W) -> C {
         self.automaton
             .last_edge_color(word)
-            .or(self.default.clone())
-            .expect("The oracle must be total!")
+            .unwrap_or(self.default.clone())
     }
 
     fn equivalence<H>(
         &self,
-        hypothesis: H,
+        hypothesis: &H,
     ) -> Result<(), Counterexample<Self::Alphabet, Self::Output>>
     where
         H: Hypothesis<Alphabet = Self::Alphabet, Output = Self::Output>,
     {
-        todo!()
+        for mr in (&self.automaton)
+            .ts_product(hypothesis)
+            .minimal_transition_representatives()
+        {
+            let Some(expected) = self.automaton.transform(&mr) else {
+                continue;
+            };
+            // .unwrap_or_else(|| {
+            //     let Some(default) = &self.default else {
+            //         panic!("Oracle must be total or provide a default!")
+            //     };
+            // self.missed.borrow_mut().insert(mr.clone());
+            // trace!("returning default for {mr:?}");
+            // default.clone()
+            // });
+            let output = hypothesis.output(&mr);
+            if output != expected {
+                return Err((mr.to_vec(), expected));
+            }
+        }
+        Ok(())
     }
 
     fn alphabet(&self) -> &A {
-        self.automaton.alphabet()
-    }
-}
-
-impl<A: Alphabet, C: Color> MealyOracle<A, C> {
-    /// Creates a new [`MealyOracle`] based on an instance of [`MealyMachine`].
-    pub fn new(
-        automaton: impl Congruence<Alphabet = A, EdgeColor = C>,
-        default: Option<C>,
-    ) -> Self {
-        Self {
-            automaton: automaton.erase_state_colors().collect_mealy(),
-            default,
-        }
-    }
-
-    pub fn alphabet(&self) -> &A {
         self.automaton.alphabet()
     }
 }
@@ -195,9 +281,9 @@ pub struct MooreOracle<D> {
     automaton: D,
 }
 
-impl<D: Congruence> Oracle for MooreOracle<IntoMooreMachine<D>>
+impl<D: Deterministic> Oracle for MooreOracle<IntoMooreMachine<D>>
 where
-    StateColor<D>: Color + Default,
+    StateColor<D>: Color + Default + Ord,
 {
     type Alphabet = D::Alphabet;
     type Output = StateColor<D>;
@@ -210,17 +296,33 @@ where
         &self,
         word: W,
     ) -> Self::Output {
-        todo!()
+        self.automaton
+            .reached_state_color(word)
+            .expect("underlying transition system of Moore oracle must be complete")
     }
 
     fn equivalence<H>(
         &self,
-        hypothesis: H,
+        hypothesis: &H,
     ) -> Result<(), Counterexample<Self::Alphabet, Self::Output>>
     where
         H: Hypothesis<Alphabet = Self::Alphabet, Output = Self::Output>,
     {
-        todo!()
+        for mr in (&self.automaton)
+            .ts_product(hypothesis)
+            .minimal_representatives()
+        {
+            match (
+                self.automaton
+                    .transform(&mr)
+                    .expect("source automaton must be complete"),
+                hypothesis.output(&mr),
+            ) {
+                (c, cc) if c != cc => return Err((mr.to_vec(), c)),
+                _ => (),
+            }
+        }
+        Ok(())
     }
 }
 
@@ -241,10 +343,9 @@ mod tests {
 
     use crate::active::LStar;
 
-    use super::MealyOracle;
+    use super::CompletingMealyOracle;
 
     #[test]
-    #[ignore]
     fn mealy_al() {
         let target = DTS::builder()
             .with_transitions([
@@ -254,13 +355,15 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 0),
                 (1, 'c', 1, 0),
+                (2, 'a', 3, 0),
+                (2, 'b', 0, 1),
+                (2, 'c', 1, 0),
             ])
             .into_mealy(0);
-        let oracle = MealyOracle::new(target, Some(0));
+        let oracle = CompletingMealyOracle::new(target, 0);
         let alphabet = oracle.alphabet().clone();
-        // let mut learner = LStar::for_mealy(alphabet, oracle);
-        // let mm = learner.infer();
-        // assert_eq!(mm.size(), 2);
-        todo!()
+        let mut learner = LStar::new(alphabet, oracle);
+        let mm: MealyMachine = learner.infer();
+        assert_eq!(mm.size(), 2);
     }
 }

@@ -426,6 +426,15 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color>
             .iter()
             .position(|s| s.is_occupied() && s.occupation().unwrap().0 .0.eq(&first))
     }
+
+    pub fn old_to_new(&self, left: X) -> Option<StateIndex<Self>> {
+        self.state_indices_with_color()
+            .find_map(|(i, c)| if c.0.eq(&left) { Some(i) } else { None })
+    }
+
+    pub fn new_to_old(&self, right: StateIndex<Self>) -> Option<X> {
+        self.state_color(right).map(|c| c.0)
+    }
 }
 
 /// Type alias for the constituent parts of an [`NTS`] with the same associated types as the
