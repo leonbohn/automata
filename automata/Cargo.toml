@@ -33,7 +33,7 @@ tabled = { version = "0.15", features = ["ansi"] }
 owo-colors = "4.0"
 test-log = { version = "0.2", features = ["trace"] }
 tempfile = { version = "3.10", optional = true }
-bit-set = "0.6"
+bit-set = "0.8"
 clap = { version = "4.5", optional = true }
 rand_distr = { version = "0.4.3", optional = true }
 
