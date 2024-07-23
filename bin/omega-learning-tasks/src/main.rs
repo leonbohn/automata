@@ -56,8 +56,12 @@ fn main() {
         println!("Generating randomly labeled samples");
         let word_lens = vec![2, 3, 4, 5, 6, 7, 8];
         let sparsities = vec![0.01, 0.02, 0.05, 0.1, 0.2];
-        let num_sets = 10;
+        let num_sets = 100;
         generate_randomly_labeled(word_lens, sparsities, num_sets);
+    }
+    if args.contains(&"sproutrand".to_string()) {
+        println!("Running sprout learner on randomly labeled samples");
+        run_sprout_rand();
     }
     println!("Done");
 }
@@ -179,7 +183,6 @@ pub fn run_sprout() {
 }
 
 pub fn generate_randomly_labeled(word_lens: Vec<usize>, sparsities: Vec<f64>, num_sets: usize) {
-    fs::create_dir_all("data/rand_sets").unwrap();
     for len in word_lens {
         let max_words = (2_u32.pow(len as u32 + 1) - 1) * (2_u32.pow(len as u32 + 1) - 2);
         for sparsity in sparsities.iter() {
@@ -193,6 +196,135 @@ pub fn generate_randomly_labeled(word_lens: Vec<usize>, sparsities: Vec<f64>, nu
             }
         }
     }
+}
+
+pub fn run_sprout_rand() {
+    // load task directories
+    let mut task_dirs = vec![];
+    let entries = fs::read_dir("data/rand_sets").expect("No learning tasks available");
+    for entry in entries.flatten() {
+        if let Ok(file_type) = entry.file_type() {
+            if file_type.is_dir() {
+                task_dirs.push(entry.path());
+            }
+        } else {
+            println!("Couldn't get file type for {:?}", entry.path());
+        }
+    }
+    task_dirs
+        .clone()
+        .into_par_iter()
+        .map(load_sample)
+        .enumerate()
+        .for_each(|(i, sample)| {
+            let dir = &task_dirs[i];
+            info!("task {i} \"{:?}\"", dir.to_string_lossy());
+            // check if task was already computed
+            if dir.join("result.csv").exists() {
+                info!("Already computed. Skip.");
+                return;
+            }
+            // learn DBA
+            debug!("starting dba learner for task {i}");
+            let time = std::time::Instant::now();
+            let result = sprout(sample.clone(), BuchiCondition);
+            let elapsed = time.elapsed();
+            let size;
+            let status;
+            match result {
+                Ok(learned) => {
+                    info!(
+                        "task {i} \"{:?}\" learning took {} ms",
+                        dir.to_string_lossy(),
+                        elapsed.as_millis()
+                    );
+                    export_automaton(
+                        format!("{}/learned_dba.hoa", dir.to_str().unwrap()),
+                        &learned,
+                    );
+                    size = learned.size();
+                    status = "success";
+                }
+                Err(SproutError::Timeout(ts)) => {
+                    warn!(
+                        "exceeded timeout on task {i} \"{:?}\" at size {:?}",
+                        dir.to_string_lossy(),
+                        ts.size(),
+                    );
+                    size = ts.size();
+                    status = "timeout"
+                }
+                Err(SproutError::Threshold(thresh, learned, ts)) => {
+                    warn!(
+                        "exceeded threshold {:?} on task {i} \"{:?}\" at size {:?}",
+                        thresh,
+                        dir.to_string_lossy(),
+                        ts.size(),
+                    );
+                    export_automaton(
+                        format!("{}/learned_dba.hoa", dir.to_str().unwrap()),
+                        &learned,
+                    );
+                    size = ts.size();
+                    status = "threshold";
+                }
+            }
+            let mut wtr = Writer::from_path(dir.join("result.csv"))
+                        .expect("creating file failed");
+            wtr.write_record(["dba_status", &format!("{}", status)]).unwrap();
+            wtr.write_record(["dba_size", &format!("{}", size)]).unwrap();            
+            wtr.write_record(["dba_time_ms", &format!("{}", elapsed.as_millis())]).unwrap();
+            
+            // DPA
+            debug!("starting dpa learner for task {i}");
+            let time = std::time::Instant::now();
+            let result = sprout(sample, MinEvenParityCondition);
+            let elapsed = time.elapsed();
+            let size;
+            let status;
+            match result {
+                Ok(learned) => {
+                    info!(
+                        "task {i} \"{:?}\" learning took {} ms",
+                        dir.to_string_lossy(),
+                        elapsed.as_millis()
+                    );
+                    export_automaton(
+                        format!("{}/learned_dpa.hoa", dir.to_str().unwrap()),
+                        &learned,
+                    );
+                    size = learned.size();
+                    status = "success";
+                }
+                Err(SproutError::Timeout(ts)) => {
+                    warn!(
+                        "exceeded timeout on task {i} \"{:?}\" at size {:?}",
+                        dir.to_string_lossy(),
+                        ts.size(),
+                    );
+                    size = ts.size();
+                    status = "timeout"
+                }
+                Err(SproutError::Threshold(thresh, learned, ts)) => {
+                    warn!(
+                        "exceeded threshold {:?} on task {i} \"{:?}\" at size {:?}",
+                        thresh,
+                        dir.to_string_lossy(),
+                        ts.size(),
+                    );
+                    export_automaton(
+                        format!("{}/learned_dpa.hoa", dir.to_str().unwrap()),
+                        &learned,
+                    );
+                    size = ts.size();
+                    status = "threshold";
+                }
+            }
+            wtr.write_record(["dpa_status", &format!("{}", status)]).unwrap();
+            wtr.write_record(["dpa_size", &format!("{}", size)]).unwrap();            
+            wtr.write_record(["dpa_time_ms", &format!("{}", elapsed.as_millis())]).unwrap();
+            wtr.flush().unwrap();
+        });
 }
 
 /// Generate a sample of ultimately periodic words by loading the training set from
@@ -475,7 +607,9 @@ pub fn set_name(
 
 /// Give filename for a set of radnomly labeled omega words
 pub fn rand_set_name(word_len: usize, sparsity: usize, set_index: usize) -> String {
-    format!("data/rand_sets/word_set__word_len={word_len}__sparsity={sparsity}__set_index{set_index:0>2}.csv")
+    let name = format!("word_set__word_len={word_len}__sparsity={sparsity}__set_index{set_index:0>2}");
+    fs::create_dir_all(format!("data/rand_sets/{name}")).unwrap();
+    format!("data/rand_sets/{name}/train.csv")
 }
 
 pub fn export_labelled_set(file: String, set: &[(ReducedOmegaWord<char>, bool)]) {
