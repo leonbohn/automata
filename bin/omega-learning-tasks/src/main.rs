@@ -1,12 +1,8 @@
 use csv::Writer;
 use itertools::{Either, Itertools};
+use rand::random;
 use rayon::prelude::*;
-use std::{
-    collections::HashMap,
-    env, fs,
-    path::PathBuf,
-    time::{Duration, SystemTime},
-};
+use std::{collections::HashMap, env, fs, path::PathBuf, time::Duration};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
 use automata::{
@@ -15,7 +11,10 @@ use automata::{
     prelude::*,
     random::{generate_random_dba, generate_random_dpa, generate_random_omega_words},
 };
-use automata_learning::passive::{sprout::sprout, OmegaSample};
+use automata_learning::passive::{
+    sprout::{sprout, SproutError},
+    OmegaSample,
+};
 use math::set::IndexSet;
 use tracing::{debug, info, warn};
 
@@ -38,7 +37,7 @@ fn main() {
         let automata_per_size = 10;
         let train_sizes = vec![100, 1000, 10000];
         let test_size = 10000;
-        let num_sets = 5;
+        let num_sets = 10;
         let lambda = 0.95;
         generate_tasks(
             automata_sizes,
@@ -52,6 +51,13 @@ fn main() {
     if args.contains(&"sprout".to_string()) {
         println!("Running sprout learner on all tasks");
         run_sprout();
+    }
+    if args.contains(&"genrand".to_string()) {
+        println!("Generating randomly labeled samples");
+        let word_lens = vec![2, 3, 4, 5, 6, 7, 8];
+        let sparsities = vec![0.01, 0.02, 0.05, 0.1, 0.2];
+        let num_sets = 10;
+        generate_randomly_labeled(word_lens, sparsities, num_sets);
     }
     println!("Done");
 }
@@ -78,43 +84,115 @@ pub fn run_sprout() {
             let dir = &task_dirs[i];
             info!("task {i} \"{:?}\"", dir.to_string_lossy());
             // check if task was already computed
-            if dir.join("result.csv").exists() {
+            if dir.join("result_minesc.csv").exists() {
                 info!("Already computed. Skip.");
                 return;
             }
             debug!("starting learner for task {i}");
-            let time = SystemTime::now();
+            let time = std::time::Instant::now();
             if dir.to_string_lossy().contains("dba") {
-                let Ok(learned) = sprout(sample, BuchiCondition) else {
-                    warn!("exceeded timeout on task {i}: {:?}", dir.to_string_lossy());
-                    return;
-                };
-                let elapsed = time.elapsed().unwrap();
-                info!(
-                    "task {i} \"{:?}\" learning took {} ms",
-                    dir.to_string_lossy(),
-                    elapsed.as_millis()
-                );
-                export_automaton(format!("{}/learned.hoa", dir.to_str().unwrap()), &learned);
-                export_sprout_result(dir, &learned, elapsed);
+                let result = sprout(sample, BuchiCondition);
+                let elapsed = time.elapsed();
+                match result {
+                    Ok(learned) => {
+                        info!(
+                            "task {i} \"{:?}\" learning took {} ms",
+                            dir.to_string_lossy(),
+                            elapsed.as_millis()
+                        );
+                        export_automaton(
+                            format!("{}/learned_minesc.hoa", dir.to_str().unwrap()),
+                            &learned,
+                        );
+                        export_sprout_result(dir, &learned, elapsed);
+                    }
+                    Err(SproutError::Timeout(ts)) => {
+                        warn!(
+                            "exceeded timeout on task {i} \"{:?}\" at size {:?}",
+                            dir.to_string_lossy(),
+                            ts.size(),
+                        );
+                        let mut wtr = Writer::from_path(dir.join("result_minesc.csv"))
+                            .expect("creating file failed");
+                        wtr.write_record(["timeout_size", &format!("{}", ts.size())])
+                            .unwrap();
+                        wtr.flush().unwrap();
+                    }
+                    Err(SproutError::Threshold(thresh, learned, ts)) => {
+                        warn!(
+                            "exceeded threshold {:?} on task {i} \"{:?}\" at size {:?}",
+                            thresh,
+                            dir.to_string_lossy(),
+                            ts.size(),
+                        );
+                        export_automaton(
+                            format!("{}/learned_min_esc.hoa", dir.to_str().unwrap()),
+                            &learned,
+                        );
+                        export_sprout_result(dir, &learned, elapsed);
+                    }
+                }
             } else {
-                let Ok(learned) = sprout(sample, MinEvenParityCondition) else {
-                    warn!(
-                        "exceeded timeout on task {i} \"{:?}\"",
-                        dir.to_string_lossy()
-                    );
-                    return;
-                };
-                let elapsed = time.elapsed().unwrap();
-                info!(
-                    "task {i} \"{:?}\" learning took {} ms",
-                    dir.to_string_lossy(),
-                    elapsed.as_millis()
-                );
-                export_automaton(format!("{}/learned.hoa", dir.to_str().unwrap()), &learned);
-                export_sprout_result(dir, &learned, elapsed);
+                let result = sprout(sample, MinEvenParityCondition);
+                let elapsed = time.elapsed();
+                match result {
+                    Ok(learned) => {
+                        info!(
+                            "task {i} \"{:?}\" learning took {} ms",
+                            dir.to_string_lossy(),
+                            elapsed.as_millis()
+                        );
+                        export_automaton(
+                            format!("{}/learned_minesc.hoa", dir.to_str().unwrap()),
+                            &learned,
+                        );
+                        export_sprout_result(dir, &learned, elapsed);
+                    }
+                    Err(SproutError::Timeout(ts)) => {
+                        warn!(
+                            "exceeded timeout on task {i} \"{:?}\" at size {:?}",
+                            dir.to_string_lossy(),
+                            ts.size(),
+                        );
+                        let mut wtr = Writer::from_path(dir.join("result_minesc.csv"))
+                            .expect("creating file failed");
+                        wtr.write_record(["timeout_size", &format!("{}", ts.size())])
+                            .unwrap();
+                        wtr.flush().unwrap();
+                    }
+                    Err(SproutError::Threshold(thresh, learned, ts)) => {
+                        warn!(
+                            "exceeded threshold {:?} on task {i} \"{:?}\" at size {:?}",
+                            thresh,
+                            dir.to_string_lossy(),
+                            ts.size(),
+                        );
+                        export_automaton(
+                            format!("{}/learned_minesc.hoa", dir.to_str().unwrap()),
+                            &learned,
+                        );
+                        export_sprout_result(dir, &learned, elapsed);
+                    }
+                }
             }
         });
+}
+
+pub fn generate_randomly_labeled(word_lens: Vec<usize>, sparsities: Vec<f64>, num_sets: usize) {
+    fs::create_dir_all("data/rand_sets").unwrap();
+    for len in word_lens {
+        let max_words = (2_u32.pow(len as u32 + 1) - 1) * (2_u32.pow(len as u32 + 1) - 2);
+        for sparsity in sparsities.iter() {
+            let size = (max_words as f64 * sparsity).round() as usize;
+            for set_index in 0..num_sets {
+                let (set, _) = generate_set(2, len, len, size, 0);
+                let labeled: Vec<_> = set.into_iter().map(|w| (w, random::<bool>())).collect();
+
+                let filename = rand_set_name(len, (sparsity * 100.0).round() as usize, set_index);
+                export_labelled_set(filename, &labeled);
+            }
+        }
+    }
 }
 
 /// Generate a sample of ultimately periodic words by loading the training set from
@@ -196,8 +274,8 @@ pub fn generate_tasks(
                 export_set(set_name(aut_size, train_size, i, false, "dba"), &test);
                 sets_of_size_dba.push((train, test));
                 // DPA sets
-                let len_spoke = 2 * ((aut_size as f64).log2().ceil() as usize) - 1;
-                let len_cycle = (2 * aut_size - len_spoke) * len_spoke;
+                let len_spoke = aut_size;
+                let len_cycle = 2 * aut_size + (aut_size - 1).pow(2);
                 let (train, test) =
                     generate_set(num_symbols, len_spoke, len_cycle, train_size, test_size);
                 export_set(set_name(aut_size, train_size, i, true, "dpa"), &train);
@@ -395,6 +473,11 @@ pub fn set_name(
     format!("data/sets/word_set__{acc_type}__aut_size={aut_size}__sample_size={set_size}__{set_index:0>2}_{class}.csv")
 }
 
+/// Give filename for a set of radnomly labeled omega words
+pub fn rand_set_name(word_len: usize, sparsity: usize, set_index: usize) -> String {
+    format!("data/rand_sets/word_set__word_len={word_len}__sparsity={sparsity}__set_index{set_index:0>2}.csv")
+}
+
 pub fn export_labelled_set(file: String, set: &[(ReducedOmegaWord<char>, bool)]) {
     let mut wtr = Writer::from_path(file).expect("creating file failed");
     wtr.write_record(["spoke", "cycle", "acceptance"]).unwrap();
@@ -489,10 +572,11 @@ pub fn export_sprout_result<Z, C>(
 
     let path_str = task_dir.to_str().unwrap();
     scored_pos.extend(scored_neg);
-    export_labelled_set(format!("{}/test_learned.csv", path_str), &scored_pos);
+    export_labelled_set(format!("{}/test_learned_minesc.csv", path_str), &scored_pos);
 
     // export %correct, %pos/neg correct, aut size in result file
-    let mut wtr = Writer::from_path(task_dir.join("result.csv")).expect("creating file failed");
+    let mut wtr =
+        Writer::from_path(task_dir.join("result_minesc.csv")).expect("creating file failed");
     wtr.write_record(["learned_aut_size", &format!("{}", learned.size())])
         .unwrap();
     wtr.write_record(["scored_correct", &format!("{total_correct}")])
