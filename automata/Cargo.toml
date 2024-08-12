@@ -29,7 +29,7 @@ rand = { workspace = true }
 automata-core = { version = "0.1.0", path = "../automata-core" }
 hoars = { version = "0.2.0", optional = true, path = "../hoars" }
 
-tabled = { version = "0.15", features = ["ansi"] }
+tabled = { version = "0.16", features = ["ansi"] }
 owo-colors = "4.0"
 test-log = { version = "0.2", features = ["trace"] }
 tempfile = { version = "3.10", optional = true }

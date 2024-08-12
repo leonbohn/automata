@@ -12,7 +12,7 @@ thiserror = { workspace = true }
 crossbeam-channel = { workspace = true }
 rand = { workspace = true }
 
-tabled = { version = "0.15.0", features = ["ansi"] }
+tabled = { version = "0.16.0", features = ["ansi"] }
 owo-colors = "4.0.0"
 alea = "0.2"
 either = "1.9.0"
