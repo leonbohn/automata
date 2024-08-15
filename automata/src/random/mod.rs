@@ -2,6 +2,7 @@
 use crate::prelude::*;
 use math::sample_continuous_bernoulli;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
+use rand_distr::{Distribution, Geometric};
 use std::cmp::min;
 use tracing::{debug, info};
 
@@ -207,6 +208,38 @@ pub fn generate_random_omega_words(
     }
 
     word_set
+}
+
+/// Generate a set of `number` random `ReducedOmegaWord`s over the universe of the `alphabet`.
+/// The length for each spoke is drawn from the geometric distribution on the range `min_len_spoke..=max_len_spoke`.
+/// The length for each cycle is drawn from the geometric distribution on the range `min_len_cycle..=max_len_cycle`.
+/// words are samped roughly uniformly
+/// Panics if the length of the cycle can be 0.
+pub fn generate_random_omega_words_uniform(
+    alphabet: &CharAlphabet,
+    min_len_spoke: usize,
+    max_len_spoke: usize,
+    min_len_cycle: usize,
+    max_len_cycle: usize,
+    number: usize,
+) -> math::Set<ReducedOmegaWord<char>> {
+    let mut word_set = math::Set::with_capacity(number);
+    let geo = Geometric::new(0.52).unwrap();
+    while word_set.len() < number {
+        let lspoke = get_geometric_len(min_len_spoke, max_len_spoke, geo);
+        let lcycle = get_geometric_len(min_len_cycle, max_len_cycle, geo);
+        let random_word = generate_random_omega_word(alphabet, lspoke, lspoke, lcycle, lcycle);
+        word_set.insert(random_word);
+    }
+
+    word_set
+}
+
+/// get a length from a geometric distribution on [min_len:max_len], max_len is the most likely
+pub fn get_geometric_len(min_len: usize, max_len: usize, geo: Geometric) -> usize {
+    let range = max_len - min_len;
+    let r = range - geo.sample(&mut rand::thread_rng()) as usize % (range + 1);
+    min_len + r
 }
 
 struct BenchmarkAverages {
