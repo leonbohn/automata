@@ -2,7 +2,11 @@ use automata::{math::Set, prelude::*, random, transition_system::path};
 use itertools::Itertools;
 use tracing::{info, warn};
 
-use std::{collections::{HashMap, HashSet}, fmt::Debug, path::Iter};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    path::Iter,
+};
 
 use crate::prefixtree::prefix_tree;
 
@@ -50,8 +54,7 @@ pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
     let mut neg_sets = vec![];
     let mut mut_sample = sample.clone();
     let mut source: u32 = 0;
-    'outer: while source < ts.size() as u32
-    {
+    'outer: while source < ts.size() as u32 {
         // WARN TODO should find a way to either pass or globally set timeout
         if time_start.elapsed() >= std::time::Duration::from_secs(60 * 30) {
             warn!(
@@ -104,7 +107,7 @@ pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
 /// missing transitions are processed, if they correspond to an escape prefix of a positive example word
 /// when no such words exist anymore, a rejecting sink is added to complete the automaton
 pub fn sprout_escprf<A: ConsistencyCheck<WithInitial<DTS>>>(
-// pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
+    // pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
     sample: OmegaSample,
     acc_type: A,
 ) -> Result<A::Aut, SproutError<A>> {
@@ -222,7 +225,7 @@ pub fn sprout_minesc<A: ConsistencyCheck<WithInitial<DTS>>>(
         }
         let source = ts.finite_run(&u).unwrap().reached();
         let mut min_target: Option<u32> = None;
-        let mut min_escapes = sample.words.len() + 1; 
+        let mut min_escapes = sample.words.len() + 1;
         for q in ts.state_indices_vec() {
             // try adding transition
             ts.add_edge((source, a, Void, q));
@@ -259,8 +262,6 @@ pub fn sprout_minesc<A: ConsistencyCheck<WithInitial<DTS>>>(
     }
     Ok(acc_type.consistent_automaton(&ts, &mut_sample, pos_sets, neg_sets))
 }
-
-
 
 /// sort a vector of Strings length lexicographically
 pub fn length_lexicographical_sort(mut words: Vec<String>) -> Vec<String> {

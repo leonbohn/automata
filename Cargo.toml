@@ -9,7 +9,6 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 biodivine-lib-bdd = "0.5.17"
 itertools = "0.13.0"
-automata-core = { version = "0.1.0", path = "../automata-core" }
 indexmap = "2.2"
 bimap = "0.6"
 rand = "0.8.5"

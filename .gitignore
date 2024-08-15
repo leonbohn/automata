@@ -21,4 +21,4 @@ samples/*
 
 .venv
 .perf
-omega-learning-tasks/data
+bin/omega-learning-tasks/data
