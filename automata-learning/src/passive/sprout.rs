@@ -2,7 +2,7 @@ use automata::{math::Set, prelude::*, random, transition_system::path};
 use itertools::Itertools;
 use tracing::{info, warn};
 
-use std::{collections::HashSet, fmt::Debug, path::Iter};
+use std::{collections::{HashMap, HashSet}, fmt::Debug, path::Iter};
 
 use crate::prefixtree::prefix_tree;
 
@@ -26,7 +26,85 @@ impl<A: ConsistencyCheck<WithInitial<DTS>>> Debug for SproutError<A> {
 
 /// gives a deterministic acc_type omega automaton that is consistent with the given sample
 /// implements the sprout passive learning algorithm for omega automata from <https://arxiv.org/pdf/2108.03735.pdf>
+/// missing transitions are processed in length-lexicographi order.
+/// the sample has no direct influence on this order.
 pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
+    sample: OmegaSample,
+    acc_type: A,
+) -> Result<A::Aut, SproutError<A>> {
+    let time_start = std::time::Instant::now();
+
+    // make ts with initial state
+    let mut ts = Automaton::new_with_initial_color(sample.alphabet().clone(), Void);
+
+    // compute threshold
+    let (lb, le) = sample
+        .words()
+        .map(|w| (w.spoke().len(), w.cycle().len()))
+        .fold((0, 0), |(a0, a1), (b0, b1)| (a0.max(b0), a1.max(b1)));
+    let thresh = (lb + le.pow(2) + 1) as isize;
+    info!("starting sprout with threshold {thresh}");
+
+    // while there are positive sample words that are escaping
+    let mut pos_sets = vec![];
+    let mut neg_sets = vec![];
+    let mut mut_sample = sample.clone();
+    let mut source: u32 = 0;
+    'outer: while source < ts.size() as u32
+    {
+        // WARN TODO should find a way to either pass or globally set timeout
+        if time_start.elapsed() >= std::time::Duration::from_secs(60 * 30) {
+            warn!(
+                "task exceeded timeout, aborting with automaton of size {}",
+                ts.size()
+            );
+            return Err(SproutError::Timeout(ts));
+        }
+        // let u = escape_prefix[..escape_prefix.len() - 1].to_string();
+        // let a = escape_prefix.chars().last().expect("empty escape prefix");
+        // check thresh
+        let mr = ts.minimal_representative(source).unwrap();
+        if mr.len() as isize > (thresh + 1) {
+            // compute default automaton
+            return Err(SproutError::Threshold(
+                thresh as usize,
+                acc_type.default_automaton(&sample),
+                ts,
+            ));
+        }
+        // let source = ts.finite_run(&u).unwrap().reached();
+        'inner: for a in sample.alphabet().universe() {
+            for q in ts.state_indices_vec() {
+                // try adding transition
+                ts.add_edge((source, a, Void, q));
+                // continue if consistent
+                let (is_consistent, pos_sets_new, neg_sets_new) =
+                    acc_type.consistent(&ts, &mut_sample, pos_sets.clone(), neg_sets.clone());
+                if is_consistent {
+                    // update already known infinity sets
+                    pos_sets = pos_sets_new;
+                    neg_sets = neg_sets_new;
+                    mut_sample.remove_non_escaping(&ts);
+                    continue 'inner;
+                } else {
+                    ts.remove_edges_from_matching(source, a);
+                }
+            }
+            // if none consistent add new state
+            let new_state = ts.add_state(Void);
+            ts.add_edge((source, a, Void, new_state));
+        }
+        source += 1;
+    }
+    Ok(acc_type.consistent_automaton(&ts, &mut_sample, pos_sets, neg_sets))
+}
+
+/// gives a deterministic acc_type omega automaton that is consistent with the given sample
+/// implements the sprout passive learning algorithm for omega automata from <https://arxiv.org/pdf/2108.03735.pdf>
+/// missing transitions are processed, if they correspond to an escape prefix of a positive example word
+/// when no such words exist anymore, a rejecting sink is added to complete the automaton
+pub fn sprout_escprf<A: ConsistencyCheck<WithInitial<DTS>>>(
+// pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
     sample: OmegaSample,
     acc_type: A,
 ) -> Result<A::Aut, SproutError<A>> {
@@ -52,7 +130,7 @@ pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
             .first()
     {
         // WARN TODO should find a way to either pass or globally set timeout
-        if time_start.elapsed() >= std::time::Duration::from_secs(60 * 10) {
+        if time_start.elapsed() >= std::time::Duration::from_secs(60 * 30) {
             warn!(
                 "task exceeded timeout, aborting with automaton of size {}",
                 ts.size()
@@ -70,7 +148,6 @@ pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
                 ts,
             ));
         }
-        // dbg!(u.len());
         let source = ts.finite_run(&u).unwrap().reached();
         for q in ts.state_indices_vec() {
             // try adding transition
@@ -83,10 +160,6 @@ pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
                 pos_sets = pos_sets_new;
                 neg_sets = neg_sets_new;
                 mut_sample.remove_non_escaping(&ts);
-                // dbg!(ts.size());
-                // dbg!(pos_sets.len());
-                // dbg!(neg_sets.len());
-                // dbg!(mut_sample.words.len());
                 continue 'outer;
             } else {
                 ts.remove_edges_from_matching(source, a);
@@ -98,6 +171,96 @@ pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
     }
     Ok(acc_type.consistent_automaton(&ts, &mut_sample, pos_sets, neg_sets))
 }
+
+/// gives a deterministic acc_type omega automaton that is consistent with the given sample
+/// implements the sprout passive learning algorithm for omega automata from <https://arxiv.org/pdf/2108.03735.pdf>
+/// all possible target transitioins are tested and ou of all such states that preserve consistency,
+/// the one is chosen, which minimizes the number of escaping words in the sample
+pub fn sprout_minesc<A: ConsistencyCheck<WithInitial<DTS>>>(
+    sample: OmegaSample,
+    acc_type: A,
+) -> Result<A::Aut, SproutError<A>> {
+    let time_start = std::time::Instant::now();
+
+    // make ts with initial state
+    let mut ts = Automaton::new_with_initial_color(sample.alphabet().clone(), Void);
+
+    // compute threshold
+    let (lb, le) = sample
+        .words()
+        .map(|w| (w.spoke().len(), w.cycle().len()))
+        .fold((0, 0), |(a0, a1), (b0, b1)| (a0.max(b0), a1.max(b1)));
+    let thresh = (lb + le.pow(2) + 1) as isize;
+    info!("starting sprout with threshold {thresh}");
+
+    // while there are positive sample words that are escaping
+    let mut pos_sets = vec![];
+    let mut neg_sets = vec![];
+    let mut mut_sample = sample.clone();
+    'outer: while let Some(escape_prefix) =
+        length_lexicographical_sort(ts.escape_prefixes(mut_sample.positive_words()).collect())
+            .first()
+    {
+        // WARN TODO should find a way to either pass or globally set timeout
+        if time_start.elapsed() >= std::time::Duration::from_secs(60 * 30) {
+            warn!(
+                "task exceeded timeout, aborting with automaton of size {}",
+                ts.size()
+            );
+            return Err(SproutError::Timeout(ts));
+        }
+        let u = escape_prefix[..escape_prefix.len() - 1].to_string();
+        let a = escape_prefix.chars().last().expect("empty escape prefix");
+        // check thresh
+        if (u.len() as isize) - 1 > thresh {
+            // compute default automaton
+            return Err(SproutError::Threshold(
+                thresh as usize,
+                acc_type.default_automaton(&sample),
+                ts,
+            ));
+        }
+        let source = ts.finite_run(&u).unwrap().reached();
+        let mut min_target: Option<u32> = None;
+        let mut min_escapes = sample.words.len() + 1; 
+        for q in ts.state_indices_vec() {
+            // try adding transition
+            ts.add_edge((source, a, Void, q));
+            // continue if consistent
+            let (is_consistent, pos_sets_new, neg_sets_new) =
+                acc_type.consistent(&ts, &mut_sample, pos_sets.clone(), neg_sets.clone());
+            if is_consistent {
+                // save number of escaping words in hash map
+                let num_successful = sample
+                    .words()
+                    .filter(|word| ts.omega_run(word).is_ok())
+                    .count();
+                if num_successful < min_escapes {
+                    min_target = Some(q);
+                    min_escapes = num_successful;
+                }
+            }
+            ts.remove_edges_from_matching(source, a);
+        }
+        if let Some(target) = min_target {
+            // choose consistent target that minimizes escapes
+            ts.add_edge((source, a, Void, target));
+            // and update already known infinity sets
+            let (is_consistent, pos_sets_new, neg_sets_new) =
+                acc_type.consistent(&ts, &mut_sample, pos_sets.clone(), neg_sets.clone());
+            pos_sets = pos_sets_new;
+            neg_sets = neg_sets_new;
+            mut_sample.remove_non_escaping(&ts);
+        } else {
+            // if none consistent add new state
+            let new_state = ts.add_state(Void);
+            ts.add_edge((source, a, Void, new_state));
+        }
+    }
+    Ok(acc_type.consistent_automaton(&ts, &mut_sample, pos_sets, neg_sets))
+}
+
+
 
 /// sort a vector of Strings length lexicographically
 pub fn length_lexicographical_sort(mut words: Vec<String>) -> Vec<String> {
