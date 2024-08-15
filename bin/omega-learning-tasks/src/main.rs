@@ -91,7 +91,7 @@ pub fn run_sprout() {
             let dir = &task_dirs[i];
             info!("task {i} \"{:?}\"", dir.to_string_lossy());
             // check if task was already computed
-            if dir.join("result_og.csv").exists() {
+            if dir.join("result.csv").exists() {
                 info!("Already computed. Skip.");
                 return;
             }
@@ -108,7 +108,7 @@ pub fn run_sprout() {
                             elapsed.as_millis()
                         );
                         export_automaton(
-                            format!("{}/learned_og.hoa", dir.to_str().unwrap()),
+                            format!("{}/learned.hoa", dir.to_str().unwrap()),
                             &learned,
                         );
                         export_sprout_result(dir, &learned, elapsed);
@@ -119,7 +119,7 @@ pub fn run_sprout() {
                             dir.to_string_lossy(),
                             ts.size(),
                         );
-                        let mut wtr = Writer::from_path(dir.join("result_og.csv"))
+                        let mut wtr = Writer::from_path(dir.join("result.csv"))
                             .expect("creating file failed");
                         wtr.write_record(["timeout_size", &format!("{}", ts.size())])
                             .unwrap();
@@ -150,7 +150,7 @@ pub fn run_sprout() {
                             elapsed.as_millis()
                         );
                         export_automaton(
-                            format!("{}/learned_og.hoa", dir.to_str().unwrap()),
+                            format!("{}/learned.hoa", dir.to_str().unwrap()),
                             &learned,
                         );
                         export_sprout_result(dir, &learned, elapsed);
@@ -161,7 +161,7 @@ pub fn run_sprout() {
                             dir.to_string_lossy(),
                             ts.size(),
                         );
-                        let mut wtr = Writer::from_path(dir.join("result_og.csv"))
+                        let mut wtr = Writer::from_path(dir.join("result.csv"))
                             .expect("creating file failed");
                         wtr.write_record(["timeout_size", &format!("{}", ts.size())])
                             .unwrap();
@@ -175,7 +175,7 @@ pub fn run_sprout() {
                             ts.size(),
                         );
                         export_automaton(
-                            format!("{}/learned_og.hoa", dir.to_str().unwrap()),
+                            format!("{}/learned.hoa", dir.to_str().unwrap()),
                             &learned,
                         );
                         export_sprout_result(dir, &learned, elapsed);
@@ -744,10 +744,10 @@ pub fn export_sprout_result<Z, C>(
 
     let path_str = task_dir.to_str().unwrap();
     scored_pos.extend(scored_neg);
-    export_labelled_set(format!("{}/test_learned_og.csv", path_str), &scored_pos);
+    export_labelled_set(format!("{}/test_learned.csv", path_str), &scored_pos);
 
     // export %correct, %pos/neg correct, aut size in result file
-    let mut wtr = Writer::from_path(task_dir.join("result_og.csv")).expect("creating file failed");
+    let mut wtr = Writer::from_path(task_dir.join("result.csv")).expect("creating file failed");
     wtr.write_record(["learned_aut_size", &format!("{}", learned.size())])
         .unwrap();
     wtr.write_record(["scored_correct", &format!("{total_correct}")])
