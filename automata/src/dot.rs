@@ -4,6 +4,8 @@ use std::fmt::{Debug, Display};
 
 use crate::prelude::*;
 use itertools::Itertools;
+use layout::backends::svg::SVGWriter;
+use tracing::trace;
 
 fn sanitize_dot_ident(name: &str) -> String {
     name.chars()
@@ -23,6 +25,40 @@ fn sanitize_dot_ident(name: &str) -> String {
 }
 
 pub trait Dottable: TransitionSystem {
+    fn try_svg(&self) -> Result<String, String> {
+        let dot = self.dot_representation();
+        let mut parser = layout::gv::parser::DotParser::new(&dot);
+
+        let graph = parser.process()?;
+
+        let mut builder = layout::gv::GraphBuilder::new();
+        builder.visit_graph(&graph);
+
+        let mut visual_graph = builder.get();
+
+        let mut svg = SVGWriter::new();
+        visual_graph.do_it(false, false, false, &mut svg);
+        Ok(svg.finalize())
+    }
+
+    fn try_data_url(&self) -> Result<String, String> {
+        Ok(format!(
+            "data:image/svg+xml;base64,{}",
+            base64::Engine::encode(
+                &base64::prelude::BASE64_STANDARD_NO_PAD,
+                self.try_svg()?
+                    .strip_prefix(r#"<?xml version="1.0" encoding="UTF-8" standalone="no"?>"#)
+                    .unwrap()
+            ),
+        ))
+    }
+
+    fn try_open_svg(&self) -> Result<(), String> {
+        let url = self.try_data_url()?;
+        trace!("opening data url\n{url}");
+        open::with(url, "firefox").map_err(|e| e.to_string())
+    }
+
     /// Compute the graphviz representation, for more information on the DOT format,
     /// see the [graphviz documentation](https://graphviz.org/doc/info/lang.html).
     fn dot_representation(&self) -> String {
@@ -651,9 +687,9 @@ mod tests {
         todo!("Learn how to render FORC!")
     }
 
-    #[test]
+    #[test_log::test]
     #[ignore]
-    fn dot_render_dpa() {
+    fn svg_open_dpa() {
         let dpa = TSBuilder::without_state_colors()
             .with_edges([
                 (0, 'a', 1, 0),
@@ -662,6 +698,6 @@ mod tests {
                 (1, 'b', 2, 0),
             ])
             .into_dpa(0);
-        dpa.display_rendered().unwrap();
+        dpa.try_open_svg().unwrap();
     }
 }
