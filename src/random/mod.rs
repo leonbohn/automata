@@ -10,7 +10,7 @@ use tracing::{debug, info};
 /// of a back edge to some state being inserted. The algorithm is as follows:
 /// 1. Start with a single state.
 /// 2. For each symbol, go through the existing states in order and with probability `probability`
-///   add a back edge that state.
+///    add a back edge that state.
 /// 3. If no back edge to some state was added, we insert an edge to a new state.
 /// 4. Repeat until all states and symbols have been treated.
 pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, StateIndex<DTS>) {
@@ -94,6 +94,7 @@ pub fn generate_random_moore(symbols: usize, max_color: usize, size: usize) -> M
 /// The algorithm is as follows:
 /// 1. Start with `size` states and no transitions.
 /// 2. For each state, for each symbol draw a target state and add the corresponding edge
+///
 /// Note that depending on which state is chosen as the initial state, there may be unreachable states.
 pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, StateIndex<DTS>) {
     assert!(size > 0);
