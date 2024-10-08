@@ -176,8 +176,6 @@ The different feature flagst that can be enabled/disabled are
 - `hoa` which enables input and output of HOA files, using the [hoars](https://github.com/leonbohn/hoars) library
 - `random` allowing generation of random transition systems
 - `graphviz` through which DOT representation of transition systems/automata can be generated and visualised
-By default, all features are enabled.
-
 
 ## Development
 Any and every help is always welcome.
