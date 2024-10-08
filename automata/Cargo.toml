@@ -31,13 +31,11 @@ thiserror = { workspace = true }
 automata-core = { version = "0.1.0", path = "../automata-core" }
 hoars = { version = "0.2.0", optional = true, path = "../hoars" }
 
-tabled = { version = "0.15", features = ["ansi"] }
-
 layout-rs = { version = "0.1.2", optional = true }
-open = { version = "5.2.0", optional = true }
+open = { version = "5.3.0", optional = true }
 base64 = { version = "0.22.1", optional = true }
 
-owo-colors = "4.0"
+owo-colors = "4.1"
 test-log = { version = "0.2", features = ["trace"] }
 tempfile = { version = "3.13", optional = true }
 bit-set = "0.6"

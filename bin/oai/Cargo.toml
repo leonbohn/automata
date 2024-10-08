@@ -8,4 +8,4 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 automata = { path = "../../automata" }
-clap = "4.5.19"
+clap = "4.5.20"
