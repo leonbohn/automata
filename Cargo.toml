@@ -15,3 +15,4 @@ bimap = "0.6"
 rand = "0.8.5"
 thiserror = "1.0"
 crossbeam-channel = "0.5.13"
+tabled = { version = "0.16", features = ["ansi"] }
