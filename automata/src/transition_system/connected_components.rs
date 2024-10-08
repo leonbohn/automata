@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use itertools::Itertools;
 use tracing::trace;
 
@@ -13,7 +15,7 @@ mod tarjan_dag;
 pub use tarjan_dag::TarjanDAG;
 
 /// Represents a decomposition of a transition system into strongly connected components.
-#[derive(Clone, Hash)]
+#[derive(Clone)]
 pub struct SccDecomposition<'a, Ts: TransitionSystem>(&'a Ts, Vec<Scc<'a, Ts>>);
 
 impl<'a, Ts: TransitionSystem> std::ops::Deref for SccDecomposition<'a, Ts> {
@@ -90,6 +92,12 @@ impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
                 .map(|scc| format!("[{}]", scc.iter().map(|q| format!("{q:?}")).join(", ")))
                 .join(", "),
         )
+    }
+}
+
+impl<'a, Ts: TransitionSystem> Hash for SccDecomposition<'a, Ts> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.1.hash(state)
     }
 }
 

@@ -1,11 +1,11 @@
 [package]
-name = "oai"
+name = "incong"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+itertools = { workspace = true }
 
 automata = { path = "../../automata" }
-clap = "4.5.19"

@@ -170,9 +170,9 @@ pub trait Deterministic: TransitionSystem {
 
     /// Runs the given `word` on the transition system, starting from the initial state. The result is
     /// - [`Ok`] if the run is successful (i.e. for all symbols of `word` a suitable transition
-    ///  can be taken),
+    ///   can be taken),
     /// - [`Err`] if the run is unsuccessful, meaning a symbol is encountered for which no
-    /// transition exists.
+    ///   transition exists.
     ///
     /// It returns a [`crate::transition_system::path::PathIn`] in either case, which is a path in the transition system. So it is possible
     /// to inspect the path, e.g. to find out which state was reached or which transitions were taken.
@@ -190,9 +190,9 @@ pub trait Deterministic: TransitionSystem {
 
     /// Runs the given `word` on the transition system, starting from `state`. The result is
     /// - [`Ok`] if the run is successful (i.e. for all symbols of `word` a suitable transition
-    ///  can be taken),
+    ///   can be taken),
     /// - [`Err`] if the run is unsuccessful, meaning a symbol is encountered for which no
-    /// transition exists.
+    ///   transition exists.
     #[allow(clippy::type_complexity)]
     #[inline(always)]
     fn finite_run_from<W, O>(

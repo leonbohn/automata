@@ -20,6 +20,9 @@ pub use omega::{OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, ReducedParseErro
 mod repeat;
 pub use repeat::Repeat;
 
+mod rotate;
+pub use rotate::Rotate;
+
 pub use self::skip::Infix;
 
 /// A linear word is a word that can be indexed by a `usize`. This is the case for both finite and

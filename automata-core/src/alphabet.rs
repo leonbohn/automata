@@ -12,7 +12,7 @@ pub use propositional::*;
 /// of alphabets:
 /// - [`CharAlphabet`] alphabets, which are just a set of symbols.
 /// - Propositional alphabets, where a symbol is a valuation of all propositional variables. This is for example
-/// implemented in the `hoars` crate.
+///   implemented in the `hoars` crate.
 pub trait Symbol: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show {}
 impl<S: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show> Symbol for S {}
 

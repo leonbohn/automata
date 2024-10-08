@@ -9,6 +9,8 @@ mod show;
 
 pub mod dag;
 
+pub mod kleene;
+
 /// Alias for the default integer type that is used for coloring edges and states.
 pub type Int = u8;
 
@@ -33,6 +35,7 @@ pub mod prelude {
     pub use super::{Int, Void};
     pub use crate::alphabet;
     pub use crate::alphabet::{Alphabet, CharAlphabet, Expression, Matcher, Symbol};
+    pub use crate::kleene::KleeneStar;
     pub use crate::upw;
     pub use crate::word::{
         self, FiniteWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, Word,
