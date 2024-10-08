@@ -628,6 +628,7 @@ impl<Q, C, const DET: bool> LinkedListTransitionSystem<CharAlphabet, Q, C, DET> 
     /// - From state 0 to state 1 on symbol 'b'
     /// - From state 1 to state 1 on symbol 'a'
     /// - From state 1 to state 0 on symbol 'b'
+    ///
     /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
     /// ```
     /// use automata::prelude::*;

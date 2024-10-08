@@ -177,6 +177,12 @@ impl<S: Symbol> TryFrom<ReducedOmegaWord<S>> for PeriodicOmegaWord<S> {
     }
 }
 
+impl<S: Show> Show for PeriodicOmegaWord<S> {
+    fn show(&self) -> String {
+        self.representation.show()
+    }
+}
+
 impl<S: Symbol> From<PeriodicOmegaWord<S>> for ReducedOmegaWord<S> {
     fn from(value: PeriodicOmegaWord<S>) -> Self {
         Self::periodic(value.representation)
@@ -216,6 +222,11 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     /// Gives a reference to the underlying representation of the word.
     pub fn representation(&self) -> &[S] {
         &self.representation
+    }
+
+    /// Gives a mutable reference to the underlying representation of the word.
+    pub fn representation_mut(&mut self) -> &mut [S] {
+        &mut self.representation
     }
 }
 
