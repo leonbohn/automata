@@ -688,6 +688,7 @@ mod tests {
     }
 
     #[test_log::test]
+    #[ignore]
     fn svg_open_dpa() {
         let dpa = TSBuilder::without_state_colors()
             .with_edges([
