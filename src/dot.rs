@@ -239,7 +239,7 @@ pub trait Dottable: TransitionSystem {
     /// On Macos, the Preview app is used, while on Linux and Windows, the image viewer
     /// can be configured by setting the `IMAGE_VIEWER` environment variable. If it is not set,
     /// then the display command of ImageMagick will be used.
-    #[cfg(feature = "render")]
+    #[cfg(feature = "graphviz")]
     fn display_rendered_graphviz(&self) -> Result<(), RenderError> {
         display_png(self.render_graphviz()?)?;
 
