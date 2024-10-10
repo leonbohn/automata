@@ -61,6 +61,8 @@ pub mod prelude {
     use crate::transition_system::LinkedListTransitionSystem;
 }
 
+mod family;
+
 pub use automata_core::math;
 use std::{fmt::Debug, hash::Hash};
 
