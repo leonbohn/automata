@@ -137,10 +137,9 @@ pub trait Dottable: TransitionSystem {
     /// using the `render` crate. Subsequently, this SVG is rendered through the
     /// `resvg` crate, resulting in a PNG of the graph.
     #[cfg(feature = "render")]
-    fn render_native(&self) -> Result<Vec<u8>, RenderError> {
+    fn render(&self) -> Result<Vec<u8>, RenderError> {
         use resvg::usvg::{self, Transform};
         let svg = self.try_svg()?;
-        tracing::trace!("trying to render SVG:\n{}", svg);
 
         let mut svg_options = usvg::Options::default();
         svg_options.fontdb_mut().load_system_fonts();
@@ -247,8 +246,8 @@ pub trait Dottable: TransitionSystem {
     }
     /// See [`Self::display_rendered`] but with a native rendering backend.
     #[cfg(feature = "render")]
-    fn display_rendered_native(&self) -> Result<(), RenderError> {
-        display_png(self.render_native()?)?;
+    fn display_rendered(&self) -> Result<(), RenderError> {
+        display_png(self.render()?)?;
 
         Ok(())
     }
@@ -543,7 +542,7 @@ mod tests {
             ])
             .with_state_colors([false, true])
             .into_dfa(0);
-        dfa.display_rendered_native().unwrap();
+        dfa.display_rendered().unwrap();
     }
 
     #[test]

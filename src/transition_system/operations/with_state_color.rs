@@ -47,6 +47,13 @@ impl<Idx: Hash + Eq, C: Color> ProvidesStateColor<Idx> for math::Map<Idx, C> {
     }
 }
 
+impl<Idx, C: Color, F: Fn(Idx) -> C> ProvidesStateColor<Idx> for F {
+    type Color = C;
+    fn state_color(&self, state: Idx) -> Self::Color {
+        (self)(state)
+    }
+}
+
 /// Augments a [`math::Map`] with a default color for missing
 /// entries. This struct implements [`ProvidesStateColor`] and
 /// wrapping an incomplete map is its only purpose.
