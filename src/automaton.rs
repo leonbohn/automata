@@ -113,6 +113,34 @@ where
         Self::from_parts(ts, initial)
     }
 
+    /// Uses `Self::new_with_initial_color` to create a new instance of
+    /// `Self` and then makes all transitions self-loops emitting the given
+    /// color.
+    pub fn new_trivial_with_initial_color(
+        alphabet: A,
+        initial_color: Q,
+        edge_color: C,
+    ) -> Automaton<A, Z, Q, C, D, OMEGA, DET>
+    where
+        D: ForAlphabet<A> + Sproutable,
+        Z: Default,
+        C: Clone,
+    {
+        let alph = alphabet.clone();
+        let mut out = Self::new_with_initial_color(alphabet, initial_color);
+
+        let initial = out.initial;
+        for sym in alph.universe() {
+            out.ts.add_edge((
+                initial,
+                alph.make_expression(sym),
+                edge_color.clone(),
+                initial,
+            ));
+        }
+        out
+    }
+
     /// Creates a new automaton from the given transition system and acceptance condition.
     pub fn from_parts_with_acceptance(ts: D, initial: D::StateIndex, acceptance: Z) -> Self {
         Self {

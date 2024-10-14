@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use tracing::trace;
 
-use crate::prelude::*;
+use crate::{congruence::StateNaming, prelude::*};
 use math::Partition;
 use std::{collections::BTreeSet, hash::Hash};
 
@@ -310,13 +310,14 @@ pub trait TransitionSystem: Sized {
     where
         Self: Sized,
     {
-        self.minimal_representatives_from(from).find_map(|rep| {
-            if rep.state_index() == to {
-                Some(rep.decompose().0)
-            } else {
-                None
-            }
-        })
+        self.minimal_representatives_iter_from(from)
+            .find_map(|rep| {
+                if rep.state_index() == to {
+                    Some(rep.decompose().0)
+                } else {
+                    None
+                }
+            })
     }
 
     /// Gives the size of `self`, which is obtained simply by counting the number of elements yielded by [`Self::state_indices()`].
@@ -575,13 +576,40 @@ pub trait TransitionSystem: Sized {
             .any(|s| s == state)
     }
 
+    /// Gives a canonical state naming for the states of `self`, based
+    /// on the minimal repesentatives of the states.
+    fn canonical_naming(&self) -> StateNaming<Self>
+    where
+        Self: Sized + Pointed,
+    {
+        self.canonical_naming_from(self.initial())
+    }
+
+    /// Gives a canonical state naming for the states of `self` with
+    /// respect to the given starting state. See [`Self::canonical_naming`].
+    fn canonical_naming_from(&self, origin: StateIndex<Self>) -> StateNaming<Self>
+    where
+        Self: Sized + Pointed,
+    {
+        StateNaming::from_iter(self.minimal_representatives_iter_from(origin))
+    }
+
     /// Returns an iterator over the minimal representative (i.e. length-lexicographically minimal
     /// word reaching the state) of each state that is reachable from the initial state.
-    fn minimal_representatives(&self) -> LengthLexicographicMinimalRepresentatives<'_, Self>
+    fn minimal_representatives_iter(&self) -> LengthLexicographicMinimalRepresentatives<'_, Self>
     where
         Self: Sized + Pointed,
     {
         LengthLexicographicMinimalRepresentatives::new(self, self.initial())
+    }
+
+    /// Returns an iterator over the minimal representatives (i.e. length-lexicographically minimal
+    /// word reaching the state) of each state that is reachable from the given `state`.
+    fn minimal_representatives_iter_from(
+        &self,
+        state: StateIndex<Self>,
+    ) -> LengthLexicographicMinimalRepresentatives<'_, Self> {
+        LengthLexicographicMinimalRepresentatives::new(self, state)
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the initial state. The iterator yields tuples
@@ -600,15 +628,6 @@ pub trait TransitionSystem: Sized {
     {
         self.reachable_states()
             .map(|q| self.state_color(q).unwrap())
-    }
-
-    /// Returns an iterator over the minimal representatives (i.e. length-lexicographically minimal
-    /// word reaching the state) of each state that is reachable from the given `state`.
-    fn minimal_representatives_from(
-        &self,
-        state: StateIndex<Self>,
-    ) -> LengthLexicographicMinimalRepresentatives<'_, Self> {
-        LengthLexicographicMinimalRepresentatives::new(self, state)
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the initial state.

@@ -125,7 +125,8 @@ where
     {
         let other_initial = other.initial();
         let prod = self.ts_product(other);
-        for mr in prod.minimal_representatives_from(ProductIndex(self.initial, other_initial)) {
+        for mr in prod.minimal_representatives_iter_from(ProductIndex(self.initial, other_initial))
+        {
             let (c, d) = prod.state_color(mr.state_index()).unwrap();
             if c != d {
                 return Some(mr.decompose().0);

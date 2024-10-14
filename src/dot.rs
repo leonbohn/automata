@@ -1,35 +1,42 @@
 #![allow(missing_docs)]
 
 use std::fmt::{Debug, Display};
+use thiserror::Error;
 
 use crate::prelude::*;
 use itertools::Itertools;
-use layout::backends::svg::SVGWriter;
-use tracing::trace;
 
-fn sanitize_dot_ident(name: &str) -> String {
-    name.chars()
-        .filter_map(|chr| match chr {
-            c if c.is_alphanumeric() => Some(c),
-            '|' => Some('_'),
-            '(' => None,
-            ')' => None,
-            '[' => None,
-            ']' => None,
-            ':' => Some('_'),
-            ',' => Some('_'),
-            w if w.is_whitespace() => None,
-            u => panic!("unexpected symbol {u} in identifier \"{name}\""),
-        })
-        .join("")
+#[cfg(feature = "render")]
+#[derive(Error, Debug)]
+pub enum RenderError {
+    #[error("encountered SVG rendering error: \"{0:?}\"")]
+    // we let `thiserror` implement From<resvg::usvg::Error>
+    SvgError(#[from] resvg::usvg::Error),
+    #[error("could not allocate pixmap")]
+    PixmapAllocationError,
+    #[error("could not encode PNG: \"{0:?}\"")]
+    PngEncodingError(String),
+    #[error("error when displaying PNG: \"{0:?}\"")]
+    PngDisplayError(#[from] std::io::Error),
+    #[error("could not render to SVG: \"{0}\"")]
+    RenderToSvgError(String),
+    #[error("Could not create VSVG document: \"{0}\"")]
+    VsvgDocumentError(String),
+    #[error("Child process had non-zero exit status \"{0}\"")]
+    NonZeroExit(std::process::ExitStatus),
 }
 
 pub trait Dottable: TransitionSystem {
-    fn try_svg(&self) -> Result<String, String> {
+    #[cfg(feature = "render")]
+    fn try_svg(&self) -> Result<String, RenderError> {
+        use layout::backends::svg::SVGWriter;
         let dot = self.dot_representation();
+
+        tracing::trace!("produced DOT representation\n{}", dot);
+
         let mut parser = layout::gv::parser::DotParser::new(&dot);
 
-        let graph = parser.process()?;
+        let graph = parser.process().map_err(RenderError::RenderToSvgError)?;
 
         let mut builder = layout::gv::GraphBuilder::new();
         builder.visit_graph(&graph);
@@ -38,10 +45,12 @@ pub trait Dottable: TransitionSystem {
 
         let mut svg = SVGWriter::new();
         visual_graph.do_it(false, false, false, &mut svg);
+
         Ok(svg.finalize())
     }
 
-    fn try_data_url(&self) -> Result<String, String> {
+    #[cfg(feature = "render")]
+    fn try_data_url(&self) -> Result<String, RenderError> {
         Ok(format!(
             "data:image/svg+xml;base64,{}",
             base64::Engine::encode(
@@ -53,10 +62,11 @@ pub trait Dottable: TransitionSystem {
         ))
     }
 
-    fn try_open_svg(&self) -> Result<(), String> {
+    #[cfg(feature = "render")]
+    fn try_open_svg_in_firefox(&self) -> Result<(), RenderError> {
         let url = self.try_data_url()?;
-        trace!("opening data url\n{url}");
-        open::with(url, "firefox").map_err(|e| e.to_string())
+        tracing::info!("opening data url\n{url}");
+        Ok(open::with(url, "firefox")?)
     }
 
     /// Compute the graphviz representation, for more information on the DOT format,
@@ -121,11 +131,38 @@ pub trait Dottable: TransitionSystem {
     ) -> impl IntoIterator<Item = DotStateAttribute> {
         []
     }
+
+    /// Renders the object visually (as PNG) and returns a vec of bytes/u8s encoding
+    /// the rendered image. It does so by first producing an SVG from the DOT representation
+    /// using the `render` crate. Subsequently, this SVG is rendered through the
+    /// `resvg` crate, resulting in a PNG of the graph.
+    #[cfg(feature = "render")]
+    fn render(&self) -> Result<Vec<u8>, RenderError> {
+        use resvg::usvg::{self, Transform};
+        let svg = self.try_svg()?;
+
+        let mut svg_options = usvg::Options::default();
+        svg_options.fontdb_mut().load_system_fonts();
+        let tree = usvg::Tree::from_str(&svg, &svg_options)?;
+
+        let size = tree.size().to_int_size();
+        let Some(mut pixmap) = resvg::tiny_skia::Pixmap::new(size.width(), size.height()) else {
+            return Err(RenderError::PixmapAllocationError);
+        };
+
+        pixmap.fill(resvg::tiny_skia::Color::WHITE);
+        resvg::render(&tree, Transform::identity(), &mut pixmap.as_mut());
+
+        pixmap
+            .encode_png()
+            .map_err(|e| RenderError::PngEncodingError(format!("{:?}", e)))
+    }
+
     /// Renders the object visually (as PNG) and returns a vec of bytes/u8s encoding
     /// the rendered image. This method is only available on the `graphviz` crate feature
     /// and makes use of temporary files.
     #[cfg(feature = "graphviz")]
-    fn render(&self) -> Result<Vec<u8>, std::io::Error> {
+    fn render_graphviz(&self) -> Result<Vec<u8>, RenderError> {
         use std::io::{Read, Write};
 
         use tracing::trace;
@@ -149,10 +186,7 @@ pub trait Dottable: TransitionSystem {
 
         let status = child.wait()?;
         if !status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("dot process exited with status: {}", status),
-            ));
+            return Err(RenderError::NonZeroExit(status));
         }
 
         Ok(output)
@@ -198,15 +232,23 @@ pub trait Dottable: TransitionSystem {
 
     /// First creates a rendered PNG using [`Self::render()`], after which the rendered
     /// image is displayed via by using a locally installed image viewer.
-    /// This method is only available on the `graphviz` crate feature.
+    /// This method is only available on the `render` crate feature.
     ///
     /// # Image viewer
     /// On Macos, the Preview app is used, while on Linux and Windows, the image viewer
     /// can be configured by setting the `IMAGE_VIEWER` environment variable. If it is not set,
     /// then the display command of ImageMagick will be used.
     #[cfg(feature = "graphviz")]
-    fn display_rendered(&self) -> Result<(), std::io::Error> {
+    fn display_rendered_graphviz(&self) -> Result<(), RenderError> {
+        display_png(self.render_graphviz()?)?;
+
+        Ok(())
+    }
+    /// See [`Self::display_rendered`] but with a native rendering backend.
+    #[cfg(feature = "render")]
+    fn display_rendered(&self) -> Result<(), RenderError> {
         display_png(self.render()?)?;
+
         Ok(())
     }
 }
@@ -425,176 +467,12 @@ impl Display for DotTransitionAttribute {
     }
 }
 
-// impl<A: Alphabet, Q: Color + Debug, C: Color + Debug> ToDot for Vec<RightCongruence<A, Q, C>>
-// where
-//     A::Symbol: Display,
-//     Q: DotStateColorize,
-//     DotTransitionInfo<C, A>: DotTransition,
-// {
-//     fn dot_representation(&self) -> String {
-//         format!("digraph A {{\n{}\n{}\n}}\n", self.header(), self.body(""),)
-//     }
-
-//     fn header(&self) -> String {
-//         [
-//             "compound=true".to_string(),
-//             "fontname=\"Helvetica,Arial,sans-serif\"\nrankdir=LR".to_string(),
-//             "init [label=\"\", shape=none]".into(),
-//             "node [shape=rect]".into(),
-//         ]
-//         .join("\n")
-//     }
-
-//     fn body(&self, _prefix: &str) -> String {
-//         self.iter()
-//             .enumerate()
-//             .map(|(i, cong)| {
-//                 format!(
-//                     "subgraph cluster_{} {{\n{}\n{}\n}}\n",
-//                     i,
-//                     cong.header(),
-//                     cong.body(&format!("{i}"))
-//                 )
-//             })
-//             .join("\n")
-//     }
-// }
-
-// impl<A: Alphabet, Q: Color + Debug, C: Color + Debug> ToDot for FORC<A, Q, C>
-// where
-//     A::Symbol: Display,
-//     Q: DotStateColorize,
-//     DotTransitionInfo<C, A>: DotTransition,
-// {
-//     fn dot_representation(&self) -> String {
-//         format!("digraph A {{\n{}\n{}\n}}\n", self.header(), self.body(""),)
-//     }
-
-//     fn header(&self) -> String {
-//         [
-//             "compund=true".to_string(),
-//             "fontname=\"Helvetica,Arial,sans-serif\"\nrankdir=LR".to_string(),
-//             "init [label=\"\", shape=none]".into(),
-//             "node [shape=rect]".into(),
-//         ]
-//         .join("\n")
-//     }
-
-//     fn body(&self, _prefix: &str) -> String {
-//         let mut lines = self
-//             .progress
-//             .iter()
-//             .map(|(class, prc)| {
-//                 format!(
-//                     "subgraph cluster_{} {{\n{}\n{}\n}}\n",
-//                     self.leading()
-//                         .state_color(*class)
-//                         .unwrap()
-//                         .class()
-//                         .mr_to_string(),
-//                     prc.header(),
-//                     prc.body(&class.to_string())
-//                 )
-//             })
-//             .collect_vec();
-
-//         lines.push("init [label=\"\", shape=none]".to_string());
-//         let eps_prc = self
-//             .prc(&Class::epsilon())
-//             .expect("Must have at least the epsilon prc");
-//         lines.push(format!(
-//             "init -> \"{},init\" [style=\"solid\"]",
-//             eps_prc
-//                 .state_color(eps_prc.initial())
-//                 .expect("State should have a color")
-//         ));
-
-//         for state in self.leading.state_indices() {
-//             for sym in self.leading.alphabet().universe() {
-//                 if let Some(edge) = self.leading.transition(state, sym) {
-//                     let _source_prc = self
-//                         .prc(
-//                             self.leading
-//                                 .state_color(state)
-//                                 .expect("State should be colored")
-//                                 .class(),
-//                         )
-//                         .expect("Must have a prc for every state");
-//                     let _target_prc = self
-//                         .prc(
-//                             self.leading
-//                                 .state_color(edge.target())
-//                                 .expect("State should be colored")
-//                                 .class(),
-//                         )
-//                         .expect("Must have a prc for every state");
-//                     lines.push(format!(
-//                         "\"{},init\" -> \"{},init\" [label = \"{}\", style=\"dashed\", ltail=\"cluster_{}\", lhead=\"cluster_{}\"]",
-//                         self.leading.state_color(state).expect("State should be colored"),
-//                         self.leading.state_color(edge.target()).expect("State should be colored"),
-//                         sym,
-//                         self.leading.state_color(state).expect("State should be colored").class().mr_to_string(),
-//                         self.leading.state_color(edge.target()).expect("State should be colored").class().mr_to_string()
-//                     ));
-//                 }
-//             }
-//         }
-
-//         lines.join("\n")
-//     }
-// }
-
-/// Renders the given dot string to a png file and displays it using the default
-/// image viewer on the system.
-#[cfg(feature = "graphviz")]
-pub fn display_dot(dot: &str) -> Result<(), std::io::Error> {
-    display_png(render_dot_to_tempfile(dot)?)
-}
-
-#[cfg(feature = "graphviz")]
-fn render_dot_to_tempfile(dot: &str) -> Result<Vec<u8>, std::io::Error> {
-    use std::{io::Write, process::Stdio};
-
-    let mut tempfile = tempfile::NamedTempFile::new()?;
-    tempfile.write_all(dot.as_bytes())?;
-
-    let mut child = std::process::Command::new("dot")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .arg("-Tpng")
-        .spawn()?;
-
-    let mut stdin = child.stdin.take().expect("Could not get handle to stdin");
-    stdin.write_all(dot.as_bytes())?;
-
-    match child.wait_with_output() {
-        Ok(res) => {
-            if res.status.success() {
-                Ok(res.stdout)
-            } else {
-                let stderr_output =
-                    String::from_utf8(res.stderr).expect("could not parse stderr of dot");
-                tracing::error!("Could not render, dot reported\n{}", &stderr_output);
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    stderr_output,
-                ))
-            }
-        }
-        Err(e) => {
-            let e = format!("Could not create dot child process\n{}", e);
-            tracing::error!("{e}");
-            Err(std::io::Error::other(e))
-        }
-    }
-}
-
 /// Displays a png given as a vector of bytes by calling an image viewer.
 /// On Macos, that is the Preview app, while on Linux and Windows this can be configured by
 /// setting the IMAGE_VIEWER environment variable. If it is not set, then the display command
 /// of ImageMagick will be used.
-#[cfg(feature = "graphviz")]
-fn display_png(contents: Vec<u8>) -> std::io::Result<()> {
+#[cfg(feature = "render")]
+fn display_png(contents: Vec<u8>) -> Result<(), RenderError> {
     use std::{io::Write, process::Stdio};
 
     use tracing::trace;
@@ -603,18 +481,16 @@ fn display_png(contents: Vec<u8>) -> std::io::Result<()> {
 
         std::process::Command::new(image_viewer)
             .stdin(Stdio::piped())
-            .spawn()
-            .unwrap()
+            .spawn()?
     } else if cfg!(target_os = "macos") {
         std::process::Command::new("open")
             .arg("-a")
             .arg("Preview.app")
             .arg("-f")
             .stdin(Stdio::piped())
-            .spawn()
-            .unwrap()
+            .spawn()?
     } else {
-        unreachable!("Platform not supported!")
+        unreachable!("Platform not supported! please open a ticket")
     };
 
     let mut stdin = child.stdin.take().unwrap();
@@ -631,15 +507,32 @@ fn display_png(contents: Vec<u8>) -> std::io::Result<()> {
     Ok(())
 }
 
+fn sanitize_dot_ident(name: &str) -> String {
+    name.chars()
+        .filter_map(|chr| match chr {
+            c if c.is_alphanumeric() => Some(c),
+            '|' => Some('_'),
+            '(' => None,
+            ')' => None,
+            '[' => None,
+            ']' => None,
+            ':' => Some('_'),
+            ',' => Some('_'),
+            w if w.is_whitespace() => None,
+            u => panic!("unexpected symbol {u} in identifier \"{name}\""),
+        })
+        .join("")
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{congruence::FORC, prelude::*};
+    use crate::prelude::*;
 
-    use super::Dottable;
-
-    #[test]
+    #[test_log::test]
+    #[cfg(feature = "render")]
     #[ignore]
     fn render_dfa() {
+        use super::Dottable;
         let dfa = DTS::builder()
             .with_transitions([
                 (0, 'a', Void, 0),
@@ -655,11 +548,11 @@ mod tests {
     #[test]
     #[ignore]
     fn display_forc() {
-        let cong = TSBuilder::without_colors()
+        let _cong = TSBuilder::without_colors()
             .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
             .into_right_congruence(0);
 
-        let prc_e = TSBuilder::without_colors()
+        let _prc_e = TSBuilder::without_colors()
             .with_edges([
                 (0, 'a', 1),
                 (0, 'b', 2),
@@ -670,7 +563,7 @@ mod tests {
             ])
             .into_right_congruence(0);
 
-        let prc_a = TSBuilder::without_colors()
+        let _prc_a = TSBuilder::without_colors()
             .with_edges([
                 (0, 'a', 1),
                 (0, 'b', 2),
@@ -683,13 +576,15 @@ mod tests {
             ])
             .into_right_congruence(0);
 
-        let _forc = FORC::from_iter(cong, [(0, prc_e), (1, prc_a)].iter().cloned());
+        // let _forc = FORC::from_iter(cong, [(0, prc_e), (1, prc_a)].iter().cloned());
         todo!("Learn how to render FORC!")
     }
 
     #[test_log::test]
     #[ignore]
+    #[cfg(feature = "render")]
     fn svg_open_dpa() {
+        use super::Dottable;
         let dpa = TSBuilder::without_state_colors()
             .with_edges([
                 (0, 'a', 1, 0),
@@ -698,6 +593,6 @@ mod tests {
                 (1, 'b', 2, 0),
             ])
             .into_dpa(0);
-        dpa.try_open_svg().unwrap();
+        dpa.try_open_svg_in_firefox().unwrap();
     }
 }

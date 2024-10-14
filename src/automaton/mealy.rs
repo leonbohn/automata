@@ -74,7 +74,8 @@ where
         other: &IntoMealyMachine<O>,
     ) -> Option<Vec<SymbolOf<C>>> {
         let prod = self.ts_product(other);
-        for rep in prod.minimal_representatives_from(ProductIndex(self.initial, other.initial)) {
+        for rep in prod.minimal_representatives_iter_from(ProductIndex(self.initial, other.initial))
+        {
             let (mut rep, ProductIndex(l, r)) = rep.decompose();
             'edges: for edge in self.edges_from(l).unwrap() {
                 let Some(sym) = edge.expression().symbols().next() else {

@@ -34,6 +34,11 @@ hoars = { version = "0.2.0", optional = true, path = "../hoars" }
 layout-rs = { version = "0.1.2", optional = true }
 open = { version = "5.3.0", optional = true }
 base64 = { version = "0.22.1", optional = true }
+resvg = { version = " 0.44", optional = true }
+usvg = { version = " 0.44", optional = true, features = [
+    "text",
+    "system-fonts",
+] }
 
 owo-colors = "4.1"
 test-log = { version = "0.2", features = ["trace"] }
@@ -43,9 +48,10 @@ clap = { version = "4.5", optional = true }
 rand_distr = { version = "0.4.3", optional = true }
 
 [features]
-default = ["hoa", "graphviz", "random"]
+default = ["hoa", "random", "render"]
 random = ["dep:rand_distr"]
 hoa = ["dep:hoars"]
-graphviz = ["dep:tempfile", "dep:open", "dep:base64", "dep:layout-rs"]
+graphviz = ["dep:tempfile", "dep:open", "render"]
 implementations = []
 petgraph = []
+render = ["dep:layout-rs", "dep:base64", "dep:resvg", "dep:open", "dep:usvg"]
