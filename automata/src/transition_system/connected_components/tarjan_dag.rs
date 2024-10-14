@@ -111,6 +111,15 @@ impl<'a, Ts: TransitionSystem> TarjanDAG<'a, Ts> {
     pub fn size(&self) -> usize {
         self.dag.size()
     }
+
+    /// Returns the number of SCCs which are not transient, meaning an SCC counts towards
+    /// the total if there is at least one transition that starts and ends in it.
+    pub fn proper_size(&self) -> usize {
+        self.dag
+            .iter()
+            .filter(|(_, scc)| scc.is_nontransient())
+            .count()
+    }
 }
 
 impl<'a, Ts: TransitionSystem> From<SccDecomposition<'a, Ts>> for TarjanDAG<'a, Ts> {

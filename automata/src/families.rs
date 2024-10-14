@@ -52,7 +52,14 @@ impl<T: Congruence, X> Family<T, X> {
         (self.leading, self.progress)
     }
     pub(crate) fn from_parts(leading: T, progress: Map<StateIndex<T>, X>) -> Self {
+        assert_eq!(leading.size(), progress.len());
         Self { leading, progress }
+    }
+    pub fn from_iter<I: IntoIterator<Item = (StateIndex<T>, X)>>(leading: T, prog_iter: I) -> Self {
+        Self {
+            leading,
+            progress: prog_iter.into_iter().collect(),
+        }
     }
 }
 
@@ -70,22 +77,10 @@ impl<T: Congruence, X> std::ops::IndexMut<StateIndex<T>> for Family<T, X> {
     }
 }
 
-impl<T: Congruence, X> Family<T, X> {
-    pub fn from(leading: T, progress: Map<StateIndex<T>, X>) -> Self {
-        Self { leading, progress }
-    }
-    pub fn from_iter<I: IntoIterator<Item = (StateIndex<T>, X)>>(leading: T, prog_iter: I) -> Self {
-        Self {
-            leading,
-            progress: prog_iter.into_iter().collect(),
-        }
-    }
-}
-
 impl<A: Alphabet, X> Family<RightCongruence<A>, X> {
     pub fn trivial(alphabet: A, progress: X) -> Self {
         let leading = RightCongruence::new_trivial_with_initial_color(alphabet, Void, Void);
-        Self::from(leading, [(0, progress)].into_iter().collect())
+        Self::from_parts(leading, [(0, progress)].into_iter().collect())
     }
 }
 
