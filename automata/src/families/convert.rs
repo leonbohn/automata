@@ -1,6 +1,5 @@
 use automata_core::{math, prelude::Show};
 use tracing::{trace, warn};
- 
 
 use super::{Alphabet, CollectTs, Deterministic, TransitionSystem, FDFA, FWPM};
 use itertools::Itertools;
@@ -101,7 +100,7 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
                         );
                         if coloring.contains_key(&scc_index) {
                             continue 'inner;
-                        } 
+                        }
 
                         let offset = classifications.get(&scc_index).map(|b| if *b {0 } else {1 }).unwrap_or(0);
                         trace!("using offset {offset}");
@@ -157,7 +156,10 @@ mod tests {
     use automata_core::prelude::CharAlphabet;
 
     use crate::{
-        connected_components::SccIndex, families::{FDFA, FWPM}, prelude::{TSBuilder, DFA}, TransitionSystem
+        connected_components::SccIndex,
+        families::{FDFA, FWPM},
+        prelude::{TSBuilder, DFA},
+        TransitionSystem,
     };
 
     #[test_log::test]
@@ -217,21 +219,27 @@ mod tests {
         let alphabet = CharAlphabet::of_size(2);
         let prc = TSBuilder::without_state_colors()
             .with_edges([
-                (0, 'a', 5, 0), (0, 'b', 5, 1),
-                (1, 'a', 4, 1), (1, 'b', 4, 2),
-                (2, 'a', 3, 2), (2, 'b', 3, 3),
-                (3, 'a', 2, 3), (3, 'b', 2, 4),
-                (4, 'a', 1, 4), (4, 'b', 1, 5),
-                (5, 'a', 0, 5), (5, 'b',0, 5)
+                (0, 'a', 5, 0),
+                (0, 'b', 5, 1),
+                (1, 'a', 4, 1),
+                (1, 'b', 4, 2),
+                (2, 'a', 3, 2),
+                (2, 'b', 3, 3),
+                (3, 'a', 2, 3),
+                (3, 'b', 2, 4),
+                (4, 'a', 1, 4),
+                (4, 'b', 1, 5),
+                (5, 'a', 0, 5),
+                (5, 'b', 0, 5),
             ])
             .into_mealy(0);
         assert_eq!(prc.tarjan_dag().dag().size(), 6);
         let fwpm = FWPM::trivial(alphabet, prc);
-                
+
         let fdfa = FDFA::from(fwpm);
         for no in ["", "bb", "abaabaaaaaaaaaa", "aaaaaabaaaabbbaaaaa"] {
             assert!(!fdfa[0].accepts(no));
-        }        
+        }
         for yes in ["baaaaa", "baabaabaaaaa", "bbbbbaaaa"] {
             assert!(fdfa[0].accepts(yes));
         }
