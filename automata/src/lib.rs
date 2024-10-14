@@ -61,6 +61,9 @@ pub mod prelude {
     use crate::transition_system::LinkedListTransitionSystem;
 }
 
+#[allow(missing_docs)]
+pub mod families;
+
 pub use automata_core::math;
 use std::{fmt::Debug, hash::Hash};
 

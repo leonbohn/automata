@@ -25,10 +25,9 @@ mod tests {
         let forc = split.infer_forc();
         let periodic = split.get(0).unwrap().to_periodic_sample();
 
-        let annotated = AnnotatedCongruence::build(forc.prc(0).unwrap(), &periodic);
+        let annotated = AnnotatedCongruence::build(&forc[0], &periodic);
 
         let coloring = annotated.canonic_coloring();
-        coloring.display_rendered();
 
         // words we expect prio 1 from
         for w in ["b", "bbabbbb", "aaaaaaabb", "babb", "baabbaabbaabbaa"] {

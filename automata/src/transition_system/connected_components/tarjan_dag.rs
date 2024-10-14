@@ -8,7 +8,7 @@ use super::{EdgeColor, Scc, SccDecomposition};
 
 /// Newtype wrapper for storing indices of SCCs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SccIndex(usize);
+pub struct SccIndex(pub usize);
 
 /// Represents a hierarchical view on the SCCs of a transition system. It stores a reference ot the
 /// original transition system and a [`Dag`] of SCCs. The SCCs are stored in topological order, i.e.,
@@ -52,6 +52,11 @@ impl<'a, Ts: TransitionSystem> TarjanDAG<'a, Ts> {
     /// Returns the index of the SCC containing the given state, if it exists.
     pub fn scc_index(&self, state: Ts::StateIndex) -> Option<SccIndex> {
         self.dag.find(|scc| scc.contains(&state)).map(SccIndex)
+    }
+
+    /// Gives a reference to the actual DAG produced by the decomposition.
+    pub fn dag(&self) -> &Dag<Scc<'a, Ts>> {
+        &self.dag
     }
 
     /// Returns the SCC containing the given state, if it exists.
@@ -105,6 +110,15 @@ impl<'a, Ts: TransitionSystem> TarjanDAG<'a, Ts> {
     /// of the DAG.
     pub fn size(&self) -> usize {
         self.dag.size()
+    }
+
+    /// Returns the number of SCCs which are not transient, meaning an SCC counts towards
+    /// the total if there is at least one transition that starts and ends in it.
+    pub fn proper_size(&self) -> usize {
+        self.dag
+            .iter()
+            .filter(|(_, scc)| scc.is_nontransient())
+            .count()
     }
 }
 

@@ -1,8 +1,7 @@
-# `automata`
 This is a library concerned with [transition systems and automata](https://en.wikipedia.org/wiki/Finite-state_machine) for both finite and infinite words.
 Provides datastructures, operations (think product, subset, mapping of edge/state colors, restriction, ...) for transition systems, acceptance conditions, congruence relations as well as some reachability theoretic operations on transition systems in general.
 
-Guaranteed to be incomplete and very much work in progress.
+Guaranteed to be incomplete and very much work in progress (for more than a year yay).
 
 ## Some examples
 are the best way of getting a feel for working with a library which has been set up as is outlined below. Then we create for example a [DFA](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) as follows.
@@ -171,11 +170,15 @@ automata = { git = "https://github.com/leonbohn/automata.git" }
 ```
 
 ### Features
-The different feature flagst that can be enabled/disabled are
-- `oai-bin` is necessary for building the `oai` executable for interatcting with HOA omega automata
-- `hoa` which enables input and output of HOA files, using the [hoars](https://github.com/leonbohn/hoars) library
-- `random` allowing generation of random transition systems
-- `graphviz` through which DOT representation of transition systems/automata can be generated and visualised
+The following features are offered.
+
+| feature name | default value | description |
+| ------- | ------- | ------- | 
+| `hoa` | `true` | enables input and output of HOA files, using the [hoars](https://github.com/leonbohn/hoars) library |
+| `random` | `true` | allows constructing random transition systems with a certain edge probability. |
+| `render` | `true` | Moreover, it allows generating SVG representation of the graph without external dependencies. | 
+| `implementations` | `false` | Offers some additional implementations of the `TransitionSystem` trait, for example `HashSet` based ones |
+| `graphviz` | `false` | through which DOT representation of transition systems/automata can be generated and visualised |
 
 ## Development
 Any and every help is always welcome.
