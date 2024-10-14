@@ -168,7 +168,7 @@ mod tests {
             .into_dfa(0);
 
         assert_eq!(
-            dfa.minimal_representatives_from(0).collect::<Vec<_>>(),
+            dfa.minimal_representatives_iter_from(0).collect::<Vec<_>>(),
             vec![
                 MinimalRepresentative::new("".collect_vec(), 0u32),
                 MinimalRepresentative::new("a".collect_vec(), 1),

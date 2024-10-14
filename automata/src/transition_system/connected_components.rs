@@ -12,7 +12,7 @@ mod tarjan;
 pub use tarjan::{kosaraju, tarjan_scc_iterative, tarjan_scc_iterative_from, tarjan_scc_recursive};
 
 mod tarjan_dag;
-pub use tarjan_dag::TarjanDAG;
+pub use tarjan_dag::{SccIndex, TarjanDAG};
 
 /// Represents a decomposition of a transition system into strongly connected components.
 #[derive(Clone)]
@@ -30,6 +30,12 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     /// Creates a new SCC decomposition from a transition system and a vector of SCCs.
     pub fn new(ts: &'a Ts, sccs: Vec<Scc<'a, Ts>>) -> Self {
         Self(ts, sccs)
+    }
+
+    /// Returns an iterator over all SCCs which are terminal, meaning they have no outgoing
+    /// edges to another SCC.
+    pub fn terminal_sccs(&self) -> impl Iterator<Item = &Scc<'a, Ts>> {
+        self.1.iter().filter(|scc| scc.border_edges().is_empty())
     }
 
     /// Gives the first [`Scc`] in the decomposition. This must exist as we only allow
@@ -65,7 +71,7 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
 
     /// Tests whether two SCC decompositions are isomorphic. This is done by checking whether each
     /// SCC in one decomposition has a matching SCC in the other decomposition.
-    pub fn isomorphic(&self, other: &SccDecomposition<'a, Ts>) -> bool {
+    pub fn equivalent(&self, other: &SccDecomposition<'a, Ts>) -> bool {
         for scc in &self.1 {
             if !other.1.iter().any(|other_scc| scc == other_scc) {
                 trace!("found no scc matching {scc:?} in other");

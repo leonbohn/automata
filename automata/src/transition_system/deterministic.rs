@@ -93,6 +93,16 @@ pub trait Deterministic: TransitionSystem {
         Ok(current_x)
     }
 
+    /// Returns true if on the given state, the word is a loop.
+    fn is_loop_on<W: FiniteWord<Symbol = SymbolOf<Self>>>(
+        &self,
+        state: StateIndex<Self>,
+        word: W,
+    ) -> bool {
+        assert!(self.contains_state_index(state));
+        Some(state) == self.reached_state_index_from(state, word)
+    }
+
     /// Returns just the [`TransitionSystem::StateIndex`] of the successor that is reached on the given `symbol`
     /// from `state`. If no suitable transition exists, `None` is returned.
     ///
@@ -145,7 +155,7 @@ pub trait Deterministic: TransitionSystem {
     where
         Self: Pointed,
     {
-        self.minimal_representatives().find_map(|rep| {
+        self.minimal_representatives_iter().find_map(|rep| {
             if rep.state_index() == q {
                 Some(rep)
             } else {
@@ -160,7 +170,7 @@ pub trait Deterministic: TransitionSystem {
     where
         Self: Pointed,
     {
-        self.minimal_representatives()
+        self.minimal_representatives_iter()
             .flat_map(|rep| {
                 self.symbols()
                     .map(move |a| word::Concat(&rep, [a]).collect_vec())
@@ -523,7 +533,7 @@ pub trait Deterministic: TransitionSystem {
     where
         Self: Pointed,
     {
-        self.size() == self.minimal_representatives().count()
+        self.size() == self.minimal_representatives_iter().count()
     }
 
     /// Attempts to extract the escape prefix of running the given omega word.

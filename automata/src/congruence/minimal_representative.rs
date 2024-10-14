@@ -5,6 +5,37 @@ use itertools::Itertools;
 
 use crate::prelude::*;
 
+/// Represents a bijection between state indices of a transition
+/// system and the minimal representative word.
+pub struct StateNaming<T: TransitionSystem>(math::Bijection<StateIndex<T>, Vec<SymbolOf<T>>>);
+
+impl<T: TransitionSystem> FromIterator<(StateIndex<T>, Vec<SymbolOf<T>>)> for StateNaming<T> {
+    fn from_iter<I: IntoIterator<Item = (StateIndex<T>, Vec<SymbolOf<T>>)>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+impl<T: TransitionSystem> FromIterator<MinimalRepresentative<T>> for StateNaming<T> {
+    fn from_iter<I: IntoIterator<Item = MinimalRepresentative<T>>>(iter: I) -> Self {
+        Self(
+            iter.into_iter()
+                .map(MinimalRepresentative::into_name)
+                .collect(),
+        )
+    }
+}
+
+impl<T: TransitionSystem> std::ops::Deref for StateNaming<T> {
+    type Target = math::Bijection<StateIndex<T>, Vec<SymbolOf<T>>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<T: TransitionSystem> std::ops::DerefMut for StateNaming<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 /// Represents the minimal representative of a state in a deterministic [`TransitionSystem`], which is the length-lexicographically
 /// minimal string with which the state can be reached from the [`Pointed::initial`] state.
 ///
@@ -17,6 +48,14 @@ impl<T: TransitionSystem> MinimalRepresentative<T> {
     /// Returns the state index of the state that this minimal representative represents.
     pub fn state_index(&self) -> StateIndex<T> {
         self.1
+    }
+
+    /// Turns the minimal representative into a state name, which is a pair
+    /// consisting of the state's index and a `Vec` representing the minimal
+    /// representative (i.e. length-lexicographically minimal string on which
+    /// the state is reached).
+    pub fn into_name(self) -> (StateIndex<T>, Vec<SymbolOf<T>>) {
+        (self.1, self.0)
     }
 
     /// Decomposes `self` into its inner vector of symbols and the state index.
@@ -137,7 +176,7 @@ impl<T: TransitionSystem> LazyMinimalRepresentatives<T> {
     ) -> &BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>> {
         self.0.get_or_init(|| {
             let mut map = BiBTreeMap::new();
-            for mr in ts.minimal_representatives_from(initial) {
+            for mr in ts.minimal_representatives_iter_from(initial) {
                 map.insert(mr.state_index(), mr);
             }
 
