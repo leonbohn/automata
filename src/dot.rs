@@ -527,7 +527,7 @@ fn sanitize_dot_ident(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::{congruence::FORC, prelude::*};
+    use crate::prelude::*;
 
     #[test_log::test]
     #[cfg(feature = "render")]
@@ -549,11 +549,11 @@ mod tests {
     #[test]
     #[ignore]
     fn display_forc() {
-        let cong = TSBuilder::without_colors()
+        let _cong = TSBuilder::without_colors()
             .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
             .into_right_congruence(0);
 
-        let prc_e = TSBuilder::without_colors()
+        let _prc_e = TSBuilder::without_colors()
             .with_edges([
                 (0, 'a', 1),
                 (0, 'b', 2),
@@ -564,7 +564,7 @@ mod tests {
             ])
             .into_right_congruence(0);
 
-        let prc_a = TSBuilder::without_colors()
+        let _prc_a = TSBuilder::without_colors()
             .with_edges([
                 (0, 'a', 1),
                 (0, 'b', 2),
@@ -577,7 +577,7 @@ mod tests {
             ])
             .into_right_congruence(0);
 
-        let _forc = FORC::from_iter(cong, [(0, prc_e), (1, prc_a)].iter().cloned());
+        // let _forc = FORC::from_iter(cong, [(0, prc_e), (1, prc_a)].iter().cloned());
         todo!("Learn how to render FORC!")
     }
 

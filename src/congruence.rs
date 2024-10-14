@@ -3,9 +3,6 @@ use crate::prelude::*;
 mod class;
 pub use class::Class;
 
-mod forc;
-pub use forc::FORC;
-
 mod transitionprofile;
 pub use transitionprofile::{Accumulates, RunProfile, RunSignature, TransitionMonoid};
 
@@ -13,7 +10,7 @@ mod cayley;
 pub use cayley::{Cayley, RightCayley};
 
 mod minimal_representative;
-pub use minimal_representative::{LazyMinimalRepresentatives, MinimalRepresentative};
+pub use minimal_representative::{LazyMinimalRepresentatives, MinimalRepresentative, StateNaming};
 
 /// A congruence is a [`TransitionSystem`], which additionally has a distinguished initial state. On top
 /// of that, a congruence does not have any coloring on either states or symbols. This

@@ -68,6 +68,13 @@ impl<D> IntoDFA<D>
 where
     D: Deterministic<StateColor = bool>,
 {
+    /// Returns true if and only if the given state is accepting, i.e.
+    /// colored with `true`. Panics if no state with the given index exists.
+    pub fn is_accepting(&self, state: StateIndex<Self>) -> bool {
+        self.state_color(state)
+            .expect("can only be called for states that exist!")
+    }
+
     /// Returns the indices of all states that are accepting.
     pub fn accepting_states(&self) -> StatesWithColor<'_, Self> {
         StatesWithColor::new(self, true)
@@ -91,7 +98,7 @@ where
     /// Tries to construct a (finite) word witnessing that the accepted language is empty. If such a word exists,
     /// the function returns it, otherwise `None`.
     pub fn give_word(&self) -> Option<Vec<SymbolOf<Self>>> {
-        self.minimal_representatives().find_map(|rep| {
+        self.minimal_representatives_iter().find_map(|rep| {
             if self
                 .state_color(rep.state_index())
                 .expect("Every state must be colored")
@@ -163,7 +170,7 @@ where
 
         self.with_initial(left)
             .ts_product(self.with_initial(right))
-            .minimal_representatives()
+            .minimal_representatives_iter()
             .find_map(|rep| {
                 let ProductIndex(l, r) = rep.state_index();
                 if self.state_color(l).unwrap() != self.state_color(r).unwrap() {

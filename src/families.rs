@@ -1,8 +1,27 @@
 use crate::prelude::*;
 use math::Map;
 
+pub type FORC<A = CharAlphabet, Q = Void, C = Void> =
+    Family<RightCongruence<A>, RightCongruence<A, Q, C>>;
+
+pub type FDFA<A = CharAlphabet> = Family<RightCongruence<A>, DFA<A>>;
+pub type FWPM<A = CharAlphabet, C = Int> = Family<RightCongruence<A>, MealyMachine<A, Void, C>>;
+
+mod fdfa;
+#[allow(unused)]
+pub use fdfa::*;
+
+mod fwpm;
+#[allow(unused)]
+pub use fwpm::*;
+
+mod convert;
+#[allow(unused)]
+pub use convert::*;
+
 /// Represents a family indexed by a transition system. For every
 /// state/class of the leading ts, there exists an element of type `X`.
+#[derive(Debug, Clone)]
 pub struct Family<T: Congruence, X> {
     leading: T,
     progress: Map<StateIndex<T>, X>,
@@ -29,6 +48,12 @@ impl<T: Congruence, X> Family<T, X> {
         self.progress
             .get_mut(&self.leading.reached_state_index(word)?)
     }
+    pub(crate) fn into_parts(self) -> (T, Map<StateIndex<T>, X>) {
+        (self.leading, self.progress)
+    }
+    pub(crate) fn from_parts(leading: T, progress: Map<StateIndex<T>, X>) -> Self {
+        Self { leading, progress }
+    }
 }
 
 impl<T: Congruence, X> std::ops::Index<StateIndex<T>> for Family<T, X> {
@@ -48,6 +73,12 @@ impl<T: Congruence, X> std::ops::IndexMut<StateIndex<T>> for Family<T, X> {
 impl<T: Congruence, X> Family<T, X> {
     pub fn from(leading: T, progress: Map<StateIndex<T>, X>) -> Self {
         Self { leading, progress }
+    }
+    pub fn from_iter<I: IntoIterator<Item = (StateIndex<T>, X)>>(leading: T, prog_iter: I) -> Self {
+        Self {
+            leading,
+            progress: prog_iter.into_iter().collect(),
+        }
     }
 }
 
