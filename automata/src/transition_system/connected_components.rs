@@ -50,7 +50,7 @@ impl<'a, Ts: TransitionSystem> std::ops::Deref for SccDecomposition<'a, Ts> {
 }
 
 #[inline(always)]
-fn find_index<'a, T: TransitionSystem>(sccs: &[Scc<'a, T>], state: StateIndex<T>) -> Option<usize> {
+fn find_index<T: TransitionSystem>(sccs: &[Scc<'_, T>], state: StateIndex<T>) -> Option<usize> {
     sccs.iter()
         .enumerate()
         .find_map(|(i, scc)| if scc.contains(&state) { Some(i) } else { None })
