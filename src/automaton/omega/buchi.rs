@@ -55,19 +55,19 @@ where
     /// Tries to identify a word which is accepted by `self`. If such a word exists, it returns it and otherwise
     /// the function gives back `None`.
     pub fn give_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
-        for good_scc in self.sccs().iter().filter(|scc| {
-            !scc.is_empty() && self.is_reachable_from(self.initial, *scc.first().unwrap())
-        }) {
+        for (_, good_scc) in self
+            .sccs()
+            .iter()
+            .filter(|(_, scc)| !scc.is_empty() && self.is_reachable_from(self.initial, scc.first()))
+        {
             if let Some(full_word) = good_scc.maximal_word() {
                 // let InfinityColors(colors) = self
                 //     .induced(&full_word, self.initial())
                 //     .expect("word is valid");
-                if let Some(infset) =
-                    self.visited_edge_colors_from(*good_scc.first().unwrap(), &full_word)
-                {
+                if let Some(infset) = self.visited_edge_colors_from(good_scc.first(), &full_word) {
                     if infset.iter().any(|b| *b) {
                         let spoke = self
-                            .word_from_to(self.initial, *good_scc.first().unwrap())
+                            .word_from_to(self.initial, good_scc.first())
                             .expect("We know this is reachable!");
                         return Some(ReducedOmegaWord::ultimately_periodic(spoke, full_word));
                     }

@@ -133,10 +133,10 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
                 let mm = progress_dfa
                     .as_ref()
                     .map_edge_colors_full(|_q, _a, _c, p| {
-                        let Some(scc_index) = scc_dag.get(p) else {
+                        let Some(scc_index) = scc_dag.scc_index_of(p) else {
                             panic!("found no SCC for state {p}");
                         };
-                        let Some(color) = coloring.get(&scc_index) else {
+                        let Some(color) = coloring.get(&*scc_index) else {
                             panic!("no color stored for SCC with index {scc_index}");
                         };
                         *color
@@ -155,7 +155,6 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
 mod tests {
     use crate::{
         alphabet::CharAlphabet,
-        connected_components::SccIndex,
         families::{FDFA, FWPM},
         prelude::{TSBuilder, DFA},
         TransitionSystem,
@@ -189,8 +188,8 @@ mod tests {
             .into_dfa(0);
 
         let dag = prc.tarjan_dag();
-        let idx = dag.get(3).unwrap();
-        let scc = dag.scc(SccIndex(idx));
+        let idx = dag.scc_index_of(3).unwrap();
+        let scc = dag.scc(idx);
         println!(
             "{:?}\n{:?}",
             scc.interior_edges(),
