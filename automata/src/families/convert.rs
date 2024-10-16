@@ -1,4 +1,4 @@
-use automata_core::{math, prelude::Show};
+use crate::prelude::*;
 use tracing::{trace, warn};
 
 use super::{Alphabet, CollectTs, Deterministic, TransitionSystem, FDFA, FWPM};
@@ -153,9 +153,8 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
 
 #[cfg(test)]
 mod tests {
-    use automata_core::prelude::CharAlphabet;
-
     use crate::{
+        alphabet::CharAlphabet,
         connected_components::SccIndex,
         families::{FDFA, FWPM},
         prelude::{TSBuilder, DFA},

@@ -1,4 +1,4 @@
-use automata_core::{
+use crate::{
     alphabet::SimpleAlphabet,
     word::{FiniteWord, OmegaWord, Word},
 };

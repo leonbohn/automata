@@ -28,7 +28,10 @@ pub use self::skip::Infix;
 /// A linear word is a word that can be indexed by a `usize`. This is the case for both finite and
 /// infinite words.
 pub trait Word: Hash + Eq {
+    /// Represents the type of symbol making up the word.
     type Symbol: Symbol;
+
+    /// Constant that indicates whether the word is finite or not.
     const FINITE: bool;
 
     /// Returns the symbol at the given `position` in `self`, if it exists.

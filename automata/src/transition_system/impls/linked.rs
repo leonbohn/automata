@@ -837,9 +837,9 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
 
 #[cfg(test)]
 mod tests {
-    use automata_core::alphabet::CharAlphabet;
 
     use crate::{
+        alphabet::CharAlphabet,
         prelude::{Deterministic, ForAlphabet, Sproutable, TSBuilder},
         transition_system::LinkedListDeterministic,
         TransitionSystem,

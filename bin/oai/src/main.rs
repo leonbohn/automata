@@ -1,5 +1,4 @@
 use automata::prelude::*;
-use hoa::HoaAlphabet;
 
 use tracing::{debug, info, trace};
 use tracing_subscriber::{filter, prelude::*};
@@ -72,7 +71,7 @@ pub fn main() {
                 );
 
                 let start = std::time::Instant::now();
-                let reconverted: DeterministicOmegaAutomaton<HoaAlphabet> =
+                let reconverted: DeterministicOmegaAutomaton<PropAlphabet> =
                     converted.try_into().unwrap();
                 info!(
                     "conversion into HOA alphabet automaton took {}µs",

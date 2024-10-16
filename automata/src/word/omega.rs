@@ -114,6 +114,11 @@ pub trait OmegaWord: Word {
         self.spoke().len()
     }
 
+    /// Returns the combined (flat) length of `self`. Note, that since
+    /// `self` is infinite, this is a length of the representation of
+    /// `self` as an ultimately periodic word.
+    /// This essentially just adds the [`Self::spoke_len`] to the
+    /// [`Self::cycle_len`].
     fn combined_len(&self) -> usize {
         self.cycle_len() + self.spoke_len()
     }
@@ -434,6 +439,8 @@ impl<S: Symbol> ReducedOmegaWord<S> {
 }
 
 impl ReducedOmegaWord<char> {
+    /// Tries to construct an instance of a [`ReducedOmegaWord`] with
+    /// symbols of type `char` from the given `&str`.
     pub fn try_from_str(value: &str) -> Result<Self, ReducedParseError> {
         match value.split_once(',') {
             None => {
