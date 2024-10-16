@@ -539,7 +539,7 @@ pub trait TransitionSystem: Sized {
 
     /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly
     /// connected components. Uses Tarjan's algorithm.
-    fn sccs_recursive(&self) -> connected_components::SccDecomposition<'_, Self>
+    fn sccs_recursive(&self) -> SccDecomposition<'_, Self>
     where
         Self: Sized,
     {
@@ -552,7 +552,7 @@ pub trait TransitionSystem: Sized {
     where
         Self: Sized,
     {
-        SccDecomposition::from(tarjan_scc_iterative(self))
+        tarjan_scc_iterative(self)
     }
 
     /// Obtains the [`TarjanDAG`] of self, which is a directed acyclic graph that represents the
@@ -561,7 +561,7 @@ pub trait TransitionSystem: Sized {
     where
         Self: Sized,
     {
-        SccDecomposition::from(tarjan_scc_recursive(self))
+        tarjan_scc_recursive(self)
     }
 
     /// Returns `true` iff the given state is reachable from the initial state.
