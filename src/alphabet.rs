@@ -118,6 +118,7 @@ pub trait Alphabet: Clone + Debug {
     /// Returns the number of symbols in the alphabet.
     fn size(&self) -> usize;
 
+    /// Returns true if the alphabet is empty.
     fn is_empty(&self) -> bool {
         self.size() == 0
     }
@@ -147,5 +148,83 @@ impl<A: Alphabet> Alphabet for &A {
     }
     fn size(&self) -> usize {
         A::size(self)
+    }
+}
+
+/// Computes all elements of the free monoid over a set of given symbols.
+/// In other words, it builds all finite words in length-lexicographic order
+/// meaning words are computed in increasing length and sorted alphabetically.
+#[derive(Debug, Clone)]
+pub struct FreeMonoid<S> {
+    symbols: Vec<S>,
+    current: Vec<usize>,
+}
+
+impl<S: Symbol> Iterator for FreeMonoid<S> {
+    type Item = Vec<S>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let out = self.current.iter().map(|i| self.symbols[*i]).collect();
+
+        let mut carry = true;
+        let mut i = self.current.len();
+        while carry && i > 0 {
+            i -= 1;
+            self.current[i] += 1;
+            if self.current[i] >= self.symbols.len() {
+                self.current[i] = 0;
+                carry = true;
+            } else {
+                carry = false;
+            }
+        }
+
+        if carry {
+            self.current = std::iter::repeat(0).take(self.current.len() + 1).collect();
+        }
+
+        Some(out)
+    }
+}
+
+impl<S> FreeMonoid<S> {
+    /// Creates a new instance for the  given vec of symbols.
+    pub fn new(symbols: Vec<S>) -> Self {
+        Self {
+            symbols,
+            current: vec![],
+        }
+    }
+
+    /// Computes the nonempty words, explicitly excluding the empty word.
+    /// This panics if the alphabet is empty.
+    pub fn non_empty(symbols: Vec<S>) -> Self {
+        assert!(!symbols.is_empty(), "need at least one symbol");
+        Self {
+            symbols,
+            current: vec![0],
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::alphabet::FreeMonoid;
+
+    #[test]
+    fn kleene_star() {
+        assert_eq!(
+            FreeMonoid::new(vec!['a', 'b'])
+                .take_while(|e| e.len() <= 2)
+                .collect::<Vec<_>>(),
+            vec![
+                vec![],
+                vec!['a'],
+                vec!['b'],
+                vec!['a', 'a'],
+                vec!['a', 'b'],
+                vec!['b', 'a'],
+                vec!['b', 'b']
+            ]
+        );
     }
 }

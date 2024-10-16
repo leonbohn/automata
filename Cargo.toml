@@ -28,7 +28,6 @@ rand = { workspace = true }
 tabled = { workspace = true }
 thiserror = { workspace = true }
 
-automata-core = { version = "0.1.0", path = "../automata-core" }
 hoars = { version = "0.2.0", optional = true, path = "../hoars" }
 
 layout-rs = { version = "0.1.2", optional = true }

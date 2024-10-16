@@ -339,11 +339,11 @@ pub(crate) fn print_random_ts_benchmark(
 
 #[cfg(test)]
 mod tests {
+    use crate::word;
     use crate::{
         random::{draw_priority, CharAlphabet},
         Dottable, TransitionSystem,
     };
-    use automata_core::word;
     use std::collections::HashMap;
 
     use super::{

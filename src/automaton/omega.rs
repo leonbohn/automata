@@ -161,10 +161,8 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
     }
 }
 
-impl From<DeterministicOmegaAutomaton<hoa::HoaAlphabet>>
-    for DeterministicOmegaAutomaton<CharAlphabet>
-{
-    fn from(value: DeterministicOmegaAutomaton<hoa::HoaAlphabet>) -> Self {
+impl From<DeterministicOmegaAutomaton<PropAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
+    fn from(value: DeterministicOmegaAutomaton<PropAlphabet>) -> Self {
         let size = value.size().into_index();
         let ts = TSBuilder::default()
             .with_state_colors((0..size).map(|i| value.state_color(i).unwrap()))
@@ -182,14 +180,14 @@ impl From<DeterministicOmegaAutomaton<hoa::HoaAlphabet>>
 }
 
 impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
-    for DeterministicOmegaAutomaton<hoa::HoaAlphabet>
+    for DeterministicOmegaAutomaton<PropAlphabet>
 {
     /// For now, we allow this to error out in exactly one case: if the number of alphabet symbols
     /// is not a power of 2 and cannot be mapped immediately into AP combinations.
     type Error = String;
     fn try_from(value: DeterministicOmegaAutomaton<CharAlphabet>) -> Result<Self, Self::Error> {
         let size = value.size();
-        let mut ts = DTS::for_alphabet(hoa::HoaAlphabet::try_from_char_alphabet(value.alphabet())?);
+        let mut ts = DTS::for_alphabet(PropAlphabet::try_from_char_alphabet(value.alphabet())?);
 
         for q in value.state_indices() {
             assert!(
