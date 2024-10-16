@@ -92,7 +92,10 @@ pub mod prelude {
             StateColor, StateIndex, SymbolOf, TSBuilder, TransitionSystem,
         },
         upw, word,
-        word::{FiniteWord, OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, Rotate, Skip, Word},
+        word::{
+            FiniteWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord, ReducedOmegaWord,
+            Rotate, Skip, Word,
+        },
         Class, Color, Int, Pointed, Void,
     };
 
