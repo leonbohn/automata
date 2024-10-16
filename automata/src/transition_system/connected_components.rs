@@ -1,5 +1,6 @@
 use std::hash::Hash;
 
+use dag::Dag;
 use itertools::Itertools;
 use tracing::trace;
 
@@ -11,75 +12,209 @@ pub use scc::Scc;
 mod tarjan;
 pub use tarjan::{kosaraju, tarjan_scc_iterative, tarjan_scc_iterative_from, tarjan_scc_recursive};
 
-mod tarjan_dag;
-pub use tarjan_dag::{SccIndex, TarjanDAG};
+/// Newtype wrapper for storing indices of SCCs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SccIndex(usize);
+
+impl std::fmt::Display for SccIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SCC{}", self.0)
+    }
+}
+
+impl std::ops::Deref for SccIndex {
+    type Target = usize;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for SccIndex {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 /// Represents a decomposition of a transition system into strongly connected components.
 #[derive(Clone)]
-pub struct SccDecomposition<'a, Ts: TransitionSystem>(&'a Ts, Vec<Scc<'a, Ts>>);
+pub struct SccDecomposition<'a, Ts: TransitionSystem> {
+    ts: &'a Ts,
+    dag: Dag<Scc<'a, Ts>>,
+}
 
 impl<'a, Ts: TransitionSystem> std::ops::Deref for SccDecomposition<'a, Ts> {
-    type Target = Vec<Scc<'a, Ts>>;
+    type Target = Dag<Scc<'a, Ts>>;
 
     fn deref(&self) -> &Self::Target {
-        &self.1
+        &self.dag
     }
 }
 
 impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     /// Creates a new SCC decomposition from a transition system and a vector of SCCs.
-    pub fn new(ts: &'a Ts, sccs: Vec<Scc<'a, Ts>>) -> Self {
-        Self(ts, sccs)
+    pub fn from_sccs(ts: &'a Ts, sccs: Vec<Scc<'a, Ts>>) -> Self {
+        let mut edges = Vec::new();
+        for i in 0..sccs.len() {
+            for j in 0..sccs.len() {
+                if i == j {
+                    continue;
+                }
+                if sccs[i]
+                    .iter()
+                    .zip(sccs[j].iter())
+                    .any(|(p, q)| ts.is_successor(p, q))
+                {
+                    debug_assert!(!edges.contains(&(j, i)));
+                    edges.push((i, j));
+                }
+            }
+        }
+        Self {
+            ts,
+            dag: Dag::from_parts(sccs, edges),
+        }
+    }
+
+    /// Returns an iterator over all transient edges in the transition system. An edge is transient
+    /// if its source and target are in different SCCs.
+    pub fn transient_edges(&self) -> impl Iterator<Item = Ts::EdgeRef<'a>> + '_ {
+        self.ts.transitions().filter(move |t| {
+            let source = t.source();
+            let target = t.target();
+            self.scc_index_of(source) != self.scc_index_of(target)
+        })
+    }
+
+    /// Returns an iterator over all transient states in the transition system. A state is transient
+    /// if it is in a singleton SCC and there are no self loops. This means that from the state, there
+    /// is no way to reach itself.
+    pub fn transient_states(&self) -> impl Iterator<Item = Ts::StateIndex> + '_
+    where
+        EdgeColor<Ts>: Hash + Eq,
+    {
+        self.dag
+            .nodes()
+            .filter_map(|scc| {
+                if scc.is_transient() {
+                    Some(scc.iter().cloned())
+                } else {
+                    None
+                }
+            })
+            .flatten()
+    }
+
+    /// Returns the index of the SCC containing the given state, if it exists.
+    pub fn scc_index_of(&self, state: Ts::StateIndex) -> Option<SccIndex> {
+        self.dag.find(|scc| scc.contains(&state)).map(SccIndex)
+    }
+
+    /// Returns an iterator over sccs which are reachable from the given source scc.
+    pub fn reachable_from(&self, source: SccIndex) -> crate::dag::ReachableIter<'_, Scc<'a, Ts>> {
+        self.dag.reachable_from(source.0)
+    }
+
+    /// Returns the number of SCCs in the transition system which is equal to the size
+    /// of the DAG.
+    pub fn size(&self) -> usize {
+        self.dag.size()
+    }
+
+    /// Returns the number of SCCs which are not transient, meaning an SCC counts towards
+    /// the total if there is at least one transition that starts and ends in it.
+    pub fn proper_size(&self) -> usize {
+        self.dag
+            .iter()
+            .filter(|(_, scc)| scc.is_nontransient())
+            .count()
+    }
+
+    /// Returns the SCC containing the given state, if it exists.
+    pub fn scc_of(&self, state: Ts::StateIndex) -> Option<&Scc<'a, Ts>> {
+        self.scc_index_of(state).map(|i| &self.dag[i.0])
+    }
+
+    /// Returns the SCC with the given index.
+    pub fn scc(&self, index: SccIndex) -> &Scc<'a, Ts> {
+        &self.dag[index.0]
+    }
+
+    /// Returns an iterator over all SCCs in the transition system.
+    pub fn sccs_iter(&self) -> impl Iterator<Item = &Scc<'a, Ts>> + '_ {
+        self.dag.nodes()
+    }
+
+    /// Folds the state colors of the SCCs of the transition system into a single value.
+    pub fn fold_state_colors<F, D>(&self, init: D, f: F) -> Dag<D>
+    where
+        D: Clone,
+        F: FnMut(D, Ts::StateColor) -> D + Copy,
+    {
+        self.dag.reduce(|x| x.state_colors().fold(init.clone(), f))
+    }
+
+    /// Folds the colors of all edges whose source and target are in the same SCC into
+    /// a single value.
+    pub fn fold_edge_colors<F, D>(&self, init: D, f: F) -> Dag<D>
+    where
+        D: Clone,
+        F: FnMut(D, &Ts::EdgeColor) -> D + Copy,
+        EdgeColor<Ts>: Hash + Eq,
+    {
+        self.dag
+            .reduce(|x| x.interior_edge_colors().iter().fold(init.clone(), f))
+    }
+
+    /// Gives a reference to the actual DAG produced by the decomposition.
+    pub fn dag(&self) -> &Dag<Scc<'a, Ts>> {
+        &self.dag
     }
 
     /// Returns an iterator over all SCCs which are terminal, meaning they have no outgoing
     /// edges to another SCC.
     pub fn terminal_sccs(&self) -> impl Iterator<Item = &Scc<'a, Ts>> {
-        self.1.iter().filter(|scc| scc.border_edges().is_empty())
+        self.dag.iter().filter_map(|(_, scc)| {
+            if scc.border_edges().is_empty() {
+                Some(scc)
+            } else {
+                None
+            }
+        })
     }
 
     /// Gives the first [`Scc`] in the decomposition. This must exist as we only allow
     /// non-empty decompositions.
     pub fn first(&self) -> &Scc<'a, Ts> {
-        self.1.first().expect("At least one SCC must exist!")
+        assert!(!self.dag.is_empty(), "At least one SCC must exist!");
+        &self.dag[0]
     }
 
     /// Tries to find a nontrivial SCC and if it finds one, asserts that it is the only one.
     pub fn singleton_nontrivial(&self) -> Option<&Scc<'a, Ts>> {
-        for i in 0..self.1.len() {
-            if self.1[i].is_trivial() || self.1[i].is_transient() {
+        for i in 0..self.dag.size() {
+            if self.dag[i].is_trivial() || self.dag[i].is_transient() {
                 continue;
             }
 
-            for j in (i + 1)..self.1.len() {
-                assert!(self.1[j].is_transient() || self.1[j].is_trivial())
+            for j in (i + 1)..self.dag.size() {
+                assert!(self.dag[j].is_transient() || self.dag[j].is_trivial())
             }
 
-            return Some(&self.1[i]);
+            return Some(&self.dag[i]);
         }
         None
-    }
-
-    /// Attepmts to find the index of a the SCC containing the given `state`. Returns this index if
-    /// it exists, otherwise returns `None`.
-    pub fn scc_of(&self, state: Ts::StateIndex) -> Option<usize> {
-        self.1
-            .iter()
-            .enumerate()
-            .find_map(|(i, scc)| if scc.contains(&state) { Some(i) } else { None })
     }
 
     /// Tests whether two SCC decompositions are isomorphic. This is done by checking whether each
     /// SCC in one decomposition has a matching SCC in the other decomposition.
     pub fn equivalent(&self, other: &SccDecomposition<'a, Ts>) -> bool {
-        for scc in &self.1 {
-            if !other.1.iter().any(|other_scc| scc == other_scc) {
-                trace!("found no scc matching {scc:?} in other");
+        for elem in self.dag.iter() {
+            if !other.dag.iter().any(|other_elem| elem == other_elem) {
+                trace!("found no scc matching {elem:?} in other");
                 return false;
             }
         }
-        for scc in &other.1 {
-            if !self.1.iter().any(|other_scc| scc == other_scc) {
+        for scc in other.dag.iter() {
+            if !self.dag.iter().any(|other_scc| scc == other_scc) {
                 trace!("found no scc matching {scc:?} in self");
                 return false;
             }
@@ -93,9 +228,9 @@ impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
         writeln!(
             f,
             "{{{}}}",
-            self.1
+            self.dag
                 .iter()
-                .map(|scc| format!("[{}]", scc.iter().map(|q| format!("{q:?}")).join(", ")))
+                .map(|(_, scc)| format!("[{}]", scc.iter().map(|q| format!("{q:?}")).join(", ")))
                 .join(", "),
         )
     }
@@ -103,13 +238,13 @@ impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
 
 impl<'a, Ts: TransitionSystem> Hash for SccDecomposition<'a, Ts> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.1.hash(state)
+        self.dag.hash(state)
     }
 }
 
 impl<'a, Ts: TransitionSystem> PartialEq for SccDecomposition<'a, Ts> {
     fn eq(&self, other: &Self) -> bool {
-        self.1 == other.1
+        self.dag == other.dag
     }
 }
 
@@ -148,7 +283,7 @@ mod tests {
 
         assert_eq!(
             sccs,
-            SccDecomposition::new(&cong, vec![scc1.clone(), scc2.clone(), scc3.clone()])
+            SccDecomposition::from_sccs(&cong, vec![scc1.clone(), scc2.clone(), scc3.clone()])
         );
 
         assert_eq!(

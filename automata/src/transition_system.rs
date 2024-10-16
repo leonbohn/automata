@@ -43,7 +43,7 @@ pub use reachable::{LengthLexicographicMinimalRepresentatives, Reachable};
 
 /// Contains implementations for SCC decompositions and the corresponding/associated types.
 pub mod connected_components;
-use connected_components::{tarjan_scc_iterative, tarjan_scc_recursive, TarjanDAG};
+use connected_components::{tarjan_scc_iterative, tarjan_scc_recursive, SccDecomposition};
 
 /// In this module, everything concering the run of a transition system on a word is defined.
 pub mod run;
@@ -98,6 +98,13 @@ pub trait TransitionSystem: Sized {
 
     /// Returns an iterator over the state indices of `self`.
     fn state_indices(&self) -> Self::StateIndices<'_>;
+
+    /// Returns `true` if `to` is an immediate successor of `from`.
+    fn is_successor(&self, from: &Self::StateIndex, to: &Self::StateIndex) -> bool {
+        self.edges_from(*from)
+            .map(|mut it| it.any(|e| e.target() == *to))
+            .unwrap_or(false)
+    }
 
     /// Calls the [`Alphabet::universe`] method on the alphabet of `self`, returning
     /// an iterator of all symbols.
@@ -541,20 +548,20 @@ pub trait TransitionSystem: Sized {
 
     /// Obtains the [`TarjanDAG`] of self, which is a directed acyclic graph that represents the
     /// strongly connected components of the transition system and the edges between them.
-    fn tarjan_dag(&self) -> TarjanDAG<'_, Self>
+    fn tarjan_dag(&self) -> SccDecomposition<'_, Self>
     where
         Self: Sized,
     {
-        TarjanDAG::from(tarjan_scc_iterative(self))
+        SccDecomposition::from(tarjan_scc_iterative(self))
     }
 
     /// Obtains the [`TarjanDAG`] of self, which is a directed acyclic graph that represents the
     /// strongly connected components of the transition system and the edges between them.
-    fn tarjan_dag_recursive(&self) -> TarjanDAG<'_, Self>
+    fn tarjan_dag_recursive(&self) -> SccDecomposition<'_, Self>
     where
         Self: Sized,
     {
-        TarjanDAG::from(tarjan_scc_recursive(self))
+        SccDecomposition::from(tarjan_scc_recursive(self))
     }
 
     /// Returns `true` iff the given state is reachable from the initial state.

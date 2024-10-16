@@ -8,7 +8,7 @@ use math::OrderedSet;
 /// Represents a directed acyclic graph. The nodes have usize indices and are
 /// colored with some type `C`. The edges are represented as a vector of pairs
 /// of indices.
-#[derive(Clone)]
+#[derive(Clone, Hash, Eq, PartialEq)]
 pub struct Dag<C = Void> {
     nodes: Vec<C>,
     edges: Vec<(usize, usize)>,

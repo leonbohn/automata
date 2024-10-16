@@ -271,7 +271,7 @@ impl BenchmarkAverages {
         let mut maximal_scc_size = 0;
         let mut scc_count = 0;
         let mut non_trivial_scc_sizes = vec![];
-        for scc in tjdag.iter() {
+        for (i, scc) in tjdag.iter() {
             scc_count += 1;
             if scc.is_trivial() {
                 continue;
