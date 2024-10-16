@@ -49,22 +49,36 @@ impl<'a, Ts: TransitionSystem> std::ops::Deref for SccDecomposition<'a, Ts> {
     }
 }
 
+#[inline(always)]
+fn find_index<'a, T: TransitionSystem>(sccs: &[Scc<'a, T>], state: StateIndex<T>) -> Option<usize> {
+    sccs.iter()
+        .enumerate()
+        .find_map(|(i, scc)| if scc.contains(&state) { Some(i) } else { None })
+}
+
 impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     /// Creates a new SCC decomposition from a transition system and a vector of SCCs.
     pub fn from_sccs(ts: &'a Ts, sccs: Vec<Scc<'a, Ts>>) -> Self {
         let mut edges = Vec::new();
-        for i in 0..sccs.len() {
-            for j in 0..sccs.len() {
-                if i == j {
+        for (i, source) in sccs.iter().enumerate() {
+            trace!(
+                "Processing SCC {i} with states {}",
+                source.iter().map(|q| format!("{q:?}")).join(", ")
+            );
+            for q in source.iter() {
+                let Some(it) = ts.successor_indices(*q) else {
                     continue;
-                }
-                if sccs[i]
-                    .iter()
-                    .zip(sccs[j].iter())
-                    .any(|(p, q)| ts.is_successor(p, q))
-                {
-                    debug_assert!(!edges.contains(&(j, i)));
-                    edges.push((i, j));
+                };
+                let mut targets = math::Set::new();
+                for target in it {
+                    let Some(target_scc_index) = find_index(&sccs, target) else {
+                        panic!("could not find SCC index for state {target:?}");
+                    };
+                    // no self loops and check that no such edge is present, already
+                    if target_scc_index == i || !targets.insert(target_scc_index) {
+                        continue;
+                    }
+                    edges.push((i, target_scc_index));
                 }
             }
         }

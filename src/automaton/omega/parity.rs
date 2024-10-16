@@ -465,7 +465,7 @@ where
                 break 'outer;
             }
 
-            let dag = ts.tarjan_dag();
+            let dag = ts.sccs();
 
             'inner: for (_, scc) in dag.iter() {
                 trace!("inner priority {priority} | scc {:?}", scc);

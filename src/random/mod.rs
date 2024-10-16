@@ -266,7 +266,7 @@ impl BenchmarkAverages {
     pub fn append<D: Deterministic>(&mut self, det: D) {
         let states = det.size();
 
-        let tjdag = det.tarjan_dag();
+        let tjdag = det.sccs();
 
         let mut maximal_scc_size = 0;
         let mut scc_count = 0;
