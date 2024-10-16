@@ -133,7 +133,7 @@ impl<A: Alphabet> AnnotatedCongruence<A> {
     pub fn canonic_coloring(&self) -> MooreMachine<A, Int> {
         // we first need to decompose into sccs and mark them with the color of the
         // idempotent that it contains.
-        let tjdag = self.0.tarjan_dag();
+        let tjdag = self.0.sccs();
         let mut dag: Dag<Result<usize, Option<bool>>> =
             tjdag.fold_state_colors(Err(None), |acc, x| match (acc, x.good) {
                 (Err(None), None) => Err(None),
@@ -174,8 +174,8 @@ impl<A: Alphabet> AnnotatedCongruence<A> {
             .0
             .state_indices()
             .map(|i| {
-                let scc = tjdag.get(i).expect("Must be in an SCC");
-                let info = dag.color(scc).expect("Must have worked on that SCC");
+                let scc = tjdag.scc_index_of(i).expect("Must be in an SCC");
+                let info = dag.color(*scc).expect("Must have worked on that SCC");
                 (
                     i,
                     info.expect("Every SCC must have a color")
@@ -187,8 +187,8 @@ impl<A: Alphabet> AnnotatedCongruence<A> {
 
         (&self.0)
             .map_edge_colors_full(|_q, _e, _c, p| {
-                let scc = tjdag.get(p).expect("Must be in an SCC");
-                let info = dag.color(scc).expect("Must have worked on that SCC");
+                let scc = tjdag.scc_index_of(p).expect("Must be in an SCC");
+                let info = dag.color(*scc).expect("Must have worked on that SCC");
                 info.expect("Every SCC must have a color")
             })
             .with_state_color(state_coloring)

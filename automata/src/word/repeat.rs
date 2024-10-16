@@ -1,5 +1,6 @@
 use super::{FiniteWord, Word};
 
+/// Represents a fixed number of repetitions of a [`FiniteWord`].
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub struct Repeat<W: FiniteWord> {
     word: W,
@@ -7,6 +8,7 @@ pub struct Repeat<W: FiniteWord> {
 }
 
 impl<W: FiniteWord> Repeat<W> {
+    /// Creates a new instance, repeating the word as many times as specified.
     pub fn new(word: W, times: usize) -> Self {
         Self { word, times }
     }

@@ -26,7 +26,7 @@ use crate::prelude::*;
 ///
 /// # Example
 /// ```
-/// use automata_core::prelude::*;
+/// use automata::prelude::*;
 /// let word = upw!("abc", "def"); // represents abc(def)^𝜔 = abcdefdefdef...
 /// assert_eq!(word.loop_index(), 3);
 /// assert_eq!(word.cycle_len(), 3);
@@ -52,7 +52,7 @@ pub trait OmegaWord: Word {
     ///
     /// # Example
     /// ```
-    /// use automata_core::prelude::*;
+    /// use automata::prelude::*;
     /// let word = upw!("abac", "acac");
     /// assert!(word.spoke().finite_word_equals("ab"));
     /// assert!(word.cycle().finite_word_equals("ac"));
@@ -64,7 +64,7 @@ pub trait OmegaWord: Word {
     /// Tests whether `self` is *semantically* equal to `other`. To see the difference compared to syntactic
     /// equality, consider the exampe below.
     /// ```
-    /// use automata_core::prelude::*;
+    /// use automata::prelude::*;
     /// let word = upw!("a"); // represents the periodic omega word a^𝜔 = aaa...
     /// let offset1 = word.skip(1); // the word obtained by skipping the first symbol of `word`
     /// let offset2 = word.skip(2);
@@ -114,6 +114,11 @@ pub trait OmegaWord: Word {
         self.spoke().len()
     }
 
+    /// Returns the combined (flat) length of `self`. Note, that since
+    /// `self` is infinite, this is a length of the representation of
+    /// `self` as an ultimately periodic word.
+    /// This essentially just adds the [`Self::spoke_len`] to the
+    /// [`Self::cycle_len`].
     fn combined_len(&self) -> usize {
         self.cycle_len() + self.spoke_len()
     }
@@ -206,7 +211,7 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     ///
     /// # Example
     /// ```
-    /// use automata_core::prelude::*;
+    /// use automata::prelude::*;
     /// let word = upw!("abcabcabc");
     /// assert_eq!(word.cycle_len(), 3);
     /// assert_eq!(word.loop_index(), 0);
@@ -329,7 +334,7 @@ impl<S: Symbol> ReducedOmegaWord<S> {
     ///
     /// # Example
     /// ```
-    /// use automata_core::prelude::*;
+    /// use automata::prelude::*;
     /// let non_normalized = ReducedOmegaWord::from_raw_parts(vec!['a', 'a'], 0);
     /// assert!(!non_normalized.is_reduced()); // the constructed word is not normalized
     /// let normalized = non_normalized.reduced();
@@ -434,6 +439,8 @@ impl<S: Symbol> ReducedOmegaWord<S> {
 }
 
 impl ReducedOmegaWord<char> {
+    /// Tries to construct an instance of a [`ReducedOmegaWord`] with
+    /// symbols of type `char` from the given `&str`.
     pub fn try_from_str(value: &str) -> Result<Self, ReducedParseError> {
         match value.split_once(',') {
             None => {

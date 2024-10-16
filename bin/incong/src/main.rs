@@ -1,10 +1,14 @@
-use automata::prelude::{word::Rotate, KleeneStar, PeriodicOmegaWord, Symbol};
+use automata::{
+    alphabet::FreeMonoid,
+    prelude::{PeriodicOmegaWord, Symbol},
+    word::Rotate,
+};
 
 fn compute<S: Symbol>(symbols: Vec<S>, max_length: usize) -> (Vec<PeriodicOmegaWord<S>>, usize) {
     let mut unique = Vec::new();
     let mut neg = 0;
 
-    'outer: for w in KleeneStar::non_empty(symbols) {
+    'outer: for w in FreeMonoid::non_empty(symbols) {
         if w.len() >= max_length {
             break;
         }

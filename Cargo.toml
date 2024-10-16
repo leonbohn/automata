@@ -1,5 +1,5 @@
 [workspace]
-members = ["automata", "automata-core", "automata-learning", "bin/*", "hoars"]
+members = ["automata", "automata-learning", "bin/*", "hoars"]
 default-members = ["automata", "automata-*", "hoars", "bin/*"]
 exclude = ["python", "bench"]
 resolver = "2"
@@ -9,7 +9,6 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 biodivine-lib-bdd = "0.5.22"
 itertools = "0.13.0"
-automata-core = { version = "0.1.0", path = "../automata-core" }
 indexmap = "2.6"
 bimap = "0.6"
 rand = "0.8.5"

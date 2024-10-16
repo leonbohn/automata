@@ -134,7 +134,7 @@ where
         "All SCCs must be unique!"
     );
     sccs.sort();
-    SccDecomposition::new(ts, sccs)
+    SccDecomposition::from_sccs(ts, sccs)
 }
 
 /// Implementation of Kosaraju's algorithm for computing the SCC decomposition.
@@ -182,7 +182,7 @@ where
         sccs.push(Scc::new(ts, scc.into_iter()));
     }
 
-    SccDecomposition::new(ts, sccs)
+    SccDecomposition::from_sccs(ts, sccs)
 }
 
 /// Calls [`tarjan_scc_iterative_from`] for the set of all states.
@@ -209,9 +209,11 @@ where
     let mut unvisited = iter.into_iter().collect::<BTreeSet<_>>();
 
     if unvisited.is_empty() {
-        return SccDecomposition::new(ts, sccs);
+        return SccDecomposition::from_sccs(ts, sccs);
     };
     let mut queue = Vec::new();
+
+    let start_time = std::time::Instant::now();
 
     // we do an outermost loop that executes as long as states have not seen all states
     while let Some(&next) = unvisited.first() {
@@ -309,8 +311,13 @@ where
         }
     }
 
+    tracing::info!(
+        "tarjan scc iterative took {}µs",
+        start_time.elapsed().as_micros()
+    );
+
     sccs.sort();
-    SccDecomposition::new(ts, sccs)
+    SccDecomposition::from_sccs(ts, sccs)
 }
 
 #[cfg(test)]
@@ -363,6 +370,8 @@ mod tests {
             "Tarjan iterative took {} microseconds",
             start.elapsed().as_micros()
         );
-        assert_eq!(*sccs, vec![vec![0], vec![1], vec![2, 3]]);
+        assert_eq!(sccs[0], vec![0]);
+        assert_eq!(sccs[1], vec![1]);
+        assert_eq!(sccs[2], vec![2, 3]);
     }
 }

@@ -276,7 +276,7 @@ where
     pub fn witness_color(&self, color: Int) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         let restrict = self.edge_color_restricted(color, Int::MAX);
         let sccs = restrict.sccs();
-        for scc in sccs.iter() {
+        for (_, scc) in sccs.iter() {
             if scc.is_transient() {
                 continue;
             }
@@ -312,7 +312,7 @@ where
         let t2 = other.edge_color_restricted(l, Int::MAX);
         let prod = t1.ts_product(t2);
         let sccs = prod.sccs();
-        for scc in sccs.iter() {
+        for (_, scc) in sccs.iter() {
             if scc.is_transient() {
                 continue;
             }
@@ -465,9 +465,9 @@ where
                 break 'outer;
             }
 
-            let dag = ts.tarjan_dag();
+            let dag = ts.sccs();
 
-            'inner: for scc in dag.iter() {
+            'inner: for (_, scc) in dag.iter() {
                 trace!("inner priority {priority} | scc {:?}", scc);
                 if scc.is_transient() {
                     trace!("scc {:?} is transient", scc);
