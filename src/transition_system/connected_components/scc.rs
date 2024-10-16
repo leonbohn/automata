@@ -111,10 +111,10 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     /// this is guaranteed to return an element. It might, however, not always be the
     /// same between calls.
     pub fn first(&self) -> Ts::StateIndex {
-        self.states
+        *self
+            .states
             .first()
             .expect("SCC must contain at least one state")
-            .clone()
     }
 
     /// Returns a reference to the underlying transition system.
