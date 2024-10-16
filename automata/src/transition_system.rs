@@ -99,18 +99,22 @@ pub trait TransitionSystem: Sized {
     /// Returns an iterator over the state indices of `self`.
     fn state_indices(&self) -> Self::StateIndices<'_>;
 
-    /// Returns `true` if `to` is an immediate successor of `from`.
-    fn is_successor(&self, from: &Self::StateIndex, to: &Self::StateIndex) -> bool {
-        self.edges_from(*from)
-            .map(|mut it| it.any(|e| e.target() == *to))
-            .unwrap_or(false)
-    }
-
     /// Calls the [`Alphabet::universe`] method on the alphabet of `self`, returning
     /// an iterator of all symbols.
     #[inline(always)]
     fn symbols(&self) -> <Self::Alphabet as Alphabet>::Universe<'_> {
         self.alphabet().universe()
+    }
+
+    /// Returns an iterator over the indices of the successors of the given state, if it exists.
+    /// Otherwise, the method returns `None`.
+    ///
+    /// Might produce duplicates.
+    fn successor_indices(
+        &self,
+        state: StateIndex<Self>,
+    ) -> Option<impl Iterator<Item = StateIndex<Self>>> {
+        Some(self.edges_from(state)?.map(|edge| edge.target()))
     }
 
     /// Returns a vector of all state indices of `self`. By default, this is simply a helper
@@ -507,7 +511,7 @@ pub trait TransitionSystem: Sized {
     fn reachable_sccs_from<I: IntoIterator<Item = StateIndex<Self>>>(
         &self,
         from: I,
-    ) -> connected_components::SccDecomposition<'_, Self>
+    ) -> SccDecomposition<'_, Self>
     where
         Self: Sized,
     {
@@ -517,7 +521,7 @@ pub trait TransitionSystem: Sized {
     /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly
     /// connected components. Uses Tarjan's algorithm.
     #[inline(always)]
-    fn sccs(&self) -> connected_components::SccDecomposition<'_, Self>
+    fn sccs(&self) -> SccDecomposition<'_, Self>
     where
         Self: Sized,
     {
@@ -526,10 +530,7 @@ pub trait TransitionSystem: Sized {
 
     /// Performs an SCC decomposition of self using Kosaraju's algorithm, starting from the state `start`. This is an
     /// efficient algorithm and it might provide more performance over Tarjan's algorithm in some cases.
-    fn sccs_kosaraju(
-        &self,
-        start: Self::StateIndex,
-    ) -> connected_components::SccDecomposition<'_, Self>
+    fn sccs_kosaraju(&self, start: Self::StateIndex) -> SccDecomposition<'_, Self>
     where
         Self: Sized,
         Self: PredecessorIterable,
@@ -540,24 +541,6 @@ pub trait TransitionSystem: Sized {
     /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly
     /// connected components. Uses Tarjan's algorithm.
     fn sccs_recursive(&self) -> SccDecomposition<'_, Self>
-    where
-        Self: Sized,
-    {
-        tarjan_scc_recursive(self)
-    }
-
-    /// Obtains the [`TarjanDAG`] of self, which is a directed acyclic graph that represents the
-    /// strongly connected components of the transition system and the edges between them.
-    fn tarjan_dag(&self) -> SccDecomposition<'_, Self>
-    where
-        Self: Sized,
-    {
-        tarjan_scc_iterative(self)
-    }
-
-    /// Obtains the [`TarjanDAG`] of self, which is a directed acyclic graph that represents the
-    /// strongly connected components of the transition system and the edges between them.
-    fn tarjan_dag_recursive(&self) -> SccDecomposition<'_, Self>
     where
         Self: Sized,
     {

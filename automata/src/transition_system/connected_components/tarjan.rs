@@ -213,6 +213,8 @@ where
     };
     let mut queue = Vec::new();
 
+    let start_time = std::time::Instant::now();
+
     // we do an outermost loop that executes as long as states have not seen all states
     while let Some(&next) = unvisited.first() {
         assert!(queue.is_empty());
@@ -308,6 +310,11 @@ where
             }
         }
     }
+
+    tracing::info!(
+        "tarjan scc iterative took {}µs",
+        start_time.elapsed().as_micros()
+    );
 
     sccs.sort();
     SccDecomposition::from_sccs(ts, sccs)
