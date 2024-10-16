@@ -2,6 +2,49 @@
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
+/// An alphabet defines a collection of possible symbols. This
+/// module implements simple alphabets which consist of just a
+/// collection of symbols, and propositional alphabets where each
+/// symbol is represented by a boolean expression over some
+/// set of base atomic propositions.
+#[macro_use]
+pub mod alphabet;
+
+/// A word is a sequence of symbols from some alphabet. Herein,
+/// different types of words are defined, specifically finite ones
+/// and different reprsentations of infinite ones.
+/// Moreover, some constructions of manipulating words, taking suffixes,
+/// infixes and such are given.
+/// Finally, the module also implements normalization for words.
+#[macro_use]
+pub mod word;
+
+/// Defines some mathematical objects that are used such as bijections,
+/// sets and mappings.
+pub mod math;
+mod show;
+
+/// Defines a representation of directed, acyclic graphs. These are for example
+/// used for the representation of the strongly connected components of a transition system.
+pub mod dag;
+
+/// Alias for the default integer type that is used for coloring edges and states.
+pub type Int = u8;
+
+/// Represents the absence of a color. The idea is that this can be used when collecting
+/// a transitions system as it can always be constructed from a color by simply forgetting it.
+/// This is useful for example when we want to collect a transition system into a different
+/// representation, but we don't care about the colors on the edges. In that case, the state
+/// colors may be kept and the edge colors are dropped.
+#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Copy, Default)]
+pub struct Void;
+
+impl std::fmt::Debug for Void {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "#")
+    }
+}
+
 /// The prelude is supposed to make using this package easier. Including everything, i.e.
 /// `use automata::prelude::*;` should be enough to use the package.
 pub mod prelude {
@@ -17,6 +60,10 @@ pub mod prelude {
     #[cfg(feature = "petgraph")]
     pub use super::transition_system::impls::petgraph_backed::{petgraph, GraphTs};
     pub use super::{
+        alphabet::{
+            Alphabet, CharAlphabet, Expression, Matcher, PropAlphabet, PropExpression, PropSymbol,
+            SimpleAlphabet, Symbol,
+        },
         automaton::{
             Automaton, BuchiCondition, DeterministicOmegaAutomaton, FiniteWordAutomaton, IntoDBA,
             IntoDFA, IntoDMA, IntoDPA, IntoDRA, IntoMealyMachine, IntoMooreMachine, MealyLike,
@@ -28,9 +75,12 @@ pub mod prelude {
             CollectRightCongruence, Congruence, IntoRightCongruence, MinimalRepresentative,
             RightCongruence,
         },
+        dag,
         dot::Dottable,
+        math,
         representation::CollectTs,
         representation::IntoTs,
+        show::Show,
         transition_system::operations,
         transition_system::run::{self, InfiniteObserver, Observer, Run},
         transition_system::{
@@ -41,9 +91,13 @@ pub mod prelude {
             IndexType, IntoEdgeTuple, IsEdge, Path, ScalarIndexType, Shrinkable, Sproutable,
             StateColor, StateIndex, SymbolOf, TSBuilder, TransitionSystem,
         },
-        Class, Color, Pointed,
+        upw, word,
+        word::{
+            FiniteWord, NormalizedOmegaWord, OmegaWord, PeriodicOmegaWord, ReducedOmegaWord,
+            Rotate, Skip, Word,
+        },
+        Class, Color, Int, Pointed, Void,
     };
-    pub use automata_core::prelude::*;
 
     pub use super::transition_system::impls::packed;
     #[cfg(feature = "implementations")]
@@ -64,7 +118,6 @@ pub mod prelude {
 #[allow(missing_docs)]
 pub mod families;
 
-pub use automata_core::math;
 use std::{fmt::Debug, hash::Hash};
 
 /// This module defines transition systems and successor functions and such.

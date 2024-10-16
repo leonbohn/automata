@@ -3,8 +3,6 @@ use tracing::trace;
 
 use crate::prelude::*;
 
-use hoa::HoaAlphabet;
-
 use std::fmt::{Result, Write};
 
 pub trait WriteHoa: TransitionSystem + Pointed {
@@ -191,7 +189,7 @@ impl HoaSuitableAlphabet for CharAlphabet {
     }
 }
 
-impl HoaSuitableAlphabet for HoaAlphabet {
+impl HoaSuitableAlphabet for PropAlphabet {
     fn write_alphabet_description<W: std::fmt::Write>(&self, w: &mut W) -> Result {
         writeln!(
             w,

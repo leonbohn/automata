@@ -1,4 +1,4 @@
-use alphabet::SimpleAlphabet;
+use crate::alphabet::SimpleAlphabet;
 
 use crate::prelude::*;
 

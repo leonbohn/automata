@@ -1,4 +1,4 @@
-use automata_core::{math, prelude::Show};
+use crate::prelude::*;
 use tracing::{trace, warn};
 
 use super::{Alphabet, CollectTs, Deterministic, TransitionSystem, FDFA, FWPM};
@@ -14,7 +14,7 @@ impl<A: Alphabet> From<FWPM<A>> for FDFA<A> {
             .map(|(i, pmm)| {
                 let mut coloring = math::Map::new();
 
-                let sccs = pmm.tarjan_dag();
+                let sccs = pmm.sccs();
                 // preallocate, in the worst case each SCC is transient
                 let mut transient = Vec::with_capacity(sccs.size());
 
@@ -64,7 +64,7 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
         let progress = progress
             .into_iter()
             .map(|(i, progress_dfa)| {
-                let scc_dag = progress_dfa.tarjan_dag();
+                let scc_dag = progress_dfa.sccs();
                 let minimal_representatives = progress_dfa.canonical_naming();
                 let mut classifications = math::Map::new();
 
@@ -133,10 +133,10 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
                 let mm = progress_dfa
                     .as_ref()
                     .map_edge_colors_full(|_q, _a, _c, p| {
-                        let Some(scc_index) = scc_dag.get(p) else {
+                        let Some(scc_index) = scc_dag.scc_index_of(p) else {
                             panic!("found no SCC for state {p}");
                         };
-                        let Some(color) = coloring.get(&scc_index) else {
+                        let Some(color) = coloring.get(&*scc_index) else {
                             panic!("no color stored for SCC with index {scc_index}");
                         };
                         *color
@@ -153,10 +153,8 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
 
 #[cfg(test)]
 mod tests {
-    use automata_core::prelude::CharAlphabet;
-
     use crate::{
-        connected_components::SccIndex,
+        alphabet::CharAlphabet,
         families::{FDFA, FWPM},
         prelude::{TSBuilder, DFA},
         TransitionSystem,
@@ -189,16 +187,16 @@ mod tests {
             .with_state_colors([false, true, false, false, true, true])
             .into_dfa(0);
 
-        let dag = prc.tarjan_dag();
-        let idx = dag.get(3).unwrap();
-        let scc = dag.scc(SccIndex(idx));
+        let dag = prc.sccs();
+        let idx = dag.scc_index_of(3).unwrap();
+        let scc = dag.scc(idx);
         println!(
             "{:?}\n{:?}",
             scc.interior_edges(),
             scc.interior_transitions()
         );
 
-        assert_eq!(prc.tarjan_dag().proper_size(), 4);
+        assert_eq!(prc.sccs().proper_size(), 4);
 
         let fdfa = FDFA::trivial(alphabet.clone(), prc);
         let fwpm = FWPM::from(fdfa);
@@ -233,7 +231,7 @@ mod tests {
                 (5, 'b', 0, 5),
             ])
             .into_mealy(0);
-        assert_eq!(prc.tarjan_dag().dag().size(), 6);
+        assert_eq!(prc.sccs().dag().size(), 6);
         let fwpm = FWPM::trivial(alphabet, prc);
 
         let fdfa = FDFA::from(fwpm);

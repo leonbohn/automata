@@ -23,7 +23,7 @@ impl<R> IntoDeterministicHoaAutomatonStream<R> {
 }
 
 impl<R: BufRead> Iterator for IntoDeterministicHoaAutomatonStream<R> {
-    type Item = DeterministicOmegaAutomaton<hoa::HoaAlphabet>;
+    type Item = DeterministicOmegaAutomaton<PropAlphabet>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -51,7 +51,7 @@ pub struct HoaAutomatonStream<R, const DET: bool = true> {
 }
 
 impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
-    type Item = OmegaAutomaton<hoa::HoaAlphabet, DET>;
+    type Item = OmegaAutomaton<PropAlphabet, DET>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -71,7 +71,7 @@ impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
                             "encountered --END-- in stream, attempting to parse automaton \n{}",
                             &self.buf[..end]
                         );
-                        let aut: Result<OmegaAutomaton<hoa::HoaAlphabet, DET>, _> =
+                        let aut: Result<OmegaAutomaton<PropAlphabet, DET>, _> =
                             parse_omega_automaton_range(&self.buf, 0, end);
                         self.buf.clear();
                         self.pos = 0;
@@ -111,7 +111,7 @@ pub fn parse_omega_automaton_range<const DET: bool>(
     hoa: &str,
     start: usize,
     end: usize,
-) -> Result<OmegaAutomaton<hoa::HoaAlphabet, DET>, String> {
+) -> Result<OmegaAutomaton<PropAlphabet, DET>, String> {
     match HoaRepresentation::try_from(&hoa[start..end]) {
         Ok(aut) => match OmegaAutomaton::try_from(aut) {
             Ok(aut) => Ok(aut),
@@ -129,7 +129,7 @@ pub fn parse_omega_automaton_range<const DET: bool>(
 
 pub fn pop_deterministic_omega_automaton(
     hoa: HoaString,
-) -> Option<(DeterministicOmegaAutomaton<hoa::HoaAlphabet>, HoaString)> {
+) -> Option<(DeterministicOmegaAutomaton<PropAlphabet>, HoaString)> {
     pop_omega_automaton(hoa)
 }
 
@@ -138,7 +138,7 @@ pub fn pop_deterministic_omega_automaton(
 /// function returns `None`.
 pub fn pop_omega_automaton<const DET: bool>(
     hoa: HoaString,
-) -> Option<(OmegaAutomaton<hoa::HoaAlphabet, DET>, HoaString)> {
+) -> Option<(OmegaAutomaton<PropAlphabet, DET>, HoaString)> {
     let mut hoa = hoa;
     const END_LEN: usize = "--END--".len();
     const ABORT_LEN: usize = "--ABORT--".len();
@@ -205,7 +205,7 @@ pub fn pop_omega_automaton<const DET: bool>(
 
 /// Considers the given HOA string as a single automaton and tries to parse it into an
 /// [`OmegaAutomaton`].
-pub fn hoa_to_ts<const DET: bool>(hoa: &str) -> Vec<OmegaAutomaton<hoa::HoaAlphabet, DET>> {
+pub fn hoa_to_ts<const DET: bool>(hoa: &str) -> Vec<OmegaAutomaton<PropAlphabet, DET>> {
     let mut out = vec![];
     for hoa_aut in hoars::parse_hoa_automata(hoa) {
         match hoa_aut.try_into() {
@@ -236,7 +236,7 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
     }
 }
 
-impl<const DET: bool> TryFrom<HoaRepresentation> for OmegaAutomaton<hoa::HoaAlphabet, DET> {
+impl<const DET: bool> TryFrom<HoaRepresentation> for OmegaAutomaton<PropAlphabet, DET> {
     type Error = String;
     fn try_from(value: HoaRepresentation) -> Result<Self, Self::Error> {
         hoa_automaton_to_ts(value)
@@ -247,12 +247,12 @@ impl<const DET: bool> TryFrom<HoaRepresentation> for OmegaAutomaton<hoa::HoaAlph
 /// number of states and inserts transitions with the appropriate labels and colors.
 pub fn hoa_automaton_to_ts<const DET: bool>(
     aut: HoaRepresentation,
-) -> Result<OmegaAutomaton<hoa::HoaAlphabet, DET>, String> {
+) -> Result<OmegaAutomaton<PropAlphabet, DET>, String> {
     let aps = aut.num_aps();
     assert!(aps <= hoa::MAX_APS);
 
-    let alphabet = hoa::HoaAlphabet::from_apnames(aut.aps().iter());
-    let mut ts: TS<hoa::HoaAlphabet, Int, AcceptanceMask, DET> = TS::for_alphabet(alphabet);
+    let alphabet = PropAlphabet::from_apnames(aut.aps().iter());
+    let mut ts: TS<PropAlphabet, Int, AcceptanceMask, DET> = TS::for_alphabet(alphabet);
 
     for (id, state) in aut.body().iter().enumerate() {
         assert_eq!(id, state.id() as usize);
@@ -270,7 +270,10 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
             let expr = label.try_into_hoa_expression(aps)?;
             let color: AcceptanceMask = edge.acceptance_signature().into();
 
-            if ts.add_edge((state.id(), expr, color, target)).is_some() {
+            if ts
+                .add_edge((state.id(), PropExpression::from_bdd(expr), color, target))
+                .is_some()
+            {
                 // this thing is not deterministic, so we return
                 if DET {
                     warn!("rejecting nondeterministic automaton");

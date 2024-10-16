@@ -70,6 +70,7 @@ pub trait FiniteWord: Word {
         VecDeque::from(self.collect_vec())
     }
 
+    /// Repeat self the given number of times.
     fn repeat(self, times: usize) -> Repeat<Self>
     where
         Self: Sized,
@@ -110,7 +111,7 @@ pub trait FiniteWord: Word {
     ///
     /// # Example
     /// ```
-    /// use automata_core::prelude::*;
+    /// use automata::prelude::*;
     /// let word = "abc";
     ///
     /// assert_eq!(word.nth_back(0), Some('c'));

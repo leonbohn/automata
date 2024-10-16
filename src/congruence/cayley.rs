@@ -5,7 +5,7 @@ use super::{Accumulates, RunProfile, TransitionMonoid};
 
 /// Represents the two-sided Cayley graph of a deterministic transition system.
 /// In essence, it is a graph using transition profiles of the ts as nodes. It uses
-/// a [`alphabet::Directional`] alphabet to represent concatenation both from the left and the right.
+/// a [`crate::alphabet::Directional`] alphabet to represent concatenation both from the left and the right.
 ///
 /// There are different ways of building the Cayley graph. The most important distinction
 /// lies in how two colours are combined, which is determined through the [`Accumulates`] trait.
@@ -24,7 +24,7 @@ where
     Ts::EdgeColor: Accumulates,
     Ts::StateColor: Accumulates,
 {
-    alphabet: alphabet::Directional,
+    alphabet: crate::alphabet::Directional,
     expressions: math::OrderedMap<SymbolOf<Self>, EdgeExpression<Self>>,
     m: TransitionMonoid<Ts>,
 }
@@ -61,13 +61,13 @@ where
 
     type EdgeColor = ();
 
-    type EdgeRef<'this> = EdgeReference<'this, alphabet::InvertibleChar, usize, ()> where Self: 'this;
+    type EdgeRef<'this> = EdgeReference<'this, crate::alphabet::InvertibleChar, usize, ()> where Self: 'this;
 
     type StateIndices<'this> = std::ops::Range<usize> where Self: 'this;
 
     type EdgesFromIter<'this> = DeterministicEdgesFrom<'this, Self> where Self: 'this;
 
-    type Alphabet = alphabet::Directional;
+    type Alphabet = crate::alphabet::Directional;
 
     fn alphabet(&self) -> &Self::Alphabet {
         &self.alphabet
@@ -102,7 +102,7 @@ where
 {
     /// Build a new Cayley graph from the given transition system.
     pub fn new(ts: Ts) -> Self {
-        let alphabet = alphabet::Directional::from_iter(ts.alphabet().universe());
+        let alphabet = crate::alphabet::Directional::from_iter(ts.alphabet().universe());
         Cayley {
             expressions: alphabet.expression_map(),
             m: TransitionMonoid::new(ts),
@@ -119,7 +119,7 @@ where
 {
     /// Builds a new Cayley graph from the given transition system and transition monoid.
     pub fn from(ts: Ts, m: TransitionMonoid<Ts>) -> Self {
-        let alphabet = alphabet::Directional::from_iter(ts.alphabet().universe());
+        let alphabet = crate::alphabet::Directional::from_iter(ts.alphabet().universe());
         Self {
             expressions: alphabet.expression_map(),
             alphabet,

@@ -10,7 +10,9 @@ pub use input::{
 pub mod output;
 pub use output::WriteHoa;
 
-pub type HoaAutomaton<const DET: bool> = crate::automaton::OmegaAutomaton<hoars::HoaAlphabet, DET>;
+use crate::prelude::PropAlphabet;
+
+pub type HoaAutomaton<const DET: bool> = crate::automaton::OmegaAutomaton<PropAlphabet, DET>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HoaString(pub(crate) String);

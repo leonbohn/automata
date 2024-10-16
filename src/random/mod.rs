@@ -266,12 +266,12 @@ impl BenchmarkAverages {
     pub fn append<D: Deterministic>(&mut self, det: D) {
         let states = det.size();
 
-        let tjdag = det.tarjan_dag();
+        let tjdag = det.sccs();
 
         let mut maximal_scc_size = 0;
         let mut scc_count = 0;
         let mut non_trivial_scc_sizes = vec![];
-        for scc in tjdag.iter() {
+        for (i, scc) in tjdag.iter() {
             scc_count += 1;
             if scc.is_trivial() {
                 continue;
@@ -339,11 +339,11 @@ pub(crate) fn print_random_ts_benchmark(
 
 #[cfg(test)]
 mod tests {
+    use crate::word;
     use crate::{
         random::{draw_priority, CharAlphabet},
         Dottable, TransitionSystem,
     };
-    use automata_core::word;
     use std::collections::HashMap;
 
     use super::{
