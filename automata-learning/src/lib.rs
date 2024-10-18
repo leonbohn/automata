@@ -15,5 +15,7 @@ pub use priority_mapping::{AnnotatedCongruence, Annotation, WeakPriorityMapping}
 
 pub(crate) mod prefixtree;
 
+mod incongruence;
+
 #[cfg(test)]
 mod tests {}

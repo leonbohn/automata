@@ -10,6 +10,7 @@ pub trait SimpleAlphabet: Alphabet
 where
     Self: Alphabet<Expression = <Self as Alphabet>::Symbol>,
 {
+    fn from_symbols(symbols: impl IntoIterator<Item = Self::Symbol>) -> Self;
     fn express(&self, sym: Self::Symbol) -> &Self::Expression;
     fn try_nth(&self, pos: usize) -> Option<Self::Symbol>;
     fn nth(&self, pos: usize) -> Self::Symbol {
@@ -150,6 +151,9 @@ impl Alphabet for CharAlphabet {
 }
 
 impl SimpleAlphabet for CharAlphabet {
+    fn from_symbols(symbols: impl IntoIterator<Item = Self::Symbol>) -> Self {
+        Self(symbols.into_iter().collect())
+    }
     fn express(&self, sym: Self::Symbol) -> &Self::Expression {
         self.0
             .iter()
