@@ -28,6 +28,10 @@ mod show;
 /// used for the representation of the strongly connected components of a transition system.
 pub mod dag;
 
+/// Module that defines automata types which are weak. Usually, this means that there
+/// is some partial order on the colors emitted.
+pub mod weak;
+
 /// Alias for the default integer type that is used for coloring edges and states.
 pub type Int = u8;
 

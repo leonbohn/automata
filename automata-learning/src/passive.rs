@@ -1,4 +1,5 @@
 use automata::{
+    families::FWPM,
     prelude::*,
     transition_system::{
         operations::{DefaultIfMissing, MapStateColor},
@@ -16,9 +17,7 @@ pub use sample::{ClassOmegaSample, PeriodicOmegaSample, SetSample, SplitOmegaSam
 
 use crate::{
     active::{CompletingMealyOracle, LStar},
-    passive::fwpm::FWPM,
     prefixtree::prefix_tree,
-    AnnotatedCongruence,
 };
 
 use self::precise::PreciseDPA;
@@ -27,9 +26,6 @@ pub use self::sample::{FiniteSample, OmegaSample};
 
 /// Module containing the implementations of the sprout/glerc algorithm.
 pub mod dpainf;
-
-/// Deals with families of weak priority mappings.
-pub mod fwpm;
 
 /// Defines the precise DPA.
 pub mod precise;
@@ -79,7 +75,7 @@ pub fn infer_precise_dpa<A: Alphabet>(
     let forc = split.infer_forc();
     trace!("{}\n{:?}", "INFERRED FORC".bold(), forc);
 
-    let mut fwpm = FWPM::empty(cong.clone());
+    let mut fwpm = FWPM::for_leading(cong.clone());
     for (class, idx) in cong.classes() {
         let periodic_sample = split.get(idx).expect("Must exist!").to_periodic_sample();
         let annotated_prc = AnnotatedCongruence::build(&forc[idx], &periodic_sample);
@@ -91,7 +87,7 @@ pub fn infer_precise_dpa<A: Alphabet>(
         );
         let coloring = annotated_prc.canonic_coloring();
         trace!("{}{:?}", "inferred ".green(), coloring);
-        fwpm.insert_pm(idx, coloring);
+        fwpm.with_progress(&idx, coloring);
     }
     trace!("Calculated the FWPM\n{:?}", fwpm);
     fwpm.into_precise_dpa()

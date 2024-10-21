@@ -23,6 +23,9 @@ pub use with_state_color::{DefaultIfMissing, ProvidesStateColor, UniformColor, W
 
 use super::{EdgeColor, StateColor};
 
+mod change_color_position;
+use change_color_position::IntoEdgeColored;
+
 /// Type alias for the transition system that results from erasing all
 /// colors, c.f. [`super::TransitionSystem::erase_colors`].
 pub type EraseColors<Ts> =

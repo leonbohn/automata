@@ -8,9 +8,7 @@ use automata::{
 use itertools::Itertools;
 use tracing::{debug, info};
 
-use super::fwpm::FWPM;
-
-const MAX_PRIORITIES: usize = 8;
+pub const MAX_PRIORITIES: usize = 8;
 
 pub fn build_precise_dpa_for<A: Alphabet>(fwpm: FWPM<A>) -> DPA<A> {
     match fwpm.complexity() {
