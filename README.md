@@ -1,3 +1,5 @@
+# automata
+
 This is a library concerned with [transition systems and automata](https://en.wikipedia.org/wiki/Finite-state_machine) for both finite and infinite words.
 Provides datastructures, operations (think product, subset, mapping of edge/state colors, restriction, ...) for transition systems, acceptance conditions, congruence relations as well as some reachability theoretic operations on transition systems in general.
 
