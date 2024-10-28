@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use automata::{
     dot::{DotStateAttribute, DotTransitionAttribute},
+    families::FWPM,
     prelude::*,
     Dottable,
 };

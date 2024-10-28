@@ -7,6 +7,7 @@ pub struct WeakPriorityMapping<A: Alphabet = CharAlphabet, C: Color = Int>(
 );
 
 impl<A: Alphabet, C: Color> WeakPriorityMapping<A, C> {
+    /// Constructs a [`MooreMachine`] realizing this weak priority mapping.
     pub fn into_moore(self) -> MooreMachine<A, C, Void> {
         todo!()
     }

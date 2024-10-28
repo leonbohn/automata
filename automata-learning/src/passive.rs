@@ -69,28 +69,29 @@ pub fn dba_rpni<A: Alphabet>(sample: &OmegaSample<A>) -> DBA<A> {
 pub fn infer_precise_dpa<A: Alphabet>(
     sample: &OmegaSample<A>,
 ) -> PreciseDPA<A, { precise::PRECISE_DPA_COLORS }> {
-    let cong = sample.infer_prefix_congruence().unwrap();
-    let split = sample.split(&cong);
+    todo!()
+    // let cong = sample.infer_prefix_congruence().unwrap();
+    // let split = sample.split(&cong);
 
-    let forc = split.infer_forc();
-    trace!("{}\n{:?}", "INFERRED FORC".bold(), forc);
+    // let forc = split.infer_forc();
+    // trace!("{}\n{:?}", "INFERRED FORC".bold(), forc);
 
-    let mut fwpm = FWPM::for_leading(cong.clone());
-    for (class, idx) in cong.classes() {
-        let periodic_sample = split.get(idx).expect("Must exist!").to_periodic_sample();
-        let annotated_prc = AnnotatedCongruence::build(&forc[idx], &periodic_sample);
-        trace!(
-            "{} for class {:?}\t{:?}",
-            "ANNOTATED CONGRUENCE".bold().blue(),
-            class,
-            annotated_prc
-        );
-        let coloring = annotated_prc.canonic_coloring();
-        trace!("{}{:?}", "inferred ".green(), coloring);
-        fwpm.with_progress(&idx, coloring);
-    }
-    trace!("Calculated the FWPM\n{:?}", fwpm);
-    fwpm.into_precise_dpa()
+    // let mut fwpm = FWPM::for_leading(cong.clone());
+    // for (class, idx) in cong.classes() {
+    //     let periodic_sample = split.get(idx).expect("Must exist!").to_periodic_sample();
+    //     let annotated_prc = AnnotatedCongruence::build(&forc[idx], &periodic_sample);
+    //     trace!(
+    //         "{} for class {:?}\t{:?}",
+    //         "ANNOTATED CONGRUENCE".bold().blue(),
+    //         class,
+    //         annotated_prc
+    //     );
+    //     let coloring = annotated_prc.canonic_coloring();
+    //     trace!("{}{:?}", "inferred ".green(), coloring);
+    //     fwpm.with_progress(&idx, coloring);
+    // }
+    // trace!("Calculated the FWPM\n{:?}", fwpm);
+    // fwpm.into_precise_dpa()
 }
 
 /// Similar to [`dba_rpni`], but produces a DPA instead.

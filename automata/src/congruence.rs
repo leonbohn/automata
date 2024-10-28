@@ -77,6 +77,13 @@ pub type IntoRightCongruence<D> =
 pub type CollectRightCongruence<D> =
     RightCongruence<<D as TransitionSystem>::Alphabet, StateColor<D>, EdgeColor<D>>;
 
+impl<A: Alphabet> RightCongruence<A> {
+    /// Constructs a new right congruence with the given alphabet.
+    pub fn new(alphabet: A) -> Self {
+        Self::new_with_initial_color(alphabet, Void)
+    }
+}
+
 impl<A: Alphabet, Q: Color, C: Color, D> RightCongruence<A, Q, C, D>
 where
     D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,

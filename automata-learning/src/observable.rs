@@ -1,14 +1,14 @@
 use automata::{
     math::Bijection,
-    prelude::{Alphabet, DefaultIdType, IndexType, SimpleAlphabet, Symbol},
+    prelude::{Alphabet, DefaultIdType, IndexType, SimpleAlphabet, Sproutable, Symbol},
     word::FiniteWord,
     Color, RightCongruence, Void,
 };
 
 pub trait ColorPosition {
     const ON_EDGES: bool;
-    type Edge<C: Color>: Color;
-    type State<C: Color>: Color;
+    type Edge<C: Color>: std::hash::Hash + Eq + Clone + std::fmt::Debug;
+    type State<C: Color>: std::hash::Hash + Eq + Clone + std::fmt::Debug;
     fn make_edge<C: Color>(c: Option<C>) -> Self::Edge<C>;
     fn make_state<C: Color>(c: Option<C>) -> Self::State<C>;
 }
@@ -16,8 +16,8 @@ pub struct StateColored;
 pub struct EdgeColored;
 impl ColorPosition for EdgeColored {
     const ON_EDGES: bool = true;
-    type Edge<C> = C;
-    type State<C> = Void;
+    type Edge<C: Color> = C;
+    type State<C: Color> = Void;
 
     fn make_edge<C: Color>(c: Option<C>) -> Self::Edge<C> {
         c.unwrap()
@@ -29,8 +29,8 @@ impl ColorPosition for EdgeColored {
 }
 impl ColorPosition for StateColored {
     const ON_EDGES: bool = false;
-    type Edge<C> = Void;
-    type State<C> = C;
+    type Edge<C: Color> = Void;
+    type State<C: Color> = C;
 
     fn make_edge<C: Color>(c: Option<C>) -> Self::Edge<C> {
         Void
@@ -46,50 +46,54 @@ pub trait Observable<A: SimpleAlphabet, CP: ColorPosition> {
     fn alphabet(&self) -> &A;
 
     fn separated(&self, x: &[A::Symbol], y: &[A::Symbol]) -> bool;
-    fn color(&self, x: impl FiniteWord<Symbol = A::Symbol>) -> Self::C;
+    fn observe(&self, x: &[A::Symbol]) -> Option<Self::C>;
 
-    fn right_congruence(self) -> RightCongruence<A, CP::State<Self::C>, CP::Edge<Self::C>> {
-        let mut cong = RightCongruence::new(self.alphabet().clone());
-        let mut mr = vec![];
-        let mut symbols = self.alphabet().universe().collect();
-        let mut positio: DefaultIdType = 0;
+    fn right_congruence(&self) -> RightCongruence<A, CP::State<Self::C>, CP::Edge<Self::C>> {
+        let initial_color = if CP::ON_EDGES {
+            CP::make_state(None)
+        } else {
+            CP::make_state(self.observe(&[]))
+        };
+        let mut cong: RightCongruence<A, CP::State<Self::C>, CP::Edge<Self::C>> =
+            RightCongruence::new_with_initial_color(self.alphabet().clone(), initial_color);
 
-        while position < mr.len() {
+        let mut mr: Vec<Vec<A::Symbol>> = vec![];
+        let mut symbols: Vec<A::Symbol> = self.alphabet().universe().collect();
+        let mut position: DefaultIdType = 0;
+        let mut access: Vec<A::Symbol> = vec![];
+
+        while position < mr.len().try_into().unwrap() {
             'symbols: for sym in &symbols {
                 access.push(*sym);
-                for target in 0..mr.len() {
-                    if !self.separated(&access, &mr[target]) {
-                        let edge_color = if CP::ON_EDGES {
-                            Some(self.color(&access))
-                        } else {
-                            None
-                        };
-                        cong.add_edge((position, target, CP::make_edge(edge_color), 0));
+
+                let new_edge_color = CP::make_edge(if CP::ON_EDGES {
+                    self.observe(&access)
+                } else {
+                    None
+                });
+
+                for target in 0..(mr.len() as DefaultIdType) {
+                    if !self.separated(&access, &mr[target as usize]) {
+                        cong.add_edge((position, *sym, new_edge_color, target));
                         access.pop();
                         continue 'symbols;
                     }
                 }
-                let q = self.observe(&access);
 
-                if let Some(id) = access.iter().position(|a| a == &q) {
-                    let edge_color = if CP::ON_EDGES {
-                        Some(self.color(&access))
-                    } else {
-                        None
-                    };
-                    cong.add_edge((
-                        position,
-                        *sym,
-                        CP::make_edge(edge_color),
-                        id as DefaultIdType,
-                    ));
+                let new_state_color = CP::make_state(if CP::ON_EDGES {
+                    None
                 } else {
-                    let id = access.len();
-                    mr.push(id);
-                    access.push(q);
-                }
+                    self.observe(&access)
+                });
+                let new_state_id = access.len() as DefaultIdType;
+                mr.push(access.clone());
+                assert_eq!(new_state_id, cong.add_state(new_state_color));
+                cong.add_edge((position, *sym, new_edge_color, new_state_id));
+                access.pop();
             }
         }
+
+        cong
     }
 }
 
