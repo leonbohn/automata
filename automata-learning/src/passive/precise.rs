@@ -444,8 +444,8 @@ impl<A: Alphabet, const N: usize> From<FWPM<A>> for PreciseDPA<A, N> {
         let leading = value.leading().clone();
         let padding_dfa = padding_universal_dfa(leading.alphabet());
         let mut prc_dfas = Vec::with_capacity(leading.size());
-        for (idx, mm) in value.pms() {
-            let mut dfas = mm.decompose_dfa();
+        for (idx, mm) in value.progress() {
+            let mut dfas = mm.collect_moore().minimize().decompose_dfa();
             assert!(dfas.len() <= N);
             while dfas.len() < N {
                 dfas.push(padding_dfa.clone());

@@ -20,7 +20,7 @@ impl<A: Alphabet, X: Color, Q: Color, C: Color, const DET: bool> GraphTs<A, (X, 
     pub fn unzip_state_indices(self) -> GraphTs<A, Q, C, DET> {
         GraphTs {
             alphabet: self.alphabet,
-            graph: self.graph.map_node_weights(|(_, w)| w),
+            graph: self.graph.map(|_, (_, c)| c.clone(), |_, c| c.clone()),
         }
     }
 }
@@ -28,45 +28,28 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> GraphTs<A, Q, C, DET> {
     pub fn zip_state_indices(self) -> GraphTs<A, (DefaultIdType, Q), C, DET> {
         GraphTs {
             alphabet: self.alphabet,
-            graph: self.graph.map_nodes(|i, w| (i.into_inner(), w)),
+            graph: self.graph.map(
+                |i, c| (i.index() as DefaultIdType, c.clone()),
+                |_, c| c.clone(),
+            ),
         }
     }
     pub fn graphts_map_state<QQ: Color, F>(self, f: F) -> GraphTs<A, QQ, C, DET>
     where
-        F: Fn(DefaultIdType, Q) -> QQ,
+        F: Fn(DefaultIdType, &Q) -> QQ,
     {
         GraphTs {
             alphabet: self.alphabet,
-            graph: self.graph.map_nodes(|i, q| f(i.into_inner(), q)),
+            graph: self
+                .graph
+                .map(|i, c| (f)(i.index() as DefaultIdType, c), |_, c| c.clone()),
         }
     }
     pub fn graphts_map_state_color<QQ: Color, F>(self, f: F) -> GraphTs<A, QQ, C, DET>
     where
-        F: Fn(Q) -> QQ,
+        F: Fn(&Q) -> QQ,
     {
-        GraphTs {
-            alphabet: self.alphabet,
-            graph: self.graph.map_node_weights(f),
-        }
-    }
-    pub fn graphts_map_edge<CC: Color, F>(self, f: F) -> GraphTs<A, Q, CC, DET>
-    where
-        F: Fn(DefaultIdType, C) -> CC,
-    {
-        GraphTs {
-            alphabet: self.alphabet,
-            graph: self.graph.map_edges(|i, (e, c)| (e, f(i.into_inner(), c))),
-        }
-    }
-
-    pub fn graphts_map_edge_color<CC: Color, F>(self, f: F) -> GraphTs<A, Q, CC, DET>
-    where
-        F: Fn(C) -> CC,
-    {
-        GraphTs {
-            alphabet: self.alphabet,
-            graph: self.graph.map_edge_weights(|(e, c)| (e, f(c))),
-        }
+        self.graphts_map_state(|_, q| (f)(q))
     }
 
     pub fn graphts_restrict_states<F>(self, f: F) -> GraphTs<A, Q, C, DET>
@@ -430,31 +413,7 @@ impl<'a, A: Alphabet, Q: Color, C: Color, const DET: bool> Iterator
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color> Deterministic for GraphTs<A, Q, C, true> {
-    fn collect_graphts_deterministic(
-        self,
-    ) -> GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true> {
-        self
-    }
-    fn collect_dts(self) -> DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>
-    where
-        Self: Sized,
-        EdgeColor<Self>: std::hash::Hash + Eq,
-    {
-        todo!()
-    }
-    fn collect_graphts_deterministic_pointed(
-        self,
-    ) -> (
-        GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true>,
-        StateIndex<GraphTs<Self::Alphabet, StateColor<Self>, EdgeColor<Self>, true>>,
-    )
-    where
-        Self: Pointed,
-    {
-        todo!()
-    }
-}
+impl<A: Alphabet, Q: Color, C: Color> Deterministic for GraphTs<A, Q, C, true> {}
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A> for GraphTs<A, Q, C, DET> {
     fn for_alphabet(from: A) -> Self {
@@ -561,7 +520,7 @@ mod tests {
         let succs: math::Set<_> = pgts.reachable_state_indices_from(q0).collect();
         assert_eq!(succs, math::Set::from_iter([q0, q1, q3, q2]));
 
-        let mut dfa = pgts.into_dfa_with_initial(0);
+        let mut dfa = pgts.with_initial(0).collect_dfa();
 
         for pos in ["", "bbb", "abababa", "a"] {
             assert!(dfa.accepts(pos))

@@ -104,11 +104,7 @@ pub mod prelude {
     };
 
     pub use super::transition_system::impls::packed;
-    #[cfg(feature = "implementations")]
-    pub use super::transition_system::{
-        EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, LinkedListDeterministic,
-        LinkedListNondeterministic, LinkedListTransitionSystem,
-    };
+    pub use super::transition_system::LinkedListTransitionSystem;
     /// implements the interface to the `hoars` package. Is only available on create feature `hoa`.
     #[cfg(feature = "hoa")]
     pub mod hoa {
@@ -116,7 +112,6 @@ pub mod prelude {
     }
     #[cfg(feature = "hoa")]
     pub use crate::hoa::WriteHoa;
-    use crate::transition_system::LinkedListTransitionSystem;
 }
 
 #[allow(missing_docs)]

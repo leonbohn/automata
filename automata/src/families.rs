@@ -28,6 +28,12 @@ pub struct Family<T: Congruence, X> {
 }
 
 impl<T: Congruence, X> Family<T, X> {
+    pub fn leading(&self) -> &T {
+        &self.leading
+    }
+    pub fn progress(&self) -> impl Iterator<Item = (StateIndex<T>, &X)> + '_ {
+        self.progress.iter().map(|(i, p)| (*i, p))
+    }
     pub fn get<W>(&self, word: W) -> Option<&X>
     where
         W: FiniteWord<Symbol = SymbolOf<T>>,

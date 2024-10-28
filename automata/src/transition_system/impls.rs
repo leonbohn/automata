@@ -7,13 +7,6 @@ pub(crate) mod petgraph_backed;
 #[cfg(feature = "petgraph")]
 pub use petgraph_backed::{petgraph, GraphTs, GraphTsNeighborsIter};
 
-#[cfg(feature = "implementations")]
-pub(crate) mod edge_lists;
-#[cfg(feature = "implementations")]
-pub use edge_lists::{
-    EdgeLists, EdgeListsDeterministic, EdgeListsNondeterministic, IntoEdgeLists, MutableTsState,
-};
-
 pub mod packed;
 
 pub(crate) mod linked;

@@ -1,7 +1,6 @@
-pub use from_states_to_edges::IntoEdgeColored;
-
+#[allow(unused)]
 mod from_edges_to_states {
-    use crate::{prelude::*, transition_system::EdgeRef};
+    use crate::prelude::*;
 
     #[derive(Debug, Clone)]
     pub struct IntoStateColored<T: TransitionSystem> {
@@ -9,6 +8,7 @@ mod from_edges_to_states {
     }
 }
 
+#[allow(unused)]
 mod from_states_to_edges {
     use crate::{prelude::*, transition_system::EdgeRef};
 

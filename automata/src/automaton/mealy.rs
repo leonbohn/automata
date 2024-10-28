@@ -51,7 +51,9 @@ where
         self.witness_inequivalence(other).is_none()
     }
 
-    /// Returns a vector over all colors that can be emitted.
+    /// Returns an iterator over all colors that can be emitted.
+    ///
+    /// This is a costly operation as it actually iterates all edges.
     pub fn color_range(&self) -> impl Iterator<Item = C::EdgeColor> + '_
     where
         EdgeColor<Self>: Clone + Hash + Eq,
