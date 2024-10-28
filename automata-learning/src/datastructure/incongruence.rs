@@ -5,6 +5,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use super::Factor;
 use automata::{
     math::{self, Equivalent},
     prelude::{Alphabet, CharAlphabet, Show, SimpleAlphabet, Sproutable, Symbol},
@@ -12,72 +13,6 @@ use automata::{
 };
 use itertools::Itertools;
 use tracing::trace;
-
-#[derive(Clone, Eq, PartialEq)]
-pub struct Factor<S>(Vec<S>);
-
-impl<S> Factor<S> {
-    pub fn without_last(&self) -> Option<Self>
-    where
-        S: Clone,
-    {
-        if self.is_empty() {
-            return None;
-        }
-        Some(Self(self.0[..self.len() - 1].to_vec()))
-    }
-}
-
-impl<S> Deref for Factor<S> {
-    type Target = Vec<S>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl<S> DerefMut for Factor<S> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<S> FromIterator<S> for Factor<S> {
-    fn from_iter<T: IntoIterator<Item = S>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
-    }
-}
-
-impl<S: Symbol> fmt::Debug for Factor<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for sym in self.0.iter().map(|sym| sym.show()) {
-            f.write_str(&sym)?;
-        }
-        Ok(())
-    }
-}
-
-impl<S: Symbol> Ord for Factor<S> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.len().cmp(&other.0.len()).then(
-            self.0
-                .iter()
-                .zip(other.0.iter())
-                .find_map(|(l, r)| {
-                    let ord = l.cmp(r);
-                    if ord != Ordering::Equal {
-                        Some(ord)
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or(Ordering::Equal),
-        )
-    }
-}
-impl<S: Symbol> PartialOrd for Factor<S> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
 
 #[derive(Clone)]
 pub struct Split<S: Symbol>([Factor<S>; 2]);
@@ -89,7 +24,7 @@ impl<S: Symbol> Equivalent<Split<S>> for (&Vec<S>, &Vec<S>) {
 }
 
 impl<S: Symbol> Split<S> {
-    pub fn shave_right(&self) -> Option<Split<S>> {
+    pub fn try_shave_right(&self) -> Option<Split<S>> {
         let [ref a, ref b] = self.0;
         if a.last()? == b.last()? {
             Some(Split::new(
@@ -164,7 +99,7 @@ impl<A: Alphabet> FromIterator<Split<A::Symbol>> for Incongruence<A> {
 }
 
 impl<A: Alphabet> Incongruence<A> {
-    pub fn refine(self) -> RefinedIncongruence<A> {
+    pub fn refine_right_congruence(self) -> RefinedIncongruence<A> {
         let original_size = self.splits.len();
         let mut splits = self.splits;
 
@@ -175,7 +110,7 @@ impl<A: Alphabet> Incongruence<A> {
                 splits[current_index]
             );
             current_index += 1;
-            if let Some(new) = splits[current_index - 1].shave_right() {
+            if let Some(new) = splits[current_index - 1].try_shave_right() {
                 trace!("adding split {:?}", new);
                 splits.push(new)
             }
@@ -299,7 +234,7 @@ mod tests {
             Split::from_words("aab", "ab"),
         ]);
 
-        let refined = incongruence.refine();
+        let refined = incongruence.refine_right_congruence();
         assert!(refined.contains(&Split::from_words("a", "aa")));
         assert!(refined.contains(&Split::from_words("", "ba")));
         assert!(refined.contains(&Split::from_words("", "a")));
@@ -314,7 +249,7 @@ mod tests {
             Split::from_words("aab", "ab"),
         ]);
 
-        let refined = incongruence.refine();
+        let refined = incongruence.refine_right_congruence();
         let rc = refined.as_right_congruence();
 
         rc.display_rendered_graphviz();
