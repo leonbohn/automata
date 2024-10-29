@@ -1,4 +1,3 @@
-use ::automata::prelude::*;
 use pyo3::prelude::*;
 
 #[pyclass(name = "DFA")]

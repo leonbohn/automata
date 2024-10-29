@@ -4,12 +4,21 @@ use std::{
     hash::Hash,
 };
 
+use crate::automaton::Semantics;
+use crate::core::{
+    alphabet::CharAlphabet,
+    math::Partition,
+    word::{FiniteWord, ReducedOmegaWord},
+    Int, Show, Void,
+};
+use crate::representation::{CollectTs, IntoTs};
+use crate::ts::operations::Product;
+use crate::ts::{
+    operations, Deterministic, EdgeColor, IsEdge, Shrinkable, StateColor, StateIndex, SymbolOf,
+};
+use crate::{automaton::InfiniteWordAutomaton, ts::run, Pointed, TransitionSystem, DTS};
 use itertools::Itertools;
 use tracing::trace;
-
-use crate::{
-    automaton::InfiniteWordAutomaton, math::Partition, prelude::*, transition_system::run,
-};
 
 /// A deterministic parity automaton (DPA). It uses a [`DTS`]
 /// as its transition system and an [`Int`] as its edge color.
@@ -71,7 +80,7 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::ts::{Sproutable, TSBuilder};
     ///
     /// let mut dpa = TSBuilder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 1), (0, 'b', 1, 1),
@@ -99,7 +108,8 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::ts::{Deterministic, TSBuilder, TransitionSystem};
+    ///
     /// let dpa = TSBuilder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
     ///     .into_dpa(0);
@@ -140,7 +150,7 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::ts::{Deterministic, TSBuilder, TransitionSystem};
     ///
     /// let dpa = TSBuilder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
@@ -160,7 +170,7 @@ where
     /// done by finding a rejecting cycle in the underlying transition system.
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::ts::{Deterministic, TSBuilder, TransitionSystem};
     ///
     /// let dpa = TSBuilder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
@@ -555,7 +565,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::DPA;
-    use crate::prelude::*;
+    use crate::representation::{CollectTs, IntoTs};
+    use crate::ts::operations::Product;
+    use crate::ts::{Deterministic, TSBuilder};
+    use crate::{Pointed, RightCongruence, TransitionSystem, DTS};
+    use automata_core::{upw, Void};
 
     #[test]
     fn normalize_dpa() {

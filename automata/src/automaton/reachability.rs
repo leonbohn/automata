@@ -1,11 +1,14 @@
-use crate::{prelude::*, transition_system::run::ReachedStateColor};
-
-use self::operations::DefaultIfMissing;
-
-use super::{FiniteWordAutomaton, StatesWithColor};
+use super::{FiniteWordAutomaton, Semantics, StatesWithColor};
+use crate::representation::CollectTs;
+use crate::ts::operations::{DefaultIfMissing, Product, ProductIndex};
+use crate::ts::run::ReachedStateColor;
+use crate::ts::{operations, Deterministic, EdgeColor, StateIndex, SymbolOf};
+use crate::{Congruence, Pointed, TransitionSystem, DTS};
+use automata_core::alphabet::CharAlphabet;
+use automata_core::{math, Void};
 
 /// Defines the [`Semantics`] that are used by a deterministic finite automaton
-/// [`DFA`]. This leads to a [`FiniteWord`] being accepted if the state that it reaches
+/// [`DFA`]. This leads to a [`crate::core::word::FiniteWord`] being accepted if the state that it reaches
 /// is colored with `true`, and the word being rejected otherwise.
 #[derive(Clone, Copy, Default, Hash, Eq, PartialEq)]
 pub struct ReachabilityCondition;
@@ -21,7 +24,7 @@ impl<T: Deterministic<StateColor = bool>> Semantics<T, false> for ReachabilityCo
     type Observer = ReachedStateColor<T>;
     fn evaluate(
         &self,
-        observed: <Self::Observer as crate::transition_system::run::Observer<T>>::Current,
+        observed: <Self::Observer as crate::ts::run::Observer<T>>::Current,
     ) -> Self::Output {
         observed
     }
@@ -43,7 +46,7 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{automaton::DFA, ts::TSBuilder};
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
@@ -184,10 +187,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::automaton::DFA;
+    use crate::ts::TSBuilder;
+
     #[test]
     fn dfa_from_ts() {
-        use crate::prelude::*;
-
         let ts = TSBuilder::without_colors()
             .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
             .into_dts_with_initial(0);

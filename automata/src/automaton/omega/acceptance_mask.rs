@@ -1,8 +1,8 @@
+use crate::core::{Int, Show};
+
 use bit_set::BitSet;
 use itertools::Itertools;
 use tracing::error;
-
-use crate::prelude::*;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AcceptanceMask(BitSet);

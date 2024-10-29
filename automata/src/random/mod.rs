@@ -1,5 +1,11 @@
 #![allow(unused)]
-use crate::prelude::*;
+use crate::automaton::{MealyMachine, MooreMachine, DBA, DFA, DPA};
+use crate::representation::IntoTs;
+use crate::ts::{DefaultIdType, Deterministic, ForAlphabet, Shrinkable, Sproutable, StateIndex};
+use crate::{TransitionSystem, DTS};
+use automata_core::alphabet::{Alphabet, CharAlphabet};
+use automata_core::word::ReducedOmegaWord;
+use automata_core::{math, upw, Int, Void};
 use math::sample_continuous_bernoulli;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 use std::cmp::min;
@@ -339,17 +345,16 @@ pub(crate) fn print_random_ts_benchmark(
 
 #[cfg(test)]
 mod tests {
-    use crate::word;
-    use crate::{
-        random::{draw_priority, CharAlphabet},
-        Dottable, TransitionSystem,
-    };
-    use std::collections::HashMap;
-
     use super::{
         generate_random_dba, generate_random_dfa, generate_random_dpa, generate_random_omega_words,
         generate_random_ts_sized, generate_random_words, print_random_ts_benchmark,
     };
+    use crate::{
+        dot::Dottable,
+        random::{draw_priority, CharAlphabet},
+        TransitionSystem,
+    };
+    use std::collections::HashMap;
 
     #[test]
     #[ignore]

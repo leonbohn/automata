@@ -2,9 +2,14 @@
 use itertools::Itertools;
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
-use crate::{prelude::*, Lattice};
-
 use super::FiniteWordAutomaton;
+use crate::core::{
+    alphabet::{CharAlphabet, Expression},
+    Color, Int, Lattice, Void,
+};
+use crate::ts::operations::{Product, ProductIndex};
+use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor, SymbolOf};
+use crate::{Pointed, TransitionSystem, DTS};
 
 /// Represents the semantics of a Mealy machine. Concretely, this type returns for
 /// a finite run, the last transition color that is taken. It panics if the run has
@@ -121,7 +126,11 @@ impl<Q> Default for MealySemantics<Q> {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
+    use crate::automaton::MealyMachine;
+    use crate::representation::IntoTs;
+    use crate::ts::TSBuilder;
+    use crate::DTS;
+    use automata_core::Void;
 
     #[test]
     fn mealy_equivalence() {

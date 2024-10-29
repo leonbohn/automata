@@ -1,6 +1,9 @@
-use crate::prelude::*;
-
-use super::{moore::MooreLike, FiniteWordAutomaton};
+use super::{moore::MooreLike, FiniteWordAutomaton, MealyLike, Semantics};
+use crate::ts::run::Observer;
+use crate::ts::{run, EdgeColor, StateColor};
+use crate::DTS;
+use automata_core::alphabet::CharAlphabet;
+use automata_core::{Int, Void};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WeakPriorityMappingSemantics<const ON_EDGES: bool>;

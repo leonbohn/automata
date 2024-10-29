@@ -1,8 +1,10 @@
-use automata::prelude::*;
-
+use automata::hoa::WriteHoa;
+use automata::TransitionSystem;
 use tracing::{debug, info, trace};
 use tracing_subscriber::{filter, prelude::*};
 
+use automata::automaton::DeterministicOmegaAutomaton;
+use automata::core::alphabet::{CharAlphabet, PropAlphabet};
 use clap::{Arg, ArgMatches, Command};
 
 fn cli() -> clap::Command {

@@ -4,11 +4,18 @@ use rayon::prelude::*;
 use std::{collections::HashMap, env, fs, path::PathBuf, time::Duration};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
+use automata::automaton::{BuchiCondition, MinEvenParityCondition, Semantics, DBA, DPA};
+use automata::core::alphabet::{Alphabet, CharAlphabet};
+use automata::core::word::{OmegaWord, ReducedOmegaWord};
+use automata::core::{math, upw, Color, Void};
+use automata::representation::CollectTs;
+use automata::ts::run::InfiniteObserver;
+use automata::ts::Deterministic;
 use automata::{
     automaton::InfiniteWordAutomaton,
-    hoa::output::WriteHoa,
-    prelude::*,
+    hoa::WriteHoa,
     random::{generate_random_dba, generate_random_dpa, generate_random_omega_words},
+    TransitionSystem, DTS,
 };
 use automata_learning::passive::{
     sprout::{sprout, SproutError},
