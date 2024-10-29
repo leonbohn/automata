@@ -1,8 +1,13 @@
 #![allow(missing_docs)]
 
-use operations::MapStateColor;
+use crate::core::{math, Color, Int, Void};
 
-use crate::prelude::*;
+use crate::automaton::{MealyMachine, MooreMachine, DBA, DFA, DPA};
+use crate::ts::{
+    DefaultIdType, Deterministic, EdgeColor, ForAlphabet, IsEdge, Sproutable, StateColor,
+    StateIndex,
+};
+use crate::{Congruence, Pointed, RightCongruence, TransitionSystem, DTS};
 
 pub trait StateColored<Q: Color = Int> {}
 impl<T: TransitionSystem> StateColored<StateColor<T>> for T {}
@@ -278,6 +283,11 @@ pub trait IntoTs: TransitionSystem {
 
 mod impl_into_ts {
     use super::*;
+    use crate::automaton::Automaton;
+    use crate::ts::operations::MapStateColor;
+    use crate::ts::{operations, EdgeColor, EdgeExpression, StateColor, StateIndex, SymbolOf};
+    use crate::{TransitionSystem, DTS};
+    use automata_core::alphabet::Alphabet;
 
     impl<A: Alphabet, Q: Color, C: Color> IntoTs for DTS<A, Q, C> {
         // fn into_dts_preserving(
@@ -355,9 +365,12 @@ mod impl_into_ts {
 
 #[cfg(test)]
 mod tests {
+    use crate::representation::IntoTs;
+    use crate::ts::TSBuilder;
+    use crate::{Pointed, TransitionSystem};
+
     #[test]
     fn representation() {
-        use crate::prelude::*;
         let ts = TSBuilder::default()
             .with_state_colors([false, false, true, true, true, false])
             .with_edges([

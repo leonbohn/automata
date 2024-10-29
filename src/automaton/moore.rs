@@ -1,9 +1,13 @@
 use itertools::Itertools;
 use std::fmt::Debug;
 
-use crate::{prelude::*, Lattice};
+use crate::core::{alphabet::CharAlphabet, word::FiniteWord, Color, Int, Lattice, Void};
 
-use super::FiniteWordAutomaton;
+use super::{FiniteWordAutomaton, MealyMachine, DFA};
+use crate::representation::{CollectTs, IntoTs};
+use crate::ts::operations::{Product, ProductIndex};
+use crate::ts::{Deterministic, EdgeColor, StateColor, SymbolOf};
+use crate::{Congruence, Pointed, TransitionSystem, DTS};
 
 /// Represents the semantics of a Moore machine, it produces the color of the
 /// state that is reached during a run on a word. If the input is empty, it
@@ -22,7 +26,7 @@ impl<T: TransitionSystem<StateColor: Lattice> + Deterministic + Pointed> MooreLi
 ///
 /// Usually, we are interested in the output of the last state that is reached during a run
 /// on a word. In case of a deterministic Moore machine, this is the only output that is
-/// produced. A [`DFA`] is then a Moore machine, where the colors are `bool`. A word reaches
+/// produced. A [`crate::automaton::DFA`] is then a Moore machine, where the colors are `bool`. A word reaches
 /// a state and the corresponding `bool` is emitted, where `true` corresponds to an accepted
 /// input, whereas `false` represents a rejected input. For infinite runs, we usually
 /// consider the colors that are produced infinitely often and base acceptance around them. It
@@ -33,7 +37,7 @@ pub type MooreMachine<A = CharAlphabet, Q = Int, C = Void, D = DTS<A, Q, C>> =
 
 /// Helper type that takes a pointed transition system and returns the corresponding
 /// [`MooreMachine`], which the ts can be converted into using [`Into::into`].
-/// For concrete automaton types such as [`DFA`], the [`IntoDFA`] type can be used to
+/// For concrete automaton types such as [`crate::automaton::DFA`], the [`crate::automaton::IntoDFA`] type can be used to
 /// obtain the type of a [`DFA`] for the given ts.
 pub type IntoMooreMachine<D> =
     MooreMachine<<D as TransitionSystem>::Alphabet, StateColor<D>, EdgeColor<D>, D>;

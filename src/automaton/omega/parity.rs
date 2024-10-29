@@ -4,12 +4,21 @@ use std::{
     hash::Hash,
 };
 
+use crate::automaton::Semantics;
+use crate::core::{
+    alphabet::CharAlphabet,
+    math::Partition,
+    word::{FiniteWord, ReducedOmegaWord},
+    Int, Show, Void,
+};
+use crate::representation::{CollectTs, IntoTs};
+use crate::ts::operations::Product;
+use crate::ts::{
+    operations, Deterministic, EdgeColor, IsEdge, Shrinkable, StateColor, StateIndex, SymbolOf,
+};
+use crate::{automaton::InfiniteWordAutomaton, ts::run, Pointed, TransitionSystem, DTS};
 use itertools::Itertools;
 use tracing::trace;
-
-use crate::{
-    automaton::InfiniteWordAutomaton, math::Partition, prelude::*, transition_system::run,
-};
 
 /// A deterministic parity automaton (DPA). It uses a [`DTS`]
 /// as its transition system and an [`Int`] as its edge color.
@@ -555,7 +564,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::DPA;
-    use crate::prelude::*;
+    use crate::representation::{CollectTs, IntoTs};
+    use crate::ts::operations::Product;
+    use crate::ts::{Deterministic, TSBuilder};
+    use crate::{Pointed, RightCongruence, TransitionSystem, DTS};
+    use automata_core::{upw, Void};
 
     #[test]
     fn normalize_dpa() {

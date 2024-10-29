@@ -1,8 +1,13 @@
-use crate::prelude::*;
+use itertools::Itertools;
 use tracing::{trace, warn};
 
-use super::{Alphabet, CollectTs, Deterministic, TransitionSystem, FDFA, FWPM};
-use itertools::Itertools;
+use crate::{
+    core::{alphabet::Alphabet, math, Show},
+    families::{FDFA, FWPM},
+    representation::CollectTs,
+    ts::Deterministic,
+    TransitionSystem,
+};
 
 impl<A: Alphabet> From<FWPM<A>> for FDFA<A> {
     fn from(value: FWPM<A>) -> Self {
@@ -153,12 +158,13 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
 
 #[cfg(test)]
 mod tests {
+    use crate::automaton::DFA;
+    use crate::ts::TSBuilder;
     use crate::{
-        alphabet::CharAlphabet,
         families::{FDFA, FWPM},
-        prelude::{TSBuilder, DFA},
         TransitionSystem,
     };
+    use automata_core::alphabet::CharAlphabet;
 
     #[test_log::test]
     fn fdfa_to_fwpm() {

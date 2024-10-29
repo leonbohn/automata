@@ -1,5 +1,9 @@
-use crate::prelude::*;
-use math::Map;
+use crate::core::{
+    alphabet::{Alphabet, CharAlphabet},
+    math::Map,
+    word::FiniteWord,
+    Int, Void,
+};
 
 pub type FORC<A = CharAlphabet, Q = Void, C = Void> =
     Family<RightCongruence<A>, RightCongruence<A, Q, C>>;
@@ -16,6 +20,9 @@ mod fwpm;
 pub use fwpm::*;
 
 mod convert;
+use crate::automaton::{MealyMachine, DFA};
+use crate::ts::{StateIndex, SymbolOf};
+use crate::{Congruence, RightCongruence};
 #[allow(unused)]
 pub use convert::*;
 
@@ -87,6 +94,7 @@ impl<A: Alphabet, X> Family<RightCongruence<A>, X> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use automata_core::alphabet::CharAlphabet;
     #[test]
     fn family_interaction() {
         let mut fam = Family::trivial(CharAlphabet::of_size(2), 1337);
