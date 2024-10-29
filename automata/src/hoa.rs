@@ -10,7 +10,9 @@ pub use input::{
 pub mod output;
 pub use output::WriteHoa;
 
-use crate::prelude::PropAlphabet;
+pub use hoars::*;
+
+use crate::core::alphabet::PropAlphabet;
 
 pub type HoaAutomaton<const DET: bool> = crate::automaton::OmegaAutomaton<PropAlphabet, DET>;
 

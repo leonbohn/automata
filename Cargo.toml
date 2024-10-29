@@ -1,5 +1,12 @@
 [workspace]
-members = ["automata", "automata-learning", "bin/*", "hoars"]
+members = [
+    "automata",
+    "automata-learning",
+    # "automata-alternation",
+    "automata-core",
+    "bin/*",
+    "hoars",
+]
 default-members = ["automata", "automata-*", "hoars", "bin/*"]
 exclude = ["python", "bench"]
 resolver = "2"

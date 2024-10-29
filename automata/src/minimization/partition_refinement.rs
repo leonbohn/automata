@@ -7,10 +7,13 @@
 //! transition systems which have outputs on both the states and the transitions.
 use std::{collections::BTreeSet, time::Instant};
 
+use crate::automaton::{MealyMachine, MooreMachine};
+use crate::core::{math, math::Partition, Color};
+use crate::representation::{CollectTs, IntoTs};
+use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor};
+use crate::{Congruence, TransitionSystem};
 use itertools::Itertools;
 use tracing::{debug, trace};
-
-use crate::{math::Partition, prelude::*};
 
 /// Computes the maximal bisimulation of the given something that behaves like a mealy machine. The returned
 /// partition is a [`Partition`] of the state indices, where any states in the same class of the
@@ -212,9 +215,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{prelude::*, tests::wiki_dfa};
-
     use super::moore_partition_refinement;
+    use crate::representation::IntoTs;
+    use crate::{tests::wiki_dfa, TransitionSystem, DTS};
 
     #[test]
     fn partition_refinement_moore() {

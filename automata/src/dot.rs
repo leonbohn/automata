@@ -3,7 +3,10 @@
 use std::fmt::{Debug, Display};
 use thiserror::Error;
 
-use crate::prelude::*;
+use crate::automaton::{IntoDPA, IntoMealyMachine, IntoMooreMachine, DFA};
+use crate::core::{alphabet::Alphabet, Color, Int, Show};
+use crate::ts::{Deterministic, IsEdge, StateColor, StateIndex};
+use crate::{Pointed, TransitionSystem};
 use itertools::Itertools;
 
 #[cfg(feature = "render")]
@@ -309,7 +312,7 @@ where
         [DotTransitionAttribute::Label(format!(
             "{:?}|{:?}",
             t.expression(),
-            t.color()
+            IsEdge::color(&t)
         ))]
         .into_iter()
     }
@@ -389,7 +392,7 @@ where
         vec![DotTransitionAttribute::Label(format!(
             "{}|{:?}",
             t.expression().show(),
-            t.color()
+            IsEdge::color(&t)
         ))]
     }
 
@@ -420,7 +423,7 @@ where
         vec![DotTransitionAttribute::Label(format!(
             "{}|{}",
             t.expression().show(),
-            t.color().show()
+            IsEdge::color(&t).show()
         ))]
     }
 
@@ -526,13 +529,15 @@ fn sanitize_dot_ident(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
+    use super::Dottable;
+    use crate::core::Void;
+    use crate::ts::TSBuilder;
+    use crate::DTS;
 
     #[test_log::test]
     #[cfg(feature = "render")]
     #[ignore]
     fn render_dfa() {
-        use super::Dottable;
         let dfa = DTS::builder()
             .with_transitions([
                 (0, 'a', Void, 0),
@@ -584,7 +589,6 @@ mod tests {
     #[ignore]
     #[cfg(feature = "render")]
     fn svg_open_dpa() {
-        use super::Dottable;
         let dpa = TSBuilder::without_state_colors()
             .with_edges([
                 (0, 'a', 1, 0),

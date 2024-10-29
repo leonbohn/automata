@@ -1,4 +1,3 @@
-use automata::prelude::*;
 #[cfg(feature = "commit_4")]
 use packed::{Id, Packed, PackedEdge};
 

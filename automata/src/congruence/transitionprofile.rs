@@ -1,9 +1,10 @@
 #![allow(missing_docs)]
 use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
+use crate::core::{alphabet::Alphabet, word::FiniteWord, Show, Void};
+use crate::ts::{Deterministic, EdgeColor, IndexType, IsEdge, StateColor, SymbolOf};
+use crate::{Pointed, TransitionSystem};
 use itertools::Itertools;
-
-use crate::prelude::*;
 
 /// Represents the monoid of transition profiles of a transition system.
 ///
@@ -446,7 +447,7 @@ mod tests {
 
     #[test]
     fn tp_from_ts_time() {
-        let dfa = crate::prelude::TSBuilder::without_edge_colors()
+        let dfa = crate::ts::TSBuilder::without_edge_colors()
             .with_transitions([(0, 'a', 0), (0, 'b', 1), (1, 'a', 1), (1, 'b', 0)])
             .with_state_colors([false, true])
             .into_dfa(0);

@@ -1,6 +1,11 @@
-use crate::prelude::*;
-
 mod class;
+
+use crate::core::{
+    alphabet::{Alphabet, CharAlphabet},
+    math, word,
+    word::OmegaWord,
+    Color, Void,
+};
 pub use class::Class;
 
 mod transitionprofile;
@@ -10,6 +15,11 @@ mod cayley;
 pub use cayley::{Cayley, RightCayley};
 
 mod minimal_representative;
+use crate::automaton::{FiniteWordAutomaton, DFA};
+use crate::representation::IntoTs;
+use crate::ts::operations::DefaultIfMissing;
+use crate::ts::{Deterministic, EdgeColor, StateColor, StateIndex, SymbolOf};
+use crate::{Pointed, TransitionSystem, DTS};
 pub use minimal_representative::{LazyMinimalRepresentatives, MinimalRepresentative, StateNaming};
 
 /// A congruence is a [`TransitionSystem`], which additionally has a distinguished initial state. On top

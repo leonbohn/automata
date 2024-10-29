@@ -1,4 +1,8 @@
-use crate::prelude::*;
+use crate::core::{alphabet::Alphabet, word::FiniteWord, Color};
+
+use crate::automaton::Automaton;
+use crate::ts::Deterministic;
+use crate::Pointed;
 
 impl<A, Z, Q, C, D, const OMEGA: bool> Automaton<A, Z, Q, C, D, OMEGA, true>
 where

@@ -1,9 +1,17 @@
 use itertools::Itertools;
 use tracing::trace;
 
-use crate::prelude::*;
-
 use std::fmt::{Result, Write};
+
+use crate::{
+    automaton::{OmegaAcceptanceCondition, DBA, DPA},
+    core::{
+        alphabet::{Alphabet, CharAlphabet, PropAlphabet},
+        Int, Show,
+    },
+    ts::{EdgeColor, EdgeExpression, IsEdge},
+    Pointed, TransitionSystem,
+};
 
 pub trait WriteHoa: TransitionSystem + Pointed {
     fn write_hoa<W: Write>(&self, w: &mut W) -> Result {
@@ -247,7 +255,8 @@ fn build_parity_condition_hoa(low: Int, high: Int) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{TSBuilder, WriteHoa};
+    use super::WriteHoa;
+    use crate::ts::TSBuilder;
 
     #[test]
     fn build_parity_hoa_string() {

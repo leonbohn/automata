@@ -1,6 +1,9 @@
-use crate::prelude::*;
-
 mod acceptance_type;
+use crate::core::{
+    alphabet::{Alphabet, CharAlphabet, Matcher},
+    word::{FiniteWord, OmegaWord},
+    Color,
+};
 pub use acceptance_type::OmegaAcceptanceType;
 
 #[macro_use]
@@ -23,7 +26,7 @@ pub use omega::{
 };
 
 mod with_initial;
-use run::{InfiniteObserver, Observer};
+use crate::ts::run::{InfiniteObserver, Observer};
 pub use with_initial::{WithInitial, WithoutCondition};
 
 /// Defines the semantics of automata, i.e. when something is accepted.
@@ -33,6 +36,12 @@ pub use semantics::Semantics;
 mod deterministic;
 
 mod priority_mapping;
+use crate::ts::predecessors::PredecessorIterable;
+use crate::ts::{
+    Deterministic, EdgeExpression, ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable, StateColor,
+    StateIndex, SymbolOf, TSBuilder,
+};
+use crate::{Congruence, Pointed, TransitionSystem, DTS, TS};
 pub use priority_mapping::{StateBasedWeakPriorityMapping, WeakPriorityMapping};
 
 /// Type alias for an omega word automaton, like [`DBA`], [`DMA`], [`DPA`] or [`DRA`].
@@ -330,7 +339,7 @@ where
     fn set_state_color(&mut self, _index: StateIndex<Self>, _color: StateColor<Self>) {
         todo!()
     }
-    fn add_edge<E>(&mut self, t: E) -> Option<crate::transition_system::EdgeTuple<Self>>
+    fn add_edge<E>(&mut self, t: E) -> Option<crate::ts::EdgeTuple<Self>>
     where
         E: IntoEdgeTuple<Self>,
     {
@@ -353,7 +362,7 @@ where
         &mut self,
         source: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+    ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
         self.ts_mut().remove_edges_from_matching(source, matcher)
     }
 
@@ -362,7 +371,7 @@ where
         source: StateIndex<Self>,
         target: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+    ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
         self.ts_mut()
             .remove_edges_between_matching(source, target, matcher)
     }
@@ -370,21 +379,21 @@ where
         &mut self,
         source: StateIndex<Self>,
         target: StateIndex<Self>,
-    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+    ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
         self.ts_mut().remove_edges_between(source, target)
     }
 
     fn remove_edges_from(
         &mut self,
         source: StateIndex<Self>,
-    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+    ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
         self.ts_mut().remove_edges_from(source)
     }
 
     fn remove_edges_to(
         &mut self,
         target: StateIndex<Self>,
-    ) -> Option<Vec<crate::transition_system::EdgeTuple<Self>>> {
+    ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
         self.ts_mut().remove_edges_to(target)
     }
 }
@@ -513,7 +522,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
+    use crate::automaton::{MooreMachine, DBA, DFA};
+    use crate::representation::CollectTs;
+    use automata_core::upw;
+    use automata_core::word::ReducedOmegaWord;
 
     #[test]
     fn mealy_color_or_below() {
