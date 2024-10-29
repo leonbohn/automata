@@ -1,4 +1,6 @@
-use crate::prelude::*;
+use crate::automaton::Automaton;
+use crate::ts::{EdgeColor, StateColor};
+use crate::TransitionSystem;
 use std::fmt::Debug;
 
 /// Auxiliary type that is used as marker for an [`Automaton`] where we are not

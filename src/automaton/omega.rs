@@ -1,6 +1,5 @@
-use crate::{math::OrderedSet, prelude::*};
-
 mod buchi;
+
 pub use buchi::*;
 
 mod parity;
@@ -14,16 +13,21 @@ pub use muller::*;
 
 #[allow(missing_docs)]
 mod acceptance_mask;
+use super::InfiniteWordAutomaton;
+use crate::representation::IntoTs;
+use crate::ts::{DefaultIdType, ForAlphabet, IsEdge, ScalarIndexType, Sproutable, TSBuilder};
+use crate::{Pointed, TransitionSystem, DTS, TS};
 pub use acceptance_mask::AcceptanceMask;
+use automata_core::alphabet::{Alphabet, CharAlphabet, PropAlphabet};
+use automata_core::math::OrderedSet;
+use automata_core::Int;
 use tracing::{error, trace};
 
-use super::InfiniteWordAutomaton;
-
 /// Type alias for an omega automaton (i.e. an [`InfiniteWordAutomaton`]) that is guaranteed to be
-/// [`Deterministic`].
+/// [`crate::Deterministic`].
 pub type DeterministicOmegaAutomaton<A> = OmegaAutomaton<A, true>;
 /// Type alias for an omega automaton (i.e. an [`InfiniteWordAutomaton`]) that is not necessarily
-/// [`Deterministic`].
+/// [`crate::Deterministic`].
 pub type NondeterministicOmegaAutomaton<A> = OmegaAutomaton<A, false>;
 
 /// Represents a generic omega automaton, i.e. an automaton over infinite words.
@@ -171,7 +175,7 @@ impl From<DeterministicOmegaAutomaton<PropAlphabet>> for DeterministicOmegaAutom
                 value.edges_from(q).unwrap().flat_map(|edge| {
                     edge.expression()
                         .chars_iter()
-                        .map(move |sym| (edge.source(), sym, edge.color(), edge.target()))
+                        .map(move |sym| (edge.source(), sym, IsEdge::color(&edge), edge.target()))
                 })
             }))
             .into_dts();

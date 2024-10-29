@@ -1,9 +1,14 @@
 use std::{cell::OnceCell, hash::Hash};
 
+use crate::core::{
+    math,
+    word::{FiniteWord, Word},
+    Show,
+};
+use crate::ts::{StateIndex, SymbolOf};
+use crate::{Pointed, TransitionSystem};
 use bimap::BiBTreeMap;
 use itertools::Itertools;
-
-use crate::prelude::*;
 
 /// Represents a bijection between state indices of a transition
 /// system and the minimal representative word.
@@ -139,7 +144,7 @@ impl<T: TransitionSystem + Show> Show for MinimalRepresentative<T> {
     }
 }
 
-/// Gives lazy acceess to the minimal representatives of a [`RightCongruence`]. This is used
+/// Gives lazy acceess to the minimal representatives of a [`crate::RightCongruence`]. This is used
 /// to avoid recomputing the minimal representatives of a congruence multiple times.
 #[derive(Clone, Debug)]
 pub struct LazyMinimalRepresentatives<T: TransitionSystem>(

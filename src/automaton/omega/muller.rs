@@ -1,6 +1,8 @@
-use crate::automaton::InfiniteWordAutomaton;
+use crate::core::{alphabet::CharAlphabet, math, Color, Void};
 
-use crate::prelude::*;
+use crate::automaton::{InfiniteWordAutomaton, Semantics};
+use crate::ts::{run, Deterministic, EdgeColor, StateColor};
+use crate::{TransitionSystem, DTS};
 
 /// A deterministic Muller automaton (DMA) uses a [`MullerCondition`] to determine acceptance.
 /// Such a condition consists of a set of sets of colors. It considers an infinite run to
@@ -27,7 +29,7 @@ impl<C: Color + Ord> MullerCondition<C> {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::automaton::MullerCondition;
     ///
     /// let condition = MullerCondition::from_iter_iter([[0], [1]]);
     ///
@@ -71,6 +73,8 @@ impl<T: Deterministic> Semantics<T, true> for MullerCondition<EdgeColor<T>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ts::TSBuilder;
+    use automata_core::upw;
 
     #[test]
     fn muller_automaton() {

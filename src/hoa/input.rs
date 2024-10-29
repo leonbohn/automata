@@ -1,9 +1,13 @@
 use std::{io::BufRead, ops::Deref};
 
-use crate::{
-    automaton::{AcceptanceMask, DeterministicOmegaAutomaton},
-    prelude::*,
+use crate::automaton::{
+    AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
 };
+use crate::core::{
+    alphabet::{PropAlphabet, PropExpression},
+    Int,
+};
+use crate::ts::{ForAlphabet, Sproutable, TransitionSystem};
 use hoars::HoaRepresentation;
 use tracing::{trace, warn};
 
@@ -243,16 +247,17 @@ impl<const DET: bool> TryFrom<HoaRepresentation> for OmegaAutomaton<PropAlphabet
     }
 }
 
-/// Converts a [`HoaRepresentation`] into a [`NTS`] with the same semantics. This creates the appropriate
+/// Converts a [`HoaRepresentation`] into a [`crate::NTS`] with the same semantics. This creates the appropriate
 /// number of states and inserts transitions with the appropriate labels and colors.
 pub fn hoa_automaton_to_ts<const DET: bool>(
     aut: HoaRepresentation,
 ) -> Result<OmegaAutomaton<PropAlphabet, DET>, String> {
     let aps = aut.num_aps();
-    assert!(aps <= hoa::MAX_APS);
+    assert!(aps <= crate::hoa::MAX_APS);
 
     let alphabet = PropAlphabet::from_apnames(aut.aps().iter());
-    let mut ts: TS<PropAlphabet, Int, AcceptanceMask, DET> = TS::for_alphabet(alphabet);
+    let mut ts: crate::TS<PropAlphabet, Int, AcceptanceMask, DET> =
+        crate::TS::for_alphabet(alphabet);
 
     for (id, state) in aut.body().iter().enumerate() {
         assert_eq!(id, state.id() as usize);

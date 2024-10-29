@@ -1,4 +1,10 @@
-use crate::{automaton::InfiniteWordAutomaton, prelude::*, transition_system::run};
+use crate::automaton::Semantics;
+use crate::representation::{CollectTs, IntoTs};
+use crate::ts::{Deterministic, StateColor, SymbolOf};
+use crate::{automaton::InfiniteWordAutomaton, ts::run, TransitionSystem, DTS};
+use automata_core::alphabet::CharAlphabet;
+use automata_core::word::ReducedOmegaWord;
+use automata_core::Void;
 
 /// Defines the [`Semantics`] of a deterministic Büchi automaton (DBA),
 /// which is an acceptor of infinite words. It considers the set of
@@ -35,7 +41,7 @@ impl<C> IntoDBA<C>
 where
     C: Deterministic<EdgeColor = bool>,
 {
-    /// Performs a streamlining operation akin to [`DPA::streamlined`].
+    /// Performs a streamlining operation akin to [`super::DPA::streamlined`].
     pub fn streamlined(&self) -> DBA<C::Alphabet>
     where
         C: IntoTs + Clone,
