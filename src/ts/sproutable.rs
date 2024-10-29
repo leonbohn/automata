@@ -73,7 +73,11 @@ pub trait Sproutable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{
+    ///     core::{alphabet::CharAlphabet, Void},
+    ///     ts::{Deterministic, ForAlphabet, TSBuilder, Shrinkable, Sproutable, TransitionSystem},
+    ///     DTS,
+    /// };
     ///     
     /// let mut ts = DTS::<_, _, Void>::for_alphabet(CharAlphabet::of_size(3));
     /// let q0 = ts.add_state(false);
@@ -97,7 +101,11 @@ pub trait Sproutable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{
+    ///     core::alphabet::CharAlphabet,
+    ///     ts::{Deterministic, ForAlphabet, TSBuilder, Shrinkable, Sproutable, TransitionSystem},
+    ///     DTS,
+    /// };
     ///
     /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(3));
     /// let q0 = ts.add_state(false);
@@ -124,7 +132,11 @@ pub trait Sproutable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{
+    ///     core::alphabet::CharAlphabet,
+    ///     ts::{Deterministic, ForAlphabet, TSBuilder, TransitionSystem, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
     ///
     /// let source: DTS<CharAlphabet, usize, usize> = DTS::builder()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
@@ -181,7 +193,11 @@ pub trait Sproutable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{
+    ///     core::alphabet::CharAlphabet,
+    ///     ts::{Deterministic, TransitionSystem, ForAlphabet, TSBuilder, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
     ///
     /// let source: DTS<CharAlphabet, usize, usize> = DTS::builder()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
@@ -214,7 +230,11 @@ pub trait Sproutable: TransitionSystem {
     /// one which is complete. For an incomplete transition system, this should result in
     /// a new state being created.
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{
+    ///     core::{alphabet::CharAlphabet, Void},
+    ///     ts::{Deterministic, ForAlphabet, TSBuilder, Shrinkable, TransitionSystem, Sproutable},
+    ///     DTS,
+    /// };
     ///
     /// let mut ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0)])
@@ -230,7 +250,11 @@ pub trait Sproutable: TransitionSystem {
     /// for every alphabet symbol going out from every state, then the method should return the
     /// original TS unchanged.
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{
+    ///     core::{alphabet::CharAlphabet, Void},
+    ///     ts::{Deterministic, ForAlphabet, TSBuilder, TransitionSystem, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
     /// let mut ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
@@ -280,8 +304,11 @@ pub trait Sproutable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
-    ///
+    /// use automata::{
+    ///     core::{alphabet::CharAlphabet, Void},
+    ///     ts::{Deterministic, TransitionSystem, ForAlphabet, TSBuilder, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
     ///
     /// let mut ts = DTS::<_, _, Void>::for_alphabet(CharAlphabet::of_size(3));
     /// let states = ts.extend_states([true, false, true]);

@@ -56,7 +56,7 @@ pub mod run;
 pub mod predecessors;
 
 mod word_as_ts;
-use crate::ts::predecessors::PredecessorIterable;
+pub use crate::ts::predecessors::PredecessorIterable;
 pub use word_as_ts::WordTs;
 
 /// Encapsulates the transition function δ of a (finite) transition system. This is the main trait that
@@ -473,7 +473,7 @@ pub trait TransitionSystem: Sized {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::ts::{TSBuilder, Deterministic, operations::UniformColor, TransitionSystem};
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])

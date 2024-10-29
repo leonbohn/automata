@@ -10,8 +10,11 @@ use itertools::Itertools;
 ///
 /// # Examples
 /// ```
-/// use automata::prelude::*;
-/// use automata::congruence::{TransitionMonoid, RunProfile};
+/// use automata::{
+///     core::Void,
+///     congruence::{RunProfile, TransitionMonoid},
+///     ts::TSBuilder,
+/// };
 ///
 /// let dfa = TSBuilder::without_edge_colors()
 ///     .with_transitions([(0, 'a', 0), (0, 'b', 1), (1, 'a', 1), (1, 'b', 0)])

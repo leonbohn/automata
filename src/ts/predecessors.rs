@@ -19,7 +19,7 @@ pub trait PredecessorIterable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::ts::{PredecessorIterable, TSBuilder};
     ///
     /// let ts = TSBuilder::without_state_colors()
     ///     .with_transitions([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (2, 'a', 0)])

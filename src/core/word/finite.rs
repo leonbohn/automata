@@ -111,7 +111,8 @@ pub trait FiniteWord: Word {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata_core::word::FiniteWord;
+    ///
     /// let word = "abc";
     ///
     /// assert_eq!(word.nth_back(0), Some('c'));

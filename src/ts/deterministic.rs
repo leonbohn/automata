@@ -36,15 +36,19 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{
+    ///     core::Void,
+    ///     ts::{Deterministic, IsEdge, TSBuilder},
+    /// };
+    ///
     /// let ts = TSBuilder::without_state_colors()
     ///     .with_transitions([(0, 'a', Void, 1), (1, 'a', Void, 2), (2, 'a', Void, 0)])
     ///     .into_right_congruence_bare(0);
-    /// assert_eq!(ts.edge(0, &'a').unwrap().target(), 1);
-    /// assert_eq!(ts.edge(1, &'a').unwrap().target(), 2);
-    /// assert_eq!(ts.edge(2, &'a').unwrap().target(), 0);
-    /// assert_eq!(ts.edge(0, &'b'), None);
-    /// assert_eq!(ts.edge(3, &'a'), None);
+    /// assert_eq!(ts.edge(0, 'a').unwrap().target(), 1);
+    /// assert_eq!(ts.edge(1, 'a').unwrap().target(), 2);
+    /// assert_eq!(ts.edge(2, 'a').unwrap().target(), 0);
+    /// assert_eq!(ts.edge(0, 'b'), None);
+    /// assert_eq!(ts.edge(3, 'a'), None);
     /// ```
     fn edge(
         &self,
@@ -113,7 +117,11 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{
+    ///     core::Void,
+    ///     ts::{Deterministic, IsEdge, TSBuilder},
+    /// };
+    ///
     ///
     /// let ts = TSBuilder::without_state_colors()
     ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 1)])

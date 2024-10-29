@@ -46,7 +46,7 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{automaton::DFA, ts::TSBuilder};
     ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])

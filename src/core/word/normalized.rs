@@ -39,7 +39,7 @@ impl<S: Symbol> NormalizedOmegaWord<S> {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata_core::{upw, word::{OmegaWord, NormalizedOmegaWord}};
     ///
     /// let word = upw!("b", "a");
     /// let normalized = NormalizedOmegaWord::new(word, 1, 2);
