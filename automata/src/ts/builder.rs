@@ -20,9 +20,9 @@ use itertools::Itertools;
 ///
 /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
 /// ```
-/// use automata::prelude::*;
+/// use automata::{core::Void, ts::TSBuilder};
 ///
-/// let ts = TSBuilder::default()
+/// let _ts = TSBuilder::default()
 ///     .with_state_colors([true, false]) // colors given in the order of the states
 ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 0)])
 ///     .into_dfa(0); // 0 is the initial state
@@ -179,7 +179,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     ///
     /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{core::Void, ts::TSBuilder};
     ///
     /// let ts = TSBuilder::default()
     ///     .with_state_colors([true, false]) // colors given in the order of the states
@@ -217,7 +217,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     ///
     /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{core::Void, ts::TSBuilder};
     ///
     /// let ts = TSBuilder::default()
     ///     .with_state_colors([true, false]) // colors given in the order of the states

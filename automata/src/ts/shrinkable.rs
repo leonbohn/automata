@@ -10,12 +10,16 @@ pub trait Shrinkable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
-    ///
+    /// use automata::{
+    ///     core::alphabet::CharAlphabet,
+    ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
+
     /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
-    /// let edge = ts.add_edge((q0, 'a', q1));
+    /// let _edge = ts.add_edge((q0, 'a', q1));
     /// assert_eq!(ts.reached_state_index_from(q0, "a"), Some(q1));
     /// assert_eq!(ts.remove_state(q1), Some(true));
     /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
@@ -27,12 +31,16 @@ pub trait Shrinkable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{
+    ///     core::alphabet::CharAlphabet,
+    ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
     ///
     /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
-    /// let edge = ts.add_edge((q0, 'a', q1));
+    /// let _edge = ts.add_edge((q0, 'a', q1));
     /// assert_eq!(ts.reached_state_index_from(q0, "a"), Some(q1));
     /// assert_eq!(ts.remove_edges_from_matching(q0, 'a').unwrap().len(), 1);
     /// assert_eq!(ts.remove_edges_from_matching(2, 'b'), None);
@@ -49,17 +57,27 @@ pub trait Shrinkable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
-    ///
+    /// use automata::{
+    ///     core::alphabet::CharAlphabet,
+    ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
+
     /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(true);
-    ///
-    /// let e0 = ts.add_edge((q0, 'a', q1));
-    /// let e1 = ts.add_edge((q0, 'b', q1));
-    ///
-    /// assert_eq!(ts.remove_edges_between_matching(q0, q1, 'a').unwrap().len(), 1);
-    /// assert_eq!(ts.remove_edges_between_matching(q0, q0, 'a').unwrap().len(), 0);
+
+    /// let _e0 = ts.add_edge((q0, 'a', q1));
+    /// let _e1 = ts.add_edge((q0, 'b', q1));
+
+    /// assert_eq!(
+    ///     ts.remove_edges_between_matching(q0, q1, 'a').unwrap().len(),
+    ///     1
+    /// );
+    /// assert_eq!(
+    ///     ts.remove_edges_between_matching(q0, q0, 'a').unwrap().len(),
+    ///     0
+    /// );
     /// assert_eq!(ts.remove_edges_between_matching(2, q0, 'a'), None);
     /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
     /// assert_eq!(ts.reached_state_index_from(q0, "b"), Some(q1));
@@ -75,16 +93,20 @@ pub trait Shrinkable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
-    ///
+    /// use automata::{
+    ///     core::alphabet::CharAlphabet,
+    ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
+
     /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(3));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(true);
-    ///
-    /// let e0 = ts.add_edge((q0, 'a', q1));
-    /// let e1 = ts.add_edge((q0, 'b', q1));
-    /// let e2 = ts.add_edge((q0, 'c', q0));
-    ///
+
+    /// let _e0 = ts.add_edge((q0, 'a', q1));
+    /// let _e1 = ts.add_edge((q0, 'b', q1));
+    /// let _e2 = ts.add_edge((q0, 'c', q0));
+
     /// assert_eq!(ts.remove_edges_between(q0, q1).unwrap().len(), 2);
     /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
     /// assert_eq!(ts.reached_state_index_from(q0, "b"), None);
@@ -101,17 +123,21 @@ pub trait Shrinkable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
-    ///
+    /// use automata::{
+    ///     core::alphabet::CharAlphabet,
+    ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
+
     /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(false);
-    /// let q2 = ts.add_state(false);
-    ///
+    /// let _q2 = ts.add_state(false);
+
     /// ts.add_edge((q0, 'a', q1));
     /// ts.add_edge((q0, 'b', q1));
     /// ts.add_edge((q1, 'a', q0));
-    ///
+
     /// assert_eq!(ts.remove_edges_from(q0).unwrap().len(), 2);
     /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
     /// assert_eq!(ts.reached_state_index_from(q0, "b"), None);
@@ -124,16 +150,20 @@ pub trait Shrinkable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
-    ///
+    /// use automata::{
+    ///     core::alphabet::CharAlphabet,
+    ///     ts::{ForAlphabet, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
+
     /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(true);
     /// let q1 = ts.add_state(false);
-    ///
+
     /// ts.add_edge((q0, 'a', q1));
     /// ts.add_edge((q0, 'b', q1));
     /// ts.add_edge((q1, 'a', q1));
-    ///
+
     /// assert_eq!(ts.remove_edges_to(q1).unwrap().len(), 3);
     /// assert_eq!(ts.remove_edges_to(q0).unwrap().len(), 0);
     /// assert_eq!(ts.remove_edges_to(2), None);
@@ -145,7 +175,11 @@ pub trait Shrinkable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{
+    ///     core::alphabet::CharAlphabet,
+    ///     ts::{ForAlphabet, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
     ///
     /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
     /// let q0 = ts.add_state(true);

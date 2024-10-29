@@ -641,7 +641,7 @@ impl<Q, C, const DET: bool> LinkedListTransitionSystem<CharAlphabet, Q, C, DET> 
     ///
     /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{core::Void, ts::TSBuilder};
     ///
     /// let ts = TSBuilder::default()
     ///     .with_state_colors([true, false]) // colors given in the order of the states

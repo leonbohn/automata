@@ -101,7 +101,11 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::{
+    ///     automaton::{Automaton, DFA},
+    ///     core::alphabet::CharAlphabet,
+    ///     ts::{Sproutable, TransitionSystem},
+    /// };
     ///
     /// let mut dfa: DFA = Automaton::new_with_initial_color(CharAlphabet::of_size(2), false);
     /// assert_eq!(dfa.size(), 1);

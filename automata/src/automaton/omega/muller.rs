@@ -29,7 +29,7 @@ impl<C: Color + Ord> MullerCondition<C> {
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::automaton::MullerCondition;
     ///
     /// let condition = MullerCondition::from_iter_iter([[0], [1]]);
     ///

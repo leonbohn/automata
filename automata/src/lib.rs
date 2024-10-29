@@ -58,11 +58,9 @@ pub mod dot;
 
 #[cfg(test)]
 mod tests {
-    use crate::automaton::DFA;
-    use crate::core::alphabet::CharAlphabet;
-    use crate::ts::TSBuilder;
+    pub fn wiki_dfa() -> crate::automaton::DFA<crate::core::alphabet::CharAlphabet> {
+        use crate::ts::TSBuilder;
 
-    pub fn wiki_dfa() -> DFA<CharAlphabet> {
         TSBuilder::without_edge_colors()
             .with_state_colors([false, false, true, true, true, false])
             .with_edges([

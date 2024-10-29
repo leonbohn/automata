@@ -111,7 +111,8 @@ mod probability {
     /// Compares two floating point numbers for equality within a certain delta.
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata_core::math;
+    ///
     /// assert!(math::almost_equal(0.7, 0.71, 0.1));
     /// assert!(!math::almost_equal(0.7, 0.91, 0.1));
     /// ```

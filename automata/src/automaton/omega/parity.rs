@@ -80,7 +80,7 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::ts::{Sproutable, TSBuilder};
     ///
     /// let mut dpa = TSBuilder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 1), (0, 'b', 1, 1),
@@ -108,7 +108,8 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::ts::{Deterministic, TSBuilder, TransitionSystem};
+    ///
     /// let dpa = TSBuilder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
     ///     .into_dpa(0);
@@ -149,7 +150,7 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::ts::{Deterministic, TSBuilder, TransitionSystem};
     ///
     /// let dpa = TSBuilder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
@@ -169,7 +170,7 @@ where
     /// done by finding a rejecting cycle in the underlying transition system.
     /// # Example
     /// ```
-    /// use automata::prelude::*;
+    /// use automata::ts::{Deterministic, TSBuilder, TransitionSystem};
     ///
     /// let dpa = TSBuilder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
