@@ -2,6 +2,15 @@ use itertools::Itertools;
 
 use crate::Void;
 
+pub fn show_duration(duration: std::time::Duration) -> String {
+    format!(
+        "{}s\t{}ms\t{}µs",
+        duration.as_secs(),
+        duration.as_millis(),
+        duration.as_micros()
+    )
+}
+
 impl<C: Show> Show for (C, Void) {
     fn show(&self) -> String {
         self.0.show()

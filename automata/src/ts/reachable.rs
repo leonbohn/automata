@@ -73,10 +73,13 @@ where
         seen.insert(origin);
         let mut queue = VecDeque::with_capacity(ts.hint_size().0);
         queue.push_front(origin);
+        let Some(it) = ts.edges_from(origin) else {
+            panic!("cannot find origin state {origin:?}");
+        };
         Self {
             seen,
             ts,
-            it: ts.edges_from(origin).expect("origin state does not exist"),
+            it,
             queue,
         }
     }

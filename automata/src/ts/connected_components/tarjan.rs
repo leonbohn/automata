@@ -11,6 +11,7 @@ use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{IndexType, IsEdge, StateIndex};
 use crate::TransitionSystem;
 use itertools::Itertools;
+use tracing::trace;
 
 #[derive(Debug, Clone)]
 struct TarjanData {
@@ -222,7 +223,7 @@ where
     // we do an outermost loop that executes as long as states have not seen all states
     while let Some(&next) = unvisited.first() {
         assert!(queue.is_empty());
-        // trace!("adding {next:?} to queue");
+        trace!("adding {next:?} to queue");
         current = 0;
         queue.push((
             next,
@@ -232,20 +233,20 @@ where
 
         // loop through the current queue
         'outer: while let Some((q, mut edges, min)) = queue.pop() {
-            // trace!(
-            //     "considering state {q:?} with stored min {min}\nstack: {{{}}}\ton_stack: {{{}}}\nlows:{}",
-            //     stack
-            //         .iter()
-            //         .map(|idx: &Ts::StateIndex| format!("{idx:?}"))
-            //         .join(", "),
-            //     on_stack
-            //         .iter()
-            //         .map(|idx: &Ts::StateIndex| format!("{idx:?}"))
-            //         .join(", "),
-            //     low.iter()
-            //         .map(|(k, v): (&Ts::StateIndex, &usize)| format!("{k:?} -> {v}"))
-            //         .join(", ")
-            // );
+            trace!(
+                "considering state {q:?} with stored min {min}\nstack: {{{}}}\ton_stack: {{{}}}\nlows:{}",
+                stack
+                    .iter()
+                    .map(|idx: &Ts::StateIndex| format!("{idx:?}"))
+                    .join(", "),
+                on_stack
+                    .iter()
+                    .map(|idx: &Ts::StateIndex| format!("{idx:?}"))
+                    .join(", "),
+                low.iter()
+                    .map(|(k, v): (&Ts::StateIndex, &usize)| format!("{k:?} -> {v}"))
+                    .join(", ")
+            );
             unvisited.remove(&q);
 
             if on_stack.insert(q) {
@@ -253,7 +254,7 @@ where
             }
 
             if let math::ordered_map::Entry::Vacant(e) = indices.entry(q) {
-                // trace!("assigning index {current} to state {q:?}");
+                trace!("assigning index {current} to state {q:?}");
                 e.insert(current);
                 low.insert(q, current);
                 current += 1;
@@ -262,45 +263,46 @@ where
             'inner: while let Some(edge) = edges.next() {
                 // we skip self loops
                 if edge.target() == q {
+                    trace!("skipping self loop on {:?}", edge.expression());
                     continue 'inner;
                 }
 
-                // trace!(
-                //     "considering edge {:?} --{}--> {:?}",
-                //     edge.source(),
-                //     edge.expression().show(),
-                //     edge.target()
-                // );
+                trace!(
+                    "considering edge {:?} --{:?}--> {:?}",
+                    edge.source(),
+                    edge.expression(),
+                    edge.target()
+                );
                 let target = edge.target();
                 if unvisited.contains(&target) {
-                    // trace!(
-                    //     "successor {target:?} on {} has not been visited, descending",
-                    //     edge.expression().show()
-                    // );
+                    trace!(
+                        "successor {target:?} on {:?} has not been visited, descending",
+                        edge.expression()
+                    );
                     queue.push((q, edges, min));
                     queue.push((target, ts.edges_from(target).unwrap(), current));
                     continue 'outer;
                 }
                 if on_stack.contains(&target) {
                     let new_low = std::cmp::min(*low.get(&q).unwrap(), *low.get(&target).unwrap());
-                    let (it, _itt) = stack.iter().skip_while(|&x| x != &target).tee();
+                    let (it, itt) = stack.iter().skip_while(|&x| x != &target).tee();
 
                     // TODO: Could there be a more performant way of doing this?
                     for x in it {
                         *low.get_mut(x).unwrap() = new_low;
                     }
-                    // trace!(
-                    //     "successor {target:?} on {} was alread seen, assigning new minimum {new_low} to states {}",
-                    //     edge.expression().show(),
-                    //     itt.into_iter().map(|x| format!("{x:?}")).join(", ")
-                    // );
+                    trace!(
+                        "successor {target:?} on {:?} was already seen, assigning new minimum {new_low} to states {}",
+                        edge.expression(),
+                        itt.into_iter().map(|x| format!("{x:?}")).join(", ")
+                    );
                 }
             }
 
             // reached when all edges have been explored
             let low_q = *low.get(&q).unwrap();
             if low_q == *indices.get(&q).unwrap() {
-                // trace!("{q:?} has matching index and low {low_q}, extracting scc",);
+                trace!("{q:?} has matching index and low {low_q}, extracting scc",);
                 let mut scc = vec![];
                 while on_stack.contains(&q) {
                     let top = stack.pop().unwrap();
@@ -309,7 +311,7 @@ where
                     scc.push(top);
                 }
                 let scc = Scc::new(ts, scc.into_iter());
-                // trace!("identified scc {:?}", scc);
+                trace!("identified scc {:?}", scc);
                 sccs.push(scc);
             }
         }
@@ -337,6 +339,17 @@ mod tests {
     use crate::Pointed;
     use automata_core::Void;
     use tracing::debug;
+
+    #[test]
+    fn tarjan_nondet() {
+        let nts = TSBuilder::<_, _, false>::without_colors()
+            .with_edges([(0, 'a', 0), (0, 'b', 0), (0, 'a', 1), (1, 'a', 1)])
+            .into_nts();
+        let sccs_kosaraju = nts.sccs_kosaraju(0);
+        let sccs_tarjan = nts.sccs_tarjan();
+
+        assert_eq!(sccs_tarjan.size(), sccs_kosaraju.size());
+    }
 
     #[test]
     fn tarjan_iterative() {

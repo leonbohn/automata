@@ -1,7 +1,7 @@
 use std::{io::BufRead, ops::Deref};
 
 use crate::automaton::{
-    AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
+    AcceptanceMask, DeterministicOmegaAutomaton, GenericOmegaAutomaton, OmegaAcceptanceCondition,
 };
 use crate::core::{
     alphabet::{PropAlphabet, PropExpression},
@@ -55,7 +55,7 @@ pub struct HoaAutomatonStream<R, const DET: bool = true> {
 }
 
 impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
-    type Item = OmegaAutomaton<PropAlphabet, DET>;
+    type Item = GenericOmegaAutomaton<PropAlphabet, DET>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -75,7 +75,7 @@ impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
                             "encountered --END-- in stream, attempting to parse automaton \n{}",
                             &self.buf[..end]
                         );
-                        let aut: Result<OmegaAutomaton<PropAlphabet, DET>, _> =
+                        let aut: Result<GenericOmegaAutomaton<PropAlphabet, DET>, _> =
                             parse_omega_automaton_range(&self.buf, 0, end);
                         self.buf.clear();
                         self.pos = 0;
@@ -115,9 +115,9 @@ pub fn parse_omega_automaton_range<const DET: bool>(
     hoa: &str,
     start: usize,
     end: usize,
-) -> Result<OmegaAutomaton<PropAlphabet, DET>, String> {
+) -> Result<GenericOmegaAutomaton<PropAlphabet, DET>, String> {
     match HoaRepresentation::try_from(&hoa[start..end]) {
-        Ok(aut) => match OmegaAutomaton::try_from(aut) {
+        Ok(aut) => match GenericOmegaAutomaton::try_from(aut) {
             Ok(aut) => Ok(aut),
             Err(e) => Err(format!(
                 "In range {}..{}, could not convert automaton into omega automaton: {}",
@@ -142,7 +142,7 @@ pub fn pop_deterministic_omega_automaton(
 /// function returns `None`.
 pub fn pop_omega_automaton<const DET: bool>(
     hoa: HoaString,
-) -> Option<(OmegaAutomaton<PropAlphabet, DET>, HoaString)> {
+) -> Option<(GenericOmegaAutomaton<PropAlphabet, DET>, HoaString)> {
     let mut hoa = hoa;
     const END_LEN: usize = "--END--".len();
     const ABORT_LEN: usize = "--ABORT--".len();
@@ -209,7 +209,7 @@ pub fn pop_omega_automaton<const DET: bool>(
 
 /// Considers the given HOA string as a single automaton and tries to parse it into an
 /// [`OmegaAutomaton`].
-pub fn hoa_to_ts<const DET: bool>(hoa: &str) -> Vec<OmegaAutomaton<PropAlphabet, DET>> {
+pub fn hoa_to_ts<const DET: bool>(hoa: &str) -> Vec<GenericOmegaAutomaton<PropAlphabet, DET>> {
     let mut out = vec![];
     for hoa_aut in hoars::parse_hoa_automata(hoa) {
         match hoa_aut.try_into() {
@@ -240,7 +240,7 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
     }
 }
 
-impl<const DET: bool> TryFrom<HoaRepresentation> for OmegaAutomaton<PropAlphabet, DET> {
+impl<const DET: bool> TryFrom<HoaRepresentation> for GenericOmegaAutomaton<PropAlphabet, DET> {
     type Error = String;
     fn try_from(value: HoaRepresentation) -> Result<Self, Self::Error> {
         hoa_automaton_to_ts(value)
@@ -251,7 +251,7 @@ impl<const DET: bool> TryFrom<HoaRepresentation> for OmegaAutomaton<PropAlphabet
 /// number of states and inserts transitions with the appropriate labels and colors.
 pub fn hoa_automaton_to_ts<const DET: bool>(
     aut: HoaRepresentation,
-) -> Result<OmegaAutomaton<PropAlphabet, DET>, String> {
+) -> Result<GenericOmegaAutomaton<PropAlphabet, DET>, String> {
     let aps = aut.num_aps();
     assert!(aps <= crate::hoa::MAX_APS);
 
@@ -298,7 +298,7 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
 
     let acceptance: OmegaAcceptanceCondition = aut.header().try_into()?;
 
-    Ok(OmegaAutomaton::from_parts_with_acceptance(
+    Ok(GenericOmegaAutomaton::from_parts_with_acceptance(
         ts, initial, acceptance,
     ))
 }

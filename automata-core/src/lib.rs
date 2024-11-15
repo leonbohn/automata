@@ -20,7 +20,7 @@ pub mod word;
 pub mod math;
 
 mod show;
-pub use show::Show;
+pub use show::{show_duration, Show};
 
 /// Defines a representation of directed, acyclic graphs. These are for example
 /// used for the representation of the strongly connected components of a transition system.

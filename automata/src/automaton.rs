@@ -19,10 +19,10 @@ pub use reachability::{IntoDFA, ReachabilityCondition, DFA};
 
 mod omega;
 pub use omega::{
-    AcceptanceMask, BuchiCondition, DeterministicOmegaAutomaton, IntoDBA, IntoDMA, IntoDPA,
-    IntoDRA, MaxEvenParityCondition, MaxOddParityCondition, MinEvenParityCondition,
-    MinOddParityCondition, MullerCondition, NondeterministicOmegaAutomaton,
-    OmegaAcceptanceCondition, OmegaAutomaton, RabinCondition, RabinPair, DBA, DMA, DPA, DRA,
+    AcceptanceMask, BuchiCondition, DeterministicOmegaAutomaton, GenericOmegaAutomaton, IntoDBA,
+    IntoDMA, IntoDPA, IntoDRA, MaxEvenParityCondition, MaxOddParityCondition,
+    MinEvenParityCondition, MinOddParityCondition, MullerCondition, NondeterministicOmegaAutomaton,
+    OmegaAcceptanceCondition, RabinCondition, RabinPair, DBA, DMA, DPA, DRA, NBA,
 };
 
 mod with_initial;

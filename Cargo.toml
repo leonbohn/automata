@@ -2,12 +2,21 @@
 members = [
     "automata",
     "automata-learning",
-    # "automata-alternation",
     "automata-core",
     "bin/*",
     "hoars",
+    # "automata-logic",
+    # "automata-games",
 ]
-default-members = ["automata", "automata-*", "hoars", "bin/*"]
+default-members = [
+    "automata",
+    "automata-core",
+    "automata-learning",
+    # "automata-logic",
+    # "automata-games",
+    "hoars",
+    "bin/*",
+]
 exclude = ["python", "bench"]
 resolver = "2"
 

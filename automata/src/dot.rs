@@ -3,7 +3,10 @@
 use std::fmt::{Debug, Display};
 use thiserror::Error;
 
-use crate::automaton::{IntoDPA, IntoMealyMachine, IntoMooreMachine, DFA};
+use crate::automaton::{
+    IntoDPA, IntoMealyMachine, IntoMooreMachine, MaxEvenParityCondition, MinEvenParityCondition,
+    DFA,
+};
 use crate::core::{alphabet::Alphabet, Color, Int, Show};
 use crate::ts::{Deterministic, IsEdge, StateColor, StateIndex};
 use crate::{Pointed, TransitionSystem};
@@ -27,6 +30,8 @@ pub enum RenderError {
     VsvgDocumentError(String),
     #[error("Child process had non-zero exit status \"{0}\"")]
     NonZeroExit(std::process::ExitStatus),
+    #[error("Child process must have panicked")]
+    JoinError,
 }
 
 pub trait Dottable: TransitionSystem {
@@ -76,7 +81,7 @@ pub trait Dottable: TransitionSystem {
     /// see the [graphviz documentation](https://graphviz.org/doc/info/lang.html).
     fn dot_representation(&self) -> String {
         let header = std::iter::once(format!(
-            "digraph {} {{",
+            "digraph \"{}\" {{",
             self.dot_name().unwrap_or("A".to_string())
         ))
         .chain(self.dot_header_statements());
@@ -283,12 +288,12 @@ where
         (String, StateColor<Self>): Show,
     {
         let shape = if self.state_color(idx).unwrap() {
-            "doublecircle"
+            DotShape::MSquare
         } else {
-            "circle"
+            DotShape::Square
         };
         vec![
-            DotStateAttribute::Shape(shape.into()),
+            DotStateAttribute::Shape(shape),
             DotStateAttribute::Label(self.dot_state_ident(idx)),
         ]
     }
@@ -334,7 +339,7 @@ where
     M: Deterministic,
 {
     fn dot_name(&self) -> Option<String> {
-        Some("DPA".into())
+        Some("Moore".into())
     }
 
     fn dot_state_attributes(
@@ -368,7 +373,7 @@ where
     M: Deterministic,
 {
     fn dot_name(&self) -> Option<String> {
-        Some("DPA".into())
+        Some("Mealy".into())
     }
 
     fn dot_state_attributes(
@@ -401,19 +406,27 @@ where
     }
 }
 
-impl<D> Dottable for IntoDPA<D>
+impl<D> Dottable for IntoDPA<D, MaxEvenParityCondition>
 where
     D: Deterministic<EdgeColor = Int>,
 {
     fn dot_name(&self) -> Option<String> {
-        Some("DPA".into())
+        Some("DPA(max even)".into())
     }
 
     fn dot_state_attributes(
         &self,
         idx: Self::StateIndex,
     ) -> impl IntoIterator<Item = DotStateAttribute> {
-        vec![DotStateAttribute::Label(self.dot_state_ident(idx))]
+        // vec![DotStateAttribute::Label(self.dot_state_ident(idx))]
+        vec![
+            DotStateAttribute::Shape(DotShape::Box),
+            DotStateAttribute::Label(format!(
+                "{} | {:?}",
+                self.dot_state_ident(idx),
+                self.state_color(idx).unwrap()
+            )),
+        ]
     }
 
     fn dot_transition_attributes<'a>(
@@ -432,13 +445,47 @@ where
     }
 }
 
+impl<D> Dottable for IntoDPA<D, MinEvenParityCondition>
+where
+    D: Deterministic<EdgeColor = Int>,
+{
+    fn dot_name(&self) -> Option<String> {
+        Some("DPA(min even)".into())
+    }
+
+    fn dot_state_attributes(
+        &self,
+        idx: Self::StateIndex,
+    ) -> impl IntoIterator<Item = DotStateAttribute> {
+        vec![
+            DotStateAttribute::Shape(DotShape::Box),
+            DotStateAttribute::Label(self.dot_state_ident(idx)),
+        ]
+    }
+
+    fn dot_transition_attributes<'a>(
+        &'a self,
+        t: Self::EdgeRef<'a>,
+    ) -> impl IntoIterator<Item = DotTransitionAttribute> {
+        vec![DotTransitionAttribute::Label(format!(
+            "{}|{}",
+            t.expression().show(),
+            IsEdge::color(&t).show()
+        ))]
+    }
+
+    fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
+        format!("q{idx:?}|{:?}", self.state_color(idx).unwrap())
+    }
+}
+
 /// Enum that abstracts attributes in the DOT format.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DotStateAttribute {
     /// The label of a node
     Label(String),
     /// The shape of a node
-    Shape(String),
+    Shape(DotShape),
     /// The color of a node
     Color(String),
 }
@@ -452,6 +499,38 @@ impl Display for DotStateAttribute {
                 DotStateAttribute::Label(s) => format!("label=\"{}\"", s),
                 DotStateAttribute::Shape(s) => format!("shape=\"{}\"", s),
                 DotStateAttribute::Color(c) => format!("color=\"{}\"", c),
+            }
+        )
+    }
+}
+
+/// Enum that abstracts node shapes in the DOT format.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DotShape {
+    Plain,
+    House,
+    InvHouse,
+    Circle,
+    Parallelogramm,
+    Box,
+    MSquare,
+    Square,
+}
+
+impl Display for DotShape {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                DotShape::Square => "square",
+                DotShape::MSquare => "msquare",
+                DotShape::House => "house",
+                DotShape::InvHouse => "invhouse",
+                DotShape::Parallelogramm => "parallelogram",
+                DotShape::Plain => "plain",
+                DotShape::Circle => "circle",
+                DotShape::Box => "box",
             }
         )
     }
@@ -478,7 +557,6 @@ impl Display for DotTransitionAttribute {
 fn display_png(contents: Vec<u8>) -> Result<(), RenderError> {
     use std::{io::Write, process::Stdio};
 
-    use tracing::trace;
     let mut child = if cfg!(target_os = "linux") || cfg!(target_os = "windows") {
         let image_viewer = std::env::var("IMAGE_VIEWER").unwrap_or("display".to_string());
 
@@ -497,17 +575,13 @@ fn display_png(contents: Vec<u8>) -> Result<(), RenderError> {
     };
 
     let mut stdin = child.stdin.take().unwrap();
-    std::thread::spawn(move || {
+    let handle = std::thread::spawn(move || {
         stdin
             .write_all(&contents)
             .expect("Could not write file to stdin");
-        let output = child
-            .wait_with_output()
-            .expect("Error in display child process!");
-        trace!("png display command exited with {}", output.status);
     });
 
-    Ok(())
+    handle.join().map_err(|_e| RenderError::JoinError)
 }
 
 fn sanitize_dot_ident(name: &str) -> String {
@@ -598,5 +672,68 @@ mod tests {
             ])
             .into_dpa(0);
         dpa.try_open_svg_in_firefox().unwrap();
+    }
+
+    #[test_log::test]
+    fn dot_legend() {
+        let dot = r#"digraph automaton {
+            rankdir=LR;
+
+            // Create a legend using HTML-like table
+            subgraph cluster_legend {
+                label="State Labels";
+                style=rounded;
+                legend [shape=none, margin=0, label=<
+                    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+                        <TR><TD><B>State</B></TD><TD><B>Description</B></TD></TR>
+                        <TR><TD>q1</TD><TD>Initial State</TD></TR>
+                        <TR><TD>q2</TD><TD>Processing</TD></TR>
+                        <TR><TD>q3</TD><TD>Final State</TD></TR>
+                    </TABLE>
+                >];
+            }
+
+            // Main automaton
+            node [shape=circle];
+            q1 -> q2 [label="a"];
+            q2 -> q3 [label="b"];
+            q3 -> q1 [label="c"];
+
+            // Make q1 initial and q3 final
+            q1 [style=bold];
+            q3 [shape=doublecircle];
+        }
+    "#;
+        use layout::backends::svg::SVGWriter;
+
+        let mut parser = layout::gv::parser::DotParser::new(&dot);
+
+        let graph = parser.process().unwrap();
+
+        let mut builder = layout::gv::GraphBuilder::new();
+        builder.visit_graph(&graph);
+
+        let mut visual_graph = builder.get();
+
+        let mut svg = SVGWriter::new();
+        visual_graph.do_it(false, false, false, &mut svg);
+
+        let svg = svg.finalize();
+        use resvg::usvg::{self, Transform};
+
+        let mut svg_options = usvg::Options::default();
+        svg_options.fontdb_mut().load_system_fonts();
+        let tree = usvg::Tree::from_str(&svg, &svg_options).unwrap();
+
+        let size = tree.size().to_int_size();
+        let Some(mut pixmap) = resvg::tiny_skia::Pixmap::new(size.width(), size.height()) else {
+            panic!();
+        };
+
+        pixmap.fill(resvg::tiny_skia::Color::WHITE);
+        resvg::render(&tree, Transform::identity(), &mut pixmap.as_mut());
+
+        let png = pixmap.encode_png().unwrap();
+        super::display_png(png).unwrap();
     }
 }

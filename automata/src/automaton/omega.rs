@@ -11,6 +11,9 @@ pub use rabin::*;
 mod muller;
 pub use muller::*;
 
+mod nondeterministic_buchi;
+pub use nondeterministic_buchi::NBA;
+
 #[allow(missing_docs)]
 mod acceptance_mask;
 use super::InfiniteWordAutomaton;
@@ -25,16 +28,16 @@ use tracing::{error, trace};
 
 /// Type alias for an omega automaton (i.e. an [`InfiniteWordAutomaton`]) that is guaranteed to be
 /// [`crate::Deterministic`].
-pub type DeterministicOmegaAutomaton<A> = OmegaAutomaton<A, true>;
+pub type DeterministicOmegaAutomaton<A> = GenericOmegaAutomaton<A, true>;
 /// Type alias for an omega automaton (i.e. an [`InfiniteWordAutomaton`]) that is not necessarily
 /// [`crate::Deterministic`].
-pub type NondeterministicOmegaAutomaton<A> = OmegaAutomaton<A, false>;
+pub type NondeterministicOmegaAutomaton<A> = GenericOmegaAutomaton<A, false>;
 
 /// Represents a generic omega automaton, i.e. an automaton over infinite words.
 /// This type is mainly used when the exact type of automaton is not known beforehand
 /// such as when parsing automata. One should prefer using specific types such as
 /// [`DPA`] whenever possible.
-pub type OmegaAutomaton<A, const DET: bool = true> =
+pub type GenericOmegaAutomaton<A, const DET: bool = true> =
     InfiniteWordAutomaton<A, OmegaAcceptanceCondition, Int, AcceptanceMask, DET>;
 
 /// Disambiguates between the different types of acceptance conditions. This is only
@@ -70,15 +73,15 @@ impl OmegaAcceptanceCondition {
     }
 }
 
-impl<A: Alphabet, const DET: bool> OmegaAutomaton<A, DET> {
+impl<A: Alphabet, const DET: bool> GenericOmegaAutomaton<A, DET> {
     /// Creates a new instance from the given transition system, initial state and
     /// acceptance condition.
     pub fn new(
         ts: TS<A, Int, AcceptanceMask, DET>,
         initial: DefaultIdType,
         acceptance: OmegaAcceptanceCondition,
-    ) -> OmegaAutomaton<A, DET> {
-        OmegaAutomaton {
+    ) -> GenericOmegaAutomaton<A, DET> {
+        GenericOmegaAutomaton {
             ts,
             initial,
             acceptance,
@@ -106,7 +109,7 @@ impl<A: Alphabet, const DET: bool> OmegaAutomaton<A, DET> {
     /// `None` if this is not possible because the transition system underlying `self`
     /// is not deterministic.
     pub fn try_into_deterministic(self) -> Result<DeterministicOmegaAutomaton<A>, Self> {
-        let OmegaAutomaton {
+        let GenericOmegaAutomaton {
             ts,
             initial,
             acceptance,

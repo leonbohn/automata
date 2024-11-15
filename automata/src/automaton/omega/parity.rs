@@ -49,7 +49,18 @@ where
     T: Deterministic<EdgeColor = Int>,
 {
     type Output = bool;
-    type Observer = run::EdgeColorLimit<T>;
+    type Observer = run::LeastEdgeColor<T>;
+    fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
+        observed % 2 == 0
+    }
+}
+
+impl<T> Semantics<T, true> for MaxEvenParityCondition
+where
+    T: Deterministic<EdgeColor = Int>,
+{
+    type Output = bool;
+    type Observer = run::GreatestEdgeColor<T>;
     fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
         observed % 2 == 0
     }

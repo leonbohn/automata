@@ -49,6 +49,12 @@ pub use congruence::{Class, Congruence, RightCongruence};
 /// Contains implementations different minimization algorithms.
 pub mod minimization;
 
+/// Contains algorithms for determinization of automata.
+pub mod determinization {
+    mod nbadet;
+    pub use nbadet::*;
+}
+
 /// Implements the generation of random transition systems.
 #[cfg(feature = "random")]
 pub mod random;

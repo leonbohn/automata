@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
 use super::{DefaultIdType, ForAlphabet, IntoEdgeTuple, Sproutable};
-use crate::automaton::{MealyMachine, MooreMachine, WithInitial, DBA, DFA, DPA};
+use crate::automaton::{MealyMachine, MooreMachine, WithInitial, DBA, DFA, DPA, NBA};
 use crate::core::{alphabet::CharAlphabet, math::OrderedSet, Color, Int, Void};
 use crate::representation::IntoTs;
 use crate::{RightCongruence, TransitionSystem, DTS, NTS, TS};
@@ -267,6 +267,12 @@ impl TSBuilder<bool, Void, true> {
     /// Tries to turn `self` into a deterministic finite automaton. Panics if `self` is not deterministic.
     pub fn into_dfa(self, initial: DefaultIdType) -> DFA<CharAlphabet> {
         self.into_dts().with_initial(initial).into_dfa()
+    }
+}
+impl TSBuilder<bool, Void, false> {
+    /// Turns `self` into a non-deterministic Büchi automaton.
+    pub fn into_nba(self, initial: impl IntoIterator<Item = DefaultIdType>) -> NBA<CharAlphabet> {
+        NBA::from_parts(self.into_nts(), initial)
     }
 }
 

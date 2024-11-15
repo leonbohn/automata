@@ -1,0 +1,12 @@
+[package]
+name = "automata-games"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+automata-core = { path = "../automata-core" }
+
+petgraph = "0.6.5"
+
+[features]
+large_index = []

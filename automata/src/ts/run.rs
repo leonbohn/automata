@@ -45,7 +45,7 @@ pub struct StateColorLimit<T: TransitionSystem, const MAX: bool = false>(pub Sta
 pub type LeastEdgeColor<T> = EdgeColorLimit<T, false>;
 pub type GreatestEdgeColor<T> = EdgeColorLimit<T, true>;
 #[derive(Debug, Clone)]
-pub struct EdgeColorLimit<T: TransitionSystem, const MAX: bool = false>(pub EdgeColor<T>);
+pub struct EdgeColorLimit<T: TransitionSystem, const MAX: bool>(pub EdgeColor<T>);
 
 #[derive(Clone, Debug)]
 pub struct StateSet<T: TransitionSystem>(pub(crate) math::OrderedSet<StateIndex<T>>);

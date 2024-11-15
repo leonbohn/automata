@@ -1,3 +1,5 @@
+use automata_core::alphabet::Alphabet;
+
 use crate::core::{
     alphabet::SimpleAlphabet,
     word::{FiniteWord, OmegaWord, Word},
@@ -6,7 +8,7 @@ use crate::core::{
 use crate::ts::{predecessors::PredecessorIterable, StateIndex};
 use crate::TransitionSystem;
 
-use super::{edge::TransitionOwnedColor, EdgeColor};
+use super::{edge::TransitionOwnedColor, EdgeColor, Pointed};
 
 /// Treats a word as if it was a transition system.
 ///
@@ -15,13 +17,13 @@ use super::{edge::TransitionOwnedColor, EdgeColor};
 /// For an infinite word, this is a transition system consisting of a spoke and
 /// an attached loop.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct WordTs<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>, const FINITE: bool> {
-    alphabet: A,
+pub struct WordTs<'a, A: Alphabet, W: Word<Symbol = A::Symbol>, const OMEGA: bool> {
+    alphabet: &'a A,
     word: W,
 }
 
-impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> PredecessorIterable
-    for WordTs<A, W, false>
+impl<'a, A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> PredecessorIterable
+    for WordTs<'a, A, W, false>
 {
     type PreEdgeRef<'this>  = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
     where
@@ -44,8 +46,8 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> PredecessorIterable
         )))
     }
 }
-impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> PredecessorIterable
-    for WordTs<A, W, true>
+impl<'a, A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> PredecessorIterable
+    for WordTs<'a, A, W, true>
 {
     type PreEdgeRef<'this>  = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
     where
@@ -82,15 +84,17 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> PredecessorIterable
     }
 }
 
-impl<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>, const FINITE: bool> WordTs<A, W, FINITE> {
+impl<'a, A: SimpleAlphabet, W: Word<Symbol = A::Symbol>, const FINITE: bool>
+    WordTs<'a, A, W, FINITE>
+{
     /// Creates a new instance from a given alphabet and a word.
-    pub fn new(alphabet: A, word: W) -> Self {
+    pub fn new(alphabet: &'a A, word: W) -> Self {
         Self { alphabet, word }
     }
 }
 
-impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
-    for WordTs<A, W, false>
+impl<'a, A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
+    for WordTs<'a, A, W, false>
 {
     type Alphabet = A;
 
@@ -142,7 +146,9 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
     }
 }
 
-impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for WordTs<A, W, true> {
+impl<'a, A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem
+    for WordTs<'a, A, W, true>
+{
     type Alphabet = A;
 
     type StateIndex = u32;
@@ -200,13 +206,25 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for W
     }
 }
 
+impl<'a, A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> Pointed for WordTs<'a, A, W, false> {
+    fn initial(&self) -> Self::StateIndex {
+        0
+    }
+}
+impl<'a, A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> Pointed for WordTs<'a, A, W, true> {
+    fn initial(&self) -> Self::StateIndex {
+        0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use automata_core::alphabet::CharAlphabet;
     #[test]
     fn word_as_ts() {
-        let w = WordTs::new(CharAlphabet::of_size(2), "abba");
+        let alphabet = CharAlphabet::of_size(2);
+        let w = WordTs::new(&alphabet, "abba");
         assert_eq!(w.state_indices_vec(), vec![0, 1, 2, 3]);
     }
 }

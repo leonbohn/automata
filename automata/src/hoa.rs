@@ -14,7 +14,7 @@ pub use hoars::*;
 
 use crate::core::alphabet::PropAlphabet;
 
-pub type HoaAutomaton<const DET: bool> = crate::automaton::OmegaAutomaton<PropAlphabet, DET>;
+pub type HoaAutomaton<const DET: bool> = crate::automaton::GenericOmegaAutomaton<PropAlphabet, DET>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HoaString(pub(crate) String);

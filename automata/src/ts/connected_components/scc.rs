@@ -391,6 +391,14 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         false
     }
 
+    /// Returns `true` if and only if the SCC is terminal, meaning all
+    /// transitions leaving a state in the SCC lead to a state in the SCC.
+    pub fn is_terminal(&self) -> bool {
+        self.interior_transitions()
+            .iter()
+            .all(|(_, _, _, q)| self.contains(q))
+    }
+
     /// Returns `true` iff the SCC consists of a single state.
     pub fn is_singleton(&self) -> bool {
         self.states.len() == 1

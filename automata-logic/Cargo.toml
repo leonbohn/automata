@@ -1,0 +1,17 @@
+[package]
+name = "automata-logic"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+biodivine-lib-bdd = { workspace = true }
+itertools = { workspace = true }
+indexmap = { workspace = true }
+bimap = { workspace = true }
+rand = { workspace = true }
+tabled = { workspace = true }
+thiserror = { workspace = true }
+
+automata = { path = "../automata" }

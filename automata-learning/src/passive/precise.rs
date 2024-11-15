@@ -493,7 +493,7 @@ impl<A: Alphabet, const N: usize> Dottable for PreciseDPA<A, N> {
         (String, StateColor<Self>): Show,
     {
         [
-            DotStateAttribute::Shape("box".to_string()),
+            DotStateAttribute::Shape(automata::dot::DotShape::Box),
             DotStateAttribute::Label(idx.to_string()),
         ]
     }

@@ -18,7 +18,7 @@ use automata_core::Void;
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, Copy)]
 pub struct BuchiCondition;
 
-impl<T: Deterministic<EdgeColor = bool>> Semantics<T, true> for BuchiCondition {
+impl<T: Deterministic<EdgeColor = bool>> Semantics<T, true, true> for BuchiCondition {
     type Observer = run::GreatestEdgeColor<T>;
     type Output = bool;
     fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {

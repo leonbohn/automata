@@ -40,7 +40,12 @@ use crate::TransitionSystem;
 /// This can actually be viewed as an instantiation of the [`crate::automaton::MinEvenParityCondition`]
 /// semantics that a [`crate::automaton::DPA`] uses, which outputs the least priority/color
 /// among those that are labels of edges taken infinitely often.
-pub trait Semantics<T: TransitionSystem, const OMEGA: bool = false> {
+pub trait Semantics<
+    T: TransitionSystem,
+    const OMEGA: bool = false,
+    const DETERMINISTIC: bool = true,
+>
+{
     /// The type of output that this semantic produces.
     type Output;
     /// The observer whose output is used for computing the output.
@@ -50,7 +55,7 @@ pub trait Semantics<T: TransitionSystem, const OMEGA: bool = false> {
     fn evaluate(&self, observed: <Self::Observer as Observer<T>>::Current) -> Self::Output;
 }
 
-impl<T: Deterministic> Semantics<T, false> for MealySemantics<EdgeColor<T>> {
+impl<T: Deterministic> Semantics<T, false, true> for MealySemantics<EdgeColor<T>> {
     type Output = EdgeColor<T>;
     type Observer = ReachedEdgeColor<T>;
     fn evaluate(&self, observed: <Self::Observer as Observer<T>>::Current) -> Self::Output {
@@ -58,7 +63,7 @@ impl<T: Deterministic> Semantics<T, false> for MealySemantics<EdgeColor<T>> {
     }
 }
 
-impl<T: Deterministic> Semantics<T, false> for MooreSemantics<StateColor<T>> {
+impl<T: Deterministic> Semantics<T, false, true> for MooreSemantics<StateColor<T>> {
     type Output = StateColor<T>;
     type Observer = ReachedStateColor<T>;
     fn evaluate(&self, observed: <Self::Observer as Observer<T>>::Current) -> Self::Output {
