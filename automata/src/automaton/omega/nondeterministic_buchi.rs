@@ -1,7 +1,12 @@
 use std::borrow::Borrow;
+use std::collections::BTreeSet;
 
+use crate::dot::{DotTransitionAttribute, Dottable};
 use crate::ts::operations::Product;
-use crate::ts::{DefaultIdType, PredecessorIterable, StateIndex, SymbolOf, WordTs};
+use crate::ts::{
+    DefaultIdType, ForAlphabet, PredecessorIterable, Shrinkable, Sproutable, StateIndex, SymbolOf,
+    WordTs,
+};
 use crate::{Pointed, TransitionSystem, NTS};
 use automata_core::alphabet::{Alphabet, CharAlphabet, SimpleAlphabet};
 use automata_core::word::OmegaWord;
@@ -27,6 +32,48 @@ impl<A: Alphabet, C: Color> NBA<A, C> {
             initial: initial_states.into_iter().collect(),
         }
     }
+    /// Removes all states that are not reachable from the initial states.
+    /// Returns a vector of the removed state indices.
+    pub fn trim(&mut self) -> Vec<DefaultIdType> {
+        let mut reachable = BTreeSet::new();
+        for initial in &self.initial {
+            reachable.extend(self.ts.reachable_state_indices_from(*initial));
+        }
+        let mut removed = vec![];
+        for state_index in self.ts.state_indices_vec() {
+            if !reachable.contains(&state_index) {
+                self.ts.remove_state(state_index);
+
+                debug_assert!(!removed.contains(&state_index));
+                removed.push(state_index);
+            }
+        }
+        for state_index in self.ts.state_indices_vec() {
+            let reached = self
+                .ts
+                .reachable_state_indices_from(state_index)
+                .collect::<Vec<_>>();
+            if !reached.iter().any(|q| self.ts.state_color(*q).unwrap()) {
+                self.ts.remove_state(state_index);
+                removed.push(state_index);
+            }
+        }
+        removed
+    }
+    /// Creates a new NBA for the given alphabet, containing states with the given colors.
+    pub fn from_state_colors(alphabet: A, iter: impl IntoIterator<Item = bool>) -> NBA<A, C> {
+        use crate::ts::Sproutable;
+
+        let mut nts = NTS::for_alphabet(alphabet);
+        for state_color in iter.into_iter() {
+            nts.add_state(state_color);
+        }
+
+        NBA {
+            ts: nts,
+            initial: vec![],
+        }
+    }
     /// Decomposes the NBA into its parts: the transition system and the initial state.
     pub fn into_parts(self) -> (NTS<A, bool, C>, Vec<DefaultIdType>) {
         (self.ts, self.initial)
@@ -38,6 +85,23 @@ impl<A: Alphabet, C: Color> NBA<A, C> {
             std::collections::BTreeSet::from_iter(self.initial.iter().cloned()).len()
         );
         &self.initial
+    }
+    /// Adds the given state to the set of initial states. Returns `true` if the state was not already in the set.
+    /// Returns `false` otherwise.
+    pub fn add_initial_state(&mut self, state: DefaultIdType) -> bool {
+        if self.initial.contains(&state) {
+            false
+        } else {
+            self.initial.push(state);
+            true
+        }
+    }
+    /// Replaces the initial states with the given ones.
+    pub fn with_initial_states(self, initials: impl IntoIterator<Item = DefaultIdType>) -> Self {
+        NBA {
+            initial: initials.into_iter().collect(),
+            ..self
+        }
     }
     /// Returns an iterator over the initial states.
     pub fn initial_states_iter(&self) -> impl Iterator<Item = DefaultIdType> + '_ {
@@ -122,6 +186,55 @@ impl<A: Alphabet, C: Color> Pointed for NBA<A, C> {
         self.initial[0]
     }
 }
+impl<A: Alphabet, C: Color> Sproutable for NBA<A, C> {
+    fn add_state(&mut self, color: crate::ts::StateColor<Self>) -> Self::StateIndex {
+        self.ts.add_state(color)
+    }
+
+    fn add_edge<E>(&mut self, t: E) -> Option<crate::ts::EdgeTuple<Self>>
+    where
+        E: crate::ts::IntoEdgeTuple<Self>,
+    {
+        self.ts.add_edge(t.into_edge_tuple())
+    }
+
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: crate::ts::StateColor<Self>) {
+        self.ts.set_state_color(index, color);
+    }
+}
+impl<A: Alphabet, C: Color> Dottable for NBA<A, C> {
+    fn dot_name(&self) -> Option<String> {
+        Some("NBA".into())
+    }
+
+    fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
+        format!("q{idx}")
+    }
+
+    fn dot_state_attributes(
+        &self,
+        idx: Self::StateIndex,
+    ) -> impl IntoIterator<Item = crate::dot::DotStateAttribute> {
+        if self.ts.state_color(idx).unwrap() {
+            vec![crate::dot::DotStateAttribute::Shape(
+                crate::dot::DotShape::DoubleCircle,
+            )]
+        } else {
+            vec![crate::dot::DotStateAttribute::Shape(
+                crate::dot::DotShape::Circle,
+            )]
+        }
+    }
+    fn dot_transition_attributes<'a>(
+        &'a self,
+        t: Self::EdgeRef<'a>,
+    ) -> impl IntoIterator<Item = crate::dot::DotTransitionAttribute> {
+        use crate::ts::IsEdge;
+        [DotTransitionAttribute::Label(automata_core::Show::show(
+            &t.expression(),
+        ))]
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -141,6 +254,9 @@ mod tests {
                 (1, 'a', 1),
             ])
             .into_nba([0]);
+        let mut copy = nba.clone();
+        let removed = copy.trim();
+        assert_eq!(removed, vec![]);
 
         for pos in [upw!("a"), upw!("bababbbabb", "a")] {
             assert!(nba.accepts(pos))

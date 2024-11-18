@@ -2,13 +2,32 @@ use itertools::Itertools;
 
 use crate::Void;
 
+/// This method should display the time in a sensible format. If it is less than a second, it should
+/// only display the milliseconds and microseconds. If it is less than a minute, it should display
+/// the seconds and milliseconds. If it is less than an hour, it should display the minutes and
+/// seconds. If it is less than a day, it should display the hours and minutes. If it is more than a
+/// day, it should display the days and hours.
 pub fn show_duration(duration: std::time::Duration) -> String {
-    format!(
-        "{}s\t{}ms\t{}µs",
-        duration.as_secs(),
-        duration.as_millis(),
-        duration.as_micros()
-    )
+    let ms = duration.as_millis();
+    let us = duration.as_micros();
+    let s = duration.as_secs();
+    let m = s / 60;
+    let h = m / 60;
+    let d = h / 24;
+
+    if d > 0 {
+        format!("{}d {}h", d, h % 24)
+    } else if h > 0 {
+        format!("{}h {}m", h, m % 60)
+    } else if m > 0 {
+        format!("{}m {}s", m, s % 60)
+    } else if s > 0 {
+        format!("{}s {}ms", s, ms % 1000)
+    } else if ms > 0 {
+        format!("{}ms {}us", ms, us % 1000)
+    } else {
+        format!("{}us", us)
+    }
 }
 
 impl<C: Show> Show for (C, Void) {

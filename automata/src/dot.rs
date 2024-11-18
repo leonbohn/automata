@@ -511,6 +511,7 @@ pub enum DotShape {
     House,
     InvHouse,
     Circle,
+    DoubleCircle,
     Parallelogramm,
     Box,
     MSquare,
@@ -530,6 +531,7 @@ impl Display for DotShape {
                 DotShape::Parallelogramm => "parallelogram",
                 DotShape::Plain => "plain",
                 DotShape::Circle => "circle",
+                DotShape::DoubleCircle => "doublecircle",
                 DotShape::Box => "box",
             }
         )

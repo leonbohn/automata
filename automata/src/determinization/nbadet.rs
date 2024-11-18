@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, hash::Hash};
 
-use automata_core::{alphabet::SimpleAlphabet, Color, Int, Show};
+use automata_core::{alphabet::SimpleAlphabet, Color, Int};
 use itertools::Itertools;
 use tracing::trace;
 
@@ -10,8 +10,9 @@ use crate::{
     TransitionSystem, DTS,
 };
 
+/// Represents a macrostate that is used for the determinization of a Büchi automaton.
 #[derive(Clone)]
-struct Macrostate<Idx = DefaultIdType> {
+pub struct Macrostate<Idx = DefaultIdType> {
     states: Vec<BTreeSet<Idx>>,
     ranks: Vec<usize>,
 }
@@ -86,6 +87,18 @@ impl<Idx: IndexType> Macrostate<Idx> {
         }
         self
     }
+    /// Returns a set of all state indices that occur in this macrostate.
+    pub fn flat_partition(&self) -> BTreeSet<Idx> {
+        self.states.iter().flatten().cloned().collect()
+    }
+    /// Gives a reference to the partition of the macrostate.
+    pub fn partition(&self) -> &[BTreeSet<Idx>] {
+        &self.states
+    }
+    /// Gives a reference to the ranks.
+    pub fn ranks(&self) -> &[usize] {
+        &self.ranks
+    }
     fn from_parts(states: Vec<BTreeSet<Idx>>, ranks: Vec<usize>) -> Self {
         Macrostate { states, ranks }._sanity_checked()
     }
@@ -97,6 +110,12 @@ impl<Idx: IndexType> Macrostate<Idx> {
         ts: T,
         sym: SymbolOf<T>,
     ) -> (Self, Int) {
+        debug_assert_eq!(self.states.len(), self.ranks.len());
+        if self.states.is_empty() {
+            // we are in a sink state
+            return (Self::from_parts(vec![], vec![]), 0);
+        }
+
         let print_states = |states: &[BTreeSet<Idx>]| {
             states
                 .iter()
@@ -207,6 +226,12 @@ impl<Idx: IndexType> Macrostate<Idx> {
                 ranks.push(ranking_out[i]);
             }
         }
+
+        if states.is_empty() {
+            // we have no states left
+            ranks.clear();
+            return (Self::from_parts(vec![], vec![]), 0);
+        }
         trace!(
             "without empty: {} {}",
             print_states(&states),
@@ -264,7 +289,8 @@ impl<Idx: IndexType> Macrostate<Idx> {
     }
 }
 
-pub(crate) fn nbadet<A: SimpleAlphabet, Q: Color>(
+/// Performs a determinization of the given `NBA` to a `DPA`.
+pub fn nbadet<A: SimpleAlphabet, Q: Color>(
     nba: NBA<A, Q>,
 ) -> DPA<A, Macrostate, MaxEvenParityCondition> {
     let start_time = std::time::Instant::now();

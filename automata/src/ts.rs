@@ -348,6 +348,15 @@ pub trait TransitionSystem: Sized {
         (0, None)
     }
 
+    /// Counts the number of transitions. This method should be overwritten whenever possible since by default, it is costly and simply
+    /// iterates over all states and all outgoing transitions.
+    fn transition_count(&self) -> usize {
+        self.state_indices()
+            .map(|i| self.edges_from(i).expect("we know this exists").count())
+            .reduce(|x, y| x + y)
+            .unwrap_or(0)
+    }
+
     /// Returns `true` if and only if there exists at least one state.
     #[inline(always)]
     fn is_empty(&self) -> bool {
