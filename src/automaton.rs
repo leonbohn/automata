@@ -478,7 +478,7 @@ impl<'a, Ts: TransitionSystem> StatesWithColor<'a, Ts> {
     }
 }
 
-impl<'a, Ts: TransitionSystem> Clone for StatesWithColor<'a, Ts> {
+impl<Ts: TransitionSystem> Clone for StatesWithColor<'_, Ts> {
     fn clone(&self) -> Self {
         Self {
             ts: self.ts,
@@ -488,7 +488,7 @@ impl<'a, Ts: TransitionSystem> Clone for StatesWithColor<'a, Ts> {
     }
 }
 
-impl<'a, Ts: TransitionSystem<StateColor = bool>> Iterator for StatesWithColor<'a, Ts> {
+impl<Ts: TransitionSystem<StateColor = bool>> Iterator for StatesWithColor<'_, Ts> {
     type Item = Ts::StateIndex;
 
     fn next(&mut self) -> Option<Self::Item> {

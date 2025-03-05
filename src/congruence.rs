@@ -41,7 +41,7 @@ pub trait Congruence: Deterministic + Pointed {
     ///     ts::TSBuilder,
     ///     Congruence,
     /// };
-
+    ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
     ///     .into_dts_with_initial(0);
@@ -102,7 +102,7 @@ where
     /// # Example
     /// ```
     /// use automata::ts::TSBuilder;
-
+    ///
     /// let ts = TSBuilder::without_colors()
     ///     .with_transitions([(0, 'a', 1), (1, 'a', 0), (0, 'b', 0), (1, 'b', 1)])
     ///     .into_right_congruence_bare(0);

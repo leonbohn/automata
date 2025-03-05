@@ -670,15 +670,18 @@ impl<Ts: TransitionSystem> TransitionSystem for &Ts {
 
     type EdgeColor = Ts::EdgeColor;
 
-    type EdgeRef<'this> = Ts::EdgeRef<'this>
+    type EdgeRef<'this>
+        = Ts::EdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = Ts::EdgesFromIter<'this>
+    type EdgesFromIter<'this>
+        = Ts::EdgesFromIter<'this>
     where
         Self: 'this;
 
-    type StateIndices<'this> = Ts::StateIndices<'this>
+    type StateIndices<'this>
+        = Ts::StateIndices<'this>
     where
         Self: 'this;
 
@@ -708,15 +711,18 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 
     type EdgeColor = Ts::EdgeColor;
 
-    type EdgeRef<'this> = Ts::EdgeRef<'this>
+    type EdgeRef<'this>
+        = Ts::EdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = Ts::EdgesFromIter<'this>
+    type EdgesFromIter<'this>
+        = Ts::EdgesFromIter<'this>
     where
         Self: 'this;
 
-    type StateIndices<'this> = Ts::StateIndices<'this>
+    type StateIndices<'this>
+        = Ts::StateIndices<'this>
     where
         Self: 'this;
 
@@ -820,4 +826,4 @@ impl<P: Pointed> Pointed for &mut P {
 use self::operations::{ProvidesStateColor, WithStateColor};
 
 #[cfg(test)]
-pub mod tests {}
+mod tests {}

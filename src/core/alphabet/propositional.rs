@@ -301,7 +301,8 @@ impl<RawTy: RawSymbolRepr> Matcher<PropExpression<RawTy>> for PropExpression<Raw
 impl<RawTy: RawSymbolRepr> Expression for PropExpression<RawTy> {
     type S = PropSymbol<RawTy>;
 
-    type SymbolsIter<'this> = PropExpressionSymbols<'this, RawTy>
+    type SymbolsIter<'this>
+        = PropExpressionSymbols<'this, RawTy>
     where
         Self: 'this;
 
@@ -322,7 +323,7 @@ pub struct PropExpressionSymbols<'a, RawTy: RawSymbolRepr> {
     _ty: PhantomData<RawTy>,
 }
 
-impl<'a, RawTy: RawSymbolRepr> Iterator for PropExpressionSymbols<'a, RawTy> {
+impl<RawTy: RawSymbolRepr> Iterator for PropExpressionSymbols<'_, RawTy> {
     type Item = PropSymbol<RawTy>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -449,7 +450,8 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
         left.bdd.and(&right.bdd).sat_witness().is_some()
     }
 
-    type Universe<'this> = PropExpressionSymbols<'this, RawTy>
+    type Universe<'this>
+        = PropExpressionSymbols<'this, RawTy>
     where
         Self: 'this;
 

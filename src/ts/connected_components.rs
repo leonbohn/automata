@@ -241,7 +241,7 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     }
 }
 
-impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
+impl<Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'_, Ts> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
@@ -254,13 +254,13 @@ impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
     }
 }
 
-impl<'a, Ts: TransitionSystem> Hash for SccDecomposition<'a, Ts> {
+impl<Ts: TransitionSystem> Hash for SccDecomposition<'_, Ts> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.dag.hash(state)
     }
 }
 
-impl<'a, Ts: TransitionSystem> PartialEq for SccDecomposition<'a, Ts> {
+impl<Ts: TransitionSystem> PartialEq for SccDecomposition<'_, Ts> {
     fn eq(&self, other: &Self) -> bool {
         self.dag == other.dag
     }

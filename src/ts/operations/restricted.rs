@@ -117,7 +117,7 @@ pub struct RestrictByStateIndexIter<'a, Ts: TransitionSystem + 'a, F> {
     it: Ts::StateIndices<'a>,
 }
 
-impl<'a, Ts, F> Iterator for RestrictByStateIndexIter<'a, Ts, F>
+impl<Ts, F> Iterator for RestrictByStateIndexIter<'_, Ts, F>
 where
     Ts: TransitionSystem,
     F: StateIndexFilter<Ts::StateIndex>,

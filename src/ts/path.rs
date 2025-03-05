@@ -348,7 +348,7 @@ impl<A: Alphabet, Idx: IndexType, Q: Show, C: Show> Show for Lasso<A, Idx, Q, C>
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use automata_core::alphabet::CharAlphabet;
 
     use crate::ts::{Edge, Path};

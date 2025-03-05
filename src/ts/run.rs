@@ -120,8 +120,8 @@ pub struct Run<
     observer: PhantomData<O>,
 }
 
-impl<'ts, T: Deterministic, W: Word<Symbol = SymbolOf<T>>, const FINITE: bool, O: Observer<T>>
-    RunResult for Run<'ts, T, W, FINITE, O>
+impl<T: Deterministic, W: Word<Symbol = SymbolOf<T>>, const FINITE: bool, O: Observer<T>>
+    RunResult for Run<'_, T, W, FINITE, O>
 {
     type StateColor = StateColor<T>;
     type EdgeColor = EdgeColor<T>;
@@ -289,7 +289,7 @@ impl<W: Word> FiniteWord for EscapePrefix<W> {
     }
 }
 pub struct EscapePrefixSymbols<'a, W: Word>(&'a EscapePrefix<W>, usize);
-impl<'a, W: Word> Iterator for EscapePrefixSymbols<'a, W> {
+impl<W: Word> Iterator for EscapePrefixSymbols<'_, W> {
     type Item = W::Symbol;
     fn next(&mut self) -> Option<Self::Item> {
         if self.1 + 1 >= self.0.shortest_escaping_length {

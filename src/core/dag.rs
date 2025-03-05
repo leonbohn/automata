@@ -176,7 +176,7 @@ pub struct ReachableIter<'a, C> {
     seen: OrderedSet<usize>,
 }
 
-impl<'a, C> Iterator for ReachableIter<'a, C> {
+impl<C> Iterator for ReachableIter<'_, C> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {

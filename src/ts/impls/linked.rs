@@ -707,7 +707,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
 
 pub struct LinkedStateIndices<'ts, Q: Color>(&'ts [LinkedListTransitionSystemState<Q>], usize);
 
-impl<'ts, Q: Color> Iterator for LinkedStateIndices<'ts, Q> {
+impl<Q: Color> Iterator for LinkedStateIndices<'_, Q> {
     type Item = DefaultIdType;
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(state) = self.0.get(self.1) {

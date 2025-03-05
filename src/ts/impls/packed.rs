@@ -150,7 +150,7 @@ pub struct PackedStateIndices<'a, Q> {
     length: usize,
 }
 
-impl<'a, Q> Iterator for PackedStateIndices<'a, Q> {
+impl<Q> Iterator for PackedStateIndices<'_, Q> {
     type Item = Id;
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos < self.length {

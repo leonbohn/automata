@@ -126,7 +126,7 @@ pub struct ProductStatesIter<'a, L: TransitionSystem, R: TransitionSystem> {
     rts: &'a R,
 }
 
-impl<'a, L: TransitionSystem, R: TransitionSystem> Iterator for ProductStatesIter<'a, L, R> {
+impl<L: TransitionSystem, R: TransitionSystem> Iterator for ProductStatesIter<'_, L, R> {
     type Item = ProductIndex<L::StateIndex, R::StateIndex>;
 
     fn next(&mut self) -> Option<Self::Item> {

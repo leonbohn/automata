@@ -28,7 +28,7 @@ where
     }
 }
 
-impl<'a, Ts> Iterator for LengthLexicographicMinimalRepresentatives<'a, Ts>
+impl<Ts> Iterator for LengthLexicographicMinimalRepresentatives<'_, Ts>
 where
     Ts: TransitionSystem,
 {
@@ -94,7 +94,7 @@ where
     }
 }
 
-impl<'a, Ts> Iterator for Reachable<'a, Ts, false>
+impl<Ts> Iterator for Reachable<'_, Ts, false>
 where
     Ts: TransitionSystem,
 {
