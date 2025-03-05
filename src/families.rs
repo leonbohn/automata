@@ -1,8 +1,8 @@
 use crate::core::{
+    Int, Void,
     alphabet::{Alphabet, CharAlphabet},
     math::Map,
     word::FiniteWord,
-    Int, Void,
 };
 
 pub type FORC<A = CharAlphabet, Q = Void, C = Void> =
@@ -20,7 +20,7 @@ mod fwpm;
 pub use fwpm::*;
 
 mod convert;
-use crate::automaton::{MealyMachine, DFA};
+use crate::automaton::{DFA, MealyMachine};
 use crate::ts::{StateIndex, SymbolOf};
 use crate::{Congruence, RightCongruence};
 #[allow(unused)]

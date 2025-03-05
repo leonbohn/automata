@@ -85,11 +85,13 @@ impl<S: Symbol> Word for NormalizedOmegaWord<S> {
 }
 
 impl<S: Symbol> OmegaWord for NormalizedOmegaWord<S> {
-    type Spoke<'this> = &'this [S]
+    type Spoke<'this>
+        = &'this [S]
     where
         Self: 'this;
 
-    type Cycle<'this> = &'this [S]
+    type Cycle<'this>
+        = &'this [S]
     where
         Self: 'this;
 

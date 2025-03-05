@@ -118,11 +118,7 @@ impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
 impl<RawTy: RawSymbolRepr> Show for PropSymbol<RawTy> {
     fn show(&self) -> String {
         let chr = |b| {
-            if b {
-                '1'
-            } else {
-                '0'
-            }
+            if b { '1' } else { '0' }
         };
         assert!(
             self.num_aps as usize <= 8usize.saturating_pow(std::mem::size_of::<RawTy>() as u32)

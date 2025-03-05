@@ -130,11 +130,13 @@ pub trait OmegaWord: Word {
 }
 
 impl<W: OmegaWord> OmegaWord for &W {
-    type Spoke<'this> = W::Spoke<'this>
+    type Spoke<'this>
+        = W::Spoke<'this>
     where
         Self: 'this;
 
-    type Cycle<'this> = W::Cycle<'this>
+    type Cycle<'this>
+        = W::Cycle<'this>
     where
         Self: 'this;
 
@@ -255,9 +257,13 @@ impl<S: Symbol> OmegaWord for PeriodicOmegaWord<S> {
         0
     }
 
-    type Spoke<'this> = &'this [S] where Self:'this;
+    type Spoke<'this>
+        = &'this [S]
+    where
+        Self: 'this;
 
-    type Cycle<'this> = &'this [S]
+    type Cycle<'this>
+        = &'this [S]
     where
         Self: 'this;
 
@@ -321,9 +327,15 @@ impl<S: Symbol> OmegaWord for ReducedOmegaWord<S> {
         self.loop_index
     }
 
-    type Spoke<'this> = &'this [S] where Self:'this;
+    type Spoke<'this>
+        = &'this [S]
+    where
+        Self: 'this;
 
-    type Cycle<'this> = &'this [S] where Self:'this;
+    type Cycle<'this>
+        = &'this [S]
+    where
+        Self: 'this;
 
     fn spoke(&self) -> Self::Spoke<'_> {
         self.word[..self.loop_index].as_ref()
@@ -485,7 +497,8 @@ impl<S: Symbol> Word for Epsilon<S> {
 }
 
 impl<S: Symbol> FiniteWord for Epsilon<S> {
-    type Symbols<'this> = std::iter::Empty<S>
+    type Symbols<'this>
+        = std::iter::Empty<S>
     where
         Self: 'this;
 
@@ -523,11 +536,13 @@ impl<W: FiniteWord> Word for OmegaIteration<W> {
 }
 
 impl<W: FiniteWord> OmegaWord for OmegaIteration<W> {
-    type Spoke<'this> = Epsilon<W::Symbol>
+    type Spoke<'this>
+        = Epsilon<W::Symbol>
     where
         Self: 'this;
 
-    type Cycle<'this> = &'this W
+    type Cycle<'this>
+        = &'this W
     where
         Self: 'this;
 
@@ -587,7 +602,7 @@ impl<S: Show> Debug for PeriodicOmegaWord<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::word::{omega::deduplicate, FiniteWord, OmegaWord, ReducedOmegaWord};
+    use crate::word::{FiniteWord, OmegaWord, ReducedOmegaWord, omega::deduplicate};
 
     use super::deduplicate_inplace;
 

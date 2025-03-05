@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 
 use crate::automaton::{InfiniteWordAutomaton, Semantics};
-use crate::core::{alphabet::CharAlphabet, math::OrderedSet, Color, Void};
+use crate::core::{Color, Void, alphabet::CharAlphabet, math::OrderedSet};
 use crate::ts::run::Observer;
-use crate::ts::{run, Deterministic, EdgeColor, StateColor};
-use crate::{TransitionSystem, DTS};
+use crate::ts::{Deterministic, EdgeColor, StateColor, run};
+use crate::{DTS, TransitionSystem};
 
 /// A deterministic Rabin automaton (DRA) uses a [`RabinCondition`] to determine acceptance.
 /// Specifically, such a condition consists of a set of [`RabinPair`]s, which in turn are

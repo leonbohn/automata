@@ -426,7 +426,7 @@ impl<Ts: TransitionSystem> Debug for Scc<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{TransitionSystem, DTS};
+    use crate::{DTS, TransitionSystem};
     use automata_core::math::Set;
 
     #[test]

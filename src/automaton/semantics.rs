@@ -1,7 +1,7 @@
+use crate::TransitionSystem;
 use crate::automaton::{MealySemantics, MooreSemantics};
 use crate::ts::run::{Observer, ReachedEdgeColor, ReachedStateColor};
 use crate::ts::{Deterministic, EdgeColor, StateColor};
-use crate::TransitionSystem;
 
 /// This is the base trait for different types of semantics that are used by the
 /// [`crate::Automaton`] struct for determining the output of a finite or infinite

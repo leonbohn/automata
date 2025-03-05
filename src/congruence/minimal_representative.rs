@@ -1,9 +1,8 @@
 use std::{cell::OnceCell, hash::Hash};
 
 use crate::core::{
-    math,
+    Show, math,
     word::{FiniteWord, Word},
-    Show,
 };
 use crate::ts::{StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
@@ -125,7 +124,8 @@ impl<T: TransitionSystem> Word for MinimalRepresentative<T> {
 }
 
 impl<T: TransitionSystem> FiniteWord for MinimalRepresentative<T> {
-    type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, SymbolOf<T>>>
+    type Symbols<'this>
+        = std::iter::Cloned<std::slice::Iter<'this, SymbolOf<T>>>
     where
         Self: 'this;
 

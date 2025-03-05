@@ -221,9 +221,9 @@ pub trait Shrinkable: TransitionSystem {
 mod tests {
     use crate::representation::CollectTs;
     use crate::ts::{ForAlphabet, Shrinkable, Sproutable};
-    use crate::{TransitionSystem, DTS};
-    use automata_core::alphabet::CharAlphabet;
+    use crate::{DTS, TransitionSystem};
     use automata_core::Void;
+    use automata_core::alphabet::CharAlphabet;
 
     #[test]
     fn shrink_to_reachable() {

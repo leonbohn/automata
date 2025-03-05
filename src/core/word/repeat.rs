@@ -15,7 +15,8 @@ impl<W: FiniteWord> Repeat<W> {
 }
 
 impl<W: FiniteWord> FiniteWord for Repeat<W> {
-    type Symbols<'this> = RepeatIter<'this, W>
+    type Symbols<'this>
+        = RepeatIter<'this, W>
     where
         Self: 'this;
 

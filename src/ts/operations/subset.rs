@@ -6,8 +6,8 @@ use crate::core::{
     math::OrderedSet,
 };
 use crate::ts::{
-    edge::TransitionOwnedColor, Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression,
-    IsEdge, Pointed, StateIndex, SymbolOf, TransitionSystem,
+    Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, IsEdge, Pointed, StateIndex,
+    SymbolOf, TransitionSystem, edge::TransitionOwnedColor,
 };
 use itertools::Itertools;
 
@@ -129,15 +129,18 @@ impl<Ts: TransitionSystem> TransitionSystem for SubsetConstruction<Ts> {
 
     type EdgeColor = Vec<Ts::EdgeColor>;
 
-    type EdgeRef<'this> = TransitionOwnedColor<'this, EdgeExpression<Ts>, usize, Self::EdgeColor>
+    type EdgeRef<'this>
+        = TransitionOwnedColor<'this, EdgeExpression<Ts>, usize, Self::EdgeColor>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = DeterministicEdgesFrom<'this, Self>
+    type EdgesFromIter<'this>
+        = DeterministicEdgesFrom<'this, Self>
     where
         Self: 'this;
 
-    type StateIndices<'this> = crate::ts::reachable::Reachable<'this, Self, false>
+    type StateIndices<'this>
+        = crate::ts::reachable::Reachable<'this, Self, false>
     where
         Self: 'this;
 
@@ -220,7 +223,7 @@ impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
 #[cfg(test)]
 mod tests {
     use crate::representation::CollectTs;
-    use crate::{TransitionSystem, NTS};
+    use crate::{NTS, TransitionSystem};
 
     #[test]
     fn subset_construction() {

@@ -1,6 +1,6 @@
-use crate::core::Color;
-use crate::ts::{operations, EdgeColor, EdgeExpression, IsEdge, StateIndex, SymbolOf};
 use crate::TransitionSystem;
+use crate::core::Color;
+use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateIndex, SymbolOf, operations};
 use automata_core::alphabet::Alphabet;
 
 /// Implementors of this trait are [`TransitionSystem`]s which allow iterating over the predecessors of a state.
@@ -40,8 +40,14 @@ where
     Ts: PredecessorIterable,
     F: operations::StateIndexFilter<Ts::StateIndex>,
 {
-    type PreEdgeRef<'this> = Ts::PreEdgeRef<'this> where Self: 'this;
-    type EdgesToIter<'this> = operations::RestrictedEdgesToIter<'this, Ts, F> where Self: 'this;
+    type PreEdgeRef<'this>
+        = Ts::PreEdgeRef<'this>
+    where
+        Self: 'this;
+    type EdgesToIter<'this>
+        = operations::RestrictedEdgesToIter<'this, Ts, F>
+    where
+        Self: 'this;
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
         Some(operations::RestrictedEdgesToIter::new(
             self.ts().predecessors(state)?,
@@ -51,15 +57,27 @@ where
 }
 
 impl<Ts: PredecessorIterable> PredecessorIterable for &Ts {
-    type PreEdgeRef<'this> = Ts::PreEdgeRef<'this> where Self: 'this;
-    type EdgesToIter<'this> = Ts::EdgesToIter<'this> where Self: 'this;
+    type PreEdgeRef<'this>
+        = Ts::PreEdgeRef<'this>
+    where
+        Self: 'this;
+    type EdgesToIter<'this>
+        = Ts::EdgesToIter<'this>
+    where
+        Self: 'this;
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
         Ts::predecessors(self, state)
     }
 }
 impl<Ts: PredecessorIterable> PredecessorIterable for &mut Ts {
-    type PreEdgeRef<'this> = Ts::PreEdgeRef<'this> where Self: 'this;
-    type EdgesToIter<'this> = Ts::EdgesToIter<'this> where Self: 'this;
+    type PreEdgeRef<'this>
+        = Ts::PreEdgeRef<'this>
+    where
+        Self: 'this;
+    type EdgesToIter<'this>
+        = Ts::EdgesToIter<'this>
+    where
+        Self: 'this;
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
         Ts::predecessors(self, state)
     }
@@ -71,8 +89,14 @@ where
     Ts: PredecessorIterable,
     F: Fn(Ts::EdgeColor) -> D,
 {
-    type PreEdgeRef<'this> = operations::MappedPreTransition<Ts::PreEdgeRef<'this>, &'this F, Ts::EdgeColor> where Self: 'this;
-    type EdgesToIter<'this> = operations::MappedTransitionsToIter<'this, Ts::EdgesToIter<'this>, F, Ts::EdgeColor> where Self: 'this;
+    type PreEdgeRef<'this>
+        = operations::MappedPreTransition<Ts::PreEdgeRef<'this>, &'this F, Ts::EdgeColor>
+    where
+        Self: 'this;
+    type EdgesToIter<'this>
+        = operations::MappedTransitionsToIter<'this, Ts::EdgesToIter<'this>, F, Ts::EdgeColor>
+    where
+        Self: 'this;
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
         Some(operations::MappedTransitionsToIter::new(
             self.ts().predecessors(state)?,
@@ -87,8 +111,14 @@ where
     Ts: PredecessorIterable,
     F: Fn(Ts::StateColor) -> D,
 {
-    type EdgesToIter<'this> = Ts::EdgesToIter<'this> where Self: 'this;
-    type PreEdgeRef<'this> = Ts::PreEdgeRef<'this> where Self: 'this;
+    type EdgesToIter<'this>
+        = Ts::EdgesToIter<'this>
+    where
+        Self: 'this;
+    type PreEdgeRef<'this>
+        = Ts::PreEdgeRef<'this>
+    where
+        Self: 'this;
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
         self.ts().predecessors(state)
     }
@@ -102,8 +132,21 @@ where
     L::StateColor: Clone,
     R::StateColor: Clone,
 {
-    type PreEdgeRef<'this> = operations::ProductPreTransition<'this, L::StateIndex, R::StateIndex, EdgeExpression<L>, L::EdgeColor, R::EdgeColor> where Self: 'this;
-    type EdgesToIter<'this> = operations::ProductEdgesTo<'this, L, R> where Self: 'this;
+    type PreEdgeRef<'this>
+        = operations::ProductPreTransition<
+        'this,
+        L::StateIndex,
+        R::StateIndex,
+        EdgeExpression<L>,
+        L::EdgeColor,
+        R::EdgeColor,
+    >
+    where
+        Self: 'this;
+    type EdgesToIter<'this>
+        = operations::ProductEdgesTo<'this, L, R>
+    where
+        Self: 'this;
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
         operations::ProductEdgesTo::new(&self.0, &self.1, state)
     }
@@ -111,8 +154,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ts::predecessors::PredecessorIterable;
     use crate::ts::TSBuilder;
+    use crate::ts::predecessors::PredecessorIterable;
 
     #[test]
     fn predecessor_iterable() {

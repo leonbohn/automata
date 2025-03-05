@@ -70,11 +70,20 @@ where
 
     type EdgeColor = ();
 
-    type EdgeRef<'this> = EdgeReference<'this, InvertibleChar, usize, ()> where Self: 'this;
+    type EdgeRef<'this>
+        = EdgeReference<'this, InvertibleChar, usize, ()>
+    where
+        Self: 'this;
 
-    type StateIndices<'this> = std::ops::Range<usize> where Self: 'this;
+    type StateIndices<'this>
+        = std::ops::Range<usize>
+    where
+        Self: 'this;
 
-    type EdgesFromIter<'this> = DeterministicEdgesFrom<'this, Self> where Self: 'this;
+    type EdgesFromIter<'this>
+        = DeterministicEdgesFrom<'this, Self>
+    where
+        Self: 'this;
 
     type Alphabet = Directional;
 
@@ -166,11 +175,20 @@ where
 
     type EdgeColor = ();
 
-    type EdgeRef<'this> = EdgeReference<'this, EdgeExpression<Ts>, usize, ()> where Self: 'this;
+    type EdgeRef<'this>
+        = EdgeReference<'this, EdgeExpression<Ts>, usize, ()>
+    where
+        Self: 'this;
 
-    type StateIndices<'this> = std::ops::Range<usize> where Self: 'this;
+    type StateIndices<'this>
+        = std::ops::Range<usize>
+    where
+        Self: 'this;
 
-    type EdgesFromIter<'this> = DeterministicEdgesFrom<'this, Self> where Self: 'this;
+    type EdgesFromIter<'this>
+        = DeterministicEdgesFrom<'this, Self>
+    where
+        Self: 'this;
 
     type Alphabet = Ts::Alphabet;
 

@@ -6,9 +6,9 @@ pub use probability::{
 use std::collections::BTreeMap;
 use std::{collections::BTreeSet, hash::Hash};
 
+pub use indexmap::Equivalent;
 pub use indexmap::map;
 pub use indexmap::set;
-pub use indexmap::Equivalent;
 pub use std::collections::btree_map as ordered_map;
 pub use std::collections::btree_set as ordered_set;
 

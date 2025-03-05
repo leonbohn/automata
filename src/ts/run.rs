@@ -1,15 +1,15 @@
 #![allow(missing_docs)]
 use crate::core::{
+    Color,
     alphabet::Symbol,
     math,
     word::Infix,
     word::{FiniteWord, OmegaWord, ReducedOmegaWord, Word},
-    Color,
 };
 use std::{fmt::Debug, marker::PhantomData};
 
-use crate::ts::{Deterministic, EdgeColor, IndexType, StateColor, StateIndex, SymbolOf};
 use crate::TransitionSystem;
+use crate::ts::{Deterministic, EdgeColor, IndexType, StateColor, StateIndex, SymbolOf};
 
 pub trait Observer<T: TransitionSystem>: Sized {
     type Current;
@@ -120,8 +120,8 @@ pub struct Run<
     observer: PhantomData<O>,
 }
 
-impl<T: Deterministic, W: Word<Symbol = SymbolOf<T>>, const FINITE: bool, O: Observer<T>>
-    RunResult for Run<'_, T, W, FINITE, O>
+impl<T: Deterministic, W: Word<Symbol = SymbolOf<T>>, const FINITE: bool, O: Observer<T>> RunResult
+    for Run<'_, T, W, FINITE, O>
 {
     type StateColor = StateColor<T>;
     type EdgeColor = EdgeColor<T>;
@@ -177,7 +177,7 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
         let mut current = match self.ts.finite_run_from::<_, O>(self.start, spoke) {
             FiniteRunOutput::Reached(r, _) => r,
             FiniteRunOutput::Failed(state, ep) => {
-                return InfiniteRunOutput::Failed(state, ep.with_word(self.word))
+                return InfiniteRunOutput::Failed(state, ep.with_word(self.word));
             }
         };
 
@@ -283,7 +283,10 @@ impl<W: Word> Word for EscapePrefix<W> {
     }
 }
 impl<W: Word> FiniteWord for EscapePrefix<W> {
-    type Symbols<'this> = EscapePrefixSymbols<'this, W> where Self: 'this;
+    type Symbols<'this>
+        = EscapePrefixSymbols<'this, W>
+    where
+        Self: 'this;
     fn symbols(&self) -> Self::Symbols<'_> {
         EscapePrefixSymbols(self, 0)
     }
@@ -443,9 +446,9 @@ impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserve
 
 mod impls {
     use super::*;
-    use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor, StateIndex, SymbolOf};
     use crate::TransitionSystem;
-    use automata_core::{math, Lattice};
+    use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor, StateIndex, SymbolOf};
+    use automata_core::{Lattice, math};
 
     impl<T: Deterministic> Observer<T> for NoObserver {
         type Current = ();

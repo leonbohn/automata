@@ -9,8 +9,8 @@ mod scc;
 pub use scc::Scc;
 
 mod tarjan;
-use crate::ts::{EdgeColor, IsEdge, StateIndex};
 use crate::TransitionSystem;
+use crate::ts::{EdgeColor, IsEdge, StateIndex};
 pub use tarjan::{kosaraju, tarjan_scc_iterative, tarjan_scc_iterative_from, tarjan_scc_recursive};
 
 /// Newtype wrapper for storing indices of SCCs.
@@ -268,14 +268,14 @@ impl<Ts: TransitionSystem> PartialEq for SccDecomposition<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
+    use automata_core::Void;
     use automata_core::alphabet::CharAlphabet;
     use automata_core::math::Set;
-    use automata_core::Void;
 
     use crate::ts::TSBuilder;
     use crate::{
-        ts::connected_components::{Scc, SccDecomposition},
         RightCongruence, TransitionSystem,
+        ts::connected_components::{Scc, SccDecomposition},
     };
 
     pub(super) fn ts() -> RightCongruence<CharAlphabet> {

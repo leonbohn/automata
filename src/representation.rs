@@ -1,13 +1,13 @@
 #![allow(missing_docs)]
 
-use crate::core::{math, Color, Int, Void};
+use crate::core::{Color, Int, Void, math};
 
-use crate::automaton::{MealyMachine, MooreMachine, DBA, DFA, DPA};
+use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
 use crate::ts::{
     DefaultIdType, Deterministic, EdgeColor, ForAlphabet, IsEdge, Sproutable, StateColor,
     StateIndex,
 };
-use crate::{Congruence, Pointed, RightCongruence, TransitionSystem, DTS};
+use crate::{Congruence, DTS, Pointed, RightCongruence, TransitionSystem};
 
 pub trait StateColored<Q: Color = Int> {}
 impl<T: TransitionSystem> StateColored<StateColor<T>> for T {}
@@ -285,8 +285,8 @@ mod impl_into_ts {
     use super::*;
     use crate::automaton::Automaton;
     use crate::ts::operations::MapStateColor;
-    use crate::ts::{operations, EdgeColor, EdgeExpression, StateColor, StateIndex, SymbolOf};
-    use crate::{TransitionSystem, DTS};
+    use crate::ts::{EdgeColor, EdgeExpression, StateColor, StateIndex, SymbolOf, operations};
+    use crate::{DTS, TransitionSystem};
     use automata_core::alphabet::Alphabet;
 
     impl<A: Alphabet, Q: Color, C: Color> IntoTs for DTS<A, Q, C> {

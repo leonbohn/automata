@@ -1,13 +1,13 @@
 #![allow(unused)]
-use crate::automaton::{MealyMachine, MooreMachine, DBA, DFA, DPA};
+use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
 use crate::representation::IntoTs;
 use crate::ts::{DefaultIdType, Deterministic, ForAlphabet, Shrinkable, Sproutable, StateIndex};
-use crate::{TransitionSystem, DTS};
+use crate::{DTS, TransitionSystem};
 use automata_core::alphabet::{Alphabet, CharAlphabet};
 use automata_core::word::ReducedOmegaWord;
-use automata_core::{math, upw, Int, Void};
+use automata_core::{Int, Void, math, upw};
 use math::sample_continuous_bernoulli;
-use rand::{rngs::ThreadRng, thread_rng, Rng};
+use rand::{Rng, rngs::ThreadRng, thread_rng};
 use std::cmp::min;
 use tracing::{debug, info};
 
@@ -336,7 +336,14 @@ pub(crate) fn print_random_ts_benchmark(
             }
 
             info!("Results for {symbol_count} symbols and probability 1/{reciprocal}.");
-            info!("States {:.2} | nontrivial SCCs {:.2}/{:.2} | average SCC size {:.2} | average maximal SCC size {:.2}", averages.states, averages.nontrivial_count, averages.scc_count, averages.nontrivial_scc_size, averages.maximal_scc_size);
+            info!(
+                "States {:.2} | nontrivial SCCs {:.2}/{:.2} | average SCC size {:.2} | average maximal SCC size {:.2}",
+                averages.states,
+                averages.nontrivial_count,
+                averages.scc_count,
+                averages.nontrivial_scc_size,
+                averages.maximal_scc_size
+            );
         }
     }
 
@@ -350,9 +357,9 @@ mod tests {
         generate_random_ts_sized, generate_random_words, print_random_ts_benchmark,
     };
     use crate::{
-        dot::Dottable,
-        random::{draw_priority, CharAlphabet},
         TransitionSystem,
+        dot::Dottable,
+        random::{CharAlphabet, draw_priority},
     };
     use std::collections::HashMap;
 

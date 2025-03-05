@@ -77,7 +77,10 @@ impl Matcher<char> for char {
 
 impl Expression for char {
     type S = char;
-    type SymbolsIter<'this> = std::iter::Once<char> where Self: 'this;
+    type SymbolsIter<'this>
+        = std::iter::Once<char>
+    where
+        Self: 'this;
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         std::iter::once(*self)
     }
@@ -99,9 +102,10 @@ impl Alphabet for CharAlphabet {
 
     type Expression = char;
 
-    type Universe<'this> = std::iter::Cloned<std::slice::Iter<'this, char>>
-        where
-            Self: 'this;
+    type Universe<'this>
+        = std::iter::Cloned<std::slice::Iter<'this, char>>
+    where
+        Self: 'this;
 
     fn size(&self) -> usize {
         self.0.len()
@@ -167,7 +171,10 @@ impl Matcher<usize> for usize {
 
 impl Expression for usize {
     type S = usize;
-    type SymbolsIter<'this> = std::iter::Once<usize> where Self: 'this;
+    type SymbolsIter<'this>
+        = std::iter::Once<usize>
+    where
+        Self: 'this;
 
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         std::iter::once(*self)
@@ -208,7 +215,8 @@ impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> Alphabet for Fi
         N
     }
 
-    type Universe<'this> = std::iter::Cloned<std::slice::Iter<'this, S>>
+    type Universe<'this>
+        = std::iter::Cloned<std::slice::Iter<'this, S>>
     where
         Self: 'this;
 
@@ -260,7 +268,10 @@ impl Matcher<InvertibleChar> for InvertibleChar {
 
 impl Expression for InvertibleChar {
     type S = InvertibleChar;
-    type SymbolsIter<'this> = std::iter::Once<InvertibleChar> where Self: 'this;
+    type SymbolsIter<'this>
+        = std::iter::Once<InvertibleChar>
+    where
+        Self: 'this;
 
     fn symbols(&self) -> Self::SymbolsIter<'_> {
         std::iter::once(*self)
@@ -333,7 +344,8 @@ impl Alphabet for Directional {
         left == right
     }
 
-    type Universe<'this> = std::iter::Cloned<std::slice::Iter<'this, InvertibleChar>>
+    type Universe<'this>
+        = std::iter::Cloned<std::slice::Iter<'this, InvertibleChar>>
     where
         Self: 'this;
 

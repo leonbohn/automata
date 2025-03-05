@@ -1,6 +1,6 @@
+use crate::TransitionSystem;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{IsEdge, StateIndex};
-use crate::TransitionSystem;
 
 /// Reverses the direction of all transitions in a given [`TransitionSystem`].
 #[derive(Clone, Debug)]
@@ -36,15 +36,21 @@ where
 
     type EdgeColor = Ts::EdgeColor;
 
-    type EdgeRef<'this> = Reversed<Ts::PreEdgeRef<'this>>
+    type EdgeRef<'this>
+        = Reversed<Ts::PreEdgeRef<'this>>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = std::iter::Map<Ts::EdgesToIter<'this>, fn(Ts::PreEdgeRef<'this>) -> Reversed<Ts::PreEdgeRef<'this>>>
+    type EdgesFromIter<'this>
+        = std::iter::Map<
+        Ts::EdgesToIter<'this>,
+        fn(Ts::PreEdgeRef<'this>) -> Reversed<Ts::PreEdgeRef<'this>>,
+    >
     where
         Self: 'this;
 
-    type StateIndices<'this> = Ts::StateIndices<'this>
+    type StateIndices<'this>
+        = Ts::StateIndices<'this>
     where
         Self: 'this;
 
@@ -69,11 +75,16 @@ impl<Ts> PredecessorIterable for Reversed<Ts>
 where
     Ts: TransitionSystem + PredecessorIterable,
 {
-    type PreEdgeRef<'this> = Reversed<Ts::EdgeRef<'this>>
+    type PreEdgeRef<'this>
+        = Reversed<Ts::EdgeRef<'this>>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = std::iter::Map<Ts::EdgesFromIter<'this>, fn(Ts::EdgeRef<'this>) -> Reversed<Ts::EdgeRef<'this>>>
+    type EdgesToIter<'this>
+        = std::iter::Map<
+        Ts::EdgesFromIter<'this>,
+        fn(Ts::EdgeRef<'this>) -> Reversed<Ts::EdgeRef<'this>>,
+    >
     where
         Self: 'this;
 

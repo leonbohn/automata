@@ -1,10 +1,10 @@
 mod class;
 
 use crate::core::{
+    Color, Void,
     alphabet::{Alphabet, CharAlphabet},
     math, word,
     word::OmegaWord,
-    Color, Void,
 };
 pub use class::Class;
 
@@ -15,11 +15,11 @@ mod cayley;
 pub use cayley::{Cayley, RightCayley};
 
 mod minimal_representative;
-use crate::automaton::{FiniteWordAutomaton, DFA};
+use crate::automaton::{DFA, FiniteWordAutomaton};
 use crate::representation::IntoTs;
 use crate::ts::operations::DefaultIfMissing;
 use crate::ts::{Deterministic, EdgeColor, StateColor, StateIndex, SymbolOf};
-use crate::{Pointed, TransitionSystem, DTS};
+use crate::{DTS, Pointed, TransitionSystem};
 pub use minimal_representative::{LazyMinimalRepresentatives, MinimalRepresentative, StateNaming};
 
 /// A congruence is a [`TransitionSystem`], which additionally has a distinguished initial state. On top

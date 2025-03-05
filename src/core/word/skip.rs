@@ -25,7 +25,10 @@ impl<W: Word> Word for Skip<'_, W> {
 }
 
 impl<W: FiniteWord> FiniteWord for Skip<'_, W> {
-    type Symbols<'this> = std::iter::Skip<W::Symbols<'this>> where Self: 'this;
+    type Symbols<'this>
+        = std::iter::Skip<W::Symbols<'this>>
+    where
+        Self: 'this;
 
     fn collect_vec(&self) -> Vec<W::Symbol> {
         (self.offset..self.sequence.len())
@@ -86,7 +89,10 @@ impl<W: FiniteWord> Iterator for RotatedIter<'_, W> {
 }
 
 impl<W: FiniteWord> FiniteWord for Rotated<W> {
-    type Symbols<'this> = RotatedIter<'this, W> where Self: 'this;
+    type Symbols<'this>
+        = RotatedIter<'this, W>
+    where
+        Self: 'this;
 
     fn symbols(&self) -> Self::Symbols<'_> {
         RotatedIter::new(self, self.1)
@@ -102,11 +108,13 @@ impl<W: FiniteWord> FiniteWord for Rotated<W> {
 }
 
 impl<W: OmegaWord> OmegaWord for Skip<'_, W> {
-    type Spoke<'this> = Infix<'this, W>
+    type Spoke<'this>
+        = Infix<'this, W>
     where
         Self: 'this;
 
-    type Cycle<'this> = Infix<'this, W>
+    type Cycle<'this>
+        = Infix<'this, W>
     where
         Self: 'this;
 
@@ -189,7 +197,8 @@ impl<W: Word> Word for Infix<'_, W> {
 }
 
 impl<W: Word> FiniteWord for Infix<'_, W> {
-    type Symbols<'this> = ConsumingInfixIterator<'this, W>
+    type Symbols<'this>
+        = ConsumingInfixIterator<'this, W>
     where
         Self: 'this;
 

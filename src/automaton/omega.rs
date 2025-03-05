@@ -16,11 +16,11 @@ mod acceptance_mask;
 use super::InfiniteWordAutomaton;
 use crate::representation::IntoTs;
 use crate::ts::{DefaultIdType, ForAlphabet, IsEdge, ScalarIndexType, Sproutable, TSBuilder};
-use crate::{Pointed, TransitionSystem, DTS, TS};
+use crate::{DTS, Pointed, TS, TransitionSystem};
 pub use acceptance_mask::AcceptanceMask;
+use automata_core::Int;
 use automata_core::alphabet::{Alphabet, CharAlphabet, PropAlphabet};
 use automata_core::math::OrderedSet;
-use automata_core::Int;
 use tracing::{error, trace};
 
 /// Type alias for an omega automaton (i.e. an [`InfiniteWordAutomaton`]) that is guaranteed to be

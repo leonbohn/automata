@@ -1,4 +1,4 @@
-use crate::core::{math, Color};
+use crate::core::{Color, math};
 use crate::ts::{Deterministic, StateIndex};
 use crate::{Pointed, TransitionSystem};
 use std::hash::Hash;
@@ -118,15 +118,18 @@ impl<Ts: TransitionSystem, P: ProvidesStateColor<Ts::StateIndex>> TransitionSyst
 
     type EdgeColor = Ts::EdgeColor;
 
-    type EdgeRef<'this> = Ts::EdgeRef<'this>
+    type EdgeRef<'this>
+        = Ts::EdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = Ts::EdgesFromIter<'this>
+    type EdgesFromIter<'this>
+        = Ts::EdgesFromIter<'this>
     where
         Self: 'this;
 
-    type StateIndices<'this> = Ts::StateIndices<'this>
+    type StateIndices<'this>
+        = Ts::StateIndices<'this>
     where
         Self: 'this;
 

@@ -1,5 +1,5 @@
-use crate::ts::{Deterministic, EdgeExpression, IsEdge, SymbolOf};
 use crate::TransitionSystem;
+use crate::ts::{Deterministic, EdgeExpression, IsEdge, SymbolOf};
 use automata_core::alphabet::{Alphabet, Expression};
 
 /// Specialized version of an iterator over the edges leaving a specific state of a **deterministic**

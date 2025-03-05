@@ -1,7 +1,7 @@
 use crate::core::{
+    Show,
     alphabet::Symbol,
     word::{FiniteWord, Word},
-    Show,
 };
 
 use itertools::Itertools;
@@ -69,7 +69,8 @@ impl<S: Symbol> Word for Class<S> {
     }
 }
 impl<S: Symbol> FiniteWord for Class<S> {
-    type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, S>>
+    type Symbols<'this>
+        = std::iter::Cloned<std::slice::Iter<'this, S>>
     where
         Self: 'this,
         S: 'this;

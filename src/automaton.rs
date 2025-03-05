@@ -1,8 +1,8 @@
 mod acceptance_type;
 use crate::core::{
+    Color,
     alphabet::{Alphabet, CharAlphabet, Matcher},
     word::{FiniteWord, OmegaWord},
-    Color,
 };
 pub use acceptance_type::OmegaAcceptanceType;
 
@@ -15,14 +15,14 @@ mod mealy;
 pub use mealy::{IntoMealyMachine, MealyLike, MealyMachine, MealySemantics};
 
 mod reachability;
-pub use reachability::{IntoDFA, ReachabilityCondition, DFA};
+pub use reachability::{DFA, IntoDFA, ReachabilityCondition};
 
 mod omega;
 pub use omega::{
-    AcceptanceMask, BuchiCondition, DeterministicOmegaAutomaton, IntoDBA, IntoDMA, IntoDPA,
-    IntoDRA, MaxEvenParityCondition, MaxOddParityCondition, MinEvenParityCondition,
-    MinOddParityCondition, MullerCondition, NondeterministicOmegaAutomaton,
-    OmegaAcceptanceCondition, OmegaAutomaton, RabinCondition, RabinPair, DBA, DMA, DPA, DRA,
+    AcceptanceMask, BuchiCondition, DBA, DMA, DPA, DRA, DeterministicOmegaAutomaton, IntoDBA,
+    IntoDMA, IntoDPA, IntoDRA, MaxEvenParityCondition, MaxOddParityCondition,
+    MinEvenParityCondition, MinOddParityCondition, MullerCondition, NondeterministicOmegaAutomaton,
+    OmegaAcceptanceCondition, OmegaAutomaton, RabinCondition, RabinPair,
 };
 
 mod with_initial;
@@ -41,7 +41,7 @@ use crate::ts::{
     Deterministic, EdgeExpression, ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable, StateColor,
     StateIndex, SymbolOf, TSBuilder,
 };
-use crate::{Congruence, Pointed, TransitionSystem, DTS, TS};
+use crate::{Congruence, DTS, Pointed, TS, TransitionSystem};
 pub use priority_mapping::{StateBasedWeakPriorityMapping, WeakPriorityMapping};
 
 /// Type alias for an omega word automaton, like [`DBA`], [`DMA`], [`DPA`] or [`DRA`].
@@ -305,11 +305,13 @@ where
     Q: Color,
     C: Color,
 {
-    type PreEdgeRef<'this> = D::PreEdgeRef<'this>
+    type PreEdgeRef<'this>
+        = D::PreEdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = D::EdgesToIter<'this>
+    type EdgesToIter<'this>
+        = D::EdgesToIter<'this>
     where
         Self: 'this;
 
@@ -417,15 +419,18 @@ where
 
     type EdgeColor = D::EdgeColor;
 
-    type EdgeRef<'this> = D::EdgeRef<'this>
+    type EdgeRef<'this>
+        = D::EdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = D::EdgesFromIter<'this>
+    type EdgesFromIter<'this>
+        = D::EdgesFromIter<'this>
     where
         Self: 'this;
 
-    type StateIndices<'this> = D::StateIndices<'this>
+    type StateIndices<'this>
+        = D::StateIndices<'this>
     where
         Self: 'this;
 
@@ -526,7 +531,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::automaton::{MooreMachine, DBA, DFA};
+    use crate::automaton::{DBA, DFA, MooreMachine};
     use crate::representation::CollectTs;
     use automata_core::upw;
     use automata_core::word::ReducedOmegaWord;

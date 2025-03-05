@@ -1,7 +1,7 @@
+use crate::TransitionSystem;
 use crate::congruence::MinimalRepresentative;
 use crate::core::{alphabet::Expression, math::OrderedSet};
 use crate::ts::{IsEdge, StateIndex};
-use crate::TransitionSystem;
 use std::collections::{BTreeMap, VecDeque};
 
 /// Struct that can return the minimal representatives of a transition system. A minimal representative
@@ -151,10 +151,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::TransitionSystem;
     use crate::automaton::DFA;
     use crate::congruence::MinimalRepresentative;
     use crate::core::word::FiniteWord;
-    use crate::TransitionSystem;
     use itertools::Itertools;
 
     #[test]

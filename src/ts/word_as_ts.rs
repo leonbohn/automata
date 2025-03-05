@@ -3,10 +3,10 @@ use crate::core::{
     word::{FiniteWord, OmegaWord, Word},
 };
 
-use crate::ts::{predecessors::PredecessorIterable, StateIndex};
 use crate::TransitionSystem;
+use crate::ts::{StateIndex, predecessors::PredecessorIterable};
 
-use super::{edge::TransitionOwnedColor, EdgeColor};
+use super::{EdgeColor, edge::TransitionOwnedColor};
 
 /// Treats a word as if it was a transition system.
 ///
@@ -23,11 +23,13 @@ pub struct WordTs<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>, const FINITE: 
 impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> PredecessorIterable
     for WordTs<A, W, false>
 {
-    type PreEdgeRef<'this>  = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
+    type PreEdgeRef<'this>
+        = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = std::iter::Once<Self::PreEdgeRef<'this>>
+    type EdgesToIter<'this>
+        = std::iter::Once<Self::PreEdgeRef<'this>>
     where
         Self: 'this;
 
@@ -47,11 +49,19 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> PredecessorIterable
 impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> PredecessorIterable
     for WordTs<A, W, true>
 {
-    type PreEdgeRef<'this>  = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
+    type PreEdgeRef<'this>
+        = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = itertools::Either<std::iter::Once<Self::PreEdgeRef<'this>>, std::iter::Chain<std::iter::Once<Self::PreEdgeRef<'this>>, std::iter::Once<Self::PreEdgeRef<'this>>>>
+    type EdgesToIter<'this>
+        = itertools::Either<
+        std::iter::Once<Self::PreEdgeRef<'this>>,
+        std::iter::Chain<
+            std::iter::Once<Self::PreEdgeRef<'this>>,
+            std::iter::Once<Self::PreEdgeRef<'this>>,
+        >,
+    >
     where
         Self: 'this;
 
@@ -100,15 +110,18 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
 
     type EdgeColor = A::Symbol;
 
-    type EdgeRef<'this> = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
+    type EdgeRef<'this>
+        = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = std::iter::Once<Self::EdgeRef<'this>>
+    type EdgesFromIter<'this>
+        = std::iter::Once<Self::EdgeRef<'this>>
     where
         Self: 'this;
 
-    type StateIndices<'this> = std::ops::Range<u32>
+    type StateIndices<'this>
+        = std::ops::Range<u32>
     where
         Self: 'this;
 
@@ -151,15 +164,18 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for W
 
     type EdgeColor = A::Symbol;
 
-    type EdgeRef<'this> = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
+    type EdgeRef<'this>
+        = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = std::iter::Once<Self::EdgeRef<'this>>
+    type EdgesFromIter<'this>
+        = std::iter::Once<Self::EdgeRef<'this>>
     where
         Self: 'this;
 
-    type StateIndices<'this> = std::ops::Range<u32>
+    type StateIndices<'this>
+        = std::ops::Range<u32>
     where
         Self: 'this;
 

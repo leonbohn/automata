@@ -1,5 +1,5 @@
 use super::LinkedListTransitionSystem;
-use crate::core::{alphabet::Alphabet, Color, Void};
+use crate::core::{Color, Void, alphabet::Alphabet};
 use crate::ts::{DefaultIdType, IntoEdgeTuple, IsEdge, ScalarIndexType};
 use std::fmt::Debug;
 

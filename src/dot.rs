@@ -3,8 +3,8 @@
 use std::fmt::{Debug, Display};
 use thiserror::Error;
 
-use crate::automaton::{IntoDPA, IntoMealyMachine, IntoMooreMachine, DFA};
-use crate::core::{alphabet::Alphabet, Color, Int, Show};
+use crate::automaton::{DFA, IntoDPA, IntoMealyMachine, IntoMooreMachine};
+use crate::core::{Color, Int, Show, alphabet::Alphabet};
 use crate::ts::{Deterministic, IsEdge, StateColor, StateIndex};
 use crate::{Pointed, TransitionSystem};
 use itertools::Itertools;
@@ -530,9 +530,9 @@ fn sanitize_dot_ident(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::Dottable;
+    use crate::DTS;
     use crate::core::Void;
     use crate::ts::TSBuilder;
-    use crate::DTS;
 
     #[test_log::test]
     #[cfg(feature = "render")]

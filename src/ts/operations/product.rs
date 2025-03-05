@@ -1,4 +1,4 @@
-use crate::core::{alphabet::Alphabet, Show};
+use crate::core::{Show, alphabet::Alphabet};
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{EdgeExpression, IndexType, IsEdge, StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
@@ -7,10 +7,7 @@ use itertools::Itertools;
 /// Trait that abstracts the product operation for transition systems.
 pub trait Product: TransitionSystem + Sized {
     /// The type of output that is produced by the product operation.
-    type Output<Ts: TransitionSystem<Alphabet = Self::Alphabet>>: TransitionSystem<
-        Alphabet = Self::Alphabet,
-        StateColor = (Self::StateColor, Ts::StateColor),
-    >;
+    type Output<Ts: TransitionSystem<Alphabet = Self::Alphabet>>: TransitionSystem<Alphabet = Self::Alphabet, StateColor = (Self::StateColor, Ts::StateColor)>;
     /// Perform a product operation on two transition systems.
     fn ts_product<Ts: TransitionSystem<Alphabet = Self::Alphabet>>(
         self,
@@ -76,9 +73,25 @@ where
     type StateIndex = ProductIndex<L::StateIndex, R::StateIndex>;
     type EdgeColor = (L::EdgeColor, R::EdgeColor);
     type StateColor = (L::StateColor, R::StateColor);
-    type EdgeRef<'this> = ProductTransition<'this, L::StateIndex, R::StateIndex, EdgeExpression<L>, L::EdgeColor, R::EdgeColor> where Self: 'this;
-    type EdgesFromIter<'this> = ProductEdgesFrom<'this, L, R> where Self: 'this;
-    type StateIndices<'this> = ProductStatesIter<'this, L, R> where Self: 'this;
+    type EdgeRef<'this>
+        = ProductTransition<
+        'this,
+        L::StateIndex,
+        R::StateIndex,
+        EdgeExpression<L>,
+        L::EdgeColor,
+        R::EdgeColor,
+    >
+    where
+        Self: 'this;
+    type EdgesFromIter<'this>
+        = ProductEdgesFrom<'this, L, R>
+    where
+        Self: 'this;
+    type StateIndices<'this>
+        = ProductStatesIter<'this, L, R>
+    where
+        Self: 'this;
     type Alphabet = L::Alphabet;
     fn alphabet(&self) -> &Self::Alphabet {
         self.0.alphabet()
@@ -403,10 +416,10 @@ impl<'a, L: PredecessorIterable, R: PredecessorIterable> ProductEdgesTo<'a, L, R
 
 #[cfg(test)]
 mod tests {
-    use crate::automaton::MealyMachine;
-    use crate::ts::operations::Product;
-    use crate::ts::Deterministic;
     use crate::DTS;
+    use crate::automaton::MealyMachine;
+    use crate::ts::Deterministic;
+    use crate::ts::operations::Product;
     use automata_core::Void;
 
     #[test]

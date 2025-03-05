@@ -41,12 +41,16 @@ impl HoaString {
                     }
                 }
                 (Some(abort), None) => {
-                    trace!("Found only one automaton --ABORT--ed at {abort}, but no subsequent --END-- of automaton to parse.");
+                    trace!(
+                        "Found only one automaton --ABORT--ed at {abort}, but no subsequent --END-- of automaton to parse."
+                    );
                     return None;
                 }
                 (Some(abort), Some(end)) => {
                     if abort < end {
-                        trace!("Found --ABORT-- before --END--, returning first automaton from {abort} to {end}");
+                        trace!(
+                            "Found --ABORT-- before --END--, returning first automaton from {abort} to {end}"
+                        );
                         match input::parse_omega_automaton_range(
                             &self.0,
                             abort + ABORT_LEN,
@@ -108,7 +112,7 @@ impl From<HoaString> for String {
 
 #[cfg(test)]
 mod tests {
-    use crate::{hoa::input::hoa_to_ts, TransitionSystem};
+    use crate::{TransitionSystem, hoa::input::hoa_to_ts};
 
     #[test]
     fn parse_generated_hoa() {

@@ -4,8 +4,8 @@ use crate::automaton::{
     AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
 };
 use crate::core::{
-    alphabet::{PropAlphabet, PropExpression},
     Int,
+    alphabet::{PropAlphabet, PropExpression},
 };
 use crate::ts::{ForAlphabet, Sproutable, TransitionSystem};
 use hoars::HoaRepresentation;
@@ -83,7 +83,8 @@ impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
                         match aut {
                             Err(e) => {
                                 warn!(
-                                    "Encountered automaton that could not be parsed, skipping... {:?}", e
+                                    "Encountered automaton that could not be parsed, skipping... {:?}",
+                                    e
                                 );
                             }
                             Ok(aut) => {
@@ -156,7 +157,7 @@ pub fn pop_omega_automaton<const DET: bool>(
                         return Some((
                             aut,
                             HoaString(hoa.0[pos + END_LEN..].trim_start().to_string()),
-                        ))
+                        ));
                     }
                     Err(e) => {
                         warn!("Could not parse automaton, skipping... {:?}", e);
@@ -165,18 +166,22 @@ pub fn pop_omega_automaton<const DET: bool>(
                 }
             }
             (Some(abort), None) => {
-                trace!("Found only one automaton --ABORT--ed at {abort}, but no subsequent --END-- of automaton to parse.");
+                trace!(
+                    "Found only one automaton --ABORT--ed at {abort}, but no subsequent --END-- of automaton to parse."
+                );
                 return None;
             }
             (Some(abort), Some(end)) => {
                 if abort < end {
-                    trace!("Found --ABORT-- before --END--, returning first automaton from {abort} to {end}");
+                    trace!(
+                        "Found --ABORT-- before --END--, returning first automaton from {abort} to {end}"
+                    );
                     match parse_omega_automaton_range(&hoa.0, abort + ABORT_LEN, end + END_LEN) {
                         Ok(aut) => {
                             return Some((
                                 aut,
                                 HoaString(hoa.0[end + END_LEN..].trim_start().to_string()),
-                            ))
+                            ));
                         }
                         Err(e) => {
                             warn!("Could not parse automaton, skipping... {:?}", e);
@@ -190,7 +195,7 @@ pub fn pop_omega_automaton<const DET: bool>(
                             return Some((
                                 aut,
                                 HoaString(hoa.0[end + END_LEN..].trim_start().to_string()),
-                            ))
+                            ));
                         }
                         Err(e) => {
                             warn!("Could not parse automaton, skipping... {:?}", e);
@@ -307,7 +312,7 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
 mod tests {
     use tracing::debug;
 
-    use crate::{hoa::HoaString, TransitionSystem};
+    use crate::{TransitionSystem, hoa::HoaString};
 
     #[test]
     fn hoa_tdba_with_abort_and_nondeterministic() {

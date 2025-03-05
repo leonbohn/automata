@@ -3,10 +3,10 @@ use crate::core::{
     math,
 };
 use crate::{
+    RightCongruence,
     core::math::Partition,
     representation::CollectTs,
     ts::{Deterministic, EdgeExpression, IsEdge, Pointed, StateIndex, SymbolOf, TransitionSystem},
-    RightCongruence,
 };
 use itertools::Itertools;
 
@@ -177,14 +177,19 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
 
     type EdgeColor = Vec<Ts::EdgeColor>;
 
-    type EdgeRef<'this> = QuotientTransition<'this, usize, EdgeExpression<Self>, Ts::EdgeColor>
+    type EdgeRef<'this>
+        = QuotientTransition<'this, usize, EdgeExpression<Self>, Ts::EdgeColor>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = QuotientEdgesFrom<'this, Ts, <Self::Alphabet as Alphabet>::Universe<'this>>
+    type EdgesFromIter<'this>
+        = QuotientEdgesFrom<'this, Ts, <Self::Alphabet as Alphabet>::Universe<'this>>
     where
         Self: 'this;
-    type StateIndices<'this> = std::ops::Range<usize> where Self: 'this;
+    type StateIndices<'this>
+        = std::ops::Range<usize>
+    where
+        Self: 'this;
 
     type Alphabet = Ts::Alphabet;
 
@@ -256,7 +261,15 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
                     "{{{}}}",
                     states.iter().map(|idx| idx.to_string()).join(", ")
                 );
-                panic!("From {origin}|{} with matcher {:?}, we reach {} while precisely one state should be reached!", self.class_iter_by_id(origin).unwrap().map(|c| format!("{c:?}")).join(", "), matcher, string)
+                panic!(
+                    "From {origin}|{} with matcher {:?}, we reach {} while precisely one state should be reached!",
+                    self.class_iter_by_id(origin)
+                        .unwrap()
+                        .map(|c| format!("{c:?}"))
+                        .join(", "),
+                    matcher,
+                    string
+                )
             }
         }
     }
@@ -265,7 +278,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
 #[cfg(test)]
 mod tests {
     use crate::ts::Deterministic;
-    use crate::{tests::wiki_dfa, TransitionSystem};
+    use crate::{TransitionSystem, tests::wiki_dfa};
     use automata_core::math::Partition;
 
     #[test]

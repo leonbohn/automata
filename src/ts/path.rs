@@ -1,6 +1,6 @@
-use crate::core::{alphabet::Alphabet, Show};
-use crate::ts::{Deterministic, Edge, IndexType, IsEdge, SymbolOf};
 use crate::TransitionSystem;
+use crate::core::{Show, alphabet::Alphabet};
+use crate::ts::{Deterministic, Edge, IndexType, IsEdge, SymbolOf};
 use itertools::{Either, Itertools};
 
 /// Represents a path through a transition system. Note, that the path itself is decoupled from the

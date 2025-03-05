@@ -1,7 +1,7 @@
-use super::{moore::MooreLike, FiniteWordAutomaton, MealyLike, Semantics};
-use crate::ts::run::Observer;
-use crate::ts::{run, EdgeColor, StateColor};
+use super::{FiniteWordAutomaton, MealyLike, Semantics, moore::MooreLike};
 use crate::DTS;
+use crate::ts::run::Observer;
+use crate::ts::{EdgeColor, StateColor, run};
 use automata_core::alphabet::CharAlphabet;
 use automata_core::{Int, Void};
 
