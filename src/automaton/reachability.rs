@@ -2,10 +2,10 @@ use super::{FiniteWordAutomaton, Semantics, StatesWithColor};
 use crate::representation::CollectTs;
 use crate::ts::operations::{DefaultIfMissing, Product, ProductIndex};
 use crate::ts::run::ReachedStateColor;
-use crate::ts::{operations, Deterministic, EdgeColor, StateIndex, SymbolOf};
-use crate::{Congruence, Pointed, TransitionSystem, DTS};
+use crate::ts::{Deterministic, EdgeColor, StateIndex, SymbolOf, operations};
+use crate::{Congruence, DTS, Pointed, TransitionSystem};
 use automata_core::alphabet::CharAlphabet;
-use automata_core::{math, Void};
+use automata_core::{Void, math};
 
 /// Defines the [`Semantics`] that are used by a deterministic finite automaton
 /// [`DFA`]. This leads to a [`crate::core::word::FiniteWord`] being accepted if the state that it reaches

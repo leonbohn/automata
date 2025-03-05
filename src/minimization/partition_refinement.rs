@@ -8,7 +8,7 @@
 use std::{collections::BTreeSet, time::Instant};
 
 use crate::automaton::{MealyMachine, MooreMachine};
-use crate::core::{math, math::Partition, Color};
+use crate::core::{Color, math, math::Partition};
 use crate::representation::{CollectTs, IntoTs};
 use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor};
 use crate::{Congruence, TransitionSystem};
@@ -217,7 +217,7 @@ where
 mod tests {
     use super::moore_partition_refinement;
     use crate::representation::IntoTs;
-    use crate::{tests::wiki_dfa, TransitionSystem, DTS};
+    use crate::{DTS, TransitionSystem, tests::wiki_dfa};
 
     #[test]
     fn partition_refinement_moore() {

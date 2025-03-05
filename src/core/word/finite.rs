@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{alphabet::Symbol, show::Show};
 
-use super::{omega::OmegaIteration, Concat, PeriodicOmegaWord, Repeat, Word};
+use super::{Concat, PeriodicOmegaWord, Repeat, Word, omega::OmegaIteration};
 
 /// A finite word is a [`Word`] that has a finite length.
 pub trait FiniteWord: Word {
@@ -135,16 +135,13 @@ pub trait FiniteWord: Word {
         Self::Symbol: Show,
     {
         let out = self.symbols().map(|a| a.show()).join("");
-        if out.is_empty() {
-            "ε".into()
-        } else {
-            out
-        }
+        if out.is_empty() { "ε".into() } else { out }
     }
 }
 
 impl<S: Symbol, const N: usize> FiniteWord for [S; N] {
-    type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, S>>
+    type Symbols<'this>
+        = std::iter::Cloned<std::slice::Iter<'this, S>>
     where
         Self: 'this;
 
@@ -166,7 +163,10 @@ impl<S: Symbol, const N: usize> Word for [S; N] {
 }
 
 impl<S: Symbol, Fw: FiniteWord<Symbol = S> + ?Sized> FiniteWord for &Fw {
-    type Symbols<'this> = Fw::Symbols<'this> where Self: 'this;
+    type Symbols<'this>
+        = Fw::Symbols<'this>
+    where
+        Self: 'this;
 
     fn symbols(&self) -> Self::Symbols<'_> {
         (*self).symbols()
@@ -193,7 +193,8 @@ impl<S: Symbol> Word for VecDeque<S> {
 }
 
 impl<S: Symbol> FiniteWord for VecDeque<S> {
-    type Symbols<'this> = std::iter::Cloned<std::collections::vec_deque::Iter<'this, S>>
+    type Symbols<'this>
+        = std::iter::Cloned<std::collections::vec_deque::Iter<'this, S>>
     where
         Self: 'this;
 
@@ -246,7 +247,8 @@ impl FiniteWord for String {
         self.len()
     }
 
-    type Symbols<'this> = std::str::Chars<'this>
+    type Symbols<'this>
+        = std::str::Chars<'this>
     where
         Self: 'this;
 
@@ -271,7 +273,8 @@ impl<S: Symbol> Word for Vec<S> {
     }
 }
 impl<S: Symbol> FiniteWord for Vec<S> {
-    type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, S>>
+    type Symbols<'this>
+        = std::iter::Cloned<std::slice::Iter<'this, S>>
     where
         Self: 'this;
 
@@ -303,7 +306,8 @@ impl<S: Symbol> Word for [S] {
     }
 }
 impl<S: Symbol> FiniteWord for [S] {
-    type Symbols<'this> = std::iter::Cloned<std::slice::Iter<'this, S>>
+    type Symbols<'this>
+        = std::iter::Cloned<std::slice::Iter<'this, S>>
     where
         Self: 'this;
 

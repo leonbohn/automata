@@ -30,11 +30,11 @@ pub type EraseColors<Ts> =
 
 #[cfg(test)]
 mod tests {
+    use crate::TransitionSystem;
     use crate::automaton::DFA;
     use crate::representation::IntoTs;
-    use crate::ts::operations::{Product, ProductIndex};
     use crate::ts::Deterministic;
-    use crate::TransitionSystem;
+    use crate::ts::operations::{Product, ProductIndex};
 
     #[test]
     fn product() {

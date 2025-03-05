@@ -44,15 +44,20 @@ where
 
     type EdgeColor = D;
 
-    type EdgeRef<'this> = MappedEdge<Ts::StateIndex, Ts::EdgeRef<'this>, &'this F, Ts::EdgeColor>
+    type EdgeRef<'this>
+        = MappedEdge<Ts::StateIndex, Ts::EdgeRef<'this>, &'this F, Ts::EdgeColor>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = MapEdgesSuccessorsIter<'this, Ts::StateIndex, Ts::EdgesFromIter<'this>, F, Ts::EdgeColor>
+    type EdgesFromIter<'this>
+        = MapEdgesSuccessorsIter<'this, Ts::StateIndex, Ts::EdgesFromIter<'this>, F, Ts::EdgeColor>
     where
         Self: 'this;
 
-    type StateIndices<'this> = Ts::StateIndices<'this> where Self: 'this;
+    type StateIndices<'this>
+        = Ts::StateIndices<'this>
+    where
+        Self: 'this;
 
     type Alphabet = Ts::Alphabet;
 
@@ -93,11 +98,13 @@ where
     Ts: PredecessorIterable,
     F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
-    type PreEdgeRef<'this> = MappedPreEdge<Ts::StateIndex, Ts::PreEdgeRef<'this>, &'this F, Ts::EdgeColor>
+    type PreEdgeRef<'this>
+        = MappedPreEdge<Ts::StateIndex, Ts::PreEdgeRef<'this>, &'this F, Ts::EdgeColor>
     where
         Self: 'this;
 
-    type EdgesToIter<'this>  = MappedEdgesToIter<'this, Ts::StateIndex, Ts::EdgesToIter<'this>, F, Ts::EdgeColor>
+    type EdgesToIter<'this>
+        = MappedEdgesToIter<'this, Ts::StateIndex, Ts::EdgesToIter<'this>, F, Ts::EdgeColor>
     where
         Self: 'this;
 
@@ -295,11 +302,19 @@ where
     type StateIndex = Ts::StateIndex;
     type EdgeColor = D;
     type StateColor = Ts::StateColor;
-    type EdgeRef<'this> = MappedTransition<Ts::EdgeRef<'this>, &'this F, Ts::EdgeColor> where Self: 'this;
-    type EdgesFromIter<'this> =
-        MappedEdgesFromIter<'this, Ts::EdgesFromIter<'this>, F, Ts::EdgeColor> where Self: 'this;
+    type EdgeRef<'this>
+        = MappedTransition<Ts::EdgeRef<'this>, &'this F, Ts::EdgeColor>
+    where
+        Self: 'this;
+    type EdgesFromIter<'this>
+        = MappedEdgesFromIter<'this, Ts::EdgesFromIter<'this>, F, Ts::EdgeColor>
+    where
+        Self: 'this;
 
-    type StateIndices<'this> = Ts::StateIndices<'this> where Self: 'this;
+    type StateIndices<'this>
+        = Ts::StateIndices<'this>
+    where
+        Self: 'this;
 
     type Alphabet = Ts::Alphabet;
 
@@ -513,9 +528,18 @@ where
     type StateIndex = Ts::StateIndex;
     type EdgeColor = Ts::EdgeColor;
     type StateColor = D;
-    type EdgeRef<'this> = Ts::EdgeRef<'this> where Self: 'this;
-    type EdgesFromIter<'this> = Ts::EdgesFromIter<'this> where Self: 'this;
-    type StateIndices<'this> = Ts::StateIndices<'this> where Self: 'this;
+    type EdgeRef<'this>
+        = Ts::EdgeRef<'this>
+    where
+        Self: 'this;
+    type EdgesFromIter<'this>
+        = Ts::EdgesFromIter<'this>
+    where
+        Self: 'this;
+    type StateIndices<'this>
+        = Ts::StateIndices<'this>
+    where
+        Self: 'this;
 
     type Alphabet = Ts::Alphabet;
 

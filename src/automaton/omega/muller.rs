@@ -1,8 +1,8 @@
-use crate::core::{alphabet::CharAlphabet, math, Color, Void};
+use crate::core::{Color, Void, alphabet::CharAlphabet, math};
 
 use crate::automaton::{InfiniteWordAutomaton, Semantics};
-use crate::ts::{run, Deterministic, EdgeColor, StateColor};
-use crate::{TransitionSystem, DTS};
+use crate::ts::{Deterministic, EdgeColor, StateColor, run};
+use crate::{DTS, TransitionSystem};
 
 /// A deterministic Muller automaton (DMA) uses a [`MullerCondition`] to determine acceptance.
 /// Such a condition consists of a set of sets of colors. It considers an infinite run to

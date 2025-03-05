@@ -127,7 +127,10 @@ pub trait Alphabet: Clone + Debug {
 impl<A: Alphabet> Alphabet for &A {
     type Expression = A::Expression;
     type Symbol = A::Symbol;
-    type Universe<'this> = A::Universe<'this> where Self: 'this;
+    type Universe<'this>
+        = A::Universe<'this>
+    where
+        Self: 'this;
     fn universe(&self) -> Self::Universe<'_> {
         A::universe(self)
     }

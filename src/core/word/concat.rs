@@ -19,7 +19,8 @@ impl<X: FiniteWord, Y: Word<Symbol = X::Symbol>> Word for Concat<X, Y> {
 }
 
 impl<X: FiniteWord, Y: FiniteWord<Symbol = X::Symbol>> FiniteWord for Concat<X, Y> {
-    type Symbols<'this> = std::iter::Chain<X::Symbols<'this>, Y::Symbols<'this>>
+    type Symbols<'this>
+        = std::iter::Chain<X::Symbols<'this>, Y::Symbols<'this>>
     where
         Self: 'this;
 
@@ -39,11 +40,13 @@ impl<X: FiniteWord, Y: FiniteWord<Symbol = X::Symbol>> FiniteWord for Concat<X, 
 }
 
 impl<X: FiniteWord, Y: OmegaWord<Symbol = X::Symbol>> OmegaWord for Concat<X, Y> {
-    type Spoke<'this> = Concat<&'this X, Y::Spoke<'this>>
+    type Spoke<'this>
+        = Concat<&'this X, Y::Spoke<'this>>
     where
         Self: 'this;
 
-    type Cycle<'this> = Y::Cycle<'this>
+    type Cycle<'this>
+        = Y::Cycle<'this>
     where
         Self: 'this;
 

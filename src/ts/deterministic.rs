@@ -16,12 +16,12 @@ use super::run::StateSequence;
 use super::run::StateSet;
 use crate::congruence::MinimalRepresentative;
 use crate::core::{
+    Color,
     alphabet::{Alphabet, Expression, Matcher, SimpleAlphabet},
     word,
     word::{FiniteWord, OmegaWord},
-    Color,
 };
-use crate::ts::{run, EdgeColor, EdgeExpression, IsEdge, StateColor, StateIndex, SymbolOf};
+use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateColor, StateIndex, SymbolOf, run};
 use crate::{Pointed, TransitionSystem};
 use itertools::Itertools;
 
@@ -669,9 +669,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ts::Deterministic;
     use crate::DTS;
-    use automata_core::{upw, Void};
+    use crate::ts::Deterministic;
+    use automata_core::{Void, upw};
 
     #[test]
     fn escape_prefixes() {

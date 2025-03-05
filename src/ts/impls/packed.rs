@@ -1,7 +1,7 @@
-use crate::core::{alphabet::SimpleAlphabet, Color};
+use crate::TransitionSystem;
+use crate::core::{Color, alphabet::SimpleAlphabet};
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{Deterministic, IsEdge, StateIndex};
-use crate::TransitionSystem;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Id(pub usize);
@@ -62,15 +62,18 @@ impl<A: SimpleAlphabet, Q: Color, C: Color> TransitionSystem for Packed<A, Q, C>
 
     type EdgeColor = C;
 
-    type EdgeRef<'this> = &'this PackedEdge<A, C>
+    type EdgeRef<'this>
+        = &'this PackedEdge<A, C>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = std::slice::Iter<'this, PackedEdge<A, C>>
+    type EdgesFromIter<'this>
+        = std::slice::Iter<'this, PackedEdge<A, C>>
     where
         Self: 'this;
 
-    type StateIndices<'this> = PackedStateIndices<'this, Q>
+    type StateIndices<'this>
+        = PackedStateIndices<'this, Q>
     where
         Self: 'this;
 
@@ -100,11 +103,14 @@ impl<A: SimpleAlphabet, Q: Color, C: Color> TransitionSystem for Packed<A, Q, C>
 impl<A: SimpleAlphabet, Q: Color, C: Color> Deterministic for Packed<A, Q, C> {}
 
 impl<A: SimpleAlphabet, Q: Color, C: Color> PredecessorIterable for Packed<A, Q, C> {
-    type PreEdgeRef<'this> = &'this PackedEdge<A, C>
+    type PreEdgeRef<'this>
+        = &'this PackedEdge<A, C>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = std::iter::Filter<std::slice::Iter<'this, PackedEdge<A, C>>, fn(&&PackedEdge<A, C>) -> bool>
+    type EdgesToIter<'this>
+        =
+        std::iter::Filter<std::slice::Iter<'this, PackedEdge<A, C>>, fn(&&PackedEdge<A, C>) -> bool>
     where
         Self: 'this;
 
@@ -150,7 +156,7 @@ pub struct PackedStateIndices<'a, Q> {
     length: usize,
 }
 
-impl<'a, Q> Iterator for PackedStateIndices<'a, Q> {
+impl<Q> Iterator for PackedStateIndices<'_, Q> {
     type Item = Id;
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos < self.length {

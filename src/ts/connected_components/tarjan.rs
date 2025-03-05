@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, VecDeque};
 
 use super::SccDecomposition;
+use crate::TransitionSystem;
 use crate::core::{
     alphabet::Expression,
     math,
@@ -9,7 +10,6 @@ use crate::core::{
 use crate::ts::connected_components::Scc;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{IndexType, IsEdge, StateIndex};
-use crate::TransitionSystem;
 use itertools::Itertools;
 
 #[derive(Debug, Clone)]
@@ -329,12 +329,12 @@ mod tests {
     use std::{collections::HashSet, time::Instant};
 
     use super::tarjan_scc_iterative;
+    use crate::Pointed;
+    use crate::ts::{TSBuilder, TransitionSystem};
     use crate::ts::{
         connected_components::{kosaraju, tarjan_scc_recursive},
         predecessors::PredecessorIterable,
     };
-    use crate::ts::{TSBuilder, TransitionSystem};
-    use crate::Pointed;
     use automata_core::Void;
     use tracing::debug;
 

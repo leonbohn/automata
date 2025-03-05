@@ -69,9 +69,18 @@ where
     type StateIndex = Ts::StateIndex;
     type EdgeColor = Ts::EdgeColor;
     type StateColor = Ts::StateColor;
-    type EdgeRef<'this> = Ts::EdgeRef<'this> where Self: 'this;
-    type EdgesFromIter<'this> = RestrictedEdgesFromIter<'this, Ts, F> where Self: 'this;
-    type StateIndices<'this> = RestrictedStateIndices<'this, Ts, F> where Self: 'this;
+    type EdgeRef<'this>
+        = Ts::EdgeRef<'this>
+    where
+        Self: 'this;
+    type EdgesFromIter<'this>
+        = RestrictedEdgesFromIter<'this, Ts, F>
+    where
+        Self: 'this;
+    type StateIndices<'this>
+        = RestrictedStateIndices<'this, Ts, F>
+    where
+        Self: 'this;
 
     type Alphabet = Ts::Alphabet;
 
@@ -117,7 +126,7 @@ pub struct RestrictByStateIndexIter<'a, Ts: TransitionSystem + 'a, F> {
     it: Ts::StateIndices<'a>,
 }
 
-impl<'a, Ts, F> Iterator for RestrictByStateIndexIter<'a, Ts, F>
+impl<Ts, F> Iterator for RestrictByStateIndexIter<'_, Ts, F>
 where
     Ts: TransitionSystem,
     F: StateIndexFilter<Ts::StateIndex>,
@@ -266,14 +275,18 @@ where
 
     type EdgeColor = D::EdgeColor;
 
-    type EdgeRef<'this> = D::EdgeRef<'this>
+    type EdgeRef<'this>
+        = D::EdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = ColorRestrictedEdgesFrom<'this, D>    where
+    type EdgesFromIter<'this>
+        = ColorRestrictedEdgesFrom<'this, D>
+    where
         Self: 'this;
 
-    type StateIndices<'this> = D::StateIndices<'this>
+    type StateIndices<'this>
+        = D::StateIndices<'this>
     where
         Self: 'this;
 
@@ -303,11 +316,13 @@ where
 }
 
 impl<D: PredecessorIterable<EdgeColor = usize>> PredecessorIterable for EdgeColorRestricted<D> {
-    type PreEdgeRef<'this> = D::PreEdgeRef<'this>
+    type PreEdgeRef<'this>
+        = D::PreEdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = ColorRestrictedEdgesTo<'this, &'this D>
+    type EdgesToIter<'this>
+        = ColorRestrictedEdgesTo<'this, &'this D>
     where
         Self: 'this;
 
@@ -408,9 +423,9 @@ impl<D: TransitionSystem> EdgeColorRestricted<D> {
 
 #[cfg(test)]
 mod tests {
+    use crate::TransitionSystem;
     use crate::representation::IntoTs;
     use crate::ts::TSBuilder;
-    use crate::TransitionSystem;
 
     #[test]
     fn restrict_ts_by_state_index() {

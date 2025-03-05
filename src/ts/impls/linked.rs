@@ -13,12 +13,13 @@ pub use linked_state::{
 };
 
 mod linked_edge;
+use crate::TransitionSystem;
 use crate::core::{
+    Color, Show, Void,
     alphabet::{Alphabet, CharAlphabet, Expression, Matcher},
-    math, Color, Show, Void,
+    math,
 };
 use crate::ts::predecessors::PredecessorIterable;
-use crate::TransitionSystem;
 pub use linked_edge::LinkedListTransitionSystemEdge;
 use tracing::{trace, warn};
 
@@ -219,8 +220,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
             if let Some(next) = self.edges[swapped_in].out_next {
                 if self.edges[next].out_prev.is_none() {
                     panic!(
-                    "unacceptable state of linked list, no out_prev stored for {next}\n{self:?}"
-                );
+                        "unacceptable state of linked list, no out_prev stored for {next}\n{self:?}"
+                    );
                 }
                 self.edges[next].out_prev = Some(id)
             }
@@ -295,7 +296,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         match self.try_into_deterministic() {
             Ok(ts) => ts,
             Err(ts) => {
-                tracing::error!("Tried to convert non-deterministic transition system to deterministic one\n{:?}", ts);
+                tracing::error!(
+                    "Tried to convert non-deterministic transition system to deterministic one\n{:?}",
+                    ts
+                );
                 panic!("This transition system is not deterministic");
             }
         }
@@ -305,7 +309,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
     pub fn try_into_deterministic(self) -> Result<LinkedListTransitionSystem<A, Q, C, true>, Self> {
         if DET {
             if !self.is_deterministic() {
-                tracing::error!("Tried to convert non-deterministic transition system to deterministic one\n{:?}", self);
+                tracing::error!(
+                    "Tried to convert non-deterministic transition system to deterministic one\n{:?}",
+                    self
+                );
                 panic!("This transition system is not deterministic");
             }
             Ok(recast(self))
@@ -434,7 +441,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color>
     pub fn position_by_first(self, first: X) -> Option<usize> {
         self.states
             .iter()
-            .position(|s| s.is_occupied() && s.occupation().unwrap().0 .0.eq(&first))
+            .position(|s| s.is_occupied() && s.occupation().unwrap().0.0.eq(&first))
     }
 
     pub fn old_to_new(&self, left: X) -> Option<StateIndex<Self>> {
@@ -662,15 +669,18 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
 
     type EdgeColor = C;
 
-    type EdgeRef<'this> = &'this LinkedListTransitionSystemEdge<A::Expression, C>
+    type EdgeRef<'this>
+        = &'this LinkedListTransitionSystemEdge<A::Expression, C>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = NTSEdgesFromIter<'this, A::Expression, C>
+    type EdgesFromIter<'this>
+        = NTSEdgesFromIter<'this, A::Expression, C>
     where
         Self: 'this;
 
-    type StateIndices<'this> = LinkedStateIndices<'this, Q>
+    type StateIndices<'this>
+        = LinkedStateIndices<'this, Q>
     where
         Self: 'this;
 
@@ -707,7 +717,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
 
 pub struct LinkedStateIndices<'ts, Q: Color>(&'ts [LinkedListTransitionSystemState<Q>], usize);
 
-impl<'ts, Q: Color> Iterator for LinkedStateIndices<'ts, Q> {
+impl<Q: Color> Iterator for LinkedStateIndices<'_, Q> {
     type Item = DefaultIdType;
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(state) = self.0.get(self.1) {
@@ -745,11 +755,13 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A>
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
-    type PreEdgeRef<'this> = &'this LinkedListTransitionSystemEdge<A::Expression, C>
+    type PreEdgeRef<'this>
+        = &'this LinkedListTransitionSystemEdge<A::Expression, C>
     where
         Self: 'this;
 
-    type EdgesToIter<'this> = LinkedListTransitionSystemEdgesToIter<'this, A::Expression, C, DET>
+    type EdgesToIter<'this>
+        = LinkedListTransitionSystemEdgesToIter<'this, A::Expression, C, DET>
     where
         Self: 'this;
 
@@ -848,7 +860,7 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
 #[cfg(test)]
 mod tests {
     use crate::ts::{Deterministic, ForAlphabet, Sproutable, TSBuilder};
-    use crate::{ts::LinkedListDeterministic, TransitionSystem};
+    use crate::{TransitionSystem, ts::LinkedListDeterministic};
     use automata_core::alphabet::CharAlphabet;
 
     #[test]

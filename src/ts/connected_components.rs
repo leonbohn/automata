@@ -9,8 +9,8 @@ mod scc;
 pub use scc::Scc;
 
 mod tarjan;
-use crate::ts::{EdgeColor, IsEdge, StateIndex};
 use crate::TransitionSystem;
+use crate::ts::{EdgeColor, IsEdge, StateIndex};
 pub use tarjan::{kosaraju, tarjan_scc_iterative, tarjan_scc_iterative_from, tarjan_scc_recursive};
 
 /// Newtype wrapper for storing indices of SCCs.
@@ -241,7 +241,7 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     }
 }
 
-impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
+impl<Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'_, Ts> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
@@ -254,13 +254,13 @@ impl<'a, Ts: TransitionSystem> std::fmt::Debug for SccDecomposition<'a, Ts> {
     }
 }
 
-impl<'a, Ts: TransitionSystem> Hash for SccDecomposition<'a, Ts> {
+impl<Ts: TransitionSystem> Hash for SccDecomposition<'_, Ts> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.dag.hash(state)
     }
 }
 
-impl<'a, Ts: TransitionSystem> PartialEq for SccDecomposition<'a, Ts> {
+impl<Ts: TransitionSystem> PartialEq for SccDecomposition<'_, Ts> {
     fn eq(&self, other: &Self) -> bool {
         self.dag == other.dag
     }
@@ -268,14 +268,14 @@ impl<'a, Ts: TransitionSystem> PartialEq for SccDecomposition<'a, Ts> {
 
 #[cfg(test)]
 mod tests {
+    use automata_core::Void;
     use automata_core::alphabet::CharAlphabet;
     use automata_core::math::Set;
-    use automata_core::Void;
 
     use crate::ts::TSBuilder;
     use crate::{
-        ts::connected_components::{Scc, SccDecomposition},
         RightCongruence, TransitionSystem,
+        ts::connected_components::{Scc, SccDecomposition},
     };
 
     pub(super) fn ts() -> RightCongruence<CharAlphabet> {

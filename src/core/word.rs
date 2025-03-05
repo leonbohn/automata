@@ -106,7 +106,7 @@ pub struct ConsumingInfixIterator<'a, W: Word> {
     end: usize,
 }
 
-impl<'a, W: Word> Word for ConsumingInfixIterator<'a, W> {
+impl<W: Word> Word for ConsumingInfixIterator<'_, W> {
     type Symbol = W::Symbol;
     const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
@@ -114,7 +114,7 @@ impl<'a, W: Word> Word for ConsumingInfixIterator<'a, W> {
     }
 }
 
-impl<'a, W: Word> Iterator for ConsumingInfixIterator<'a, W> {
+impl<W: Word> Iterator for ConsumingInfixIterator<'_, W> {
     type Item = W::Symbol;
     fn next(&mut self) -> Option<Self::Item> {
         if self.start < self.end {

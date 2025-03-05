@@ -4,12 +4,12 @@ use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use super::FiniteWordAutomaton;
 use crate::core::{
-    alphabet::{CharAlphabet, Expression},
     Color, Int, Lattice, Void,
+    alphabet::{CharAlphabet, Expression},
 };
 use crate::ts::operations::{Product, ProductIndex};
 use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor, SymbolOf};
-use crate::{Pointed, TransitionSystem, DTS};
+use crate::{DTS, Pointed, TransitionSystem};
 
 /// Represents the semantics of a Mealy machine. Concretely, this type returns for
 /// a finite run, the last transition color that is taken. It panics if the run has
@@ -126,10 +126,10 @@ impl<Q> Default for MealySemantics<Q> {
 
 #[cfg(test)]
 mod tests {
+    use crate::DTS;
     use crate::automaton::MealyMachine;
     use crate::representation::IntoTs;
     use crate::ts::TSBuilder;
-    use crate::DTS;
     use automata_core::Void;
 
     #[test]

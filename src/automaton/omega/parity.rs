@@ -6,17 +6,17 @@ use std::{
 
 use crate::automaton::Semantics;
 use crate::core::{
+    Int, Show, Void,
     alphabet::CharAlphabet,
     math::Partition,
     word::{FiniteWord, ReducedOmegaWord},
-    Int, Show, Void,
 };
 use crate::representation::{CollectTs, IntoTs};
 use crate::ts::operations::Product;
 use crate::ts::{
-    operations, Deterministic, EdgeColor, IsEdge, Shrinkable, StateColor, StateIndex, SymbolOf,
+    Deterministic, EdgeColor, IsEdge, Shrinkable, StateColor, StateIndex, SymbolOf, operations,
 };
-use crate::{automaton::InfiniteWordAutomaton, ts::run, Pointed, TransitionSystem, DTS};
+use crate::{DTS, Pointed, TransitionSystem, automaton::InfiniteWordAutomaton, ts::run};
 use itertools::Itertools;
 use tracing::trace;
 
@@ -459,8 +459,8 @@ where
                     };
                     trace!(
                         "recoloring edge {} --{}--> with {:?}",
-                        recoloring[idx].0 .0,
-                        recoloring[idx].0 .1.show(),
+                        recoloring[idx].0.0,
+                        recoloring[idx].0.1.show(),
                         recoloring[idx].1
                     );
                 }
@@ -568,8 +568,8 @@ mod tests {
     use crate::representation::{CollectTs, IntoTs};
     use crate::ts::operations::Product;
     use crate::ts::{Deterministic, TSBuilder};
-    use crate::{Pointed, RightCongruence, TransitionSystem, DTS};
-    use automata_core::{upw, Void};
+    use crate::{DTS, Pointed, RightCongruence, TransitionSystem};
+    use automata_core::{Void, upw};
 
     #[test]
     fn normalize_dpa() {
@@ -589,7 +589,6 @@ mod tests {
         for (input, expected) in [("a", 0), ("b", 0), ("ba", 0), ("bb", 1)] {
             assert_eq!(normalized.last_edge_color(input), Some(expected))
         }
-        let _n = example_dpa().normalized();
     }
 
     fn example_dpa() -> DPA {

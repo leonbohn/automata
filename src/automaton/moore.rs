@@ -1,13 +1,13 @@
 use itertools::Itertools;
 use std::fmt::Debug;
 
-use crate::core::{alphabet::CharAlphabet, word::FiniteWord, Color, Int, Lattice, Void};
+use crate::core::{Color, Int, Lattice, Void, alphabet::CharAlphabet, word::FiniteWord};
 
-use super::{FiniteWordAutomaton, MealyMachine, DFA};
+use super::{DFA, FiniteWordAutomaton, MealyMachine};
 use crate::representation::{CollectTs, IntoTs};
 use crate::ts::operations::{Product, ProductIndex};
 use crate::ts::{Deterministic, EdgeColor, StateColor, SymbolOf};
-use crate::{Congruence, Pointed, TransitionSystem, DTS};
+use crate::{Congruence, DTS, Pointed, TransitionSystem};
 
 /// Represents the semantics of a Moore machine, it produces the color of the
 /// state that is reached during a run on a word. If the input is empty, it

@@ -153,10 +153,10 @@ pub trait Sproutable: TransitionSystem {
     where
         Self: ForAlphabet<Ts::Alphabet>,
         Ts: TransitionSystem<
-            Alphabet = Self::Alphabet,
-            StateColor = StateColor<Self>,
-            EdgeColor = EdgeColor<Self>,
-        >,
+                Alphabet = Self::Alphabet,
+                StateColor = StateColor<Self>,
+                EdgeColor = EdgeColor<Self>,
+            >,
     {
         let mut out: Self = Self::for_alphabet(ts.alphabet().clone());
         let mut map = Bijection::new();
@@ -211,10 +211,10 @@ pub trait Sproutable: TransitionSystem {
     where
         Self: ForAlphabet<Ts::Alphabet>,
         Ts: TransitionSystem<
-            Alphabet = Self::Alphabet,
-            StateColor = StateColor<Self>,
-            EdgeColor = EdgeColor<Self>,
-        >,
+                Alphabet = Self::Alphabet,
+                StateColor = StateColor<Self>,
+                EdgeColor = EdgeColor<Self>,
+            >,
     {
         Self::sprout_from_ts_with_bijection(ts).0
     }
@@ -341,7 +341,7 @@ pub trait Sproutable: TransitionSystem {
 #[cfg(test)]
 mod tests {
     use crate::ts::{Deterministic, ForAlphabet, Sproutable};
-    use crate::{TransitionSystem, DTS};
+    use crate::{DTS, TransitionSystem};
     use automata_core::alphabet::{Alphabet, CharAlphabet};
 
     #[test]

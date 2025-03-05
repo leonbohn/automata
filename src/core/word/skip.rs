@@ -16,7 +16,7 @@ impl<'a, W: Word> Skip<'a, W> {
     }
 }
 
-impl<'a, W: Word> Word for Skip<'a, W> {
+impl<W: Word> Word for Skip<'_, W> {
     type Symbol = W::Symbol;
     const FINITE: bool = W::FINITE;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
@@ -24,8 +24,11 @@ impl<'a, W: Word> Word for Skip<'a, W> {
     }
 }
 
-impl<'a, W: FiniteWord> FiniteWord for Skip<'a, W> {
-    type Symbols<'this> = std::iter::Skip<W::Symbols<'this>> where Self: 'this;
+impl<W: FiniteWord> FiniteWord for Skip<'_, W> {
+    type Symbols<'this>
+        = std::iter::Skip<W::Symbols<'this>>
+    where
+        Self: 'this;
 
     fn collect_vec(&self) -> Vec<W::Symbol> {
         (self.offset..self.sequence.len())
@@ -69,7 +72,7 @@ impl<'a, W> RotatedIter<'a, W> {
     }
 }
 
-impl<'a, W: FiniteWord> Iterator for RotatedIter<'a, W> {
+impl<W: FiniteWord> Iterator for RotatedIter<'_, W> {
     type Item = W::Symbol;
     fn next(&mut self) -> Option<Self::Item> {
         if self.position < self.rotated.len() {
@@ -86,7 +89,10 @@ impl<'a, W: FiniteWord> Iterator for RotatedIter<'a, W> {
 }
 
 impl<W: FiniteWord> FiniteWord for Rotated<W> {
-    type Symbols<'this> = RotatedIter<'this, W> where Self: 'this;
+    type Symbols<'this>
+        = RotatedIter<'this, W>
+    where
+        Self: 'this;
 
     fn symbols(&self) -> Self::Symbols<'_> {
         RotatedIter::new(self, self.1)
@@ -101,12 +107,14 @@ impl<W: FiniteWord> FiniteWord for Rotated<W> {
     }
 }
 
-impl<'a, W: OmegaWord> OmegaWord for Skip<'a, W> {
-    type Spoke<'this> = Infix<'this, W>
+impl<W: OmegaWord> OmegaWord for Skip<'_, W> {
+    type Spoke<'this>
+        = Infix<'this, W>
     where
         Self: 'this;
 
-    type Cycle<'this> = Infix<'this, W>
+    type Cycle<'this>
+        = Infix<'this, W>
     where
         Self: 'this;
 
@@ -176,7 +184,7 @@ impl<'a, W: Word + ?Sized> Infix<'a, W> {
     }
 }
 
-impl<'a, W: Word> Word for Infix<'a, W> {
+impl<W: Word> Word for Infix<'_, W> {
     type Symbol = W::Symbol;
     const FINITE: bool = true;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
@@ -188,8 +196,9 @@ impl<'a, W: Word> Word for Infix<'a, W> {
     }
 }
 
-impl<'a, W: Word> FiniteWord for Infix<'a, W> {
-    type Symbols<'this> = ConsumingInfixIterator<'this, W>
+impl<W: Word> FiniteWord for Infix<'_, W> {
+    type Symbols<'this>
+        = ConsumingInfixIterator<'this, W>
     where
         Self: 'this;
 

@@ -4,13 +4,13 @@ use tracing::trace;
 use std::fmt::{Result, Write};
 
 use crate::{
-    automaton::{OmegaAcceptanceCondition, DBA, DPA},
+    Pointed, TransitionSystem,
+    automaton::{DBA, DPA, OmegaAcceptanceCondition},
     core::{
-        alphabet::{Alphabet, CharAlphabet, PropAlphabet},
         Int, Show,
+        alphabet::{Alphabet, CharAlphabet, PropAlphabet},
     },
     ts::{EdgeColor, EdgeExpression, IsEdge},
-    Pointed, TransitionSystem,
 };
 
 pub trait WriteHoa: TransitionSystem + Pointed {

@@ -2,11 +2,11 @@ use itertools::Itertools;
 use tracing::trace;
 
 use crate::core::{
+    Color, Show, Void,
     alphabet::{Alphabet, Expression, Matcher},
     math::Partition,
-    Color, Show, Void,
 };
-use crate::{congruence::StateNaming, DTS};
+use crate::{DTS, congruence::StateNaming};
 use std::{collections::BTreeSet, hash::Hash};
 
 mod state_index;
@@ -47,7 +47,7 @@ pub use reachable::{LengthLexicographicMinimalRepresentatives, Reachable};
 
 /// Contains implementations for SCC decompositions and the corresponding/associated types.
 pub mod connected_components;
-use connected_components::{tarjan_scc_iterative, tarjan_scc_recursive, SccDecomposition};
+use connected_components::{SccDecomposition, tarjan_scc_iterative, tarjan_scc_recursive};
 
 /// In this module, everything concering the run of a transition system on a word is defined.
 pub mod run;
@@ -670,15 +670,18 @@ impl<Ts: TransitionSystem> TransitionSystem for &Ts {
 
     type EdgeColor = Ts::EdgeColor;
 
-    type EdgeRef<'this> = Ts::EdgeRef<'this>
+    type EdgeRef<'this>
+        = Ts::EdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = Ts::EdgesFromIter<'this>
+    type EdgesFromIter<'this>
+        = Ts::EdgesFromIter<'this>
     where
         Self: 'this;
 
-    type StateIndices<'this> = Ts::StateIndices<'this>
+    type StateIndices<'this>
+        = Ts::StateIndices<'this>
     where
         Self: 'this;
 
@@ -708,15 +711,18 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 
     type EdgeColor = Ts::EdgeColor;
 
-    type EdgeRef<'this> = Ts::EdgeRef<'this>
+    type EdgeRef<'this>
+        = Ts::EdgeRef<'this>
     where
         Self: 'this;
 
-    type EdgesFromIter<'this> = Ts::EdgesFromIter<'this>
+    type EdgesFromIter<'this>
+        = Ts::EdgesFromIter<'this>
     where
         Self: 'this;
 
-    type StateIndices<'this> = Ts::StateIndices<'this>
+    type StateIndices<'this>
+        = Ts::StateIndices<'this>
     where
         Self: 'this;
 
@@ -820,4 +826,4 @@ impl<P: Pointed> Pointed for &mut P {
 use self::operations::{ProvidesStateColor, WithStateColor};
 
 #[cfg(test)]
-pub mod tests {}
+mod tests {}

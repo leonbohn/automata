@@ -15,7 +15,8 @@ impl<W: FiniteWord> Repeat<W> {
 }
 
 impl<W: FiniteWord> FiniteWord for Repeat<W> {
-    type Symbols<'this> = RepeatIter<'this, W>
+    type Symbols<'this>
+        = RepeatIter<'this, W>
     where
         Self: 'this;
 
@@ -48,7 +49,7 @@ pub struct RepeatIter<'a, W: FiniteWord> {
     pos: usize,
 }
 
-impl<'a, W: FiniteWord> Iterator for RepeatIter<'a, W> {
+impl<W: FiniteWord> Iterator for RepeatIter<'_, W> {
     type Item = W::Symbol;
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos < self.word.len() * self.times {

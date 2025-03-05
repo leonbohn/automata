@@ -1,10 +1,10 @@
 use std::hash::Hash;
 
 use super::{DefaultIdType, ForAlphabet, IntoEdgeTuple, Sproutable};
-use crate::automaton::{MealyMachine, MooreMachine, WithInitial, DBA, DFA, DPA};
-use crate::core::{alphabet::CharAlphabet, math::OrderedSet, Color, Int, Void};
+use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine, WithInitial};
+use crate::core::{Color, Int, Void, alphabet::CharAlphabet, math::OrderedSet};
 use crate::representation::IntoTs;
-use crate::{RightCongruence, TransitionSystem, DTS, NTS, TS};
+use crate::{DTS, NTS, RightCongruence, TS, TransitionSystem};
 use itertools::Itertools;
 
 /// Helper struct for the construction of non-deterministic transition systems. It stores a list of edges, a list of colors and a default color.
@@ -141,7 +141,9 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
 
         for (q, e, c, p) in self.edges {
             if let Some((q, e, d, pp)) = ts.add_edge((q, e, c.clone(), p)) {
-                panic!("Failed to add edge from {q:?} on {e} to {p:?} with color {c:?}, it is overlapping an existing edge with color {d:?} to {pp:?}")
+                panic!(
+                    "Failed to add edge from {q:?} on {e} to {p:?} with color {c:?}, it is overlapping an existing edge with color {d:?} to {pp:?}"
+                )
             }
         }
         ts

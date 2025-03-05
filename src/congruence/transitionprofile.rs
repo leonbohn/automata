@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
-use crate::core::{alphabet::Alphabet, word::FiniteWord, Show, Void};
+use crate::core::{Show, Void, alphabet::Alphabet, word::FiniteWord};
 use crate::ts::{Deterministic, EdgeColor, IndexType, IsEdge, StateColor, SymbolOf};
 use crate::{Pointed, TransitionSystem};
 use itertools::Itertools;
@@ -383,9 +383,11 @@ where
                     word.len() < ts.size() * 2,
                     "This looks dangerously like an infinite loop..."
                 );
-                assert!(profile_extension
-                    .iter()
-                    .all(|tp| ts.contains_state_index(tp.state())));
+                assert!(
+                    profile_extension
+                        .iter()
+                        .all(|tp| ts.contains_state_index(tp.state()))
+                );
                 let mut word_extension = word.clone();
                 word_extension.push(sym);
                 if let Some(existing_idx) = tps.iter().position(|(tp, _)| *tp == profile_extension)

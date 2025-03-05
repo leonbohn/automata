@@ -2,7 +2,7 @@ use std::{collections::BTreeSet, fmt::Debug};
 
 use itertools::Itertools;
 
-use crate::{math::OrderedSet, Void};
+use crate::{Void, math::OrderedSet};
 
 /// Represents a directed acyclic graph. The nodes have usize indices and are
 /// colored with some type `C`. The edges are represented as a vector of pairs
@@ -176,7 +176,7 @@ pub struct ReachableIter<'a, C> {
     seen: OrderedSet<usize>,
 }
 
-impl<'a, C> Iterator for ReachableIter<'a, C> {
+impl<C> Iterator for ReachableIter<'_, C> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {

@@ -10,9 +10,9 @@ pub enum LinkedListTransitionSystemState<Q> {
     Occupied(Q, Option<usize>, Option<usize>),
     Vacant(Option<usize>, Option<usize>),
 }
+use LinkedListTransitionSystemState::*;
 use automata_core::alphabet::Alphabet;
 use tracing::warn;
-use LinkedListTransitionSystemState::*;
 
 impl<Q> LinkedListTransitionSystemState<Q> {
     pub fn map_occupied<QQ: Color, F>(self, f: F) -> LinkedListTransitionSystemState<QQ>

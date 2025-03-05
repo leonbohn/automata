@@ -48,7 +48,7 @@ pub struct Scc<'a, Ts: TransitionSystem> {
     border_transitions: OnceCell<BorderTransitionSet<Ts>>,
 }
 
-impl<'a, Ts: TransitionSystem> IntoIterator for Scc<'a, Ts> {
+impl<Ts: TransitionSystem> IntoIterator for Scc<'_, Ts> {
     type IntoIter = std::collections::btree_set::IntoIter<Ts::StateIndex>;
     type Item = Ts::StateIndex;
     fn into_iter(self) -> Self::IntoIter {
@@ -56,7 +56,7 @@ impl<'a, Ts: TransitionSystem> IntoIterator for Scc<'a, Ts> {
     }
 }
 
-impl<'a, Ts: TransitionSystem> std::ops::Deref for Scc<'a, Ts> {
+impl<Ts: TransitionSystem> std::ops::Deref for Scc<'_, Ts> {
     type Target = BTreeSet<Ts::StateIndex>;
 
     fn deref(&self) -> &Self::Target {
@@ -64,30 +64,30 @@ impl<'a, Ts: TransitionSystem> std::ops::Deref for Scc<'a, Ts> {
     }
 }
 
-impl<'a, T: TransitionSystem> PartialEq<Vec<StateIndex<T>>> for Scc<'a, T> {
+impl<T: TransitionSystem> PartialEq<Vec<StateIndex<T>>> for Scc<'_, T> {
     fn eq(&self, other: &Vec<StateIndex<T>>) -> bool {
         self.states.iter().sorted().eq(other.iter().sorted())
     }
 }
 
-impl<'a, Ts: TransitionSystem> PartialEq for Scc<'a, Ts> {
+impl<Ts: TransitionSystem> PartialEq for Scc<'_, Ts> {
     fn eq(&self, other: &Self) -> bool {
         self.states == other.states
     }
 }
-impl<'a, Ts: TransitionSystem> Eq for Scc<'a, Ts> {}
+impl<Ts: TransitionSystem> Eq for Scc<'_, Ts> {}
 
-impl<'a, Ts: TransitionSystem> PartialOrd for Scc<'a, Ts> {
+impl<Ts: TransitionSystem> PartialOrd for Scc<'_, Ts> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
-impl<'a, Ts: TransitionSystem> Ord for Scc<'a, Ts> {
+impl<Ts: TransitionSystem> Ord for Scc<'_, Ts> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.first().cmp(&other.first())
     }
 }
-impl<'a, Ts: TransitionSystem> std::hash::Hash for Scc<'a, Ts> {
+impl<Ts: TransitionSystem> std::hash::Hash for Scc<'_, Ts> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.states.hash(state);
     }
@@ -414,7 +414,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     }
 }
 
-impl<'a, Ts: TransitionSystem> Debug for Scc<'a, Ts> {
+impl<Ts: TransitionSystem> Debug for Scc<'_, Ts> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -426,7 +426,7 @@ impl<'a, Ts: TransitionSystem> Debug for Scc<'a, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{TransitionSystem, DTS};
+    use crate::{DTS, TransitionSystem};
     use automata_core::math::Set;
 
     #[test]
