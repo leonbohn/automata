@@ -19,8 +19,6 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 ./scripts/check                    # fmt + clippy + doc + test
 ```
 
-If the disk is full or `sccache` fails with a missing temp dir: `TMPDIR=/tmp RUSTC_WRAPPER= CARGO_TARGET_DIR=$HOME/.cache/automata-extract-target cargo ...`.
-
 ## Layout
 
 - `src/core/`: foundations (formerly the `automata-core` crate; transitional location, see `PLAN.md`).
