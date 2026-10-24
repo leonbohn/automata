@@ -670,8 +670,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::DTS;
+    use crate::core::{Void, upw};
     use crate::ts::Deterministic;
-    use automata_core::{Void, upw};
 
     #[test]
     fn escape_prefixes() {

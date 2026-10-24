@@ -1,4 +1,4 @@
-use automata_core::Void;
+use crate::core::Void;
 
 mod map;
 pub use map::*;

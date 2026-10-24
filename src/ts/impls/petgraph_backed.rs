@@ -485,8 +485,8 @@ mod tests {
     use super::GraphTs;
     use crate::transition_system::{ForAlphabet, Shrinkable, Sproutable};
     use crate::TransitionSystem;
-    use automata_core::alphabet::CharAlphabet;
-    use automata_core::{math, Void};
+    use crate::core::alphabet::CharAlphabet;
+    use crate::core::{math, Void};
 
     #[test]
     fn petgraph_overlapping() {

@@ -420,9 +420,9 @@ impl<'a, L: PredecessorIterable, R: PredecessorIterable> ProductEdgesTo<'a, L, R
 mod tests {
     use crate::DTS;
     use crate::automaton::MealyMachine;
+    use crate::core::Void;
     use crate::ts::Deterministic;
     use crate::ts::operations::Product;
-    use automata_core::Void;
 
     #[test]
     fn product_subalphabet() {

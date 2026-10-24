@@ -447,8 +447,8 @@ impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserve
 mod impls {
     use super::*;
     use crate::TransitionSystem;
+    use crate::core::{Lattice, math};
     use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor, StateIndex, SymbolOf};
-    use automata_core::{Lattice, math};
 
     impl<T: Deterministic> Observer<T> for NoObserver {
         type Current = ();
@@ -941,9 +941,9 @@ mod impls {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::upw;
     use crate::ts::run::EscapePrefix;
     use crate::ts::{Deterministic, TSBuilder};
-    use automata_core::upw;
 
     #[test]
     fn run_escaping() {

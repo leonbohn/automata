@@ -565,11 +565,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::DPA;
+    use crate::core::{Void, upw};
     use crate::representation::{CollectTs, IntoTs};
     use crate::ts::operations::Product;
     use crate::ts::{Deterministic, TSBuilder};
     use crate::{DTS, Pointed, RightCongruence, TransitionSystem};
-    use automata_core::{Void, upw};
 
     #[test]
     fn normalize_dpa() {

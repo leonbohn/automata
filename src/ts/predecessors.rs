@@ -1,7 +1,7 @@
 use crate::TransitionSystem;
 use crate::core::Color;
+use crate::core::alphabet::Alphabet;
 use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateIndex, SymbolOf, operations};
-use automata_core::alphabet::Alphabet;
 
 /// Implementors of this trait are [`TransitionSystem`]s which allow iterating over the predecessors of a state.
 pub trait PredecessorIterable: TransitionSystem {

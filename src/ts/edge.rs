@@ -1,5 +1,5 @@
+use crate::core::Void;
 use crate::ts::IndexType;
-use automata_core::Void;
 use std::fmt::Debug;
 
 /// This trait is implemented for references to transitions, so that they can be used in

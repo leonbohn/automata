@@ -159,12 +159,12 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
 #[cfg(test)]
 mod tests {
     use crate::automaton::DFA;
+    use crate::core::alphabet::CharAlphabet;
     use crate::ts::TSBuilder;
     use crate::{
         TransitionSystem,
         families::{FDFA, FWPM},
     };
-    use automata_core::alphabet::CharAlphabet;
 
     #[test_log::test]
     fn fdfa_to_fwpm() {

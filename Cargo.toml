@@ -1,34 +1,28 @@
 [package]
 name = "automata"
-version = "0.0.4"
+version = "0.1.0"
+edition = "2024"
 readme = "README.md"
 description = "A library for transition systems and automata over (in)finite words."
-repository.workspace = true
-keywords = [
-    "transition-system",
-    "language",
-    "hoa",
-    "automata",
-    "omega-automata",
-]
+repository = "https://github.com/leonbohn/automata"
+homepage = "https://github.com/leonbohn/automata"
+license = "MIT"
+authors = ["León Bohn <bohn@lics.rwth-aachen.de>"]
+keywords = ["transition-system", "language", "hoa", "automata", "omega-automata"]
 categories = ["mathematics", "science"]
-license.workspace = true
-edition.workspace = true
-homepage.workspace = true
-authors.workspace = true
 
 [dependencies]
-tracing = { workspace = true }
-biodivine-lib-bdd = { workspace = true }
-itertools = { workspace = true }
-indexmap = { workspace = true }
-bimap = { workspace = true }
-rand = { workspace = true }
-tabled = { workspace = true }
-thiserror = { workspace = true }
+tracing = "0.1"
+biodivine-lib-bdd = "0.5.23"
+itertools = "0.14.0"
+indexmap = "2.7"
+bimap = "0.6"
+rand = "0.8.5"
+thiserror = "2.0"
+tabled = { version = "0.16", features = ["ansi"] }
 
-automata-core = { version = "0.1.0", path = "../automata-core" }
-hoars = { version = "0.2.1", optional = true, path = "../hoars" }
+# TODO: depend on the crates.io release once hoars 0.2.1 (or newer) is published
+hoars = { git = "https://github.com/leonbohn/frieda", optional = true }
 
 petgraph = { version = "0.8", optional = true }
 
@@ -36,10 +30,7 @@ layout-rs = { version = "0.1.2", optional = true }
 open = { version = "5.3.2", optional = true }
 base64 = { version = "0.23", optional = true }
 resvg = { version = "0.48", optional = true }
-usvg = { version = "0.48", optional = true, features = [
-    "text",
-    "system-fonts",
-] }
+usvg = { version = "0.48", optional = true, features = ["text", "system-fonts"] }
 
 owo-colors = "4.2"
 tempfile = { version = "3.17", optional = true }

@@ -277,9 +277,9 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::math::Partition;
     use crate::ts::Deterministic;
     use crate::{TransitionSystem, tests::wiki_dfa};
-    use automata_core::math::Partition;
 
     #[test]
     fn quotient_test() {

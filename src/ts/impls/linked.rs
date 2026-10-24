@@ -857,9 +857,9 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
 
 #[cfg(test)]
 mod tests {
+    use crate::core::alphabet::CharAlphabet;
     use crate::ts::{Deterministic, ForAlphabet, Sproutable, TSBuilder};
     use crate::{TransitionSystem, ts::LinkedListDeterministic};
-    use automata_core::alphabet::CharAlphabet;
 
     #[test]
     fn dts_equality() {

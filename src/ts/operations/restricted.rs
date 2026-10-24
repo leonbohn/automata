@@ -1,8 +1,8 @@
+use crate::core::alphabet::Matcher;
+use crate::core::math::OrderedSet;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{Deterministic, EdgeColor, EdgeExpression, IndexType, IsEdge, StateIndex};
 use crate::{Congruence, Pointed, TransitionSystem};
-use automata_core::alphabet::Matcher;
-use automata_core::math::OrderedSet;
 use std::marker::PhantomData;
 
 /// Abstracts the filtering of a transition system's state indices. This trait is implemented by

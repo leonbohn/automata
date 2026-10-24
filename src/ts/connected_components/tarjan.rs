@@ -330,12 +330,12 @@ mod tests {
 
     use super::tarjan_scc_iterative;
     use crate::Pointed;
+    use crate::core::Void;
     use crate::ts::{TSBuilder, TransitionSystem};
     use crate::ts::{
         connected_components::{kosaraju, tarjan_scc_recursive},
         predecessors::PredecessorIterable,
     };
-    use automata_core::Void;
     use tracing::debug;
 
     #[test]

@@ -2,11 +2,8 @@
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
-/// Exports everything provided by `automata-core`
-pub mod core {
-    pub use automata_core::Show;
-    pub use automata_core::*;
-}
+/// Foundations shared by the rest of the crate: alphabets, words, colors and basic math types.
+pub mod core;
 
 /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
 pub type TS<

@@ -1,10 +1,10 @@
 use crate::automaton::Semantics;
+use crate::core::Void;
+use crate::core::alphabet::CharAlphabet;
+use crate::core::word::ReducedOmegaWord;
 use crate::representation::{CollectTs, IntoTs};
 use crate::ts::{Deterministic, StateColor, SymbolOf};
 use crate::{DTS, TransitionSystem, automaton::InfiniteWordAutomaton, ts::run};
-use automata_core::Void;
-use automata_core::alphabet::CharAlphabet;
-use automata_core::word::ReducedOmegaWord;
 
 /// Defines the [`Semantics`] of a deterministic Büchi automaton (DBA),
 /// which is an acceptor of infinite words. It considers the set of

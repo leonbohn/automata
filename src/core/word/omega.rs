@@ -2,7 +2,7 @@ use itertools::Itertools;
 use std::{fmt::Debug, marker::PhantomData};
 use thiserror::Error;
 
-use crate::{alphabet::Symbol, show::Show};
+use crate::core::{alphabet::Symbol, show::Show};
 
 use super::{FiniteWord, Word};
 
@@ -28,7 +28,7 @@ use super::{FiniteWord, Word};
 ///
 /// # Example
 /// ```
-/// use automata_core::{upw, word::OmegaWord};
+/// use automata::core::{upw, word::OmegaWord};
 ///
 /// let word = upw!("abc", "def"); // represents abc(def)^𝜔 = abcdefdefdef...
 /// assert_eq!(word.loop_index(), 3);
@@ -55,7 +55,7 @@ pub trait OmegaWord: Word {
     ///
     /// # Example
     /// ```
-    /// use automata_core::{upw, word::{FiniteWord, OmegaWord}};
+    /// use automata::core::{upw, word::{FiniteWord, OmegaWord}};
     ///
     /// let word = upw!("abac", "acac");
     /// assert!(word.spoke().finite_word_equals("ab"));
@@ -68,7 +68,7 @@ pub trait OmegaWord: Word {
     /// Tests whether `self` is *semantically* equal to `other`. To see the difference compared to syntactic
     /// equality, consider the exampe below.
     /// ```
-    /// use automata_core::{upw, word::{FiniteWord, OmegaWord, Word}};
+    /// use automata::core::{upw, word::{FiniteWord, OmegaWord, Word}};
     ///
     /// let word = upw!("a"); // represents the periodic omega word a^𝜔 = aaa...
     /// let offset1 = word.skip(1); // the word obtained by skipping the first symbol of `word`
@@ -218,7 +218,7 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     ///
     /// # Example
     /// ```
-    /// use automata_core::{upw, word::{FiniteWord, OmegaWord}};
+    /// use automata::core::{upw, word::{FiniteWord, OmegaWord}};
     ///
     /// let word = upw!("abcabcabc");
     /// assert_eq!(word.cycle_len(), 3);
@@ -352,7 +352,7 @@ impl<S: Symbol> ReducedOmegaWord<S> {
     ///
     /// # Example
     /// ```
-    /// use automata_core::{upw, word::{FiniteWord, OmegaWord, ReducedOmegaWord}};
+    /// use automata::core::{upw, word::{FiniteWord, OmegaWord, ReducedOmegaWord}};
     ///
     /// let non_normalized = ReducedOmegaWord::from_raw_parts(vec!['a', 'a'], 0);
     /// assert!(!non_normalized.is_reduced()); // the constructed word is not normalized
@@ -602,7 +602,7 @@ impl<S: Show> Debug for PeriodicOmegaWord<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::word::{FiniteWord, OmegaWord, ReducedOmegaWord, omega::deduplicate};
+    use crate::core::word::{FiniteWord, OmegaWord, ReducedOmegaWord, omega::deduplicate};
 
     use super::deduplicate_inplace;
 
@@ -640,7 +640,7 @@ mod tests {
 
     #[test]
     fn word_equality() {
-        let word = crate::upw!("abac", "acac");
+        let word = crate::core::upw!("abac", "acac");
         assert!(word.spoke().finite_word_equals("ab"));
         assert!(word.cycle().finite_word_equals("ac"));
     }

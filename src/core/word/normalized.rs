@@ -5,7 +5,7 @@ use std::{
 
 use itertools::Itertools;
 
-use crate::alphabet::Symbol;
+use crate::core::alphabet::Symbol;
 
 use super::{FiniteWord, OmegaWord, ReducedOmegaWord, Word};
 
@@ -39,7 +39,7 @@ impl<S: Symbol> NormalizedOmegaWord<S> {
     ///
     /// # Example
     /// ```
-    /// use automata_core::{upw, word::{OmegaWord, NormalizedOmegaWord}};
+    /// use automata::core::{upw, word::{OmegaWord, NormalizedOmegaWord}};
     ///
     /// let word = upw!("b", "a");
     /// let normalized = NormalizedOmegaWord::new(word, 1, 2);
@@ -122,7 +122,7 @@ impl<S: Symbol> Hash for NormalizedOmegaWord<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{upw, word::normalized::NormalizedOmegaWord};
+    use crate::core::{upw, word::normalized::NormalizedOmegaWord};
 
     #[test]
     fn debug_normalized() {

@@ -1,6 +1,6 @@
+use crate::core::alphabet::{Alphabet, CharAlphabet};
+use crate::core::math::Bijection;
 use crate::{Pointed, TransitionSystem};
-use automata_core::alphabet::{Alphabet, CharAlphabet};
-use automata_core::math::Bijection;
 use bit_set::BitSet;
 use itertools::Itertools;
 
@@ -340,9 +340,9 @@ pub trait Sproutable: TransitionSystem {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::alphabet::{Alphabet, CharAlphabet};
     use crate::ts::{Deterministic, ForAlphabet, Sproutable};
     use crate::{DTS, TransitionSystem};
-    use automata_core::alphabet::{Alphabet, CharAlphabet};
 
     #[test]
     fn for_alphabet_inference() {

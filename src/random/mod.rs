@@ -1,11 +1,11 @@
 #![allow(unused)]
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
+use crate::core::alphabet::{Alphabet, CharAlphabet};
+use crate::core::word::ReducedOmegaWord;
+use crate::core::{Int, Void, math, upw};
 use crate::representation::IntoTs;
 use crate::ts::{DefaultIdType, Deterministic, ForAlphabet, Shrinkable, Sproutable, StateIndex};
 use crate::{DTS, TransitionSystem};
-use automata_core::alphabet::{Alphabet, CharAlphabet};
-use automata_core::word::ReducedOmegaWord;
-use automata_core::{Int, Void, math, upw};
 use math::sample_continuous_bernoulli;
 use rand::{Rng, rngs::ThreadRng, thread_rng};
 use std::cmp::min;

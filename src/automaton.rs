@@ -532,9 +532,9 @@ where
 #[cfg(test)]
 mod tests {
     use crate::automaton::{DBA, DFA, MooreMachine};
+    use crate::core::upw;
+    use crate::core::word::ReducedOmegaWord;
     use crate::representation::CollectTs;
-    use automata_core::upw;
-    use automata_core::word::ReducedOmegaWord;
 
     #[test]
     fn mealy_color_or_below() {

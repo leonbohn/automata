@@ -128,9 +128,9 @@ impl<Q> Default for MealySemantics<Q> {
 mod tests {
     use crate::DTS;
     use crate::automaton::MealyMachine;
+    use crate::core::Void;
     use crate::representation::IntoTs;
     use crate::ts::TSBuilder;
-    use automata_core::Void;
 
     #[test]
     fn mealy_equivalence() {

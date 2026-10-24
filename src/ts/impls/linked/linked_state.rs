@@ -10,8 +10,8 @@ pub enum LinkedListTransitionSystemState<Q> {
     Occupied(Q, Option<usize>, Option<usize>),
     Vacant(Option<usize>, Option<usize>),
 }
+use crate::core::alphabet::Alphabet;
 use LinkedListTransitionSystemState::*;
-use automata_core::alphabet::Alphabet;
 use tracing::warn;
 
 impl<Q> LinkedListTransitionSystemState<Q> {

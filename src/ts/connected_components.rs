@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
-use automata_core::dag::Dag;
-use automata_core::math;
+use crate::core::dag::Dag;
+use crate::core::math;
 use itertools::Itertools;
 use tracing::trace;
 
@@ -268,9 +268,9 @@ impl<Ts: TransitionSystem> PartialEq for SccDecomposition<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use automata_core::Void;
-    use automata_core::alphabet::CharAlphabet;
-    use automata_core::math::Set;
+    use crate::core::Void;
+    use crate::core::alphabet::CharAlphabet;
+    use crate::core::math::Set;
 
     use crate::ts::TSBuilder;
     use crate::{

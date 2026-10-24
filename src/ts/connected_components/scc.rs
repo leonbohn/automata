@@ -426,8 +426,8 @@ impl<Ts: TransitionSystem> Debug for Scc<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::math::Set;
     use crate::{DTS, TransitionSystem};
-    use automata_core::math::Set;
 
     #[test]
     fn interior_transitions() {

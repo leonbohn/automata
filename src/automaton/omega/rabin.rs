@@ -93,8 +93,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::upw;
     use crate::ts::TSBuilder;
-    use automata_core::upw;
 
     #[test]
     fn rabin_pairs() {

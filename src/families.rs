@@ -94,7 +94,7 @@ impl<A: Alphabet, X> Family<RightCongruence<A>, X> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use automata_core::alphabet::CharAlphabet;
+    use crate::core::alphabet::CharAlphabet;
     #[test]
     fn family_interaction() {
         let mut fam = Family::trivial(CharAlphabet::of_size(2), 1337);

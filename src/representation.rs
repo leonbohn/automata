@@ -284,10 +284,10 @@ pub trait IntoTs: TransitionSystem {
 mod impl_into_ts {
     use super::*;
     use crate::automaton::Automaton;
+    use crate::core::alphabet::Alphabet;
     use crate::ts::operations::MapStateColor;
     use crate::ts::{EdgeColor, EdgeExpression, StateColor, StateIndex, SymbolOf, operations};
     use crate::{DTS, TransitionSystem};
-    use automata_core::alphabet::Alphabet;
 
     impl<A: Alphabet, Q: Color, C: Color> IntoTs for DTS<A, Q, C> {
         // fn into_dts_preserving(

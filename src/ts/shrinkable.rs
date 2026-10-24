@@ -1,5 +1,5 @@
+use crate::core::alphabet::Matcher;
 use crate::{Pointed, TransitionSystem};
-use automata_core::alphabet::Matcher;
 
 use super::{EdgeExpression, EdgeTuple, StateColor, StateIndex};
 
@@ -219,11 +219,11 @@ pub trait Shrinkable: TransitionSystem {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::Void;
+    use crate::core::alphabet::CharAlphabet;
     use crate::representation::CollectTs;
     use crate::ts::{ForAlphabet, Shrinkable, Sproutable};
     use crate::{DTS, TransitionSystem};
-    use automata_core::Void;
-    use automata_core::alphabet::CharAlphabet;
 
     #[test]
     fn shrink_to_reachable() {
