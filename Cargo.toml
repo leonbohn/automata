@@ -14,7 +14,7 @@ categories = ["mathematics", "science"]
 [dependencies]
 tracing = "0.1"
 biodivine-lib-bdd = "0.5.23"
-itertools = "0.14.0"
+itertools = "0.15.0"
 indexmap = "2.7"
 bimap = "0.6"
 rand = "0.8.5"
