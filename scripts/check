@@ -24,5 +24,9 @@ else
 fi
 cargo test
 cargo test --no-default-features
+for example in examples/*.rs; do
+    cargo run -q --example "$(basename "$example" .rs)" > /dev/null
+done
+echo "examples ran"
 cargo test --all-features
 echo "cargo test passed (default, no default, all features)"

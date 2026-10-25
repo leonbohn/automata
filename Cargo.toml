@@ -48,3 +48,7 @@ render = ["dep:layout-rs", "dep:base64", "dep:resvg", "dep:open", "dep:usvg"]
 
 [package.metadata.docs.rs]
 all-features = true
+
+[[example]]
+name = "hoa"
+required-features = ["hoa"]

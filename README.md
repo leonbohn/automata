@@ -134,6 +134,8 @@ assert!(dpa.accepts(&word));
 
 Büchi, Rabin and Muller conditions are available as `DBA`, `DRA` and `DMA`; parity automata are the best supported ones.
 
+More runnable programs are in the [`examples/`](examples) directory, for example `cargo run --example dfa` or `cargo run --example parity`.
+
 ## Transition systems and lazy operations
 
 A DFA is a *transition system* (states connected by colored edges) together with an initial state and an acceptance condition. The transition system alone is available through the `TransitionSystem` trait, which also provides combinators that transform it **without copying**: each of them returns a new object that computes its result on demand.

@@ -78,6 +78,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Default features
         run: cargo test
+      - name: Run the examples
+        shell: bash
+        run: |
+          for example in examples/*.rs; do
+            cargo run --example "$(basename "$example" .rs)" > /dev/null
+          done
       - name: No default features
         run: cargo test --no-default-features
 

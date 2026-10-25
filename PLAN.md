@@ -47,7 +47,7 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 
 - [x] Removed all `allow(missing_docs)`, `allow(unused)` and `allow(dead_code)` attributes (34 uses) and documented every public item (about 260 items); dead code that surfaced was deleted (unused `random` benchmark helpers, linked-list helpers, empty `families` modules). Quality of the documentation is still uneven: many items have one-line descriptions, richer docs with examples are still wanted for the main entry points.
 - [ ] Integration tests in `tests/`, property tests (`proptest`): `minimize(A) ≡ A`, `A ∪ ¬A` accepts everything, HOA round trips.
-- [x] No `ignore`d doctests left (README rewritten, all snippets run). Still to decide: the 4 `#[ignore]`d unit tests (3 rendering tests, see #16, and one `random` benchmark-style test).
+- [x] No `ignore`d doctests left (README rewritten, all snippets run). The 3 `#[ignore]`d rendering tests (they opened GUI windows) were replaced by automated tests of the SVG, PNG and data-URL rendering and the DOT output; no test is ignored anymore.
 - [ ] `criterion` benchmarks in `benches/` (product, determinize, minimize, SCC).
 - [ ] CI: Linux/macOS/Windows test matrix, `--no-default-features` and `--all-features`, MSRV job, `cargo doc -D warnings`, `cargo deny`, `cargo semver-checks`, coverage. The current workflow only builds on Windows and macOS.
 
@@ -55,8 +55,8 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 
 - [x] README rewritten (pitch, feature table, install, runnable quick starts for DFAs and DPAs, lazy transition-system operations, DOT output, concepts). The HOA example lives in the `hoa` module docs (it needs the `hoa` feature, README doctests run without features). Still to do at release time: switch the install instructions from the git dependency to `cargo add automata`, add crates.io / docs.rs badges, and add a comparison with alternatives (Spot, `regex-automata`).
 - [ ] Crate-level rustdoc tour (alphabet, word, transition system, automaton, acceptance, operations) with runnable examples; examples on all major public functions.
-- [ ] `examples/` (build a DFA, minimize, boolean ops, parse HOA and render, omega acceptance).
-- [ ] mdBook guide in `docs/`, deployed via GitHub Pages; `CHANGELOG.md`, `CONTRIBUTING.md`.
+- [x] `examples/` (`dfa`, `parity`, `transition_system`, `dot`, `hoa`), run by CI.
+- [ ] mdBook guide in `docs/`, deployed via GitHub Pages; `CONTRIBUTING.md`; a `CHANGELOG.md` starts with the release after 0.1.0 (there is nothing to compare 0.1.0 against).
 - [ ] Keep `CLAUDE.md` in sync.
 
 ## Phase 6: release
