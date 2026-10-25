@@ -79,54 +79,31 @@ impl HoaString {
         const ABORT_LEN: usize = "--ABORT--".len();
 
         loop {
-            match (self.0.find("--ABORT--"), self.0.find("--END--")) {
-                (None, Some(pos)) => {
-                    trace!("Returnting first automaton, going up to position {pos}");
-                    match input::parse_omega_automaton_range(&self.0, 0, pos + END_LEN) {
-                        Ok(aut) => return Some(aut),
-                        Err(e) => {
-                            warn!("Could not parse automaton, skipping... {:?}", e);
-                            self.0 = self.0[pos + END_LEN..].trim_start().to_string();
-                        }
-                    }
+            // the part of the string that holds the next automaton, if there is one
+            let (start, end) = match (self.0.find("--ABORT--"), self.0.find("--END--")) {
+                (Some(abort), Some(end)) if abort < end => {
+                    trace!("Found --ABORT-- before --END--, taking the automaton from {abort}");
+                    (abort + ABORT_LEN, end + END_LEN)
+                }
+                (_, Some(end)) => {
+                    trace!("Found --END--, taking the first automaton up to {end}");
+                    (0, end + END_LEN)
                 }
                 (Some(abort), None) => {
-                    trace!(
-                        "Found only one automaton --ABORT--ed at {abort}, but no subsequent --END-- of automaton to parse."
-                    );
+                    trace!("Found only the --ABORT--ed automaton at {abort} without an --END--");
                     return None;
-                }
-                (Some(abort), Some(end)) => {
-                    if abort < end {
-                        trace!(
-                            "Found --ABORT-- before --END--, returning first automaton from {abort} to {end}"
-                        );
-                        match input::parse_omega_automaton_range(
-                            &self.0,
-                            abort + ABORT_LEN,
-                            end + END_LEN,
-                        ) {
-                            Ok(aut) => return Some(aut),
-                            Err(e) => {
-                                warn!("Could not parse automaton, skipping... {:?}", e);
-                                self.0 = self.0[end + END_LEN..].trim_start().to_string();
-                            }
-                        }
-                    } else {
-                        trace!("Found --END--, returning first automaton up to {end}");
-                        match input::parse_omega_automaton_range(&self.0, 0, end + END_LEN) {
-                            Ok(aut) => return Some(aut),
-                            Err(e) => {
-                                warn!("Could not parse automaton, skipping... {:?}", e);
-                                self.0 = self.0[end + END_LEN..].trim_start().to_string();
-                            }
-                        }
-                    }
                 }
                 (None, None) => {
                     trace!("No end of automaton found, there is no automaton to parse.");
                     return None;
                 }
+            };
+
+            let parsed = input::parse_omega_automaton_range(&self.0, start, end);
+            self.0 = self.0[end..].trim_start().to_string();
+            match parsed {
+                Ok(automaton) => return Some(automaton),
+                Err(error) => warn!("Could not parse automaton, skipping... {:?}", error),
             }
         }
     }
@@ -162,6 +139,22 @@ impl From<HoaString> for String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn pop_removes_the_automata_one_after_the_other() {
+        use crate::hoa::HoaString;
+
+        let one = "HOA: v1\nStates: 1\nStart: 0\nacc-name: Buchi\nAcceptance: 1 Inf(0)\nAP: 1 \"a\"\n--BODY--\nState: 0\n[t] 0 {0}\n--END--\n";
+        let two = "HOA: v1\nStates: 2\nStart: 0\nacc-name: Buchi\nAcceptance: 1 Inf(0)\nAP: 1 \"a\"\n--BODY--\nState: 0\n[0] 1\n[!0] 0\nState: 1\n[t] 1 {0}\n--END--\n";
+        // the segment in the middle ends with `--END--`, but uses an unsupported acceptance condition
+        let invalid = "HOA: v1\nStates: 1\nStart: 0\nacc-name: Rabin 1\nAcceptance: 2 Fin(0) & Inf(1)\nAP: 1 \"a\"\n--BODY--\nState: 0\n[t] 0 {0}\n--END--\n";
+        let mut hoa = HoaString::from(format!("{one}{invalid}{two}"));
+
+        assert_eq!(hoa.pop::<true>().map(|a| a.size()), Some(1));
+        assert_eq!(hoa.pop::<true>().map(|a| a.size()), Some(2));
+        assert!(hoa.pop::<true>().is_none());
+        assert!(hoa.is_empty());
+    }
+
     use crate::{TransitionSystem, hoa::input::hoa_to_ts};
 
     #[test]
