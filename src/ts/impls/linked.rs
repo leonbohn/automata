@@ -671,6 +671,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        if !self.states.get(state.into_usize())?.is_occupied() {
+            return None;
+        }
         Some(NTSEdgesFromIter::new(
             &self.edges,
             self.first_out_edge(state.into_usize()),
@@ -678,16 +681,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        if state.into_usize() >= self.states.len() {
-            panic!(
-                "index {state} is out of bounds, there are only {} states",
-                self.states.len()
-            );
-        }
-        assert!(state.into_usize() < self.states.len());
-        self.states
-            .get(state.into_usize())
-            .map(|x| x.color().unwrap().clone())
+        self.states.get(state.into_usize())?.color().cloned()
     }
 }
 

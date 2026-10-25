@@ -69,21 +69,17 @@ impl<'a, D: TransitionSystem + 'a> Iterator for TransitionsFrom<'a, D> {
 
 impl<'a, D: TransitionSystem + 'a> TransitionsFrom<'a, D> {
     /// Creates a new instance from a reference to a transition system and the index of the state
-    /// from which the transitions should be taken.
-    pub fn new(det: &'a D, state: D::StateIndex) -> Self {
-        let Some(edges) = det.edges_from(state) else {
-            panic!(
-                "We should at least get an iterator. Probably the state {state:?} does not exist.",
-            );
-        };
+    /// from which the transitions should be taken. Returns `None` if the state does not exist.
+    pub fn new(det: &'a D, state: D::StateIndex) -> Option<Self> {
+        let edges = det.edges_from(state)?;
 
-        Self {
+        Some(Self {
             edges,
             symbols: None,
 
             target: None,
             color: None,
             source: state,
-        }
+        })
     }
 }

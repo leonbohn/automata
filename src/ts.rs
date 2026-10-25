@@ -257,6 +257,8 @@ pub trait TransitionSystem: Sized {
         for q in self.state_indices() {
             let syms = self
                 .transitions_from(q)
+                .into_iter()
+                .flatten()
                 .map(|(_q, a, _c, _p)| a)
                 .collect::<BTreeSet<_>>();
 
@@ -287,9 +289,9 @@ pub trait TransitionSystem: Sized {
         }
     }
 
-    /// Returns an iterator over the transitions that start in the given `state`. Panics if the
-    /// state does not exist.
-    fn transitions_from(&self, state: StateIndex<Self>) -> TransitionsFrom<'_, Self> {
+    /// Returns an iterator over the transitions that start in the given `state`, or `None` if
+    /// the state does not exist.
+    fn transitions_from(&self, state: StateIndex<Self>) -> Option<TransitionsFrom<'_, Self>> {
         TransitionsFrom::new(self, state)
     }
 
@@ -826,4 +828,35 @@ impl<P: Pointed> Pointed for &mut P {
 use self::operations::{ProvidesStateColor, WithStateColor};
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::TransitionSystem;
+
+    #[test]
+    fn linked_list_ts_answers_none_for_unknown_states() {
+        use crate::DTS;
+        use crate::Void;
+        use crate::alphabet::CharAlphabet;
+        use crate::ts::{ForAlphabet, Sproutable};
+
+        let mut ts: DTS<CharAlphabet, bool, Void> = DTS::for_alphabet(CharAlphabet::of_size(2));
+        let q = ts.add_state(true);
+        let p = ts.add_state(false);
+        assert!(ts.edges_from(q).is_some());
+        assert_eq!(ts.state_color(p), Some(false));
+        assert!(ts.edges_from(17).is_none());
+        assert_eq!(ts.state_color(17), None);
+        // a removed state no longer exists
+        use crate::ts::Shrinkable;
+        ts.remove_state(p);
+        assert!(ts.edges_from(p).is_none());
+        assert_eq!(ts.state_color(p), None);
+        assert!(ts.edges_from(q).is_some());
+    }
+
+    #[test]
+    fn transitions_from_unknown_state_is_none() {
+        let dfa = crate::tests::wiki_dfa();
+        assert!(dfa.transitions_from(0).is_some());
+        assert!(dfa.transitions_from(100).is_none());
+    }
+}

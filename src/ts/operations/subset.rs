@@ -158,19 +158,12 @@ impl<Ts: TransitionSystem> TransitionSystem for SubsetConstruction<Ts> {
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        let Some(color) = self.states.borrow().get(state).map(|q| {
-            q.iter()
-                .map(|idx| {
-                    let Some(color) = self.ts.state_color(*idx) else {
-                        panic!("Could not find state {}", state);
-                    };
-                    color
-                })
-                .collect()
-        }) else {
-            panic!("Could not find state {}", state);
-        };
-        Some(color)
+        self.states
+            .borrow()
+            .get(state)?
+            .iter()
+            .map(|idx| self.ts.state_color(*idx))
+            .collect()
     }
 }
 

@@ -134,12 +134,11 @@ where
     }
 
     /// Verifies whether an element of `self` is  idempotent, i.e. if the mr of the indexed
-    /// class is u, then it should be that uu ~ u.
-    pub fn is_idempotent(&self, idx: StateIndex<Self>) -> bool {
-        let Some(mr) = self.state_to_mr(idx) else {
-            panic!("The class {idx:?} is not labeled!");
-        };
-        self.reached_state_index_from(idx, mr) == Some(idx)
+    /// class is u, then it should be that uu ~ u. Returns `None` if the class does not
+    /// exist or is not labeled with a minimal representative.
+    pub fn is_idempotent(&self, idx: StateIndex<Self>) -> Option<bool> {
+        let mr = self.state_to_mr(idx)?;
+        Some(self.reached_state_index_from(idx, mr) == Some(idx))
     }
 
     /// Returns the [`Class`] that is referenced by `index`.
@@ -166,4 +165,15 @@ where
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::ts::TSBuilder;
+
+    #[test]
+    fn is_idempotent_is_none_for_unknown_classes() {
+        let rc = TSBuilder::without_colors()
+            .with_transitions([(0, 'a', 1), (1, 'a', 0), (0, 'b', 0), (1, 'b', 1)])
+            .into_right_congruence_bare(0);
+        assert!(rc.is_idempotent(0).is_some());
+        assert_eq!(rc.is_idempotent(42), None);
+    }
+}
