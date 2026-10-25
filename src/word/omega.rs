@@ -412,6 +412,10 @@ impl<S: Symbol> ReducedOmegaWord<S> {
 
     /// Creates a new reduced omega word from a finite word representing the spoke and a finite
     /// word representing the cycle. The spoke must not be empty.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `cycle` is empty.
     pub fn ultimately_periodic<Spoke: FiniteWord<Symbol = S>, Cycle: FiniteWord<Symbol = S>>(
         spoke: Spoke,
         cycle: Cycle,

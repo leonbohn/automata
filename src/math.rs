@@ -80,6 +80,10 @@ impl<I: Hash + Eq + Ord> From<Vec<BTreeSet<I>>> for Partition<I> {
 mod probability {
     /// Computes the inverse cumulative density function of the continuous bernoulli distribution
     /// as described in [10.3390/fractalfract7050386](https://www.mdpi.com/2504-3110/7/5/386).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `lambda` or `y` is not in the interval `[0, 1]`.
     pub fn continuous_bernoulli_inverse_cumulative_density_function(lambda: f64, y: f64) -> f64 {
         assert!((0.0..=1.0).contains(&lambda));
         assert!((0.0..=1.0).contains(&y));
@@ -91,6 +95,10 @@ mod probability {
 
     /// Computes the mean of the continuous bernoulli distribution for the
     /// given parameter lambda.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `lambda` is not in the interval `[0, 1]`.
     pub fn continuous_bernoulli_mean(lambda: f64) -> f64 {
         assert!((0.0..=1.0).contains(&lambda));
         let first = lambda / (2.0 * lambda - 1.0);
@@ -102,8 +110,12 @@ mod probability {
     /// by sampling a uniformly distributed value `y` between 0 and 1.
     /// The inverse of this value under the cumulative density function of the continuous
     /// bernoulli function gives a sample of this distribution.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `lambda` is not in the interval `[0, 1]`.
     pub fn sample_continuous_bernoulli(lambda: f64) -> f64 {
-        assert!((0.0..=1.1).contains(&lambda));
+        assert!((0.0..=1.0).contains(&lambda));
         let y = rand::random::<f64>();
         continuous_bernoulli_inverse_cumulative_density_function(lambda, y)
     }

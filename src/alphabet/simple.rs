@@ -36,6 +36,10 @@ pub struct CharAlphabet(pub(crate) Vec<char>);
 impl CharAlphabet {
     /// Creates a new [`CharAlphabet`] alphabet of the given size. The symbols are just the first `size` letters
     /// of the alphabet, i.e. 'a' to 'z'.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `size` is 26 or more, as every symbol is a lowercase letter.
     pub fn of_size(size: usize) -> Self {
         assert!(size < 26, "Alphabet is too large");
         Self((0..size).map(|i| (b'a' + i as u8) as char).collect())

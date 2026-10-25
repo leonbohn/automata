@@ -200,6 +200,10 @@ impl<S> FreeMonoid<S> {
 
     /// Computes the nonempty words, explicitly excluding the empty word.
     /// This panics if the alphabet is empty.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `symbols` is empty.
     pub fn non_empty(symbols: Vec<S>) -> Self {
         assert!(!symbols.is_empty(), "need at least one symbol");
         Self {

@@ -228,6 +228,10 @@ impl<Q: Color, C: Color, const DET: bool> Builder<Q, C, DET> {
     }
 
     /// Assigns the given `color` to the state with the given index `idx`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the state `idx` already has a color.
     pub fn color(mut self, idx: DefaultIdType, color: Q) -> Self {
         assert!(self.colors.iter().all(|(q, _c)| q != &idx));
         self.colors.push((idx, color));

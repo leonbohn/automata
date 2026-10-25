@@ -102,6 +102,10 @@ pub fn generate_random_moore(symbols: usize, max_color: usize, size: usize) -> M
 /// 2. For each state, for each symbol draw a target state and add the corresponding edge
 ///
 /// Note that depending on which state is chosen as the initial state, there may be unreachable states.
+///
+/// # Panics
+///
+/// Panics if `size` is zero or if `symbols` is 26 or more.
 pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, StateIndex<DTS>) {
     assert!(size > 0);
     let alphabet = CharAlphabet::of_size(symbols);
@@ -199,6 +203,10 @@ pub fn generate_random_words(
 /// The length of the spoke is drawn uniformly from the range `min_len_spoke..=max_len_spoke`.
 /// The length of the cycle is drawn uniformly from the range `min_len_cycle..=max_len_cycle`.
 /// Panics if the length of the cycle can be 0.
+///
+/// # Panics
+///
+/// Panics if a minimum length exceeds the corresponding maximum, or if `min_len_cycle` is zero.
 pub fn generate_random_omega_word(
     alphabet: &CharAlphabet,
     min_len_spoke: usize,

@@ -46,6 +46,10 @@ impl<S: Symbol> NormalizedOmegaWord<S> {
     /// assert_eq!(normalized.spoke_vec(), vec!['b', 'a']);
     /// assert_eq!(normalized.cycle_vec(), vec!['a', 'a']);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if `loop_size` is zero.
     pub fn new(upw: ReducedOmegaWord<S>, pre_loop_count: usize, loop_size: usize) -> Self {
         assert!(loop_size > 0, "loop size must be positive");
         Self {

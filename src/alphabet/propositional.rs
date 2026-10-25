@@ -88,6 +88,12 @@ impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
     pub fn as_char(&self) -> char {
         (b'a' + ((self.raw.as_usize() as u8) & 0b1111)) as char
     }
+    /// Creates a symbol over `aps` atomic propositions from a letter.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `aps` is larger than the number of atomic propositions the representation supports,
+    /// if `value` is not one of the letters `'a'` to `'o'`, or if `aps` does not fit into a `u8`.
     pub fn from_char(value: char, aps: usize) -> Self {
         assert!(aps <= RawTy::max_aps());
         let val = value as u8;
@@ -99,6 +105,11 @@ impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
             num_aps: aps.try_into().unwrap(),
         }
     }
+    /// Returns the valuation of the atomic propositions as a vector of booleans.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the symbol has more atomic propositions than its representation can hold.
     pub fn as_bools(&self) -> Vec<bool> {
         assert!(
             self.num_aps as usize <= 8usize.saturating_pow(std::mem::size_of::<RawTy>() as u32)
@@ -114,6 +125,11 @@ impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
         trace!("got {out:?} from {self:?}");
         out
     }
+    /// Creates a symbol from a valuation of the atomic propositions.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are more booleans than the representation can hold.
     pub fn from_bools(bools: Vec<bool>) -> Self {
         assert!(bools.len() <= 8usize.saturating_pow(std::mem::size_of::<RawTy>() as u32));
         let mut raw = RawTy::from_usize(0);
@@ -192,6 +208,11 @@ impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
             _ty: PhantomData,
         }
     }
+    /// Creates an expression from a BDD over the atomic propositions.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the BDD has more than 255 variables.
     pub fn from_bdd(bdd: Bdd) -> Self {
         Self {
             num_aps: bdd
@@ -416,6 +437,11 @@ impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
         self.aps.len() as u8
     }
 
+    /// Converts a letter into the corresponding symbol of this alphabet.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `value` is smaller than `'a'`.
     pub fn char_to_symbol(&self, value: char) -> PropSymbol<RawTy> {
         assert!(value >= 'a');
 
@@ -426,6 +452,12 @@ impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
         }
     }
 
+    /// Converts a symbol of this alphabet into a letter.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the symbol was created for a different number of atomic propositions than this
+    /// alphabet has, or if there are too many atomic propositions.
     pub fn hoa_symbol_to_char(&self, sym: &PropSymbol<RawTy>) -> char {
         assert_eq!(sym.num_aps, self.aps(), "symbol does not match alphabet");
         assert!((sym.num_aps as usize) < RawTy::max_aps(), "too many aps");
