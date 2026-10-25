@@ -687,6 +687,26 @@ mod tests {
         assert!(ts.omega_escape_prefix(upw!("b")).is_some());
         assert!(ts.omega_escape_prefix(upw!("b", "a")).is_some());
         assert!(ts.omega_escape_prefix(upw!("a", "b")).is_none());
-        assert_eq!(ts.omega_escape_prefixes(words.iter()).count(), 3);
+        // a^ω and aab^ω both escape after the prefix `aa`, which counts only once
+        assert_eq!(ts.omega_escape_prefixes(words.iter()).count(), 2);
+    }
+
+    #[test]
+    fn equal_escape_prefixes_hash_equally() {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+
+        let ts = DTS::builder()
+            .with_transitions([(0, 'a', Void, 1), (1, 'b', Void, 1)])
+            .default_color(Void)
+            .into_dts_with_initial(0);
+        let first = ts.omega_escape_prefix(upw!("a")).unwrap();
+        let second = ts.omega_escape_prefix(upw!("aa", "b")).unwrap();
+        assert_eq!(first, second);
+        let hash = |p: &crate::ts::run::EscapePrefix<_>| {
+            let mut hasher = DefaultHasher::new();
+            p.hash(&mut hasher);
+            hasher.finish()
+        };
+        assert_eq!(hash(&first), hash(&second));
     }
 }

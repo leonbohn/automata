@@ -316,8 +316,14 @@ impl<W: Word> PartialOrd for EscapePrefix<W> {
     }
 }
 impl<W: Word> std::hash::Hash for EscapePrefix<W> {
+    // must agree with `PartialEq`, which compares the symbols of the prefix; hashing the
+    // `Infix` itself would also hash the underlying word and its position
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.as_prefix().hash(state)
+        let prefix = self.as_prefix();
+        prefix.len().hash(state);
+        for symbol in prefix.symbols() {
+            symbol.hash(state);
+        }
     }
 }
 
