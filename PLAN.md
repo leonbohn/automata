@@ -13,8 +13,9 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 - [ ] Switch `frieda`'s `automata-learning` and binaries to depend on this crate instead of their path copy; then delete `crates/automata` and `crates/automata-core` from `frieda`.
 - [ ] Add `rust-version` (MSRV) and verify it in CI with `cargo-msrv`.
 - [ ] Push `main` to `github.com/leonbohn/automata`, set up docs.rs metadata (`all-features = true`).
-- [ ] Split heavy features: `default = ["hoa"]`; make `render`, `graphviz`, `random` opt-in; keep text `dot` output always available.
-- [ ] Remove the unused optional `clap` dependency.
+- [x] Slimmed the default features to `["hoa"]`; `render`, `graphviz` and `random` are opt-in. Text `dot` output stays always available. docs.rs builds with all features.
+- [ ] Consider further feature gates for non-standard modules (e.g. `families` with FDFA/FWPM), and review the rendering on all platforms (see issues).
+- [x] Removed the unused optional `clap` dependency (it created an implicit public feature).
 - [x] Deleted dead code that was never compiled: `edge_lists.rs`, `petgraph_backed.rs`, `packed.rs`, together with the no-op features `petgraph` and `implementations` and the unused `petgraph` dependency (still in git history).
 
 ## Phase 2: API redesign

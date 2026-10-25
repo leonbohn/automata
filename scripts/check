@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
+# Runs the same checks as the CI workflow (.github/workflows/ci.yml).
 set -e
 
 cargo fmt --check
-echo "cargo fmt --check --all passed"
-cargo clippy --all-targets --all-features -- -D warnings
-echo "cargo clippy --all -- -D warnings passed"
+echo "cargo fmt --check passed"
+cargo clippy --all-targets -- -D warnings
 cargo clippy --all-targets --no-default-features -- -D warnings
-echo "cargo clippy --no-default-features passed"
-cargo doc --no-deps
-echo "doc tests passed"
+cargo clippy --all-targets --all-features -- -D warnings
+echo "cargo clippy passed (default, no default, all features)"
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
+echo "cargo doc passed"
+if command -v cargo-hack >/dev/null 2>&1; then
+    cargo hack check --each-feature --no-dev-deps
+    echo "cargo hack check --each-feature passed"
+else
+    echo "cargo-hack not installed, skipping the per-feature check"
+fi
 cargo test
-echo "cargo test passed"
 cargo test --no-default-features
-echo "cargo test --no-default-features passed"
+cargo test --all-features
+echo "cargo test passed (default, no default, all features)"

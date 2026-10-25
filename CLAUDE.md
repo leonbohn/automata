@@ -16,7 +16,7 @@ cargo test                         # 68 unit tests, 45 doctests (some ignored)
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
-./scripts/check                    # fmt + clippy + doc + test
+./scripts/check                    # same as CI: fmt, clippy, doc, per-feature check (needs cargo-hack), tests in three feature configurations
 ```
 
 ## Layout
@@ -36,7 +36,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 
 Edges are labeled with alphabet *expressions*; a *transition* is the concrete (state, symbol) step. Capabilities are layered via extra traits rather than one large trait; add a trait or blanket impl rather than extending `TransitionSystem`.
 
-Features: `default = ["hoa", "random", "render"]`, plus `graphviz`.
+Features: `default = ["hoa"]`; opt-in: `random`, `render` (SVG/PNG via `resvg`/`layout-rs`, experimental), `graphviz` (calls the `dot` executable, implies `render`). Text `dot` output is always available.
 
 ## Conventions
 
@@ -49,5 +49,4 @@ Features: `default = ["hoa", "random", "render"]`, plus `graphviz`.
 
 - `Automaton` has seven generic parameters; type errors can be long.
 - Features must stay independent: code using an optional dependency needs the matching `#[cfg(feature = "...")]` (`scripts/check` builds with `--no-default-features` too).
-- Heavy rendering dependencies are in `default` features.
 - ~320 `unwrap`/`expect` and ~65 `panic!` calls in library code; many `#[allow(missing_docs)]`.

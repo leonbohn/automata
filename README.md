@@ -177,9 +177,11 @@ The following features are offered.
 | feature name | default value | description |
 | ------- | ------- | ------- | 
 | `hoa` | `true` | enables input and output of HOA files, using the [hoars](https://github.com/leonbohn/hoars) library |
-| `random` | `true` | allows constructing random transition systems with a certain edge probability. |
-| `render` | `true` | Moreover, it allows generating SVG representation of the graph without external dependencies. | 
-| `graphviz` | `false` | through which DOT representation of transition systems/automata can be generated and visualised |
+| `random` | `false` | allows constructing random transition systems with a certain edge probability. |
+| `render` | `false` | allows rendering transition systems/automata to SVG/PNG without external tools (pulls in `resvg`, `usvg` and `layout-rs`; still experimental) |
+| `graphviz` | `false` | renders and displays automata by calling an installed [graphviz](https://graphviz.org/) `dot` executable (implies `render`) |
+
+The textual DOT output is always available and does not need any feature.
 
 ## Development
 Any and every help is always welcome.
