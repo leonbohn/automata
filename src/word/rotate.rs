@@ -1,6 +1,6 @@
 use std::ops::Rem;
 
-use crate::core::alphabet::Symbol;
+use crate::alphabet::Symbol;
 
 use super::{FiniteWord, OmegaWord, PeriodicOmegaWord, Word};
 

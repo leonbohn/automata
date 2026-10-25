@@ -5,8 +5,8 @@ use std::fmt::{Debug, Display};
 use thiserror::Error;
 
 use crate::automaton::{DFA, IntoDPA, IntoMealyMachine, IntoMooreMachine};
-use crate::core::{Color, Int, Show, alphabet::Alphabet};
 use crate::ts::{Deterministic, IsEdge, StateColor, StateIndex};
+use crate::{Color, Int, Show, alphabet::Alphabet};
 use crate::{Pointed, TransitionSystem};
 use itertools::Itertools;
 
@@ -533,7 +533,7 @@ mod tests {
     #[cfg(feature = "render")]
     use crate::DTS;
     #[cfg(feature = "render")]
-    use crate::core::Void;
+    use crate::Void;
     use crate::ts::TSBuilder;
 
     #[test_log::test]

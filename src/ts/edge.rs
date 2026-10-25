@@ -1,4 +1,4 @@
-use crate::core::Void;
+use crate::Void;
 use crate::ts::IndexType;
 use std::fmt::Debug;
 

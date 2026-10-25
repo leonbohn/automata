@@ -1,9 +1,9 @@
 use super::{FiniteWordAutomaton, MealyLike, Semantics, moore::MooreLike};
 use crate::DTS;
-use crate::core::alphabet::CharAlphabet;
-use crate::core::{Int, Void};
+use crate::alphabet::CharAlphabet;
 use crate::ts::run::Observer;
 use crate::ts::{EdgeColor, StateColor, run};
+use crate::{Int, Void};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WeakPriorityMappingSemantics<const ON_EDGES: bool>;

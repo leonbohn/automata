@@ -1,4 +1,4 @@
-use crate::core::{
+use crate::{
     Int, Void,
     alphabet::{Alphabet, CharAlphabet},
     math::Map,
@@ -94,7 +94,7 @@ impl<A: Alphabet, X> Family<RightCongruence<A>, X> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::alphabet::CharAlphabet;
+    use crate::alphabet::CharAlphabet;
     #[test]
     fn family_interaction() {
         let mut fam = Family::trivial(CharAlphabet::of_size(2), 1337);

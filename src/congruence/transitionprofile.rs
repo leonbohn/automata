@@ -1,9 +1,9 @@
 #![allow(missing_docs)]
 use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
-use crate::core::{Show, Void, alphabet::Alphabet, word::FiniteWord};
 use crate::ts::{Deterministic, EdgeColor, IndexType, IsEdge, StateColor, SymbolOf};
 use crate::{Pointed, TransitionSystem};
+use crate::{Show, Void, alphabet::Alphabet, word::FiniteWord};
 use itertools::Itertools;
 
 /// Represents the monoid of transition profiles of a transition system.
@@ -11,7 +11,7 @@ use itertools::Itertools;
 /// # Examples
 /// ```
 /// use automata::{
-///     core::Void,
+///     Void,
 ///     congruence::{RunProfile, TransitionMonoid},
 ///     ts::TSBuilder,
 /// };

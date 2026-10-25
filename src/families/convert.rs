@@ -2,9 +2,10 @@ use itertools::Itertools;
 use tracing::{trace, warn};
 
 use crate::{
-    TransitionSystem,
-    core::{Show, alphabet::Alphabet, math},
+    Show, TransitionSystem,
+    alphabet::Alphabet,
     families::{FDFA, FWPM},
+    math,
     representation::CollectTs,
     ts::Deterministic,
 };
@@ -163,8 +164,8 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
 
 #[cfg(test)]
 mod tests {
+    use crate::alphabet::CharAlphabet;
     use crate::automaton::DFA;
-    use crate::core::alphabet::CharAlphabet;
     use crate::ts::TSBuilder;
     use crate::{
         TransitionSystem,

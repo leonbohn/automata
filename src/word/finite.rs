@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use itertools::Itertools;
 
-use crate::core::{alphabet::Symbol, show::Show};
+use crate::{alphabet::Symbol, show::Show};
 
 use super::{Concat, PeriodicOmegaWord, Repeat, Word, omega::OmegaIteration};
 
@@ -111,7 +111,7 @@ pub trait FiniteWord: Word {
     ///
     /// # Example
     /// ```
-    /// use automata::core::word::FiniteWord;
+    /// use automata::word::FiniteWord;
     ///
     /// let word = "abc";
     ///

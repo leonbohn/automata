@@ -1,13 +1,13 @@
 use std::{cell::RefCell, fmt::Debug};
 
-use crate::core::{
-    alphabet::{Alphabet, Matcher},
-    math,
-    math::OrderedSet,
-};
 use crate::ts::{
     Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, IsEdge, Pointed, StateIndex,
     SymbolOf, TransitionSystem, edge::TransitionOwnedColor,
+};
+use crate::{
+    alphabet::{Alphabet, Matcher},
+    math,
+    math::OrderedSet,
 };
 use itertools::Itertools;
 

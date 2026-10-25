@@ -56,7 +56,7 @@ impl<W: OmegaWord> OmegaWord for Skip<'_, W> {
     where
         Self: 'this;
 
-    fn reduced(&self) -> crate::core::word::ReducedOmegaWord<W::Symbol> {
+    fn reduced(&self) -> crate::word::ReducedOmegaWord<W::Symbol> {
         if self.offset >= self.sequence.spoke_len() {
             let mut period = self.sequence.cycle_vec();
             period
@@ -160,7 +160,7 @@ mod tests {
 
     use itertools::Itertools;
 
-    use crate::core::{
+    use crate::{
         upw,
         word::{FiniteWord, OmegaWord, ReducedOmegaWord, Word},
     };

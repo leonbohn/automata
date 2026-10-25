@@ -1,4 +1,4 @@
-use crate::core::{Color, Void, alphabet::CharAlphabet, math};
+use crate::{Color, Void, alphabet::CharAlphabet, math};
 
 use crate::automaton::{InfiniteWordAutomaton, Semantics};
 use crate::ts::{Deterministic, EdgeColor, StateColor, run};
@@ -73,7 +73,6 @@ impl<T: Deterministic> Semantics<T, true> for MullerCondition<EdgeColor<T>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::upw;
     use crate::ts::TSBuilder;
 
     #[test]

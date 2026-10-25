@@ -1,4 +1,4 @@
-use crate::core::alphabet::Matcher;
+use crate::alphabet::Matcher;
 use crate::{Pointed, TransitionSystem};
 
 use super::{EdgeExpression, EdgeTuple, StateColor, StateIndex};
@@ -11,7 +11,7 @@ pub trait Shrinkable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::alphabet::CharAlphabet,
+    ///     alphabet::CharAlphabet,
     ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
     ///     DTS,
     /// };
@@ -32,7 +32,7 @@ pub trait Shrinkable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::alphabet::CharAlphabet,
+    ///     alphabet::CharAlphabet,
     ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
     ///     DTS,
     /// };
@@ -58,7 +58,7 @@ pub trait Shrinkable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::alphabet::CharAlphabet,
+    ///     alphabet::CharAlphabet,
     ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
     ///     DTS,
     /// };
@@ -94,7 +94,7 @@ pub trait Shrinkable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::alphabet::CharAlphabet,
+    ///     alphabet::CharAlphabet,
     ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
     ///     DTS,
     /// };
@@ -124,7 +124,7 @@ pub trait Shrinkable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::alphabet::CharAlphabet,
+    ///     alphabet::CharAlphabet,
     ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
     ///     DTS,
     /// };
@@ -151,7 +151,7 @@ pub trait Shrinkable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::alphabet::CharAlphabet,
+    ///     alphabet::CharAlphabet,
     ///     ts::{ForAlphabet, Shrinkable, Sproutable},
     ///     DTS,
     /// };
@@ -176,7 +176,7 @@ pub trait Shrinkable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::alphabet::CharAlphabet,
+    ///     alphabet::CharAlphabet,
     ///     ts::{ForAlphabet, Shrinkable, Sproutable},
     ///     DTS,
     /// };
@@ -219,8 +219,8 @@ pub trait Shrinkable: TransitionSystem {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::Void;
-    use crate::core::alphabet::CharAlphabet;
+    use crate::Void;
+    use crate::alphabet::CharAlphabet;
     use crate::representation::CollectTs;
     use crate::ts::{ForAlphabet, Shrinkable, Sproutable};
     use crate::{DTS, TransitionSystem};

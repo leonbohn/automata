@@ -14,12 +14,12 @@ pub use linked_state::{
 
 mod linked_edge;
 use crate::TransitionSystem;
-use crate::core::{
+use crate::ts::predecessors::PredecessorIterable;
+use crate::{
     Color, Show, Void,
     alphabet::{Alphabet, CharAlphabet, Expression, Matcher},
     math,
 };
-use crate::ts::predecessors::PredecessorIterable;
 pub use linked_edge::LinkedListTransitionSystemEdge;
 use tracing::{trace, warn};
 
@@ -646,7 +646,7 @@ impl<Q, C, const DET: bool> LinkedListTransitionSystem<CharAlphabet, Q, C, DET> 
     ///
     /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
     /// ```
-    /// use automata::{core::Void, ts::TSBuilder};
+    /// use automata::{Void, ts::TSBuilder};
     ///
     /// let ts = TSBuilder::default()
     ///     .with_state_colors([true, false]) // colors given in the order of the states
@@ -857,7 +857,7 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
 
 #[cfg(test)]
 mod tests {
-    use crate::core::alphabet::CharAlphabet;
+    use crate::alphabet::CharAlphabet;
     use crate::ts::{Deterministic, ForAlphabet, Sproutable, TSBuilder};
     use crate::{TransitionSystem, ts::LinkedListDeterministic};
 

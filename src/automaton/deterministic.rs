@@ -1,4 +1,4 @@
-use crate::core::{Color, alphabet::Alphabet, word::FiniteWord};
+use crate::{Color, alphabet::Alphabet, word::FiniteWord};
 
 use crate::Pointed;
 use crate::automaton::Automaton;

@@ -1,13 +1,13 @@
 use std::{cell::OnceCell, collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use crate::congruence::MinimalRepresentative;
-use crate::core::{
+use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateIndex, SymbolOf};
+use crate::{Pointed, TransitionSystem};
+use crate::{
     alphabet::Expression,
     math,
     math::{OrderedSet, Set},
 };
-use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateIndex, SymbolOf};
-use crate::{Pointed, TransitionSystem};
 use itertools::Itertools;
 
 type InteriorEdgeSet<Ts> = Set<(
@@ -426,7 +426,7 @@ impl<Ts: TransitionSystem> Debug for Scc<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::math::Set;
+    use crate::math::Set;
     use crate::{DTS, TransitionSystem};
 
     #[test]

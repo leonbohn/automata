@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use tracing::trace;
 
-use crate::core::{
+use crate::{
     Color, Show, Void,
     alphabet::{Alphabet, Expression, Matcher},
     math::Partition,
@@ -62,7 +62,7 @@ pub use word_as_ts::WordTs;
 /// Encapsulates the transition function δ of a (finite) transition system. This is the main trait that
 /// is used to query a transition system. Transitions are labeled with a [`Alphabet::Expression`], which
 /// determines on which [`Alphabet::Symbol`]s the transition can be taken. Additionally, every transition
-/// is labeled with a [`crate::core::Color`], which can be used to store additional information about it, like an
+/// is labeled with a [`crate::Color`], which can be used to store additional information about it, like an
 /// associated priority.
 ///
 /// # The difference between transitions and edges
@@ -779,9 +779,9 @@ where
     }
 }
 
-/// Helper trait for extracting the [`crate::core::alphabet::Symbol`] type from an a transition system.
+/// Helper trait for extracting the [`crate::alphabet::Symbol`] type from an a transition system.
 pub type SymbolOf<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Symbol;
-/// Helper trait for extracting the [`crate::core::alphabet::Expression`] type from an a transition system.
+/// Helper trait for extracting the [`crate::alphabet::Expression`] type from an a transition system.
 pub type EdgeExpression<A> = <<A as TransitionSystem>::Alphabet as Alphabet>::Expression;
 /// Type alias for extracting the state color in a [`TransitionSystem`].
 pub type StateColor<X> = <X as TransitionSystem>::StateColor;

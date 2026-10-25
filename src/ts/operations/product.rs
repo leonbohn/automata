@@ -1,7 +1,7 @@
-use crate::core::{Show, alphabet::Alphabet};
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{EdgeExpression, IndexType, IsEdge, StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
+use crate::{Show, alphabet::Alphabet};
 use itertools::Itertools;
 
 /// Trait that abstracts the product operation for transition systems.
@@ -419,8 +419,8 @@ impl<'a, L: PredecessorIterable, R: PredecessorIterable> ProductEdgesTo<'a, L, R
 #[cfg(test)]
 mod tests {
     use crate::DTS;
+    use crate::Void;
     use crate::automaton::MealyMachine;
-    use crate::core::Void;
     use crate::ts::Deterministic;
     use crate::ts::operations::Product;
 

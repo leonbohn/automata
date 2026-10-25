@@ -1,6 +1,6 @@
+use crate::Color;
 use crate::TransitionSystem;
-use crate::core::Color;
-use crate::core::alphabet::Alphabet;
+use crate::alphabet::Alphabet;
 use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateIndex, SymbolOf, operations};
 
 /// Implementors of this trait are [`TransitionSystem`]s which allow iterating over the predecessors of a state.

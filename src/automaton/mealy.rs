@@ -3,12 +3,12 @@ use itertools::Itertools;
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use super::FiniteWordAutomaton;
-use crate::core::{
+use crate::ts::operations::{Product, ProductIndex};
+use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor, SymbolOf};
+use crate::{
     Color, Int, Lattice, Void,
     alphabet::{CharAlphabet, Expression},
 };
-use crate::ts::operations::{Product, ProductIndex};
-use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor, SymbolOf};
 use crate::{DTS, Pointed, TransitionSystem};
 
 /// Represents the semantics of a Mealy machine. Concretely, this type returns for
@@ -127,8 +127,8 @@ impl<Q> Default for MealySemantics<Q> {
 #[cfg(test)]
 mod tests {
     use crate::DTS;
+    use crate::Void;
     use crate::automaton::MealyMachine;
-    use crate::core::Void;
     use crate::representation::IntoTs;
     use crate::ts::TSBuilder;
 

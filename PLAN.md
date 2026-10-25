@@ -6,7 +6,7 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 
 ## Phase 1 follow-ups (finish the extraction)
 
-- [ ] Flatten `src/core/` into top-level modules (`automata::alphabet`, `automata::word`, `automata::math`, ...), dropping the `core` indirection. Keep `Color`, `Lattice`, `Void`, `Show` at sensible paths. This is a breaking path change; do it before 0.1.0 is released.
+- [x] Flattened `src/core/` into top-level modules (`automata::alphabet`, `automata::word`, `automata::math`, `automata::dag`) with `Color`, `Lattice`, `Void`, `Int`, `Show` re-exported at the crate root (issue #9). `automata-learning` needs matching path updates.
 - [x] `hoars` 0.3.0 is released (own repo `leonbohn/hoars`); this crate depends on it from crates.io. `biodivine-lib-bdd` is on 0.6 to match (its `Bdd` type is shared via `hoars`), plus `itertools` 0.15 and `resvg`/`usvg` 0.49.
 - [ ] Remaining dependency upgrades: `rand` 0.8 to 0.10 (and `rand_distr` accordingly) and `tabled` 0.16 to 0.22; both need API migrations.
 - [x] Fixed `--no-default-features` (ungated `hoars` impl in `acceptance_mask.rs`, unused imports in `dot.rs`); all feature combinations build, pass clippy and tests. `scripts/check` and CI now cover it. Still to do: a full feature matrix (`cargo hack --each-feature`) in CI.
@@ -57,7 +57,7 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 
 ## Phase 6: release
 
-- [ ] Publish `automata 0.1.0` (after `hoars` is released and the `core` module is flattened); set up release-plz or cargo-release; announce.
+- [ ] Publish `automata 0.1.0` (after the remaining items of issue #15); set up release-plz or cargo-release; announce.
 
 ## Known issues parked for later
 

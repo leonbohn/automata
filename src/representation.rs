@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use crate::core::{Color, Int, Void, math};
+use crate::{Color, Int, Void, math};
 
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
 use crate::ts::{
@@ -283,8 +283,8 @@ pub trait IntoTs: TransitionSystem {
 
 mod impl_into_ts {
     use super::*;
+    use crate::alphabet::Alphabet;
     use crate::automaton::Automaton;
-    use crate::core::alphabet::Alphabet;
     use crate::ts::operations::MapStateColor;
     use crate::ts::{EdgeColor, EdgeExpression, StateColor, StateIndex, SymbolOf, operations};
     use crate::{DTS, TransitionSystem};

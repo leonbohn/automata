@@ -1,4 +1,4 @@
-use crate::core::{
+use crate::{
     Show,
     alphabet::Symbol,
     word::{FiniteWord, Word},

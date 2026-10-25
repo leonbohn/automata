@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use crate::core::alphabet::Symbol;
+use crate::alphabet::Symbol;
 
 mod skip;
 pub use skip::Skip;
@@ -49,7 +49,7 @@ pub trait Word: Hash + Eq {
     ///
     /// # Example
     /// ```
-    /// use automata::core::word::{Word, FiniteWord};
+    /// use automata::word::{Word, FiniteWord};
     /// let word = "abcde".to_string();
     /// assert_eq!(word.infix(1, 3).as_string(), "bcd");
     /// ```
@@ -77,7 +77,7 @@ pub trait Word: Hash + Eq {
         (first, self.skip(1))
     }
 
-    /// Creates an [`crate::core::word::Skip`] object, which is the suffix of `self` that starts at the given `offset`.
+    /// Creates an [`crate::word::Skip`] object, which is the suffix of `self` that starts at the given `offset`.
     fn skip(&self, offset: usize) -> skip::Skip<'_, Self>
     where
         Self: Sized,
@@ -143,7 +143,7 @@ impl<'a, W: Word> ConsumingInfixIterator<'a, W> {
 ///
 /// # Example:
 /// ```
-/// use automata::core::{upw, word::{FiniteWord, OmegaWord}};
+/// use automata::{upw, word::{FiniteWord, OmegaWord}};
 ///
 /// let ultimately_periodic = upw!("ab", "bb"); // represents the ultimately periodic word `ab(bb)^𝜔`
 /// assert!(ultimately_periodic.spoke().finite_word_equals("a")); // the spoke is normalized to just `a`
@@ -156,16 +156,16 @@ impl<'a, W: Word> ConsumingInfixIterator<'a, W> {
 #[macro_export]
 macro_rules! upw {
     ($recur:expr) => {
-        $crate::core::word::ReducedOmegaWord::periodic($recur)
+        $crate::word::ReducedOmegaWord::periodic($recur)
     };
     ($base:expr, $recur:expr) => {
-        $crate::core::word::ReducedOmegaWord::ultimately_periodic($base, $recur)
+        $crate::word::ReducedOmegaWord::ultimately_periodic($base, $recur)
     };
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::core::word::{FiniteWord, Word};
+    use crate::word::{FiniteWord, Word};
 
     #[test]
     fn macro_upw() {

@@ -1,9 +1,9 @@
+use crate::Void;
+use crate::alphabet::CharAlphabet;
 use crate::automaton::Semantics;
-use crate::core::Void;
-use crate::core::alphabet::CharAlphabet;
-use crate::core::word::ReducedOmegaWord;
 use crate::representation::{CollectTs, IntoTs};
 use crate::ts::{Deterministic, StateColor, SymbolOf};
+use crate::word::ReducedOmegaWord;
 use crate::{DTS, TransitionSystem, automaton::InfiniteWordAutomaton, ts::run};
 
 /// Defines the [`Semantics`] of a deterministic Büchi automaton (DBA),

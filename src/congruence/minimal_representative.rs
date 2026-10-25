@@ -1,11 +1,11 @@
 use std::{cell::OnceCell, hash::Hash};
 
-use crate::core::{
+use crate::ts::{StateIndex, SymbolOf};
+use crate::{Pointed, TransitionSystem};
+use crate::{
     Show, math,
     word::{FiniteWord, Word},
 };
-use crate::ts::{StateIndex, SymbolOf};
-use crate::{Pointed, TransitionSystem};
 use bimap::BiBTreeMap;
 use itertools::Itertools;
 

@@ -2,8 +2,8 @@ use std::hash::Hash;
 
 use super::{DefaultIdType, ForAlphabet, IntoEdgeTuple, Sproutable};
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine, WithInitial};
-use crate::core::{Color, Int, Void, alphabet::CharAlphabet, math::OrderedSet};
 use crate::representation::IntoTs;
+use crate::{Color, Int, Void, alphabet::CharAlphabet, math::OrderedSet};
 use crate::{DTS, NTS, RightCongruence, TS, TransitionSystem};
 use itertools::Itertools;
 
@@ -20,7 +20,7 @@ use itertools::Itertools;
 ///
 /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
 /// ```
-/// use automata::{core::Void, ts::TSBuilder};
+/// use automata::{Void, ts::TSBuilder};
 ///
 /// let _ts = TSBuilder::default()
 ///     .with_state_colors([true, false]) // colors given in the order of the states
@@ -181,7 +181,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     ///
     /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
     /// ```
-    /// use automata::{core::Void, ts::TSBuilder};
+    /// use automata::{Void, ts::TSBuilder};
     ///
     /// let ts = TSBuilder::default()
     ///     .with_state_colors([true, false]) // colors given in the order of the states
@@ -203,7 +203,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     /// Adds a list of edges to `self`. The edges are added in the order in which they are given.
     /// The edges can be passed in as anything that is iterable. An easy way is to pass in an array of tuples.
     /// Note, that in comparison to [`Self::with_transitions`], this method adds **edges** and so the individual
-    /// elements that are added must store/provide [`crate::core::alphabet::Expression`]s instead of [`crate::core::alphabet::Symbol`]s.
+    /// elements that are added must store/provide [`crate::alphabet::Expression`]s instead of [`crate::alphabet::Symbol`]s.
     ///
     /// This method accepts any iterable yielding objects that implement [`IntoEdgeTuple`] for the stored color `C`.
     /// If the desired edge color is [`Void`], then we may simply omit it from the tuples. The only restriction
@@ -219,7 +219,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     ///
     /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
     /// ```
-    /// use automata::{core::Void, ts::TSBuilder};
+    /// use automata::{Void, ts::TSBuilder};
     ///
     /// let ts = TSBuilder::default()
     ///     .with_state_colors([true, false]) // colors given in the order of the states

@@ -48,7 +48,7 @@ This is indicated by a type if it implements the `Deterministic` trait and sice 
 This allows us to perform additional operations
 
 ```rust
-use automata::{core::math, ts::{TSBuilder, TransitionSystem}};
+use automata::{math, ts::{TSBuilder, TransitionSystem}};
 
 let aut = TSBuilder::without_edge_colors()
     .with_state_colors([true, false, true, false])
@@ -129,7 +129,7 @@ A DPA, for example, accepts a word if the least edge color that is seen infinite
 Since DPA have nice algorithmic properties and [are able to capture](https://en.wikipedia.org/wiki/%CE%A9-automaton#Expressive_power_of_%CF%89-automata) the full class of $\omega$-regular languages, this library gears mostly towards them.
 
 ```rust
-use automata::{core::upw, ts::TSBuilder};
+use automata::{upw, ts::TSBuilder};
 
 let dpa = TSBuilder::without_state_colors()
     .with_transitions([

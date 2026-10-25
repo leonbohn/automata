@@ -6,21 +6,45 @@
 pub mod error;
 pub use error::Error;
 
-/// Foundations shared by the rest of the crate: alphabets, words, colors and basic math types.
-pub mod core;
+/// An alphabet defines a collection of possible symbols. This
+/// module implements simple alphabets which consist of just a
+/// collection of symbols, and propositional alphabets where each
+/// symbol is represented by a boolean expression over some
+/// set of base atomic propositions.
+#[macro_use]
+pub mod alphabet;
+
+/// A word is a sequence of symbols from some alphabet. Herein,
+/// different types of words are defined, specifically finite ones
+/// and different reprsentations of infinite ones.
+/// Moreover, some constructions of manipulating words, taking suffixes,
+/// infixes and such are given.
+/// Finally, the module also implements normalization for words.
+#[macro_use]
+pub mod word;
+
+/// Defines some mathematical objects that are used such as bijections,
+/// sets and mappings.
+pub mod math;
+
+/// Defines a representation of directed, acyclic graphs. These are for example
+/// used for the representation of the strongly connected components of a transition system.
+pub mod dag;
+
+mod color;
+pub use color::{Color, Int, Lattice, Void};
+
+mod show;
+pub use show::Show;
 
 /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
-pub type TS<
-    A = core::alphabet::CharAlphabet,
-    Q = core::Void,
-    C = core::Void,
-    const DET: bool = true,
-> = ts::LinkedListTransitionSystem<A, Q, C, DET>;
+pub type TS<A = alphabet::CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
+    ts::LinkedListTransitionSystem<A, Q, C, DET>;
 /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
-pub type DTS<A = core::alphabet::CharAlphabet, Q = core::Void, C = core::Void> = TS<A, Q, C, true>;
+pub type DTS<A = alphabet::CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, true>;
 /// Points to the default implementation of [`TransitionSystem`] in the case where it is
 /// **now known to be** [`Deterministic`].
-pub type NTS<A = core::alphabet::CharAlphabet, Q = core::Void, C = core::Void> = TS<A, Q, C, false>;
+pub type NTS<A = alphabet::CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, false>;
 
 /// implements the interface to the `hoars` package. Is only available on create feature `hoa`.
 #[cfg(feature = "hoa")]
@@ -59,7 +83,7 @@ pub mod dot;
 
 #[cfg(test)]
 mod tests {
-    pub fn wiki_dfa() -> crate::automaton::DFA<crate::core::alphabet::CharAlphabet> {
+    pub fn wiki_dfa() -> crate::automaton::DFA<crate::alphabet::CharAlphabet> {
         use crate::ts::TSBuilder;
 
         TSBuilder::without_edge_colors()

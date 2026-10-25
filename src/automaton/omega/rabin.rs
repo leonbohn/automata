@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 
 use crate::automaton::{InfiniteWordAutomaton, Semantics};
-use crate::core::{Color, Void, alphabet::CharAlphabet, math::OrderedSet};
 use crate::ts::run::Observer;
 use crate::ts::{Deterministic, EdgeColor, StateColor, run};
+use crate::{Color, Void, alphabet::CharAlphabet, math::OrderedSet};
 use crate::{DTS, TransitionSystem};
 
 /// A deterministic Rabin automaton (DRA) uses a [`RabinCondition`] to determine acceptance.
@@ -93,7 +93,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::upw;
     use crate::ts::TSBuilder;
 
     #[test]

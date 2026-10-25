@@ -15,13 +15,13 @@ use super::run::StateColorSet;
 use super::run::StateSequence;
 use super::run::StateSet;
 use crate::congruence::MinimalRepresentative;
-use crate::core::{
+use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateColor, StateIndex, SymbolOf, run};
+use crate::{
     Color,
     alphabet::{Alphabet, Expression, Matcher, SimpleAlphabet},
     word,
     word::{FiniteWord, OmegaWord},
 };
-use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateColor, StateIndex, SymbolOf, run};
 use crate::{Pointed, TransitionSystem};
 use itertools::Itertools;
 
@@ -37,7 +37,7 @@ pub trait Deterministic: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::Void,
+    ///     Void,
     ///     ts::{Deterministic, IsEdge, TSBuilder},
     /// };
     ///
@@ -118,7 +118,7 @@ pub trait Deterministic: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::Void,
+    ///     Void,
     ///     ts::{Deterministic, IsEdge, TSBuilder},
     /// };
     ///
@@ -670,7 +670,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::DTS;
-    use crate::core::{Void, upw};
+    use crate::Void;
     use crate::ts::Deterministic;
 
     #[test]

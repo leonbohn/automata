@@ -8,9 +8,9 @@
 use std::{collections::BTreeSet, time::Instant};
 
 use crate::automaton::{MealyMachine, MooreMachine};
-use crate::core::{Color, math, math::Partition};
 use crate::representation::{CollectTs, IntoTs};
 use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor};
+use crate::{Color, math, math::Partition};
 use crate::{Congruence, TransitionSystem};
 use itertools::Itertools;
 use tracing::{debug, trace};

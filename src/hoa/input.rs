@@ -3,11 +3,11 @@ use std::{io::BufRead, ops::Deref};
 use crate::automaton::{
     AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
 };
-use crate::core::{
+use crate::ts::{ForAlphabet, Sproutable, TransitionSystem};
+use crate::{
     Int,
     alphabet::{PropAlphabet, PropExpression},
 };
-use crate::ts::{ForAlphabet, Sproutable, TransitionSystem};
 use hoars::HoaRepresentation;
 use tracing::{trace, warn};
 

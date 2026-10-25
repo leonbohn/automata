@@ -2,14 +2,14 @@ use std::collections::{BTreeSet, VecDeque};
 
 use super::SccDecomposition;
 use crate::TransitionSystem;
-use crate::core::{
+use crate::ts::connected_components::Scc;
+use crate::ts::predecessors::PredecessorIterable;
+use crate::ts::{IndexType, IsEdge, StateIndex};
+use crate::{
     alphabet::Expression,
     math,
     math::{OrderedMap, OrderedSet},
 };
-use crate::ts::connected_components::Scc;
-use crate::ts::predecessors::PredecessorIterable;
-use crate::ts::{IndexType, IsEdge, StateIndex};
 use itertools::Itertools;
 
 #[derive(Debug, Clone)]
@@ -330,7 +330,7 @@ mod tests {
 
     use super::tarjan_scc_iterative;
     use crate::Pointed;
-    use crate::core::Void;
+    use crate::Void;
     use crate::ts::{TSBuilder, TransitionSystem};
     use crate::ts::{
         connected_components::{kosaraju, tarjan_scc_recursive},

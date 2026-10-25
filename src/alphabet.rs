@@ -6,7 +6,7 @@ pub use simple::*;
 mod propositional;
 pub use propositional::*;
 
-use crate::core::show::Show;
+use crate::show::Show;
 
 /// A symbol of an alphabet, which is also the type of the symbols in a word. We consider different types
 /// of alphabets:
@@ -71,7 +71,7 @@ pub trait Alphabet: Clone + Debug {
     fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression;
 
     /// Returns a map from each symbol in the alphabet to the corresponding expression.
-    fn expression_map(&self) -> crate::core::math::OrderedMap<Self::Symbol, Self::Expression> {
+    fn expression_map(&self) -> crate::math::OrderedMap<Self::Symbol, Self::Expression> {
         self.universe()
             .map(|sym| (sym, self.make_expression(sym)))
             .collect()
@@ -87,10 +87,10 @@ pub trait Alphabet: Clone + Debug {
 
     /// This method is used for an optimization: If we have a [`CharAlphabet`] alphabet, then an edge list essentially
     /// boils down to a map from `Self::Symbol` to an edge. For more complicated alphabets, this may not always
-    /// be so easy. To allow for an optimization (i.e. just lookup the corresponding edge in a [`crate::core::math::Map`]),
+    /// be so easy. To allow for an optimization (i.e. just lookup the corresponding edge in a [`crate::math::Map`]),
     /// we force alphabets to implement this method.
     fn search_edge<X>(
-        map: &crate::core::math::OrderedMap<Self::Expression, X>,
+        map: &crate::math::OrderedMap<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.iter().find_map(|(e, x)| {
@@ -138,7 +138,7 @@ impl<A: Alphabet> Alphabet for &A {
         A::make_expression(self, symbol)
     }
     fn search_edge<X>(
-        map: &crate::core::math::OrderedMap<Self::Expression, X>,
+        map: &crate::math::OrderedMap<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         A::search_edge(map, sym)
@@ -211,7 +211,7 @@ impl<S> FreeMonoid<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::alphabet::FreeMonoid;
+    use crate::alphabet::FreeMonoid;
 
     #[test]
     fn kleene_star() {

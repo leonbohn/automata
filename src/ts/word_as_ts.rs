@@ -1,4 +1,4 @@
-use crate::core::{
+use crate::{
     alphabet::SimpleAlphabet,
     word::{FiniteWord, OmegaWord, Word},
 };
@@ -219,7 +219,7 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for W
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::alphabet::CharAlphabet;
+    use crate::alphabet::CharAlphabet;
     #[test]
     fn word_as_ts() {
         let w = WordTs::new(CharAlphabet::of_size(2), "abba");

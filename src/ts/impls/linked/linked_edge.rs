@@ -1,6 +1,6 @@
 use super::LinkedListTransitionSystem;
-use crate::core::{Color, Void, alphabet::Alphabet};
 use crate::ts::{DefaultIdType, IntoEdgeTuple, IsEdge, ScalarIndexType};
+use crate::{Color, Void, alphabet::Alphabet};
 use std::fmt::Debug;
 
 /// Represents an edge in a non-deterministic transition system, see [`crate::NTS`]. It stores a color, an

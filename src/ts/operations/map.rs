@@ -1,4 +1,4 @@
-use crate::core::Color;
+use crate::Color;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{EdgeExpression, IndexType, IsEdge, StateIndex};
 use crate::{Pointed, TransitionSystem};

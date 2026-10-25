@@ -1,14 +1,14 @@
 use super::{FiniteWordAutomaton, Semantics, StatesWithColor};
-use crate::core::alphabet::CharAlphabet;
-use crate::core::{Void, math};
+use crate::alphabet::CharAlphabet;
 use crate::representation::CollectTs;
 use crate::ts::operations::{DefaultIfMissing, Product, ProductIndex};
 use crate::ts::run::ReachedStateColor;
 use crate::ts::{Deterministic, EdgeColor, StateIndex, SymbolOf, operations};
 use crate::{Congruence, DTS, Pointed, TransitionSystem};
+use crate::{Void, math};
 
 /// Defines the [`Semantics`] that are used by a deterministic finite automaton
-/// [`DFA`]. This leads to a [`crate::core::word::FiniteWord`] being accepted if the state that it reaches
+/// [`DFA`]. This leads to a [`crate::word::FiniteWord`] being accepted if the state that it reaches
 /// is colored with `true`, and the word being rejected otherwise.
 #[derive(Clone, Copy, Default, Hash, Eq, PartialEq)]
 pub struct ReachabilityCondition;

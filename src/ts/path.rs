@@ -1,6 +1,6 @@
 use crate::TransitionSystem;
-use crate::core::{Show, alphabet::Alphabet};
 use crate::ts::{Deterministic, Edge, IndexType, IsEdge, SymbolOf};
+use crate::{Show, alphabet::Alphabet};
 use itertools::{Either, Itertools};
 
 /// Represents a path through a transition system. Note, that the path itself is decoupled from the
@@ -349,7 +349,7 @@ impl<A: Alphabet, Idx: IndexType, Q: Show, C: Show> Show for Lasso<A, Idx, Q, C>
 
 #[cfg(test)]
 mod tests {
-    use crate::core::alphabet::CharAlphabet;
+    use crate::alphabet::CharAlphabet;
 
     use crate::ts::{Edge, Path};
 

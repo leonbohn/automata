@@ -1,5 +1,5 @@
 mod acceptance_type;
-use crate::core::{
+use crate::{
     Color,
     alphabet::{Alphabet, CharAlphabet, Matcher},
     word::{FiniteWord, OmegaWord},
@@ -103,7 +103,7 @@ where
     /// ```
     /// use automata::{
     ///     automaton::{Automaton, DFA},
-    ///     core::alphabet::CharAlphabet,
+    ///     alphabet::CharAlphabet,
     ///     ts::{Sproutable, TransitionSystem},
     /// };
     ///
@@ -533,7 +533,7 @@ where
 mod tests {
     #[test]
     fn set_initial_color_on_automaton() {
-        use crate::core::alphabet::CharAlphabet;
+        use crate::alphabet::CharAlphabet;
         use crate::ts::Sproutable;
         use crate::{Pointed, TransitionSystem};
 
@@ -545,9 +545,8 @@ mod tests {
     }
 
     use crate::automaton::{DBA, DFA, MooreMachine};
-    use crate::core::upw;
-    use crate::core::word::ReducedOmegaWord;
     use crate::representation::CollectTs;
+    use crate::word::ReducedOmegaWord;
 
     #[test]
     fn mealy_color_or_below() {

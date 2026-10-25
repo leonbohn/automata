@@ -1,5 +1,5 @@
-use crate::core::{Color, math};
 use crate::ts::{Deterministic, StateIndex};
+use crate::{Color, math};
 use crate::{Pointed, TransitionSystem};
 use std::hash::Hash;
 

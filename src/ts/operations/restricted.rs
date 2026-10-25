@@ -1,5 +1,5 @@
-use crate::core::alphabet::Matcher;
-use crate::core::math::OrderedSet;
+use crate::alphabet::Matcher;
+use crate::math::OrderedSet;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{Deterministic, EdgeColor, EdgeExpression, IndexType, IsEdge, StateIndex};
 use crate::{Congruence, Pointed, TransitionSystem};
@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 
 /// Abstracts the filtering of a transition system's state indices. This trait is implemented by
 /// functions which take a state index and return a boolean value indicating whether the state index
-/// should be filtered out or not. It is also implemented by [`Vec`] and [`crate::core::math::Set`] which are used to
+/// should be filtered out or not. It is also implemented by [`Vec`] and [`crate::math::Set`] which are used to
 /// filter out state indices that are not contained in the vector or set.
 pub trait StateIndexFilter<Idx: IndexType> {
     /// This method is called to check whether an index should be present in a filtered transition

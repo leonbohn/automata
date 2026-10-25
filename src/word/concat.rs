@@ -65,7 +65,7 @@ impl<X: FiniteWord, Y: OmegaWord<Symbol = X::Symbol>> OmegaWord for Concat<X, Y>
 
 #[cfg(test)]
 mod tests {
-    use crate::core::word::FiniteWord;
+    use crate::word::FiniteWord;
 
     #[test]
     fn concatenations() {

@@ -16,7 +16,7 @@ use crate::ts::{Deterministic, EdgeColor, StateColor};
 /// semantics of finite and infinite word acceptors, respectively.
 ///
 /// # Finite inputs
-/// For a finite input such as a [`crate::core::word::FiniteWord`] we use [`Semantics`],
+/// For a finite input such as a [`crate::word::FiniteWord`] we use [`Semantics`],
 /// which defines an `Output` type and provides the [`Semantics::evaluate`] method.
 /// It takes the [`crate::ts::run::Run`] that is the result of running the finite
 /// input in some transition system and turns it into the desired output.
@@ -30,7 +30,7 @@ use crate::ts::{Deterministic, EdgeColor, StateColor};
 /// transition that is taken when reading `w`.
 ///
 /// # Infinite inputs
-/// For an infinite input like an [`crate::core::word::OmegaWord`], we also need to define an
+/// For an infinite input like an [`crate::word::OmegaWord`], we also need to define an
 /// `Output` type. This is now computed in the [`Semantics::evaluate`] method on
 /// the [`Semantics`] trait. It does this based on a [`crate::ts::run::Run`].
 ///

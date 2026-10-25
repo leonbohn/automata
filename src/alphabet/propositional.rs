@@ -13,7 +13,7 @@ use biodivine_lib_bdd::{
 use itertools::Itertools;
 use tracing::trace;
 
-use crate::core::{math::OrderedSet, show::Show};
+use crate::{math::OrderedSet, show::Show};
 
 use super::{Alphabet, CharAlphabet, Expression, Matcher};
 

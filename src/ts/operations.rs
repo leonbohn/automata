@@ -1,4 +1,4 @@
-use crate::core::Void;
+use crate::Void;
 
 mod map;
 pub use map::*;

@@ -1,33 +1,3 @@
-/// An alphabet defines a collection of possible symbols. This
-/// module implements simple alphabets which consist of just a
-/// collection of symbols, and propositional alphabets where each
-/// symbol is represented by a boolean expression over some
-/// set of base atomic propositions.
-#[macro_use]
-pub mod alphabet;
-
-/// A word is a sequence of symbols from some alphabet. Herein,
-/// different types of words are defined, specifically finite ones
-/// and different reprsentations of infinite ones.
-/// Moreover, some constructions of manipulating words, taking suffixes,
-/// infixes and such are given.
-/// Finally, the module also implements normalization for words.
-#[macro_use]
-pub mod word;
-
-/// Defines some mathematical objects that are used such as bijections,
-/// sets and mappings.
-pub mod math;
-
-mod show;
-pub use show::Show;
-
-pub use crate::upw;
-
-/// Defines a representation of directed, acyclic graphs. These are for example
-/// used for the representation of the strongly connected components of a transition system.
-pub mod dag;
-
 /// Alias for the default integer type that is used for coloring edges and states.
 pub type Int = u8;
 

@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use super::{LinkedListTransitionSystem, LinkedListTransitionSystemEdge};
-use crate::core::Color;
+use crate::Color;
 
 /// Stores information characterizing a state in a non-deterministic transition system, see [`crate::NTS`].
 /// It stores a color and a pointer to the index of the first edge leaving the state.
@@ -10,7 +10,7 @@ pub enum LinkedListTransitionSystemState<Q> {
     Occupied(Q, Option<usize>, Option<usize>),
     Vacant(Option<usize>, Option<usize>),
 }
-use crate::core::alphabet::Alphabet;
+use crate::alphabet::Alphabet;
 use LinkedListTransitionSystemState::*;
 use tracing::warn;
 

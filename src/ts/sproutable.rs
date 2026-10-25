@@ -1,5 +1,5 @@
-use crate::core::alphabet::{Alphabet, CharAlphabet};
-use crate::core::math::Bijection;
+use crate::alphabet::{Alphabet, CharAlphabet};
+use crate::math::Bijection;
 use crate::{Pointed, TransitionSystem};
 use bit_set::BitSet;
 use itertools::Itertools;
@@ -74,7 +74,7 @@ pub trait Sproutable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::{alphabet::CharAlphabet, Void},
+    ///     alphabet::CharAlphabet, Void,
     ///     ts::{Deterministic, ForAlphabet, TSBuilder, Shrinkable, Sproutable, TransitionSystem},
     ///     DTS,
     /// };
@@ -102,7 +102,7 @@ pub trait Sproutable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::alphabet::CharAlphabet,
+    ///     alphabet::CharAlphabet,
     ///     ts::{Deterministic, ForAlphabet, TSBuilder, Shrinkable, Sproutable, TransitionSystem},
     ///     DTS,
     /// };
@@ -133,7 +133,7 @@ pub trait Sproutable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::alphabet::CharAlphabet,
+    ///     alphabet::CharAlphabet,
     ///     ts::{Deterministic, ForAlphabet, TSBuilder, TransitionSystem, Shrinkable, Sproutable},
     ///     DTS,
     /// };
@@ -194,7 +194,7 @@ pub trait Sproutable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::alphabet::CharAlphabet,
+    ///     alphabet::CharAlphabet,
     ///     ts::{Deterministic, TransitionSystem, ForAlphabet, TSBuilder, Shrinkable, Sproutable},
     ///     DTS,
     /// };
@@ -231,7 +231,7 @@ pub trait Sproutable: TransitionSystem {
     /// a new state being created.
     /// ```
     /// use automata::{
-    ///     core::{alphabet::CharAlphabet, Void},
+    ///     alphabet::CharAlphabet, Void,
     ///     ts::{Deterministic, ForAlphabet, TSBuilder, Shrinkable, TransitionSystem, Sproutable},
     ///     DTS,
     /// };
@@ -251,7 +251,7 @@ pub trait Sproutable: TransitionSystem {
     /// original TS unchanged.
     /// ```
     /// use automata::{
-    ///     core::{alphabet::CharAlphabet, Void},
+    ///     alphabet::CharAlphabet, Void,
     ///     ts::{Deterministic, ForAlphabet, TSBuilder, TransitionSystem, Shrinkable, Sproutable},
     ///     DTS,
     /// };
@@ -305,7 +305,7 @@ pub trait Sproutable: TransitionSystem {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::{alphabet::CharAlphabet, Void},
+    ///     alphabet::CharAlphabet, Void,
     ///     ts::{Deterministic, TransitionSystem, ForAlphabet, TSBuilder, Shrinkable, Sproutable},
     ///     DTS,
     /// };
@@ -340,7 +340,7 @@ pub trait Sproutable: TransitionSystem {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::alphabet::{Alphabet, CharAlphabet};
+    use crate::alphabet::{Alphabet, CharAlphabet};
     use crate::ts::{Deterministic, ForAlphabet, Sproutable};
     use crate::{DTS, TransitionSystem};
 

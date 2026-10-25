@@ -1,5 +1,5 @@
 use crate::TransitionSystem;
-use crate::core::alphabet::{Alphabet, Expression};
+use crate::alphabet::{Alphabet, Expression};
 use crate::ts::{Deterministic, EdgeExpression, IsEdge, SymbolOf};
 
 /// Specialized version of an iterator over the edges leaving a specific state of a **deterministic**

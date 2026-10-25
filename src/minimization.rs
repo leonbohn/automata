@@ -1,9 +1,9 @@
 pub(crate) mod partition_refinement;
 
+use crate::Color;
 use crate::automaton::{
     DFA, IntoDFA, IntoMealyMachine, IntoMooreMachine, MealyMachine, MooreMachine,
 };
-use crate::core::Color;
 use crate::representation::IntoTs;
 use crate::ts::{Deterministic, EdgeColor, StateColor};
 

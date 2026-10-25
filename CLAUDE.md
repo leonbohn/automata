@@ -4,7 +4,7 @@ Guidance for working in this repository. See `PLAN.md` for the roadmap and known
 
 ## What this is
 
-`automata` is a single Rust crate for working with transition systems and automata over finite and infinite (omega) words. It was extracted, with history, from `leonbohn/frieda` (where it lived as `crates/automata` plus `crates/automata-core`). `automata-core` is now the `src/core/` module. Edition 2024, version 0.1.0.
+`automata` is a single Rust crate for working with transition systems and automata over finite and infinite (omega) words. It was extracted, with history, from `leonbohn/frieda` (where it lived as `crates/automata` plus `crates/automata-core`). The former `automata-core` crate was merged in as top-level modules (`alphabet`, `word`, `math`, `dag`, plus `Color`/`Lattice`/`Void`/`Int`/`Show` at the crate root). Edition 2024, version 0.1.0.
 
 Related crates that stay elsewhere: `hoars` (HOA parser, `leonbohn/hoars`, depended on from crates.io, currently 0.3) and `automata-learning` (learning algorithms, in `leonbohn/frieda`).
 
@@ -21,10 +21,10 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 
 ## Layout
 
-- `src/core/`: foundations (formerly the `automata-core` crate; transitional location, see `PLAN.md`).
-  - `alphabet`: `Symbol`, `Expression`/`Matcher`, `Alphabet`; `CharAlphabet`, `Fixed<S, N>`, `Directional`, and propositional (`PropAlphabet`, BDD-backed, used for HOA).
-  - `word`: `Word`, `FiniteWord`, `OmegaWord`; `PeriodicOmegaWord`, `ReducedOmegaWord`, `NormalizedOmegaWord`; adapters (`Concat`, `Repeat`, `Skip`, `Infix`, `Rotate`). The `upw!` macro is exported at the crate root and re-exported as `core::upw`.
-  - `math`, `dag`, `Color`, `Lattice`, `Void`, `Show`.
+- Foundations (formerly the `automata-core` crate):
+  - `src/alphabet.rs` (+ `alphabet/`): `Symbol`, `Expression`/`Matcher`, `Alphabet`; `CharAlphabet`, `Fixed<S, N>`, `Directional`, and propositional (`PropAlphabet`, BDD-backed, used for HOA).
+  - `src/word.rs` (+ `word/`): `Word`, `FiniteWord`, `OmegaWord`; `PeriodicOmegaWord`, `ReducedOmegaWord`, `NormalizedOmegaWord`; adapters (`Concat`, `Repeat`, `Skip`, `Infix`, `Rotate`). The `upw!` macro is exported at the crate root.
+  - `src/math.rs`, `src/dag.rs`, `src/color.rs` (`Int`, `Void`, `Color`, `Lattice`), `src/show.rs` (`Show`).
 - `src/ts.rs` and `src/ts/`: the `TransitionSystem` trait and everything around it.
   - `impls/`: `LinkedListTransitionSystem` (the only implementation; aliases `TS`, `DTS`, `NTS`).
   - `operations/`: lazy adapters (`map`, `product`, `quotient`, `restricted`, `reverse`, `subset`, `with_state_color`).
@@ -44,7 +44,6 @@ Features: `default = ["hoa", "random", "render"]`, plus `graphviz`.
 - Use `tracing` for logging in library code.
 - Do not panic in library code: return `Result` with the crate's `Error` enum (`src/error.rs`, `#[non_exhaustive]`); use `Error::NotYetImplemented` instead of `todo!()`/`unimplemented!()`. Existing panics are being removed (see `PLAN.md`).
 - Ask before committing or pushing.
-- Inside `src/core/`, refer to siblings with `crate::core::...`.
 
 ## Known sharp edges
 

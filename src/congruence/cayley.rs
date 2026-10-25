@@ -1,14 +1,14 @@
 #![allow(dead_code)]
 
-use crate::core::{
-    alphabet::{Alphabet, CharAlphabet, Directional, InvertibleChar},
-    math,
-};
 use crate::ts::{
     Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, EdgeReference, StateColor,
     StateIndex, SymbolOf,
 };
 use crate::{Pointed, TransitionSystem};
+use crate::{
+    alphabet::{Alphabet, CharAlphabet, Directional, InvertibleChar},
+    math,
+};
 
 use super::{Accumulates, RunProfile, TransitionMonoid};
 

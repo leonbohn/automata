@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 
 use itertools::Itertools;
 
-use crate::core::show::Show;
+use crate::show::Show;
 
 use super::{Alphabet, Expression, Matcher, Symbol};
 
@@ -125,7 +125,7 @@ impl Alphabet for CharAlphabet {
 
     #[inline(always)]
     fn search_edge<X>(
-        map: &crate::core::math::OrderedMap<Self::Expression, X>,
+        map: &crate::math::OrderedMap<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.get_key_value(&sym)
@@ -201,7 +201,7 @@ impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> Alphabet for Fi
     type Expression = S;
 
     fn search_edge<X>(
-        map: &crate::core::math::OrderedMap<Self::Expression, X>,
+        map: &crate::math::OrderedMap<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.get_key_value(&sym)
@@ -330,7 +330,7 @@ impl Alphabet for Directional {
     type Expression = InvertibleChar;
 
     fn search_edge<X>(
-        map: &crate::core::math::OrderedMap<Self::Expression, X>,
+        map: &crate::math::OrderedMap<Self::Expression, X>,
         sym: Self::Symbol,
     ) -> Option<(&Self::Expression, &X)> {
         map.get_key_value(&sym)

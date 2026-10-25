@@ -1,6 +1,6 @@
 mod class;
 
-use crate::core::{
+use crate::{
     Color, Void,
     alphabet::{Alphabet, CharAlphabet},
     math, word,
@@ -37,7 +37,7 @@ pub trait Congruence: Deterministic + Pointed {
     /// # Example
     /// ```
     /// use automata::{
-    ///     core::{upw, word::OmegaWord},
+    ///     upw, word::OmegaWord,
     ///     ts::TSBuilder,
     ///     Congruence,
     /// };

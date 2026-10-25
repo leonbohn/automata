@@ -1,12 +1,12 @@
-use crate::core::{
-    alphabet::{Alphabet, Matcher},
-    math,
-};
 use crate::{
     RightCongruence,
-    core::math::Partition,
+    math::Partition,
     representation::CollectTs,
     ts::{Deterministic, EdgeExpression, IsEdge, Pointed, StateIndex, SymbolOf, TransitionSystem},
+};
+use crate::{
+    alphabet::{Alphabet, Matcher},
+    math,
 };
 use itertools::Itertools;
 
@@ -277,7 +277,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::math::Partition;
+    use crate::math::Partition;
     use crate::ts::Deterministic;
     use crate::{TransitionSystem, tests::wiki_dfa};
 

@@ -5,18 +5,18 @@ use std::{
 };
 
 use crate::automaton::Semantics;
-use crate::core::{
-    Int, Show, Void,
-    alphabet::CharAlphabet,
-    math::Partition,
-    word::{FiniteWord, ReducedOmegaWord},
-};
 use crate::representation::{CollectTs, IntoTs};
 use crate::ts::operations::Product;
 use crate::ts::{
     Deterministic, EdgeColor, IsEdge, Shrinkable, StateColor, StateIndex, SymbolOf, operations,
 };
 use crate::{DTS, Pointed, TransitionSystem, automaton::InfiniteWordAutomaton, ts::run};
+use crate::{
+    Int, Show, Void,
+    alphabet::CharAlphabet,
+    math::Partition,
+    word::{FiniteWord, ReducedOmegaWord},
+};
 use itertools::Itertools;
 use tracing::trace;
 
@@ -565,7 +565,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::DPA;
-    use crate::core::{Void, upw};
+    use crate::Void;
     use crate::representation::{CollectTs, IntoTs};
     use crate::ts::operations::Product;
     use crate::ts::{Deterministic, TSBuilder};

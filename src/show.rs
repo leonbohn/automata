@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::core::Void;
+use crate::Void;
 
 impl<C: Show> Show for (C, Void) {
     fn show(&self) -> String {

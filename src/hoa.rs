@@ -12,7 +12,7 @@ pub use output::WriteHoa;
 
 pub use hoars::*;
 
-use crate::core::alphabet::PropAlphabet;
+use crate::alphabet::PropAlphabet;
 
 pub type HoaAutomaton<const DET: bool> = crate::automaton::OmegaAutomaton<PropAlphabet, DET>;
 

@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
-use crate::core::dag::Dag;
-use crate::core::math;
+use crate::dag::Dag;
+use crate::math;
 use itertools::Itertools;
 use tracing::trace;
 
@@ -124,10 +124,7 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     }
 
     /// Returns an iterator over sccs which are reachable from the given source scc.
-    pub fn reachable_from(
-        &self,
-        source: SccIndex,
-    ) -> crate::core::dag::ReachableIter<'_, Scc<'a, Ts>> {
+    pub fn reachable_from(&self, source: SccIndex) -> crate::dag::ReachableIter<'_, Scc<'a, Ts>> {
         self.dag.reachable_from(source.0)
     }
 
@@ -268,9 +265,9 @@ impl<Ts: TransitionSystem> PartialEq for SccDecomposition<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::Void;
-    use crate::core::alphabet::CharAlphabet;
-    use crate::core::math::Set;
+    use crate::Void;
+    use crate::alphabet::CharAlphabet;
+    use crate::math::Set;
 
     use crate::ts::TSBuilder;
     use crate::{

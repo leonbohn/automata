@@ -1,4 +1,4 @@
-use crate::core::{Int, Show};
+use crate::{Int, Show};
 
 use bit_set::BitSet;
 use itertools::Itertools;

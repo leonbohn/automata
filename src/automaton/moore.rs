@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::fmt::Debug;
 
-use crate::core::{Color, Int, Lattice, Void, alphabet::CharAlphabet, word::FiniteWord};
+use crate::{Color, Int, Lattice, Void, alphabet::CharAlphabet, word::FiniteWord};
 
 use super::{DFA, FiniteWordAutomaton, MealyMachine};
 use crate::representation::{CollectTs, IntoTs};

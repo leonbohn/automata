@@ -4,12 +4,9 @@ use tracing::trace;
 use std::fmt::{Result, Write};
 
 use crate::{
-    Pointed, TransitionSystem,
+    Int, Pointed, Show, TransitionSystem,
+    alphabet::{Alphabet, CharAlphabet, PropAlphabet},
     automaton::{DBA, DPA, OmegaAcceptanceCondition},
-    core::{
-        Int, Show,
-        alphabet::{Alphabet, CharAlphabet, PropAlphabet},
-    },
     ts::{EdgeColor, EdgeExpression, IsEdge},
 };
 
