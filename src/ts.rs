@@ -39,7 +39,7 @@ mod deterministic;
 pub use deterministic::Deterministic;
 
 mod builder;
-pub use builder::{BuilderError, TSBuilder};
+pub use builder::{Builder, BuilderError};
 
 /// Deals with analysing reachability in transition systems.
 pub mod reachable;
@@ -475,9 +475,9 @@ pub trait TransitionSystem: Sized {
     ///
     /// # Example
     /// ```
-    /// use automata::ts::{TSBuilder, Deterministic, operations::UniformColor, TransitionSystem};
+    /// use automata::ts::{Builder, Deterministic, operations::UniformColor, TransitionSystem};
     ///
-    /// let ts = TSBuilder::without_colors()
+    /// let ts = Builder::without_colors()
     ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
     ///     .into_dts_with_initial(0);
     /// let colored = ts.with_state_color(UniformColor(false));

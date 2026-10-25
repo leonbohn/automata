@@ -80,9 +80,9 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::ts::{Sproutable, TSBuilder};
+    /// use automata::ts::{Sproutable, Builder};
     ///
-    /// let mut dpa = TSBuilder::without_state_colors()
+    /// let mut dpa = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 1), (0, 'b', 1, 1),
     ///                        (1, 'a', 0, 0), (1, 'b', 3, 0)])
     ///     .into_dpa(0);
@@ -108,15 +108,15 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::ts::{Deterministic, TSBuilder, TransitionSystem};
+    /// use automata::ts::{Deterministic, Builder, TransitionSystem};
     ///
-    /// let dpa = TSBuilder::without_state_colors()
+    /// let dpa = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
     ///     .into_dpa(0);
     /// let streamlined = dpa.streamlined();
     /// assert_eq!(dpa.size(), streamlined.size());
     ///
-    /// let dpa = TSBuilder::without_state_colors()
+    /// let dpa = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 1), (0, 'b', 1, 1),
     ///                        (1, 'a', 0, 0), (1, 'b', 3, 0)])
     ///     .into_dpa(0);
@@ -150,9 +150,9 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::ts::{Deterministic, TSBuilder, TransitionSystem};
+    /// use automata::ts::{Deterministic, Builder, TransitionSystem};
     ///
-    /// let dpa = TSBuilder::without_state_colors()
+    /// let dpa = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
     ///     .into_dpa(0);
     /// assert!(dpa.give_accepted_word().is_some())
@@ -170,14 +170,14 @@ where
     /// done by finding a rejecting cycle in the underlying transition system.
     /// # Example
     /// ```
-    /// use automata::ts::{Deterministic, TSBuilder, TransitionSystem};
+    /// use automata::ts::{Deterministic, Builder, TransitionSystem};
     ///
-    /// let dpa = TSBuilder::without_state_colors()
+    /// let dpa = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
     ///     .into_dpa(0);
     /// assert!(dpa.give_rejected_word().is_some());
     ///
-    /// let univ = TSBuilder::without_state_colors()
+    /// let univ = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 2, 0)])
     ///     .into_dpa(0);
     /// assert!(univ.give_rejected_word().is_none())
@@ -568,7 +568,7 @@ mod tests {
     use crate::Void;
     use crate::representation::{CollectTs, IntoTs};
     use crate::ts::operations::Product;
-    use crate::ts::{Deterministic, TSBuilder};
+    use crate::ts::{Builder, Deterministic};
     use crate::{DTS, Pointed, RightCongruence, TransitionSystem};
 
     #[test]
@@ -747,7 +747,7 @@ mod tests {
 
     #[test]
     fn bug_normalized() {
-        let dpa = TSBuilder::without_state_colors()
+        let dpa = Builder::without_state_colors()
             .with_transitions([
                 (0, 'a', 3, 2),
                 (0, 'b', 3, 0),

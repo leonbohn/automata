@@ -8,10 +8,10 @@ Guaranteed to be incomplete and very much work in progress (for more than a year
 ## Some examples
 are the best way of getting a feel for working with a library which has been set up as is outlined below. Then we create for example a [DFA](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) as follows.
 ```rust
-use automata::ts::TSBuilder;
+use automata::ts::Builder;
 
 // we use a builder for creating a transition system, the edges are not colored
-let zero_mod_three_times_a = TSBuilder::without_edge_colors()
+let zero_mod_three_times_a = Builder::without_edge_colors()
     // we give the colors of our three states (position in the given collection determins state id)
     //         State:    0      1      2
     .with_state_colors([true, false, false])
@@ -48,9 +48,9 @@ This is indicated by a type if it implements the `Deterministic` trait and sice 
 This allows us to perform additional operations
 
 ```rust
-use automata::{math, ts::{TSBuilder, TransitionSystem}};
+use automata::{math, ts::{Builder, TransitionSystem}};
 
-let aut = TSBuilder::without_edge_colors()
+let aut = Builder::without_edge_colors()
     .with_state_colors([true, false, true, false])
     .with_transitions([(0, 'a', 2), (0, 'b', 1), (0, 'c', 3),
                        (1, 'a', 0), (1, 'b', 2), (1, 'c', 3),
@@ -129,9 +129,9 @@ A DPA, for example, accepts a word if the least edge color that is seen infinite
 Since DPA have nice algorithmic properties and [are able to capture](https://en.wikipedia.org/wiki/%CE%A9-automaton#Expressive_power_of_%CF%89-automata) the full class of $\omega$-regular languages, this library gears mostly towards them.
 
 ```rust
-use automata::{upw, ts::TSBuilder};
+use automata::{upw, ts::Builder};
 
-let dpa = TSBuilder::without_state_colors()
+let dpa = Builder::without_state_colors()
     .with_transitions([
         (0, 'a', 1, 1),
         (0, 'b', 0, 0),

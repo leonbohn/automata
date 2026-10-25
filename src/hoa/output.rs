@@ -290,7 +290,7 @@ mod tests {
     }
 
     use super::WriteHoa;
-    use crate::ts::TSBuilder;
+    use crate::ts::Builder;
 
     #[test]
     fn build_parity_hoa_string() {
@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn write_hoa_dpa() {
-        let dpa = TSBuilder::without_state_colors()
+        let dpa = Builder::without_state_colors()
             .with_edges([(0, 'a', 0, 0), (0, 'b', 1, 0), (0, 'c', 2, 0)])
             .into_dpa(0);
         let hoa = dpa.to_hoa();
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn write_hoa_dba() {
-        let dba = TSBuilder::without_state_colors()
+        let dba = Builder::without_state_colors()
             .with_edges([(0, 'a', true, 0), (0, 'b', false, 0), (0, 'c', true, 0)])
             .into_dba(0);
         let hoa = dba.to_hoa();

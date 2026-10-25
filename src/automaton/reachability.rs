@@ -46,9 +46,9 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::{automaton::DFA, ts::TSBuilder};
+    /// use automata::{automaton::DFA, ts::Builder};
     ///
-    /// let ts = TSBuilder::without_colors()
+    /// let ts = Builder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
     ///     .into_dts_with_initial(0);
     /// assert!(DFA::from_ts(&ts, [0]).accepts(""));
@@ -188,11 +188,11 @@ where
 #[cfg(test)]
 mod tests {
     use crate::automaton::DFA;
-    use crate::ts::TSBuilder;
+    use crate::ts::Builder;
 
     #[test]
     fn dfa_from_ts() {
-        let ts = TSBuilder::without_colors()
+        let ts = Builder::without_colors()
             .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
             .into_dts_with_initial(0);
 

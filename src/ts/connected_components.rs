@@ -269,14 +269,14 @@ mod tests {
     use crate::alphabet::CharAlphabet;
     use crate::math::Set;
 
-    use crate::ts::TSBuilder;
+    use crate::ts::Builder;
     use crate::{
         RightCongruence, TransitionSystem,
         ts::connected_components::{Scc, SccDecomposition},
     };
 
     pub(super) fn ts() -> RightCongruence<CharAlphabet> {
-        TSBuilder::without_colors()
+        Builder::without_colors()
             .with_edges([
                 (0, 'a', 1),
                 (0, 'b', 2),

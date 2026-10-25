@@ -331,7 +331,7 @@ mod tests {
     use super::tarjan_scc_iterative;
     use crate::Pointed;
     use crate::Void;
-    use crate::ts::{TSBuilder, TransitionSystem};
+    use crate::ts::{Builder, TransitionSystem};
     use crate::ts::{
         connected_components::{kosaraju, tarjan_scc_recursive},
         predecessors::PredecessorIterable,
@@ -340,7 +340,7 @@ mod tests {
 
     #[test]
     fn tarjan_iterative() {
-        let ts = TSBuilder::without_colors()
+        let ts = Builder::without_colors()
             .with_transitions([
                 (0, 'a', Void, 0),
                 (0, 'b', Void, 1),

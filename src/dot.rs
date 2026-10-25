@@ -534,7 +534,7 @@ mod tests {
     use crate::DTS;
     #[cfg(feature = "render")]
     use crate::Void;
-    use crate::ts::TSBuilder;
+    use crate::ts::Builder;
 
     #[test_log::test]
     #[cfg(feature = "render")]
@@ -555,11 +555,11 @@ mod tests {
     #[test]
     #[ignore]
     fn display_forc() {
-        let _cong = TSBuilder::without_colors()
+        let _cong = Builder::without_colors()
             .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
             .into_right_congruence(0);
 
-        let _prc_e = TSBuilder::without_colors()
+        let _prc_e = Builder::without_colors()
             .with_edges([
                 (0, 'a', 1),
                 (0, 'b', 2),
@@ -570,7 +570,7 @@ mod tests {
             ])
             .into_right_congruence(0);
 
-        let _prc_a = TSBuilder::without_colors()
+        let _prc_a = Builder::without_colors()
             .with_edges([
                 (0, 'a', 1),
                 (0, 'b', 2),
@@ -591,7 +591,7 @@ mod tests {
     #[ignore]
     #[cfg(feature = "render")]
     fn svg_open_dpa() {
-        let dpa = TSBuilder::without_state_colors()
+        let dpa = Builder::without_state_colors()
             .with_edges([
                 (0, 'a', 1, 0),
                 (0, 'b', 2, 1),

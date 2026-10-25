@@ -8,7 +8,7 @@ use crate::{DTS, NTS, RightCongruence, TS, TransitionSystem};
 use itertools::Itertools;
 use thiserror::Error;
 
-/// Errors that can occur when turning a [`TSBuilder`] into a transition system or automaton.
+/// Errors that can occur when turning a [`Builder`] into a transition system or automaton.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum BuilderError {
@@ -51,24 +51,24 @@ fn or_panic<T>(result: Result<T, BuilderError>) -> T {
 ///
 /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
 /// ```
-/// use automata::{Void, ts::TSBuilder};
+/// use automata::{Void, ts::Builder};
 ///
-/// let _ts = TSBuilder::default()
+/// let _ts = Builder::default()
 ///     .with_state_colors([true, false]) // colors given in the order of the states
 ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 0)])
 ///     .into_dfa(0); // 0 is the initial state
 /// ```
-pub struct TSBuilder<Q = Void, C = Void, const DET: bool = true> {
+pub struct Builder<Q = Void, C = Void, const DET: bool = true> {
     symbols: OrderedSet<char>,
     edges: Vec<(DefaultIdType, char, C, DefaultIdType)>,
     default: Option<Q>,
     colors: Vec<(DefaultIdType, Q)>,
 }
 
-impl<C, const DET: bool> TSBuilder<Void, C, DET> {
+impl<C, const DET: bool> Builder<Void, C, DET> {
     /// Creates an empty instance of `Self`, where states are uncolored (have color [`Void`])
     pub fn without_state_colors() -> Self {
-        TSBuilder {
+        Builder {
             symbols: OrderedSet::default(),
             edges: vec![],
             default: Some(Void),
@@ -76,10 +76,10 @@ impl<C, const DET: bool> TSBuilder<Void, C, DET> {
         }
     }
 }
-impl<Q, const DET: bool> TSBuilder<Q, Void, DET> {
+impl<Q, const DET: bool> Builder<Q, Void, DET> {
     /// Creates an empty instance of `Self`, where edges are uncolored (have color [`Void`])
     pub fn without_edge_colors() -> Self {
-        TSBuilder {
+        Builder {
             symbols: OrderedSet::default(),
             edges: vec![],
             default: None,
@@ -88,7 +88,7 @@ impl<Q, const DET: bool> TSBuilder<Q, Void, DET> {
     }
 }
 
-impl<const DET: bool> TSBuilder<Void, Void, DET> {
+impl<const DET: bool> Builder<Void, Void, DET> {
     /// Creates an empty instance of `Self`, where neither states nor edges have a color (i.e. both
     /// are colored [`Void`]).
     pub fn without_colors() -> Self {
@@ -101,7 +101,7 @@ impl<const DET: bool> TSBuilder<Void, Void, DET> {
     }
 }
 
-impl<Q, C, const DET: bool> Default for TSBuilder<Q, C, DET> {
+impl<Q, C, const DET: bool> Default for Builder<Q, C, DET> {
     fn default() -> Self {
         Self {
             symbols: OrderedSet::default(),
@@ -112,7 +112,7 @@ impl<Q, C, const DET: bool> Default for TSBuilder<Q, C, DET> {
     }
 }
 
-impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
+impl<Q: Color, C: Color, const DET: bool> Builder<Q, C, DET> {
     /// Sets the default color for states that have no color specified.
     pub fn default_color(mut self, color: Q) -> Self {
         self.default = Some(color);
@@ -247,9 +247,9 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     ///
     /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
     /// ```
-    /// use automata::{Void, ts::TSBuilder};
+    /// use automata::{Void, ts::Builder};
     ///
-    /// let ts = TSBuilder::default()
+    /// let ts = Builder::default()
     ///     .with_state_colors([true, false]) // colors given in the order of the states
     ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 0)])
     ///     .into_dfa(0); // 0 is the initial state
@@ -285,9 +285,9 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     ///
     /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
     /// ```
-    /// use automata::{Void, ts::TSBuilder};
+    /// use automata::{Void, ts::Builder};
     ///
-    /// let ts = TSBuilder::default()
+    /// let ts = Builder::default()
     ///     .with_state_colors([true, false]) // colors given in the order of the states
     ///     .with_edges([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1)])
     ///     .with_edges([(1, 'b', 0)]) // We can also skip the `Void` entry at position 3
@@ -303,7 +303,7 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     }
 }
 
-impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
+impl<Q: Color, C: Color> Builder<Q, C, true> {
     /// Builds an instance of [`DTS`] from `self`.
     ///
     /// # Panics
@@ -395,7 +395,7 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     }
 }
 
-impl TSBuilder<bool, Void, true> {
+impl Builder<bool, Void, true> {
     /// Turns `self` into a deterministic finite automaton.
     ///
     /// # Panics
@@ -411,7 +411,7 @@ impl TSBuilder<bool, Void, true> {
     }
 }
 
-impl TSBuilder<Void, bool, true> {
+impl Builder<Void, bool, true> {
     /// Turns `self` into a deterministic Büchi automaton.
     ///
     /// # Panics
@@ -431,7 +431,7 @@ impl TSBuilder<Void, bool, true> {
     }
 }
 
-impl TSBuilder<Void, Int, true> {
+impl Builder<Void, Int, true> {
     /// Turns `self` into a deterministic parity automaton.
     ///
     /// # Panics
@@ -472,7 +472,7 @@ impl TSBuilder<Void, Int, true> {
     }
 }
 
-impl TSBuilder<Int, Void, true> {
+impl Builder<Int, Void, true> {
     /// Builds a Moore machine from `self`.
     ///
     /// # Panics
@@ -493,12 +493,12 @@ impl TSBuilder<Int, Void, true> {
 
 #[cfg(test)]
 mod tests {
-    use super::{BuilderError, TSBuilder};
+    use super::{Builder, BuilderError};
 
     #[test]
     fn building_reports_missing_state_colors() {
         // state 1 has no color and there is no default
-        let builder = TSBuilder::without_edge_colors()
+        let builder = Builder::without_edge_colors()
             .color(0, true)
             .with_transitions([(0, 'a', 1), (1, 'a', 0)]);
         assert_eq!(
@@ -506,7 +506,7 @@ mod tests {
             Some(BuilderError::MissingStateColor(1))
         );
 
-        let with_default = TSBuilder::without_edge_colors()
+        let with_default = Builder::without_edge_colors()
             .color(0, true)
             .default_color(false)
             .with_transitions([(0, 'a', 1), (1, 'a', 0)]);
@@ -515,7 +515,7 @@ mod tests {
 
     #[test]
     fn building_reports_overlapping_edges() {
-        let builder = TSBuilder::without_colors().with_transitions([(0, 'a', 1), (0, 'a', 0)]);
+        let builder = Builder::without_colors().with_transitions([(0, 'a', 1), (0, 'a', 0)]);
         assert_eq!(
             builder.try_into_dts().err(),
             Some(BuilderError::OverlappingEdge {
@@ -526,7 +526,7 @@ mod tests {
             })
         );
         // the same edges are fine in a nondeterministic transition system
-        let nondeterministic = TSBuilder::<crate::Void, crate::Void, false>::without_colors()
+        let nondeterministic = Builder::<crate::Void, crate::Void, false>::without_colors()
             .with_transitions([(0, 'a', 1), (0, 'a', 0)])
             .try_into_nts();
         assert!(nondeterministic.is_ok());
@@ -535,7 +535,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "has no color")]
     fn into_panics_where_try_into_returns_an_error() {
-        let _ = TSBuilder::without_edge_colors()
+        let _ = Builder::without_edge_colors()
             .color(0, true)
             .with_transitions([(0, 'a', 1)])
             .into_dfa(0);

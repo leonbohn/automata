@@ -38,10 +38,10 @@ pub trait Deterministic: TransitionSystem {
     /// ```
     /// use automata::{
     ///     Void,
-    ///     ts::{Deterministic, IsEdge, TSBuilder},
+    ///     ts::{Deterministic, IsEdge, Builder},
     /// };
     ///
-    /// let ts = TSBuilder::without_state_colors()
+    /// let ts = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', Void, 1), (1, 'a', Void, 2), (2, 'a', Void, 0)])
     ///     .into_right_congruence_bare(0);
     /// assert_eq!(ts.edge(0, 'a').unwrap().target(), 1);
@@ -119,11 +119,11 @@ pub trait Deterministic: TransitionSystem {
     /// ```
     /// use automata::{
     ///     Void,
-    ///     ts::{Deterministic, IsEdge, TSBuilder},
+    ///     ts::{Deterministic, IsEdge, Builder},
     /// };
     ///
     ///
-    /// let ts = TSBuilder::without_state_colors()
+    /// let ts = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 1)])
     ///     .into_right_congruence_bare(0);
     /// assert_eq!(ts.successor_index(0, 'a'), Some(0));

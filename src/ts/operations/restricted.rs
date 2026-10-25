@@ -421,11 +421,11 @@ impl<D: TransitionSystem> EdgeColorRestricted<D> {
 mod tests {
     use crate::TransitionSystem;
     use crate::representation::IntoTs;
-    use crate::ts::TSBuilder;
+    use crate::ts::Builder;
 
     #[test]
     fn restrict_ts_by_state_index() {
-        let dfa = TSBuilder::without_edge_colors()
+        let dfa = Builder::without_edge_colors()
             .with_state_colors([false, false, true])
             .with_edges([
                 (0, 'a', 1),

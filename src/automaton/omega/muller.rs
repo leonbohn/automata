@@ -73,11 +73,11 @@ impl<T: Deterministic> Semantics<T, true> for MullerCondition<EdgeColor<T>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ts::TSBuilder;
+    use crate::ts::Builder;
 
     #[test]
     fn muller_automaton() {
-        let ts = TSBuilder::without_state_colors()
+        let ts = Builder::without_state_colors()
             .with_transitions([
                 (0, 'a', 0, 0),
                 (0, 'b', 1, 1),

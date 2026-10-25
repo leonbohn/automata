@@ -38,11 +38,11 @@ pub trait Congruence: Deterministic + Pointed {
     /// ```
     /// use automata::{
     ///     upw, word::OmegaWord,
-    ///     ts::TSBuilder,
+    ///     ts::Builder,
     ///     Congruence,
     /// };
     ///
-    /// let ts = TSBuilder::without_colors()
+    /// let ts = Builder::without_colors()
     ///     .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
     ///     .into_dts_with_initial(0);
     /// let word = upw!("b", "a");
@@ -101,9 +101,9 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::ts::TSBuilder;
+    /// use automata::ts::Builder;
     ///
-    /// let ts = TSBuilder::without_colors()
+    /// let ts = Builder::without_colors()
     ///     .with_transitions([(0, 'a', 1), (1, 'a', 0), (0, 'b', 0), (1, 'b', 1)])
     ///     .into_right_congruence_bare(0);
     /// let dfa = ts.looping_words(1);
@@ -166,11 +166,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ts::TSBuilder;
+    use crate::ts::Builder;
 
     #[test]
     fn is_idempotent_is_none_for_unknown_classes() {
-        let rc = TSBuilder::without_colors()
+        let rc = Builder::without_colors()
             .with_transitions([(0, 'a', 1), (1, 'a', 0), (0, 'b', 0), (1, 'b', 1)])
             .into_right_congruence_bare(0);
         assert!(rc.is_idempotent(0).is_some());

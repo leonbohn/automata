@@ -29,7 +29,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
   - `impls/`: `LinkedListTransitionSystem` (the only implementation; aliases `TS`, `DTS`, `NTS`).
   - `operations/`: lazy adapters (`map`, `product`, `quotient`, `restricted`, `reverse`, `subset`, `with_state_color`).
   - `run.rs`/`path.rs`: runs with `Observer`s, `Path`, `Lasso`.
-  - `connected_components/`: Tarjan SCCs, `SccDecomposition`. `reachable.rs`: reachability, minimal representatives. `builder.rs`: `TSBuilder`.
+  - `connected_components/`: Tarjan SCCs, `SccDecomposition`. `reachable.rs`: reachability, minimal representatives. `builder.rs`: `Builder`.
   - Capability traits: `Deterministic`, `Pointed`, `Sproutable`, `Shrinkable`, `PredecessorIterable`; conversions in `representation.rs` (`CollectTs`, `IntoTs`).
 - `src/automaton.rs` and `src/automaton/`: `Automaton<A, Z, Q, C, D, const OMEGA, const DET>` pairs a TS with an initial state and acceptance condition `Z`. Aliases `DFA`, `DBA`, `DPA`, Moore/Mealy. `omega/` has `buchi`, `parity` (four min/max even/odd variants), `rabin`, `muller`; the `Semantics` trait defines acceptance.
 - `src/congruence/` (right congruences, Cayley graphs, transition profiles), `src/minimization/partition_refinement.rs`, `src/families/` (FDFA, FWPM), `src/hoa/` (feature `hoa`), `src/dot.rs` (Graphviz/dot output and rendering), `src/random/` (feature `random`).

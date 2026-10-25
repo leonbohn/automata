@@ -39,8 +39,8 @@ mod deterministic;
 mod priority_mapping;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{
-    Deterministic, EdgeExpression, ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable, StateColor,
-    StateIndex, SymbolOf, TSBuilder,
+    Builder, Deterministic, EdgeExpression, ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable,
+    StateColor, StateIndex, SymbolOf,
 };
 use crate::{Congruence, DTS, Pointed, TS, TransitionSystem};
 pub use priority_mapping::{StateBasedWeakPriorityMapping, WeakPriorityMapping};
@@ -84,9 +84,9 @@ pub struct Automaton<
 impl<Z, Q: Color, C: Color + std::hash::Hash + Eq, const OMEGA: bool>
     Automaton<CharAlphabet, Z, Q, C, DTS<CharAlphabet, Q, C>, OMEGA>
 {
-    /// Instantiates a new [`TSBuilder`] for the edge and state color of `self`.
-    pub fn builder() -> TSBuilder<Q, C> {
-        TSBuilder::default()
+    /// Instantiates a new [`Builder`] for the edge and state color of `self`.
+    pub fn builder() -> Builder<Q, C> {
+        Builder::default()
     }
 }
 

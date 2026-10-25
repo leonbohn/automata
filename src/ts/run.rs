@@ -942,11 +942,11 @@ mod impls {
 #[cfg(test)]
 mod tests {
     use crate::ts::run::EscapePrefix;
-    use crate::ts::{Deterministic, TSBuilder};
+    use crate::ts::{Builder, Deterministic};
 
     #[test]
     fn run_escaping() {
-        let dts = TSBuilder::without_colors()
+        let dts = Builder::without_colors()
             .with_transitions([(0, 'a', 1), (1, 'a', 0)])
             .into_dts_with_initial(0);
 

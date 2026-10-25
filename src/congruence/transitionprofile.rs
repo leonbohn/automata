@@ -13,10 +13,10 @@ use itertools::Itertools;
 /// use automata::{
 ///     Void,
 ///     congruence::{RunProfile, TransitionMonoid},
-///     ts::TSBuilder,
+///     ts::Builder,
 /// };
 ///
-/// let dfa = TSBuilder::without_edge_colors()
+/// let dfa = Builder::without_edge_colors()
 ///     .with_transitions([(0, 'a', 0), (0, 'b', 1), (1, 'a', 1), (1, 'b', 0)])
 ///     .with_state_colors([false, true])
 ///     .into_dfa(0);
@@ -452,7 +452,7 @@ mod tests {
 
     #[test]
     fn tp_from_ts_time() {
-        let dfa = crate::ts::TSBuilder::without_edge_colors()
+        let dfa = crate::ts::Builder::without_edge_colors()
             .with_transitions([(0, 'a', 0), (0, 'b', 1), (1, 'a', 1), (1, 'b', 0)])
             .with_state_colors([false, true])
             .into_dfa(0);

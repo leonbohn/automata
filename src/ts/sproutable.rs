@@ -75,7 +75,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet, Void,
-    ///     ts::{Deterministic, ForAlphabet, TSBuilder, Shrinkable, Sproutable, TransitionSystem},
+    ///     ts::{Deterministic, ForAlphabet, Builder, Shrinkable, Sproutable, TransitionSystem},
     ///     DTS,
     /// };
     ///     
@@ -103,7 +103,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet,
-    ///     ts::{Deterministic, ForAlphabet, TSBuilder, Shrinkable, Sproutable, TransitionSystem},
+    ///     ts::{Deterministic, ForAlphabet, Builder, Shrinkable, Sproutable, TransitionSystem},
     ///     DTS,
     /// };
     ///
@@ -134,7 +134,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet,
-    ///     ts::{Deterministic, ForAlphabet, TSBuilder, TransitionSystem, Shrinkable, Sproutable},
+    ///     ts::{Deterministic, ForAlphabet, Builder, TransitionSystem, Shrinkable, Sproutable},
     ///     DTS,
     /// };
     ///
@@ -195,7 +195,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet,
-    ///     ts::{Deterministic, TransitionSystem, ForAlphabet, TSBuilder, Shrinkable, Sproutable},
+    ///     ts::{Deterministic, TransitionSystem, ForAlphabet, Builder, Shrinkable, Sproutable},
     ///     DTS,
     /// };
     ///
@@ -232,11 +232,11 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet, Void,
-    ///     ts::{Deterministic, ForAlphabet, TSBuilder, Shrinkable, TransitionSystem, Sproutable},
+    ///     ts::{Deterministic, ForAlphabet, Builder, Shrinkable, TransitionSystem, Sproutable},
     ///     DTS,
     /// };
     ///
-    /// let mut ts = TSBuilder::without_colors()
+    /// let mut ts = Builder::without_colors()
     ///     .with_edges([(0, 'a', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
     ///     .into_dts();
@@ -252,10 +252,10 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet, Void,
-    ///     ts::{Deterministic, ForAlphabet, TSBuilder, TransitionSystem, Shrinkable, Sproutable},
+    ///     ts::{Deterministic, ForAlphabet, Builder, TransitionSystem, Shrinkable, Sproutable},
     ///     DTS,
     /// };
-    /// let mut ts = TSBuilder::without_colors()
+    /// let mut ts = Builder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
     ///     .into_dts();
@@ -306,7 +306,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet, Void,
-    ///     ts::{Deterministic, TransitionSystem, ForAlphabet, TSBuilder, Shrinkable, Sproutable},
+    ///     ts::{Deterministic, TransitionSystem, ForAlphabet, Builder, Shrinkable, Sproutable},
     ///     DTS,
     /// };
     ///

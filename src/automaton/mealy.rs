@@ -130,11 +130,11 @@ mod tests {
     use crate::Void;
     use crate::automaton::MealyMachine;
     use crate::representation::IntoTs;
-    use crate::ts::TSBuilder;
+    use crate::ts::Builder;
 
     #[test]
     fn mealy_equivalence() {
-        let mm1: MealyMachine = TSBuilder::without_state_colors()
+        let mm1: MealyMachine = Builder::without_state_colors()
             .with_transitions([
                 (0, 'a', 1, 0),
                 (0, 'b', 0, 1),

@@ -19,9 +19,9 @@ pub trait PredecessorIterable: TransitionSystem {
     ///
     /// # Example
     /// ```
-    /// use automata::ts::{PredecessorIterable, TSBuilder};
+    /// use automata::ts::{PredecessorIterable, Builder};
     ///
-    /// let ts = TSBuilder::without_state_colors()
+    /// let ts = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (2, 'a', 0)])
     ///     .into_dts();
     /// assert_eq!(ts.predecessors(0).unwrap().collect::<Vec<_>>().len(), 3);
@@ -154,12 +154,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ts::TSBuilder;
+    use crate::ts::Builder;
     use crate::ts::predecessors::PredecessorIterable;
 
     #[test]
     fn predecessor_iterable() {
-        let ts = TSBuilder::without_state_colors()
+        let ts = Builder::without_state_colors()
             .with_transitions([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (2, 'a', 0)])
             .into_dts();
         assert_eq!(

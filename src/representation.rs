@@ -366,12 +366,12 @@ mod impl_into_ts {
 #[cfg(test)]
 mod tests {
     use crate::representation::IntoTs;
-    use crate::ts::TSBuilder;
+    use crate::ts::Builder;
     use crate::{Pointed, TransitionSystem};
 
     #[test]
     fn representation() {
-        let ts = TSBuilder::default()
+        let ts = Builder::default()
             .with_state_colors([false, false, true, true, true, false])
             .with_edges([
                 (0, 'a', 9, 1),

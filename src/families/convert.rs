@@ -166,7 +166,7 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
 mod tests {
     use crate::alphabet::CharAlphabet;
     use crate::automaton::DFA;
-    use crate::ts::TSBuilder;
+    use crate::ts::Builder;
     use crate::{
         TransitionSystem,
         families::{FDFA, FWPM},
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn fwpm_to_fdfa() {
         let alphabet = CharAlphabet::of_size(2);
-        let prc = TSBuilder::without_state_colors()
+        let prc = Builder::without_state_colors()
             .with_edges([
                 (0, 'a', 5, 0),
                 (0, 'b', 5, 1),

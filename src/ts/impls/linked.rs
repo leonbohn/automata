@@ -1,8 +1,8 @@
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use crate::ts::{
-    DefaultIdType, Deterministic, EdgeColor, EdgeExpression, EdgeTuple, ForAlphabet, IntoEdgeTuple,
-    IsEdge, ScalarIndexType, Shrinkable, Sproutable, StateColor, StateIndex, TSBuilder,
+    Builder, DefaultIdType, Deterministic, EdgeColor, EdgeExpression, EdgeTuple, ForAlphabet,
+    IntoEdgeTuple, IsEdge, ScalarIndexType, Shrinkable, Sproutable, StateColor, StateIndex,
 };
 use itertools::Itertools;
 use owo_colors::OwoColorize;
@@ -624,15 +624,15 @@ impl<Q, C, const DET: bool> LinkedListTransitionSystem<CharAlphabet, Q, C, DET> 
     ///
     /// Further, state 0 should be initial and colored `true` and state 1 should be colored `false`. This can be done as follows
     /// ```
-    /// use automata::{Void, ts::TSBuilder};
+    /// use automata::{Void, ts::Builder};
     ///
-    /// let ts = TSBuilder::default()
+    /// let ts = Builder::default()
     ///     .with_state_colors([true, false]) // colors given in the order of the states
     ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 0)])
     ///     .into_dfa(0); // 0 is the initial state
     /// ```
-    pub fn builder() -> TSBuilder<Q, C> {
-        TSBuilder::default()
+    pub fn builder() -> Builder<Q, C> {
+        Builder::default()
     }
 }
 
@@ -830,12 +830,12 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
 #[cfg(test)]
 mod tests {
     use crate::alphabet::CharAlphabet;
-    use crate::ts::{Deterministic, ForAlphabet, Sproutable, TSBuilder};
+    use crate::ts::{Builder, Deterministic, ForAlphabet, Sproutable};
     use crate::{TransitionSystem, ts::LinkedListDeterministic};
 
     #[test]
     fn dts_equality() {
-        let first = TSBuilder::default()
+        let first = Builder::default()
             .with_state_colors([0, 1])
             .with_edges([
                 (0, 'a', 100u32, 0),
@@ -844,7 +844,7 @@ mod tests {
                 (1, 'b', 2000, 1),
             ])
             .into_dts();
-        let second = TSBuilder::default()
+        let second = Builder::default()
             .with_state_colors([0, 1])
             .with_edges([
                 (0, 'b', 1000, 1),
