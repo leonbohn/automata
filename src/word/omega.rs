@@ -176,11 +176,17 @@ pub struct PeriodicOmegaWord<S> {
     representation: Vec<S>,
 }
 
+/// Returned when converting a [`ReducedOmegaWord`] with a non-empty finite prefix into a
+/// [`PeriodicOmegaWord`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[error("the word has a non-empty prefix and is therefore not purely periodic")]
+pub struct NotPeriodicError;
+
 impl<S: Symbol> TryFrom<ReducedOmegaWord<S>> for PeriodicOmegaWord<S> {
-    type Error = ();
+    type Error = NotPeriodicError;
     fn try_from(value: ReducedOmegaWord<S>) -> Result<Self, Self::Error> {
         if value.loop_index() > 0 {
-            Err(())
+            Err(NotPeriodicError)
         } else {
             Ok(Self {
                 representation: value.word,
@@ -602,6 +608,20 @@ impl<S: Show> Debug for PeriodicOmegaWord<S> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn periodic_conversion_requires_empty_prefix() {
+        use super::{NotPeriodicError, PeriodicOmegaWord, ReducedOmegaWord};
+        use crate::upw;
+
+        let periodic: ReducedOmegaWord<char> = upw!("ab");
+        assert!(PeriodicOmegaWord::try_from(periodic).is_ok());
+        let with_prefix: ReducedOmegaWord<char> = upw!("c", "ab");
+        assert_eq!(
+            PeriodicOmegaWord::try_from(with_prefix),
+            Err(NotPeriodicError)
+        );
+    }
+
     use crate::word::{FiniteWord, OmegaWord, ReducedOmegaWord, omega::deduplicate};
 
     use super::deduplicate_inplace;

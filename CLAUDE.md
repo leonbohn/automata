@@ -4,7 +4,7 @@ Guidance for working in this repository. See `PLAN.md` for the roadmap and known
 
 ## What this is
 
-`automata` is a single Rust crate for working with transition systems and automata over finite and infinite (omega) words. It was extracted, with history, from `leonbohn/frieda` (where it lived as `crates/automata` plus `crates/automata-core`). The former `automata-core` crate was merged in as top-level modules (`alphabet`, `word`, `math`, `dag`, plus `Color`/`Lattice`/`Void`/`Int`/`Show` at the crate root). Edition 2024, version 0.1.0.
+`automata` is a single Rust crate for working with transition systems and automata over finite and infinite (omega) words. It was extracted, with history, from `leonbohn/frieda` (where it lived as `crates/automata` plus `crates/automata-core`). The former `automata-core` crate was merged in as top-level modules (`alphabet`, `word`, `math`, `dag`, plus `Color`/`Lattice`/`Void`/`Int`/`Show` at the crate root). Edition 2024, version 0.1.0, MSRV 1.88 (`rust-version`; checked by the `msrv` CI job).
 
 Related crates that stay elsewhere: `hoars` (HOA parser, `leonbohn/hoars`, depended on from crates.io, currently 0.3) and `automata-learning` (learning algorithms, in `leonbohn/frieda`).
 
@@ -42,7 +42,7 @@ Features: `default = ["hoa"]`; opt-in: `random`, `render` (SVG/PNG via `resvg`/`
 
 - `#![deny(missing_docs)]` and `deny(rustdoc::broken_intra_doc_links)` are on; README is `include_str!`ed into the crate docs, so README code blocks are doctests.
 - Use `tracing` for logging in library code.
-- Do not panic in library code: return `Result` with the crate's `Error` enum (`src/error.rs`, `#[non_exhaustive]`); use `Error::NotYetImplemented` instead of `todo!()`/`unimplemented!()`. Existing panics are being removed (see `PLAN.md`).
+- Do not panic in library code: return `Result` with typed errors (`src/error.rs` has the crate-wide `#[non_exhaustive]` `Error`; domain errors such as `PropAlphabetError`, `NotPeriodicError`, `hoa::HoaError` convert into it; never use `String` as an error type); use `Error::NotYetImplemented` instead of `todo!()`/`unimplemented!()`. Existing panics are being removed (see `PLAN.md`).
 - Ask before committing or pushing.
 
 ## Known sharp edges

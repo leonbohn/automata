@@ -16,7 +16,7 @@ mod acceptance_mask;
 use super::InfiniteWordAutomaton;
 use crate::Error;
 use crate::Int;
-use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet};
+use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
 use crate::math::OrderedSet;
 use crate::representation::IntoTs;
 use crate::ts::{DefaultIdType, ForAlphabet, IsEdge, ScalarIndexType, Sproutable, TSBuilder};
@@ -210,7 +210,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
 {
     /// For now, we allow this to error out in exactly one case: if the number of alphabet symbols
     /// is not a power of 2 and cannot be mapped immediately into AP combinations.
-    type Error = String;
+    type Error = PropAlphabetError;
     fn try_from(value: DeterministicOmegaAutomaton<CharAlphabet>) -> Result<Self, Self::Error> {
         let size = value.size();
         let mut ts = DTS::for_alphabet(PropAlphabet::try_from_char_alphabet(value.alphabet())?);

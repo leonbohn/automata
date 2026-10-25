@@ -2,6 +2,9 @@
 
 use tracing::{trace, warn};
 
+mod error;
+pub use error::HoaError;
+
 pub mod input;
 pub use input::{
     HoaAutomatonStream, IntoDeterministicHoaAutomatonStream, NoneterministicHoaAutomatonStream,

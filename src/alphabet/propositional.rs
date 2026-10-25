@@ -11,11 +11,23 @@ use biodivine_lib_bdd::{
     Bdd, BddPartialValuation, BddSatisfyingValuations, BddValuation, BddVariableSet,
 };
 use itertools::Itertools;
+use thiserror::Error;
 use tracing::trace;
 
 use crate::{math::OrderedSet, show::Show};
 
 use super::{Alphabet, CharAlphabet, Expression, Matcher};
+
+/// Errors that can occur when building a [`PropAlphabet`] from another alphabet.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum PropAlphabetError {
+    /// The number of symbols cannot be expressed as a number of atomic propositions.
+    #[error(
+        "an alphabet of size {0} cannot be represented by atomic propositions, the size must be a power of two and at least 2"
+    )]
+    InvalidSize(usize),
+}
 
 pub trait RawSymbolRepr: std::fmt::Debug + Hash + Eq + Ord + Copy {
     fn as_usize(&self) -> usize;
@@ -401,16 +413,17 @@ impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
     /// Attempts to build an instance of `Self` from the given pointer to a [`CharAlphabet`]. This
     /// only works (for the moment) if the number of symbols in the given alphabet is an exact
     /// power of two.
-    pub fn try_from_char_alphabet(value: &CharAlphabet) -> Result<Self, String> {
+    ///
+    /// # Errors
+    /// Returns [`PropAlphabetError::InvalidSize`] if the size is not a power of two or is
+    /// smaller than two (that would require zero atomic propositions).
+    pub fn try_from_char_alphabet(value: &CharAlphabet) -> Result<Self, PropAlphabetError> {
         let alphabet_size = value.size();
-        if alphabet_size != alphabet_size.next_power_of_two() || alphabet_size == 0 {
-            return Err(format!(
-                "Alphabet size is not a power of two: {alphabet_size}"
-            ));
+        if alphabet_size < 2 || !alphabet_size.is_power_of_two() {
+            return Err(PropAlphabetError::InvalidSize(alphabet_size));
         }
 
         let aps = alphabet_size.ilog2() as u8;
-        assert!(aps > 0, "We do not want this edge case");
 
         Ok(Self::from_apnames(
             (0u8..aps).map(|i| ((b'a' + i) as char).to_string()),
@@ -468,6 +481,21 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn char_alphabet_conversion_requires_power_of_two_size() {
+        for size in [0, 1, 3, 5, 6, 7] {
+            assert!(matches!(
+                PropAlphabet::<u32>::try_from_char_alphabet(&CharAlphabet::of_size(size)),
+                Err(PropAlphabetError::InvalidSize(s)) if s == size
+            ));
+        }
+        for (size, aps) in [(2, 1), (4, 2), (8, 3)] {
+            let converted =
+                PropAlphabet::<u32>::try_from_char_alphabet(&CharAlphabet::of_size(size)).unwrap();
+            assert_eq!(converted.aps(), aps);
+        }
+    }
 
     #[test]
     fn alphabet_contains_only_its_own_symbols() {

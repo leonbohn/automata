@@ -15,7 +15,9 @@ mod finite;
 pub use finite::FiniteWord;
 
 mod omega;
-pub use omega::{OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, ReducedParseError};
+pub use omega::{
+    NotPeriodicError, OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, ReducedParseError,
+};
 
 mod repeat;
 pub use repeat::Repeat;

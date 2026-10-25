@@ -11,7 +11,7 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 - [ ] Remaining dependency upgrades: `rand` 0.8 to 0.10 (and `rand_distr` accordingly) and `tabled` 0.16 to 0.22; both need API migrations.
 - [x] Fixed `--no-default-features` (ungated `hoars` impl in `acceptance_mask.rs`, unused imports in `dot.rs`); all feature combinations build, pass clippy and tests. `scripts/check` and CI now cover it. Still to do: a full feature matrix (`cargo hack --each-feature`) in CI.
 - [ ] Switch `frieda`'s `automata-learning` and binaries to depend on this crate instead of their path copy; then delete `crates/automata` and `crates/automata-core` from `frieda`.
-- [ ] Add `rust-version` (MSRV) and verify it in CI with `cargo-msrv`.
+- [x] `rust-version = "1.88"` (the floor set by `biodivine-lib-bdd` 0.6 and let-chains); verified by the `msrv` CI job and clippy's `incompatible_msrv` lint. Revisit when dependencies raise their minimum.
 - [ ] Push `main` to `github.com/leonbohn/automata`, set up docs.rs metadata (`all-features = true`).
 - [x] Slimmed the default features to `["hoa"]`; `render`, `graphviz` and `random` are opt-in. Text `dot` output stays always available. docs.rs builds with all features.
 - [ ] Consider further feature gates for non-standard modules (e.g. `families` with FDFA/FWPM), and review the rendering on all platforms (see issues).
@@ -21,7 +21,8 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 ## Phase 2: API redesign
 
 - [x] Introduced the crate-wide `Error` enum (`#[non_exhaustive]`, `Error::NotYetImplemented`) and `Result` alias in `src/error.rs`. `OmegaAcceptanceCondition::satisfied` and `DeterministicOmegaAutomaton::into_dpa` now return `Result`.
-- [ ] Policy: return `Result` with custom error enums instead of panicking. Audit the remaining ~37 `panic!` and ~220 `unwrap`/`expect` calls module by module and replace those reachable from the public API; replace the `Result<_, String>` error types (e.g. in `hoa/input.rs`, `PropAlphabet::try_from_char_alphabet`) with proper enums.
+- [x] Typed errors replace every `Result<_, String>` and `Result<_, ()>` (#8): `PropAlphabetError`, `word::NotPeriodicError`, `hoa::HoaError`, all folded into the `#[non_exhaustive]` crate `Error`.
+- [ ] Policy: return `Result` with custom error enums instead of panicking. Audit the remaining ~35 `panic!` and ~220 `unwrap`/`expect` calls module by module and replace those reachable from the public API (#7). Still open: the `RenderError` variants in `dot.rs` carry `String` payloads.
 - [ ] Implement the conversions that currently return `Error::NotYetImplemented`: `into_dpa` for Rabin, Streett, Reachability and Safety (Rabin/Streett need a real construction such as an index appearance record), and `OmegaAcceptanceCondition::satisfied` for everything except Parity. Rabin/Streett variants of the enum carry no pairs; decide whether the enum should.
 - [ ] Reduce `Automaton`'s seven parameters (remove the `OMEGA`/`DET` const bools by carrying that information in the acceptance condition and TS types). Concise aliases for `DFA`, `NFA`, `DBA`, `NBA`, `DPA`, `NPA`, `DRA`, `DMA`, `Moore`, `Mealy`.
 - [ ] Add a `prelude` module.

@@ -11,7 +11,7 @@ use crate::{
 use hoars::HoaRepresentation;
 use tracing::{trace, warn};
 
-use super::HoaString;
+use super::{HoaError, HoaString};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct IntoDeterministicHoaAutomatonStream<R> {
@@ -114,20 +114,14 @@ pub fn parse_omega_automaton_range<const DET: bool>(
     hoa: &str,
     start: usize,
     end: usize,
-) -> Result<OmegaAutomaton<PropAlphabet, DET>, String> {
-    match HoaRepresentation::try_from(&hoa[start..end]) {
-        Ok(aut) => match OmegaAutomaton::try_from(aut) {
-            Ok(aut) => Ok(aut),
-            Err(e) => Err(format!(
-                "In range {}..{}, could not convert automaton into omega automaton: {}",
-                start, end, e
-            )),
-        },
-        Err(e) => Err(format!(
-            "Could not parse automaton from range {}..{}: {}",
-            start, end, e
-        )),
-    }
+) -> Result<OmegaAutomaton<PropAlphabet, DET>, HoaError> {
+    let in_range = |source: HoaError| HoaError::InRange {
+        start,
+        end,
+        source: Box::new(source),
+    };
+    let aut = HoaRepresentation::try_from(&hoa[start..end]).map_err(|e| in_range(e.into()))?;
+    OmegaAutomaton::try_from(aut).map_err(in_range)
 }
 
 pub fn pop_deterministic_omega_automaton(
@@ -224,7 +218,7 @@ pub fn hoa_to_ts<const DET: bool>(hoa: &str) -> Vec<OmegaAutomaton<PropAlphabet,
 }
 
 impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
-    type Error = String;
+    type Error = HoaError;
 
     fn try_from(value: &hoars::Header) -> Result<Self, Self::Error> {
         let acceptance_sets = value.iter().find_map(|it| match it {
@@ -235,17 +229,16 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
         match value.acceptance_name() {
             hoars::AcceptanceName::Buchi => Ok(OmegaAcceptanceCondition::Buchi),
             hoars::AcceptanceName::Parity => {
-                let sets = acceptance_sets
-                    .ok_or_else(|| "Parity automaton without Acceptance header item".to_string())?;
+                let sets = acceptance_sets.ok_or(HoaError::MissingAcceptanceSets)?;
                 Ok(OmegaAcceptanceCondition::Parity(0, sets as Int))
             }
-            _ => Err("Unsupported acceptance condition".to_string()),
+            other => Err(HoaError::UnsupportedAcceptance(format!("{other:?}"))),
         }
     }
 }
 
 impl<const DET: bool> TryFrom<HoaRepresentation> for OmegaAutomaton<PropAlphabet, DET> {
-    type Error = String;
+    type Error = HoaError;
     fn try_from(value: HoaRepresentation) -> Result<Self, Self::Error> {
         hoa_automaton_to_ts(value)
     }
@@ -255,7 +248,7 @@ impl<const DET: bool> TryFrom<HoaRepresentation> for OmegaAutomaton<PropAlphabet
 /// number of states and inserts transitions with the appropriate labels and colors.
 pub fn hoa_automaton_to_ts<const DET: bool>(
     aut: HoaRepresentation,
-) -> Result<OmegaAutomaton<PropAlphabet, DET>, String> {
+) -> Result<OmegaAutomaton<PropAlphabet, DET>, HoaError> {
     let aps = aut.num_aps();
     assert!(aps <= crate::hoa::MAX_APS);
 
@@ -276,7 +269,9 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
                 .expect("Cannot yet deal with conjunctions of target states");
             let label = edge.label().deref().clone();
 
-            let expr = label.try_into_hoa_expression(aps)?;
+            let expr = label
+                .try_into_hoa_expression(aps)
+                .map_err(HoaError::InvalidLabel)?;
             let color: AcceptanceMask = edge.acceptance_signature().into();
 
             if ts
@@ -286,7 +281,7 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
                 // this thing is not deterministic, so we return
                 if DET {
                     warn!("rejecting nondeterministic automaton");
-                    return Err("Automaton is not deterministic".to_string());
+                    return Err(HoaError::NotDeterministic);
                 }
             }
         }
@@ -378,6 +373,57 @@ mod tests {
         --END--
         "#;
         let parsed = hoars::HoaRepresentation::try_from(raw_hoa).expect("valid HOA syntax");
-        assert!(super::OmegaAcceptanceCondition::try_from(parsed.header()).is_err());
+        assert_eq!(
+            super::OmegaAcceptanceCondition::try_from(parsed.header()),
+            Err(super::HoaError::MissingAcceptanceSets)
+        );
+    }
+
+    const NONDETERMINISTIC: &str = r#"HOA: v1
+States: 2
+Start: 0
+acc-name: Buchi
+Acceptance: 1 Inf(0)
+AP: 1 "a"
+--BODY--
+State: 0
+[0] 0 {0}
+[0] 1
+[!0] 0
+State: 1
+[t] 1
+--END--
+"#;
+
+    #[test]
+    fn nondeterministic_input_is_rejected_for_deterministic_automata() {
+        use super::{HoaError, parse_omega_automaton_range};
+
+        let end = NONDETERMINISTIC.len();
+        assert!(parse_omega_automaton_range::<false>(NONDETERMINISTIC, 0, end).is_ok());
+        match parse_omega_automaton_range::<true>(NONDETERMINISTIC, 0, end) {
+            Err(HoaError::InRange {
+                start: 0,
+                end: e,
+                source,
+            }) => {
+                assert_eq!(e, end);
+                assert_eq!(*source, HoaError::NotDeterministic);
+            }
+            other => panic!("unexpected result: {:?}", other.map(|_| ())),
+        }
+    }
+
+    #[test]
+    fn invalid_input_reports_a_parse_error() {
+        use super::{HoaError, parse_omega_automaton_range};
+
+        let garbage = "HOA: v1\nthis is not an automaton\n--END--";
+        match parse_omega_automaton_range::<true>(garbage, 0, garbage.len()) {
+            Err(HoaError::InRange { source, .. }) => {
+                assert!(matches!(*source, HoaError::Parse(_)));
+            }
+            other => panic!("unexpected result: {:?}", other.map(|_| ())),
+        }
     }
 }
