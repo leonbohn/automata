@@ -6,7 +6,7 @@ use crate::automaton::{
 use crate::ts::{ForAlphabet, Sproutable, TransitionSystem};
 use crate::{
     Int,
-    alphabet::{PropAlphabet, PropExpression},
+    alphabet::{PropAlphabet, PropAlphabetError, PropExpression},
 };
 use hoars::HoaRepresentation;
 use tracing::{trace, warn};
@@ -250,15 +250,27 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
     aut: HoaRepresentation,
 ) -> Result<OmegaAutomaton<PropAlphabet, DET>, HoaError> {
     let aps = aut.num_aps();
-    assert!(aps <= crate::hoa::MAX_APS);
+    if aps > crate::hoa::MAX_APS {
+        return Err(PropAlphabetError::TooManyAtomicPropositions {
+            count: aps as usize,
+            max: crate::hoa::MAX_APS as usize,
+        }
+        .into());
+    }
 
-    let alphabet = PropAlphabet::from_apnames(aut.aps().iter());
+    let alphabet = PropAlphabet::try_from_apnames(aut.aps().iter())?;
     let mut ts: crate::TS<PropAlphabet, Int, AcceptanceMask, DET> =
         crate::TS::for_alphabet(alphabet);
 
-    for (id, state) in aut.body().iter().enumerate() {
-        assert_eq!(id, state.id() as usize);
-        assert_eq!(id, ts.add_state(state.id() as Int) as usize);
+    for (position, state) in aut.body().iter().enumerate() {
+        if state.id() as usize != position {
+            return Err(HoaError::StateOrder {
+                position,
+                id: state.id(),
+            });
+        }
+        let added = ts.add_state(state.id() as Int);
+        debug_assert_eq!(added as usize, position);
     }
 
     for state in aut.body().iter() {
@@ -266,7 +278,7 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
             let target = edge
                 .state_conjunction()
                 .get_singleton()
-                .expect("Cannot yet deal with conjunctions of target states");
+                .ok_or(HoaError::UnsupportedAlternation)?;
             let label = edge.label().deref().clone();
 
             let expr = label
@@ -290,10 +302,12 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
     debug_assert!(!DET || ts.is_deterministic());
 
     let start = aut.start();
-    assert_eq!(start.len(), 1);
+    if start.len() != 1 {
+        return Err(HoaError::UnsupportedStartStates(start.len()));
+    }
     let initial = start[0]
         .get_singleton()
-        .expect("Initial state must be a singleton");
+        .ok_or(HoaError::UnsupportedAlternation)?;
 
     let acceptance: OmegaAcceptanceCondition = aut.header().try_into()?;
 
@@ -425,5 +439,77 @@ State: 1
             }
             other => panic!("unexpected result: {:?}", other.map(|_| ())),
         }
+    }
+
+    /// Parses `hoa` and returns the error that caused the failure, without the range information.
+    fn failure(hoa: &str) -> super::HoaError {
+        match super::parse_omega_automaton_range::<false>(hoa, 0, hoa.len()) {
+            Err(super::HoaError::InRange { source, .. }) => *source,
+            Err(other) => other,
+            Ok(_) => panic!("expected the input to be rejected"),
+        }
+    }
+
+    fn hoa_with(aps: &str, start: &str, body: &str) -> String {
+        format!(
+            "HOA: v1\nStates: 2\n{start}\nacc-name: Buchi\nAcceptance: 1 Inf(0)\n{aps}\n--BODY--\n{body}\n--END--\n"
+        )
+    }
+
+    #[test]
+    fn automaton_without_atomic_propositions_is_an_error() {
+        use super::{HoaError, PropAlphabetError};
+        let hoa = hoa_with("AP: 0", "Start: 0", "State: 0\n[t] 0 {0}\nState: 1\n[t] 1");
+        assert_eq!(
+            failure(&hoa),
+            HoaError::Alphabet(PropAlphabetError::NoAtomicPropositions)
+        );
+    }
+
+    #[test]
+    fn automaton_with_too_many_atomic_propositions_is_an_error() {
+        use super::{HoaError, PropAlphabetError};
+        let hoa = hoa_with(
+            "AP: 7 \"a\" \"b\" \"c\" \"d\" \"e\" \"f\" \"g\"",
+            "Start: 0",
+            "State: 0\n[t] 0 {0}\nState: 1\n[t] 1",
+        );
+        assert!(matches!(
+            failure(&hoa),
+            HoaError::Alphabet(PropAlphabetError::TooManyAtomicPropositions { count: 7, .. })
+        ));
+    }
+
+    #[test]
+    fn state_ids_must_be_contiguous() {
+        use super::HoaError;
+        let hoa = hoa_with(
+            "AP: 1 \"a\"",
+            "Start: 0",
+            "State: 0\n[t] 0 {0}\nState: 5\n[t] 5",
+        );
+        assert_eq!(failure(&hoa), HoaError::StateOrder { position: 1, id: 5 });
+    }
+
+    #[test]
+    fn multiple_initial_states_are_an_error() {
+        use super::HoaError;
+        let hoa = hoa_with(
+            "AP: 1 \"a\"",
+            "Start: 0\nStart: 1",
+            "State: 0\n[t] 0 {0}\nState: 1\n[t] 1",
+        );
+        assert_eq!(failure(&hoa), HoaError::UnsupportedStartStates(2));
+    }
+
+    #[test]
+    fn alternating_automata_are_an_error() {
+        use super::HoaError;
+        let hoa = hoa_with(
+            "AP: 1 \"a\"",
+            "Start: 0",
+            "State: 0\n[t] 0&1 {0}\nState: 1\n[t] 1",
+        );
+        assert_eq!(failure(&hoa), HoaError::UnsupportedAlternation);
     }
 }

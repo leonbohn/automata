@@ -27,6 +27,17 @@ pub enum PropAlphabetError {
         "an alphabet of size {0} cannot be represented by atomic propositions, the size must be a power of two and at least 2"
     )]
     InvalidSize(usize),
+    /// A propositional alphabet needs at least one atomic proposition.
+    #[error("a propositional alphabet needs at least one atomic proposition")]
+    NoAtomicPropositions,
+    /// More atomic propositions were requested than can be represented.
+    #[error("{count} atomic propositions are too many, at most {max} are supported")]
+    TooManyAtomicPropositions {
+        /// The requested number of atomic propositions.
+        count: usize,
+        /// The maximum number of atomic propositions that is supported.
+        max: usize,
+    },
 }
 
 pub trait RawSymbolRepr: std::fmt::Debug + Hash + Eq + Ord + Copy {
@@ -368,16 +379,37 @@ pub struct PropAlphabet<RawTy: RawSymbolRepr = u32> {
 }
 
 impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
+    /// Creates a new alphabet over the atomic propositions with the given names.
+    ///
+    /// # Panics
+    /// Panics if `aps` is empty or contains too many names, see [`Self::try_new`] for a
+    /// fallible version.
     pub fn new(aps: Vec<String>) -> Self {
-        assert!(aps.len() < RawTy::max_aps());
-        assert!(!aps.is_empty());
+        Self::try_new(aps).expect("invalid atomic propositions")
+    }
+
+    /// Creates a new alphabet over the atomic propositions with the given names.
+    ///
+    /// # Errors
+    /// Returns an error if `aps` is empty ([`PropAlphabetError::NoAtomicPropositions`]) or
+    /// contains too many names ([`PropAlphabetError::TooManyAtomicPropositions`]).
+    pub fn try_new(aps: Vec<String>) -> Result<Self, PropAlphabetError> {
+        if aps.is_empty() {
+            return Err(PropAlphabetError::NoAtomicPropositions);
+        }
+        if aps.len() >= RawTy::max_aps() {
+            return Err(PropAlphabetError::TooManyAtomicPropositions {
+                count: aps.len(),
+                max: RawTy::max_aps() - 1,
+            });
+        }
 
         let universal = PropExpression::<RawTy>::universal(aps.len() as u8);
-        Self {
+        Ok(Self {
             expressions: Arc::new(Mutex::new(OrderedSet::from_iter([universal.clone()]))),
             universal,
             aps,
-        }
+        })
     }
 
     pub fn aps(&self) -> u8 {
@@ -425,18 +457,32 @@ impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
 
         let aps = alphabet_size.ilog2() as u8;
 
-        Ok(Self::from_apnames(
-            (0u8..aps).map(|i| ((b'a' + i) as char).to_string()),
-        ))
+        Self::try_from_apnames((0u8..aps).map(|i| ((b'a' + i) as char).to_string()))
     }
 
+    /// Creates a new alphabet from the names of the atomic propositions.
+    ///
+    /// # Panics
+    /// Panics if there are no names or too many, see [`Self::try_from_apnames`].
     pub fn from_apnames<I>(apnames: I) -> Self
     where
         I: IntoIterator,
         I::Item: Display,
     {
+        Self::try_from_apnames(apnames).expect("invalid atomic propositions")
+    }
+
+    /// Creates a new alphabet from the names of the atomic propositions.
+    ///
+    /// # Errors
+    /// See [`Self::try_new`].
+    pub fn try_from_apnames<I>(apnames: I) -> Result<Self, PropAlphabetError>
+    where
+        I: IntoIterator,
+        I::Item: Display,
+    {
         let apnames: Vec<_> = apnames.into_iter().map(|i| i.to_string()).collect();
-        Self::new(apnames)
+        Self::try_new(apnames)
     }
 }
 
@@ -481,6 +527,20 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn try_new_validates_the_number_of_atomic_propositions() {
+        assert!(matches!(
+            PropAlphabet::<u32>::try_new(vec![]),
+            Err(PropAlphabetError::NoAtomicPropositions)
+        ));
+        let too_many = (0..40).map(|i| i.to_string()).collect();
+        assert!(matches!(
+            PropAlphabet::<u32>::try_new(too_many),
+            Err(PropAlphabetError::TooManyAtomicPropositions { count: 40, .. })
+        ));
+        assert!(PropAlphabet::<u32>::try_new(vec!["a".into(), "b".into()]).is_ok());
+    }
 
     #[test]
     fn char_alphabet_conversion_requires_power_of_two_size() {
