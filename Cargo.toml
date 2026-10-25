@@ -2,6 +2,7 @@
 name = "automata"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.88"
 readme = "README.md"
 description = "A library for transition systems and automata over (in)finite words."
 repository = "https://github.com/leonbohn/automata"

@@ -56,6 +56,15 @@ jobs:
       - uses: taiki-e/install-action@cargo-hack
       - run: cargo hack check --each-feature --no-dev-deps
 
+  msrv:
+    name: Minimum supported Rust version (1.88)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install 1.88 --profile minimal --no-self-update
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo +1.88 check --all-targets --all-features
+
   test:
     name: Test (${{ matrix.os }})
     strategy:
