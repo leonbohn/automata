@@ -2,7 +2,29 @@ use crate::{Int, Show};
 
 use bit_set::BitSet;
 use itertools::Itertools;
-use tracing::error;
+use thiserror::Error;
+
+/// Errors concerning the acceptance sets that are attached to the edges of an omega automaton.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum AcceptanceError {
+    /// An edge does not belong to any acceptance set, but exactly one is required.
+    #[error("an edge has no acceptance set, but exactly one is required")]
+    NoAcceptanceSet,
+    /// An edge belongs to several acceptance sets, but exactly one is required.
+    #[error("an edge has the acceptance sets {0:?}, but exactly one is required")]
+    MultipleAcceptanceSets(Vec<Int>),
+    /// The priority of an edge lies outside of the range of the acceptance condition.
+    #[error("the priority {priority} is outside of the range {low}..={high} of the condition")]
+    PriorityOutOfRange {
+        /// The priority found on an edge.
+        priority: Int,
+        /// The lowest priority allowed by the condition.
+        low: Int,
+        /// The highest priority allowed by the condition.
+        high: Int,
+    },
+}
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AcceptanceMask(BitSet);
@@ -20,22 +42,31 @@ impl AcceptanceMask {
         self.iter().min()
     }
 
+    /// Returns the single acceptance set that the mask consists of, interpreted as a priority.
+    ///
+    /// # Panics
+    /// Panics unless exactly one acceptance set is present, see [`Self::try_as_priority`].
     pub fn as_priority(&self) -> Int {
+        self.try_as_priority()
+            .expect("an edge needs exactly one acceptance set to have a priority")
+    }
+
+    /// Returns the single acceptance set that the mask consists of, interpreted as a priority.
+    ///
+    /// # Errors
+    /// Fails with [`AcceptanceError::NoAcceptanceSet`] or
+    /// [`AcceptanceError::MultipleAcceptanceSets`] unless exactly one acceptance set is present.
+    pub fn try_as_priority(&self) -> Result<Int, AcceptanceError> {
         let mut it = self.iter();
         let Some(priority) = it.next() else {
-            error!(
-                "no priority is set on the edge, we require each edge to have precisely one color"
-            );
-            panic!("could not extract priority from acceptance mask");
+            return Err(AcceptanceError::NoAcceptanceSet);
         };
         if it.next().is_some() {
-            error!(
-                "more than one priority is set on the edge: {:?}, but we require edges to have precisely one color",
-                self.0
-            );
-            panic!("could not extract priority from acceptance mask");
+            return Err(AcceptanceError::MultipleAcceptanceSets(
+                self.iter().collect(),
+            ));
         }
-        priority
+        Ok(priority)
     }
 
     pub fn as_bool(&self) -> bool {
@@ -46,6 +77,12 @@ impl AcceptanceMask {
             tracing::error!("invalid acceptance mask: {self:?}, expected color 0 or no color");
         }
         true
+    }
+}
+
+impl FromIterator<Int> for AcceptanceMask {
+    fn from_iter<I: IntoIterator<Item = Int>>(iter: I) -> Self {
+        Self(iter.into_iter().map(|i| i as usize).collect())
     }
 }
 
@@ -67,5 +104,23 @@ impl From<&hoars::AcceptanceSignature> for AcceptanceMask {
 impl std::fmt::Debug for AcceptanceMask {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AcceptanceError, AcceptanceMask};
+
+    #[test]
+    fn priority_requires_exactly_one_acceptance_set() {
+        assert_eq!(AcceptanceMask::from_iter([3]).try_as_priority(), Ok(3));
+        assert_eq!(
+            AcceptanceMask::from_iter([]).try_as_priority(),
+            Err(AcceptanceError::NoAcceptanceSet)
+        );
+        assert_eq!(
+            AcceptanceMask::from_iter([1, 4]).try_as_priority(),
+            Err(AcceptanceError::MultipleAcceptanceSets(vec![1, 4]))
+        );
     }
 }

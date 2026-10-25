@@ -10,6 +10,9 @@ pub enum Error {
     /// An alphabet could not be converted into a propositional alphabet.
     #[error(transparent)]
     PropAlphabet(#[from] crate::alphabet::PropAlphabetError),
+    /// The acceptance sets of an edge are not valid for the acceptance condition.
+    #[error(transparent)]
+    Acceptance(#[from] crate::automaton::AcceptanceError),
     /// A reduced omega word has a non-empty prefix and cannot be turned into a periodic one.
     #[error(transparent)]
     NotPeriodic(#[from] crate::word::NotPeriodicError),

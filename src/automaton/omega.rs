@@ -21,8 +21,7 @@ use crate::math::OrderedSet;
 use crate::representation::IntoTs;
 use crate::ts::{DefaultIdType, ForAlphabet, IsEdge, ScalarIndexType, Sproutable, TSBuilder};
 use crate::{DTS, Pointed, TS, TransitionSystem};
-pub use acceptance_mask::AcceptanceMask;
-use tracing::{error, trace};
+pub use acceptance_mask::{AcceptanceError, AcceptanceMask};
 
 /// Type alias for an omega automaton (i.e. an [`InfiniteWordAutomaton`]) that is guaranteed to be
 /// [`crate::Deterministic`].
@@ -92,26 +91,8 @@ impl<A: Alphabet, const DET: bool> OmegaAutomaton<A, DET> {
         }
     }
     /// Attempts to convert `self` into a [`DeterministicOmegaAutomaton`]. Returns
-    /// `None` if this is not possible because the transition system underlying `self`
-    /// is not deterministic.
-    pub fn into_deterministic(self) -> DeterministicOmegaAutomaton<A> {
-        match self.try_into_deterministic() {
-            Ok(dts) => {
-                trace!("Converted into deterministic: {:?}", dts);
-                dts
-            }
-            Err(nts) => {
-                error!(
-                    "Tried to convert non-deterministic omega automaton into deterministic: \n{:?}",
-                    nts
-                );
-                panic!("Automaton that we want to convert is not deterministic!")
-            }
-        }
-    }
-    /// Attempts to convert `self` into a [`DeterministicOmegaAutomaton`]. Returns
-    /// `None` if this is not possible because the transition system underlying `self`
-    /// is not deterministic.
+    /// `self` unchanged as the error if this is not possible because the transition system
+    /// underlying `self` is not deterministic.
     pub fn try_into_deterministic(self) -> Result<DeterministicOmegaAutomaton<A>, Self> {
         let OmegaAutomaton {
             ts,
@@ -130,15 +111,41 @@ impl<A: Alphabet, const DET: bool> OmegaAutomaton<A, DET> {
 }
 
 impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
+    /// Verifies that every edge has exactly one acceptance set and that the corresponding
+    /// priority lies within `low..=high`.
+    fn check_priorities(&self, low: Int, high: Int) -> Result<(), AcceptanceError> {
+        for q in self.ts.state_indices() {
+            for edge in self.ts.edges_from(q).into_iter().flatten() {
+                let priority = edge.color().try_as_priority()?;
+                if priority < low || priority > high {
+                    return Err(AcceptanceError::PriorityOutOfRange {
+                        priority,
+                        low,
+                        high,
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Consumes and converts `self` into a [`DPA`]. Since [`DPA`]s can capture the
     /// full class of omega-regular languages, this is possible in principle for every
     /// acceptance condition.
     ///
     /// # Errors
+    /// For parity conditions every edge needs exactly one acceptance set that lies within
+    /// the range of the condition, otherwise an [`Error::Acceptance`] is returned.
+    ///
     /// The conversion is not implemented for [`OmegaAcceptanceCondition::Rabin`],
     /// [`OmegaAcceptanceCondition::Streett`], [`OmegaAcceptanceCondition::Reachability`]
     /// and [`OmegaAcceptanceCondition::Safety`]; these yield [`Error::NotYetImplemented`].
     pub fn into_dpa(self) -> Result<DPA<A>, Error> {
+        match self.acceptance {
+            OmegaAcceptanceCondition::Parity(low, high) => self.check_priorities(low, high)?,
+            OmegaAcceptanceCondition::MaxParity(low, high) => self.check_priorities(low, high)?,
+            _ => {}
+        }
         match self.acceptance {
             OmegaAcceptanceCondition::Parity(_, _) => Ok(self
                 .ts
@@ -158,11 +165,9 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
             OmegaAcceptanceCondition::MaxParity(low, high) => {
                 let k = (high - low) + if low % 2 == 0 { 0 } else { 1 };
                 let to_new = |mask: AcceptanceMask| {
-                    let c = mask.as_priority();
-                    assert!(c >= low);
-                    assert!(c <= high);
-                    let diff = high - c;
-                    assert!(diff <= k);
+                    // the priorities have been validated at the start of this function
+                    let diff = high - mask.as_priority();
+                    debug_assert!(diff <= k);
                     diff
                 };
                 Ok(self
@@ -269,6 +274,61 @@ mod tests {
             OmegaAcceptanceCondition::Buchi.satisfied(&empty),
             Err(Error::NotYetImplemented(_))
         ));
+    }
+
+    fn two_state_automaton(
+        acceptance: OmegaAcceptanceCondition,
+        mask: AcceptanceMask,
+    ) -> DeterministicOmegaAutomaton<CharAlphabet> {
+        let mut ts: DTS<CharAlphabet, Int, AcceptanceMask> =
+            DTS::for_alphabet(CharAlphabet::of_size(1));
+        let q = ts.add_state(0);
+        ts.add_edge((q, 'a', mask, q));
+        DeterministicOmegaAutomaton::new(ts, q, acceptance)
+    }
+
+    #[test]
+    fn into_dpa_validates_priorities() {
+        use crate::automaton::AcceptanceError;
+
+        let parity = OmegaAcceptanceCondition::Parity(0, 2);
+        assert!(
+            two_state_automaton(parity, AcceptanceMask::from_iter([1]))
+                .into_dpa()
+                .is_ok()
+        );
+        assert_eq!(
+            two_state_automaton(parity, AcceptanceMask::from_iter([]))
+                .into_dpa()
+                .err(),
+            Some(Error::Acceptance(AcceptanceError::NoAcceptanceSet))
+        );
+        assert_eq!(
+            two_state_automaton(parity, AcceptanceMask::from_iter([0, 1]))
+                .into_dpa()
+                .err(),
+            Some(Error::Acceptance(AcceptanceError::MultipleAcceptanceSets(
+                vec![0, 1]
+            )))
+        );
+        assert_eq!(
+            two_state_automaton(parity, AcceptanceMask::from_iter([5]))
+                .into_dpa()
+                .err(),
+            Some(Error::Acceptance(AcceptanceError::PriorityOutOfRange {
+                priority: 5,
+                low: 0,
+                high: 2
+            }))
+        );
+        assert!(
+            two_state_automaton(
+                OmegaAcceptanceCondition::MaxParity(1, 3),
+                AcceptanceMask::from_iter([2])
+            )
+            .into_dpa()
+            .is_ok()
+        );
     }
 
     #[test]

@@ -291,32 +291,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         }
     }
 
-    /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
-    pub fn into_deterministic(self) -> LinkedListTransitionSystem<A, Q, C> {
-        match self.try_into_deterministic() {
-            Ok(ts) => ts,
-            Err(ts) => {
-                tracing::error!(
-                    "Tried to convert non-deterministic transition system to deterministic one\n{:?}",
-                    ts
-                );
-                panic!("This transition system is not deterministic");
-            }
-        }
-    }
-
-    /// Turns `self` into a deterministic transition system. Panics if `self` is not deterministic.
+    /// Turns `self` into a deterministic transition system. If `self` is not deterministic,
+    /// it is returned unchanged as the error.
     pub fn try_into_deterministic(self) -> Result<LinkedListTransitionSystem<A, Q, C, true>, Self> {
-        if DET {
-            if !self.is_deterministic() {
-                tracing::error!(
-                    "Tried to convert non-deterministic transition system to deterministic one\n{:?}",
-                    self
-                );
-                panic!("This transition system is not deterministic");
-            }
-            Ok(recast(self))
-        } else if self.is_deterministic() {
+        if self.is_deterministic() {
             Ok(recast(self))
         } else {
             Err(self)
