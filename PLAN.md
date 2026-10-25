@@ -13,11 +13,15 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 - [ ] Switch `frieda`'s `automata-learning` and binaries to depend on this crate instead of their path copy; then delete `crates/automata` and `crates/automata-core` from `frieda`.
 - [ ] Add `rust-version` (MSRV) and verify it in CI with `cargo-msrv`.
 - [ ] Push `main` to `github.com/leonbohn/automata`, set up docs.rs metadata (`all-features = true`).
-- [ ] Split heavy features: `default = ["hoa"]`; make `render`, `graphviz`, `random`, `petgraph` opt-in; keep text `dot` output always available.
+- [ ] Split heavy features: `default = ["hoa"]`; make `render`, `graphviz`, `random` opt-in; keep text `dot` output always available.
 - [ ] Remove the unused optional `clap` dependency.
+- [x] Deleted dead code that was never compiled: `edge_lists.rs`, `petgraph_backed.rs`, `packed.rs`, together with the no-op features `petgraph` and `implementations` and the unused `petgraph` dependency (still in git history).
 
 ## Phase 2: API redesign
 
+- [x] Introduced the crate-wide `Error` enum (`#[non_exhaustive]`, `Error::NotYetImplemented`) and `Result` alias in `src/error.rs`. `OmegaAcceptanceCondition::satisfied` and `DeterministicOmegaAutomaton::into_dpa` now return `Result`.
+- [ ] Policy: return `Result` with custom error enums instead of panicking. Audit the remaining ~37 `panic!` and ~220 `unwrap`/`expect` calls module by module and replace those reachable from the public API; replace the `Result<_, String>` error types (e.g. in `hoa/input.rs`, `PropAlphabet::try_from_char_alphabet`) with proper enums.
+- [ ] Implement the conversions that currently return `Error::NotYetImplemented`: `into_dpa` for Rabin, Streett, Reachability and Safety (Rabin/Streett need a real construction such as an index appearance record), and `OmegaAcceptanceCondition::satisfied` for everything except Parity. Rabin/Streett variants of the enum carry no pairs; decide whether the enum should.
 - [ ] Reduce `Automaton`'s seven parameters (remove the `OMEGA`/`DET` const bools by carrying that information in the acceptance condition and TS types). Concise aliases for `DFA`, `NFA`, `DBA`, `NBA`, `DPA`, `NPA`, `DRA`, `DMA`, `Moore`, `Mealy`.
 - [ ] Add a `prelude` module.
 - [ ] Replace panics in the public API with `Result`/`Option` and one crate `Error` type; shrink large error variants and drop the `result_large_err` allows.
@@ -54,3 +58,15 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 ## Phase 6: release
 
 - [ ] Publish `automata 0.1.0` (after `hoars` is released and the `core` module is flattened); set up release-plz or cargo-release; announce.
+
+## Known issues parked for later
+
+Performance (measure with benchmarks first, see Phase 4):
+- `src/ts/connected_components/tarjan.rs`: for every back edge the stack is walked linearly (`skip_while`), which can make SCC computation quadratic; the `tee()` has an unused half.
+- `src/ts/impls/linked.rs`: state removal removes edges one by one via repeated first-edge lookups.
+- `src/minimization/partition_refinement.rs`: open question whether edge colors can be dropped entirely when collecting into a Moore machine.
+
+Correctness and design:
+- `From<FDFA> for FWPM` (`src/families/convert.rs`) does not check that the FDFA is saturated (documented as a precondition). The check is costly; add it later, probably as an opt-in `TryFrom`.
+- `PeriodicOmegaWord` should wrap a non-empty word type instead of documenting the invariant.
+- `out_edge_position` / `in_edge_position` in `linked.rs` have a "make this a match" cleanup pending.

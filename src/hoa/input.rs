@@ -234,10 +234,11 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
 
         match value.acceptance_name() {
             hoars::AcceptanceName::Buchi => Ok(OmegaAcceptanceCondition::Buchi),
-            hoars::AcceptanceName::Parity => Ok(OmegaAcceptanceCondition::Parity(
-                0,
-                acceptance_sets.unwrap() as Int,
-            )),
+            hoars::AcceptanceName::Parity => {
+                let sets = acceptance_sets
+                    .ok_or_else(|| "Parity automaton without Acceptance header item".to_string())?;
+                Ok(OmegaAcceptanceCondition::Parity(0, sets as Int))
+            }
             _ => Err("Unsupported acceptance condition".to_string()),
         }
     }
@@ -360,5 +361,23 @@ mod tests {
         let (first, hoa) = first.unwrap();
         assert_eq!(first.size(), 1);
         assert!(hoa.0.is_empty());
+    }
+
+    #[test]
+    fn parity_without_acceptance_item_is_an_error() {
+        let raw_hoa = r#"
+        HOA: v1
+        States: 1
+        Start: 0
+        acc-name: parity min even 2
+        AP: 1 "a"
+        --BODY--
+        State: 0
+        [0] 0 {0}
+        [!0] 0
+        --END--
+        "#;
+        let parsed = hoars::HoaRepresentation::try_from(raw_hoa).expect("valid HOA syntax");
+        assert!(super::OmegaAcceptanceCondition::try_from(parsed.header()).is_err());
     }
 }

@@ -26,7 +26,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
   - `word`: `Word`, `FiniteWord`, `OmegaWord`; `PeriodicOmegaWord`, `ReducedOmegaWord`, `NormalizedOmegaWord`; adapters (`Concat`, `Repeat`, `Skip`, `Infix`, `Rotate`). The `upw!` macro is exported at the crate root and re-exported as `core::upw`.
   - `math`, `dag`, `Color`, `Lattice`, `Void`, `Show`.
 - `src/ts.rs` and `src/ts/`: the `TransitionSystem` trait and everything around it.
-  - `impls/`: `LinkedListTransitionSystem` (default; aliases `TS`, `DTS`, `NTS`), edge-list variants, `petgraph`-backed (feature `petgraph`).
+  - `impls/`: `LinkedListTransitionSystem` (the only implementation; aliases `TS`, `DTS`, `NTS`).
   - `operations/`: lazy adapters (`map`, `product`, `quotient`, `restricted`, `reverse`, `subset`, `with_state_color`).
   - `run.rs`/`path.rs`: runs with `Observer`s, `Path`, `Lasso`.
   - `connected_components/`: Tarjan SCCs, `SccDecomposition`. `reachable.rs`: reachability, minimal representatives. `builder.rs`: `TSBuilder`.
@@ -36,12 +36,14 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 
 Edges are labeled with alphabet *expressions*; a *transition* is the concrete (state, symbol) step. Capabilities are layered via extra traits rather than one large trait; add a trait or blanket impl rather than extending `TransitionSystem`.
 
-Features: `default = ["hoa", "random", "render"]`, plus `graphviz`, `petgraph`, `implementations`.
+Features: `default = ["hoa", "random", "render"]`, plus `graphviz`.
 
 ## Conventions
 
 - `#![deny(missing_docs)]` and `deny(rustdoc::broken_intra_doc_links)` are on; README is `include_str!`ed into the crate docs, so README code blocks are doctests.
 - Use `tracing` for logging in library code.
+- Do not panic in library code: return `Result` with the crate's `Error` enum (`src/error.rs`, `#[non_exhaustive]`); use `Error::NotYetImplemented` instead of `todo!()`/`unimplemented!()`. Existing panics are being removed (see `PLAN.md`).
+- Ask before committing or pushing.
 - Inside `src/core/`, refer to siblings with `crate::core::...`.
 
 ## Known sharp edges

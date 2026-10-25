@@ -309,8 +309,10 @@ impl<RawTy: RawSymbolRepr> Expression for PropExpression<RawTy> {
         }
     }
 
-    fn overlaps(&self, _other: &Self) -> bool {
-        todo!()
+    /// Two expressions overlap if some symbol satisfies both. Expressions over a different
+    /// number of atomic propositions never overlap.
+    fn overlaps(&self, other: &Self) -> bool {
+        self.num_aps == other.num_aps && self.bdd.and(&other.bdd).sat_witness().is_some()
     }
 }
 
@@ -442,8 +444,7 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
     }
 
     fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
-        assert_eq!(left.num_aps, right.num_aps);
-        left.bdd.and(&right.bdd).sat_witness().is_some()
+        left.overlaps(right)
     }
 
     type Universe<'this>
@@ -455,8 +456,8 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
         self.universal.sat_vals()
     }
 
-    fn contains(&self, _symbol: Self::Symbol) -> bool {
-        unimplemented!()
+    fn contains(&self, symbol: Self::Symbol) -> bool {
+        symbol.num_aps == self.aps() && symbol.raw.as_usize() < self.size()
     }
 
     fn size(&self) -> usize {
@@ -467,6 +468,30 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn alphabet_contains_only_its_own_symbols() {
+        let alphabet: PropAlphabet = PropAlphabet::new(vec!["a".into(), "b".into()]);
+        assert!(alphabet.contains(alphabet.char_to_symbol('a')));
+        assert!(alphabet.contains(alphabet.char_to_symbol('d')));
+        // raw value 7 needs three atomic propositions
+        assert!(!alphabet.contains(alphabet.char_to_symbol('h')));
+        // symbol over a different number of atomic propositions
+        let other: PropAlphabet = PropAlphabet::new(vec!["a".into(), "b".into(), "c".into()]);
+        assert!(!alphabet.contains(other.char_to_symbol('a')));
+    }
+
+    #[test]
+    fn expression_overlaps() {
+        let a_and_b = PropExpression::<u32>::new(2, "x_0 & x_1");
+        let a = PropExpression::<u32>::new(2, "x_0");
+        let not_a = PropExpression::<u32>::new(2, "!x_0");
+        assert!(a_and_b.overlaps(&a));
+        assert!(a.overlaps(&a_and_b));
+        assert!(!a.overlaps(&not_a));
+        // different numbers of atomic propositions never overlap
+        assert!(!a.overlaps(&PropExpression::<u32>::new(3, "x_0")));
+    }
 
     #[test]
     fn prop_symbol() {

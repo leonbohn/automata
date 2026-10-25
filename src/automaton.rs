@@ -342,8 +342,8 @@ where
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         self.ts.add_state(color)
     }
-    fn set_state_color(&mut self, _index: StateIndex<Self>, _color: StateColor<Self>) {
-        todo!()
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
+        self.ts.set_state_color(index, color)
     }
     fn add_edge<E>(&mut self, t: E) -> Option<crate::ts::EdgeTuple<Self>>
     where
@@ -531,6 +531,19 @@ where
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn set_initial_color_on_automaton() {
+        use crate::core::alphabet::CharAlphabet;
+        use crate::ts::Sproutable;
+        use crate::{Pointed, TransitionSystem};
+
+        let mut dfa: DFA =
+            super::Automaton::new_with_initial_color(CharAlphabet::of_size(2), false);
+        assert_eq!(dfa.state_color(dfa.initial()), Some(false));
+        dfa.set_initial_color(true);
+        assert_eq!(dfa.state_color(dfa.initial()), Some(true));
+    }
+
     use crate::automaton::{DBA, DFA, MooreMachine};
     use crate::core::upw;
     use crate::core::word::ReducedOmegaWord;

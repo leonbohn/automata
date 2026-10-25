@@ -60,9 +60,14 @@ impl<A: Alphabet> From<FWPM<A>> for FDFA<A> {
     }
 }
 
+/// Converts an [`FDFA`] into the corresponding [`FWPM`].
+///
+/// # Precondition
+/// The [`FDFA`] is expected to be *saturated*. This is **not checked**, as the check is
+/// costly: for an [`FDFA`] that is not saturated, the resulting [`FWPM`] may silently
+/// not capture the intended language.
 impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
     fn from(value: FDFA<A>) -> Self {
-        // TODO: assert that FDFA is saturated?
         let (leading, progress) = value.into_parts();
         assert_eq!(leading.size(), progress.len());
 

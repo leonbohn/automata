@@ -179,7 +179,6 @@ The following features are offered.
 | `hoa` | `true` | enables input and output of HOA files, using the [hoars](https://github.com/leonbohn/hoars) library |
 | `random` | `true` | allows constructing random transition systems with a certain edge probability. |
 | `render` | `true` | Moreover, it allows generating SVG representation of the graph without external dependencies. | 
-| `implementations` | `false` | Offers some additional implementations of the `TransitionSystem` trait, for example `HashSet` based ones |
 | `graphviz` | `false` | through which DOT representation of transition systems/automata can be generated and visualised |
 
 ## Development

@@ -2,6 +2,10 @@
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
+/// The crate-wide [`Error`] type.
+pub mod error;
+pub use error::Error;
+
 /// Foundations shared by the rest of the crate: alphabets, words, colors and basic math types.
 pub mod core;
 

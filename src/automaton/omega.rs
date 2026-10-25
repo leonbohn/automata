@@ -14,6 +14,7 @@ pub use muller::*;
 #[allow(missing_docs)]
 mod acceptance_mask;
 use super::InfiniteWordAutomaton;
+use crate::Error;
 use crate::core::Int;
 use crate::core::alphabet::{Alphabet, CharAlphabet, PropAlphabet};
 use crate::core::math::OrderedSet;
@@ -57,15 +58,21 @@ pub enum OmegaAcceptanceCondition {
 impl OmegaAcceptanceCondition {
     /// Returns true if and only if the condition is satisfied by the given set of
     /// [`AcceptanceMask`]s.
-    pub fn satisfied(&self, infset: &OrderedSet<AcceptanceMask>) -> bool {
+    ///
+    /// # Errors
+    /// Currently only [`OmegaAcceptanceCondition::Parity`] is supported, all other
+    /// conditions yield [`Error::NotYetImplemented`].
+    pub fn satisfied(&self, infset: &OrderedSet<AcceptanceMask>) -> Result<bool, Error> {
         match self {
-            OmegaAcceptanceCondition::Parity(_low, _high) => infset
+            OmegaAcceptanceCondition::Parity(_low, _high) => Ok(infset
                 .iter()
                 .map(|x| x.as_priority())
                 .min()
                 .map(|x| x % 2 == 0)
-                .unwrap_or(false),
-            _ => unimplemented!(),
+                .unwrap_or(false)),
+            _ => Err(Error::NotYetImplemented(
+                "checking satisfaction for this acceptance condition",
+            )),
         }
     }
 }
@@ -124,24 +131,30 @@ impl<A: Alphabet, const DET: bool> OmegaAutomaton<A, DET> {
 
 impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
     /// Consumes and converts `self` into a [`DPA`]. Since [`DPA`]s can capture the
-    /// full class of omega-regular languages, this operation never fails.
-    pub fn into_dpa(self) -> DPA<A> {
+    /// full class of omega-regular languages, this is possible in principle for every
+    /// acceptance condition.
+    ///
+    /// # Errors
+    /// The conversion is not implemented for [`OmegaAcceptanceCondition::Rabin`],
+    /// [`OmegaAcceptanceCondition::Streett`], [`OmegaAcceptanceCondition::Reachability`]
+    /// and [`OmegaAcceptanceCondition::Safety`]; these yield [`Error::NotYetImplemented`].
+    pub fn into_dpa(self) -> Result<DPA<A>, Error> {
         match self.acceptance {
-            OmegaAcceptanceCondition::Parity(_, _) => self
+            OmegaAcceptanceCondition::Parity(_, _) => Ok(self
                 .ts
                 .map_edge_colors(|mask| mask.as_priority())
                 .with_initial(self.initial)
-                .into_dpa(),
-            OmegaAcceptanceCondition::Buchi => self
+                .into_dpa()),
+            OmegaAcceptanceCondition::Buchi => Ok(self
                 .ts
                 .map_edge_colors(|mask| if mask.as_bool() { 0 } else { 1 })
                 .with_initial(self.initial)
-                .into_dpa(),
-            OmegaAcceptanceCondition::CoBuchi => self
+                .into_dpa()),
+            OmegaAcceptanceCondition::CoBuchi => Ok(self
                 .ts
                 .map_edge_colors(|mask| if mask.as_bool() { 1 } else { 0 })
                 .with_initial(self.initial)
-                .into_dpa(),
+                .into_dpa()),
             OmegaAcceptanceCondition::MaxParity(low, high) => {
                 let k = (high - low) + if low % 2 == 0 { 0 } else { 1 };
                 let to_new = |mask: AcceptanceMask| {
@@ -152,15 +165,24 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
                     assert!(diff <= k);
                     diff
                 };
-                self.ts
+                Ok(self
+                    .ts
                     .map_edge_colors(to_new)
                     .with_initial(self.initial)
-                    .into_dpa()
+                    .into_dpa())
             }
-            OmegaAcceptanceCondition::Rabin => todo!(),
-            OmegaAcceptanceCondition::Streett => todo!(),
-            OmegaAcceptanceCondition::Reachability => todo!(),
-            OmegaAcceptanceCondition::Safety => todo!(),
+            OmegaAcceptanceCondition::Rabin => Err(Error::NotYetImplemented(
+                "conversion of Rabin automata into DPA",
+            )),
+            OmegaAcceptanceCondition::Streett => Err(Error::NotYetImplemented(
+                "conversion of Streett automata into DPA",
+            )),
+            OmegaAcceptanceCondition::Reachability => Err(Error::NotYetImplemented(
+                "conversion of reachability automata into DPA",
+            )),
+            OmegaAcceptanceCondition::Safety => Err(Error::NotYetImplemented(
+                "conversion of safety automata into DPA",
+            )),
         }
     }
 }
@@ -219,5 +241,55 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
             value.initial,
             value.acceptance,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Error;
+
+    fn single_state_automaton(
+        acceptance: OmegaAcceptanceCondition,
+    ) -> DeterministicOmegaAutomaton<CharAlphabet> {
+        let mut ts: DTS<CharAlphabet, Int, AcceptanceMask> =
+            DTS::for_alphabet(CharAlphabet::of_size(1));
+        let q = ts.add_state(0);
+        DeterministicOmegaAutomaton::new(ts, q, acceptance)
+    }
+
+    #[test]
+    fn satisfied_reports_unsupported_conditions() {
+        let empty = OrderedSet::new();
+        assert_eq!(
+            OmegaAcceptanceCondition::Parity(0, 1).satisfied(&empty),
+            Ok(false)
+        );
+        assert!(matches!(
+            OmegaAcceptanceCondition::Buchi.satisfied(&empty),
+            Err(Error::NotYetImplemented(_))
+        ));
+    }
+
+    #[test]
+    fn into_dpa_reports_unsupported_conditions() {
+        for unsupported in [
+            OmegaAcceptanceCondition::Rabin,
+            OmegaAcceptanceCondition::Streett,
+            OmegaAcceptanceCondition::Reachability,
+            OmegaAcceptanceCondition::Safety,
+        ] {
+            assert!(matches!(
+                single_state_automaton(unsupported).into_dpa(),
+                Err(Error::NotYetImplemented(_))
+            ));
+        }
+        for supported in [
+            OmegaAcceptanceCondition::Buchi,
+            OmegaAcceptanceCondition::CoBuchi,
+            OmegaAcceptanceCondition::Parity(0, 1),
+        ] {
+            assert!(single_state_automaton(supported).into_dpa().is_ok());
+        }
     }
 }
