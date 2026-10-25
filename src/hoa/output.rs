@@ -5,7 +5,7 @@ use std::fmt::{Result, Write};
 
 use super::HoaError;
 use crate::{
-    Int, Pointed, Show, TransitionSystem,
+    Int, Pointed, TransitionSystem,
     alphabet::{Alphabet, CharAlphabet, PropAlphabet},
     automaton::{DBA, DPA, OmegaAcceptanceCondition},
     ts::{EdgeColor, EdgeExpression, IsEdge},
@@ -220,7 +220,7 @@ impl HoaSuitableAlphabet for PropAlphabet {
     }
 
     fn write_expression<W: std::fmt::Write>(&self, w: &mut W, expr: &Self::Expression) -> Result {
-        write!(w, "{}", expr.show())
+        write!(w, "{}", expr.to_hoa_label())
     }
 }
 
@@ -263,6 +263,51 @@ fn build_parity_condition_hoa(low: Int, high: Int) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn written_hoa_uses_proposition_indices_and_round_trips() {
+        use crate::hoa::HoaString;
+
+        let input = r#"HOA: v1
+States: 2
+Start: 0
+acc-name: parity min even 3
+Acceptance: 3 Inf(0) | (Fin(1) & Inf(2))
+AP: 2 "a" "b"
+--BODY--
+State: 0
+[0 & !1] 1 {1}
+[!0 & 1] 0 {0}
+[!0 & !1] 0 {2}
+[0 & 1] 1 {2}
+State: 1
+[0] 0 {1}
+[!0] 1 {2}
+--END--
+"#;
+        let parse = |text: &str| {
+            HoaString::from(text.to_string())
+                .pop::<true>()
+                .expect("valid HOA")
+                .into_dpa()
+                .expect("a parity automaton")
+        };
+        let first = parse(input).to_hoa();
+        for label in first
+            .lines()
+            .filter(|line| line.starts_with('['))
+            .map(|line| &line[1..line.find(']').unwrap()])
+        {
+            assert!(
+                label
+                    .chars()
+                    .all(|c| c.is_ascii_digit() || " !&|()".contains(c)),
+                "labels must be written over proposition indices: {label}"
+            );
+        }
+        let second = parse(&first).to_hoa();
+        assert_eq!(first, second);
+    }
+
     #[test]
     fn only_buchi_and_parity_can_be_written() {
         use crate::automaton::OmegaAcceptanceCondition;

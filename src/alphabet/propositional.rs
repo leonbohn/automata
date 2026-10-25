@@ -7,9 +7,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use biodivine_lib_bdd::{
-    Bdd, BddPartialValuation, BddSatisfyingValuations, BddValuation, BddVariableSet,
-};
+use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddValuation, BddVariableSet};
 use itertools::Itertools;
 use thiserror::Error;
 use tracing::trace;
@@ -288,37 +286,49 @@ impl<RawTy: RawSymbolRepr> Ord for PropExpression<RawTy> {
     }
 }
 
-fn clause_to_string(clause: &BddPartialValuation) -> String {
-    let offset = |x| (b'a' + x as u8) as char;
-    let mut vals = clause.to_values();
-    vals.sort();
-    vals.into_iter()
-        .map(|(v, b)| {
-            if b {
-                offset(v.to_index()).to_string()
-            } else {
-                format!("!{}", offset(v.to_index()))
-            }
+/// Renders a BDD as a disjunction of conjunctions (its optimized DNF). The variable with index
+/// `i` is rendered as `name(i)`, conjunctions are joined by `and`. The constants are rendered as
+/// `t` and `f`.
+fn bdd_to_string(bdd: &Bdd, name: impl Fn(usize) -> String, and: &str) -> String {
+    if bdd.is_true() {
+        return "t".to_string();
+    }
+    if bdd.is_false() {
+        return "f".to_string();
+    }
+    let dnf = bdd.to_optimized_dnf();
+    let clauses = dnf
+        .iter()
+        .map(|clause| {
+            let mut vals = clause.to_values();
+            vals.sort();
+            vals.into_iter()
+                .map(|(v, b)| {
+                    let name = name(v.to_index());
+                    if b { name } else { format!("!{name}") }
+                })
+                .join(and)
         })
-        .join("&")
+        .collect_vec();
+    if clauses.len() > 1 {
+        clauses.into_iter().map(|c| format!("({c})")).join(" | ")
+    } else {
+        clauses.into_iter().next().unwrap_or_default()
+    }
+}
+
+impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
+    /// Renders the expression as a label in the HOA format, i.e. over the indices of the atomic
+    /// propositions, for example `0 & !1` or `(0 & 1) | (!0 & !1)`.
+    pub fn to_hoa_label(&self) -> String {
+        bdd_to_string(&self.bdd, |i| i.to_string(), " & ")
+    }
 }
 
 impl<RawTy: RawSymbolRepr> Show for PropExpression<RawTy> {
+    /// Renders the expression over the letters `a`, `b`, ... instead of the proposition indices.
     fn show(&self) -> String {
-        let dnf = self.bdd.to_optimized_dnf();
-        let clauses = dnf.len();
-
-        if clauses > 1 {
-            let mut out = format!("({})", clause_to_string(&dnf[0]));
-
-            for clause in &dnf {
-                out.push_str(&format!(" | ({})", clause_to_string(clause)));
-            }
-
-            out
-        } else {
-            clause_to_string(&dnf[0])
-        }
+        bdd_to_string(&self.bdd, |i| ((b'a' + i as u8) as char).to_string(), "&")
     }
 }
 
@@ -559,6 +569,27 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn expressions_are_rendered_over_indices_for_hoa_and_letters_for_humans() {
+        let both = PropExpression::<u32>::new(2, "x_0 & !x_1");
+        assert_eq!(both.to_hoa_label(), "0 & !1");
+        assert_eq!(both.show(), "a&!b");
+
+        let either = PropExpression::<u32>::new(2, "x_0 | x_1");
+        let label = either.to_hoa_label();
+        assert!(label.contains(" | "), "{label}");
+        assert!(
+            !label.contains(|c: char| c.is_ascii_alphabetic()),
+            "{label}"
+        );
+
+        let always = PropExpression::<u32>::universal(2);
+        assert_eq!(always.to_hoa_label(), "t");
+        let never = PropExpression::<u32>::new(2, "x_0 & !x_0");
+        assert_eq!(never.to_hoa_label(), "f");
+        assert_eq!(never.show(), "f");
+    }
 
     #[test]
     fn try_new_validates_the_number_of_atomic_propositions() {
