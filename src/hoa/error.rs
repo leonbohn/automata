@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-/// Errors that can occur when reading an automaton from the HOA format.
+/// Errors that can occur when reading an automaton from, or writing one to, the HOA format.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HoaError {
@@ -26,6 +26,9 @@ pub enum HoaError {
     /// The automaton does not have exactly one initial state.
     #[error("expected exactly one initial state, found {0}")]
     UnsupportedStartStates(usize),
+    /// Writing to the output failed.
+    #[error("could not write HOA: {0}")]
+    Format(#[from] std::fmt::Error),
     /// A parity automaton does not specify its number of acceptance sets.
     #[error("parity automaton without an Acceptance header item")]
     MissingAcceptanceSets,

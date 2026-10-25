@@ -3,6 +3,7 @@ use tracing::trace;
 
 use std::fmt::{Result, Write};
 
+use super::HoaError;
 use crate::{
     Int, Pointed, Show, TransitionSystem,
     alphabet::{Alphabet, CharAlphabet, PropAlphabet},
@@ -68,29 +69,40 @@ pub trait WriteHoa: TransitionSystem + Pointed {
 
     fn to_hoa(&self) -> String {
         let mut w = String::new();
-        self.write_hoa(&mut w).unwrap();
+        self.write_hoa(&mut w)
+            .expect("writing to a String cannot fail");
         trace!("produced HOA string from automaton\n{}", w);
         w
     }
 }
 
+fn write_buchi_hoa<W: Write>(w: &mut W) -> Result {
+    write!(w, "acc-name: Buchi\nAcceptance: 1 Inf(0)\n")
+}
+
+fn write_parity_hoa<W: Write>(w: &mut W, low: Int, high: Int) -> Result {
+    let zero_based_range = high - low + (low % 2);
+    write!(
+        w,
+        "acc-name: parity min even {}\nAcceptance: {} {}\n",
+        zero_based_range + 1,
+        zero_based_range + 1,
+        build_parity_condition_hoa(low, high)
+    )
+}
+
 impl OmegaAcceptanceCondition {
-    pub fn write_hoa<W: Write>(&self, w: &mut W) -> Result {
+    /// Writes the `acc-name` and `Acceptance` header items of this condition in the HOA format.
+    ///
+    /// # Errors
+    /// Only Büchi and parity conditions can be written so far, for all others
+    /// [`HoaError::UnsupportedAcceptance`] is returned. A failing writer yields
+    /// [`HoaError::Format`].
+    pub fn write_hoa<W: Write>(&self, w: &mut W) -> std::result::Result<(), HoaError> {
         match self {
-            OmegaAcceptanceCondition::Parity(low, high) => {
-                let zero_based_range = high - low + (low % 2);
-                write!(
-                    w,
-                    "acc-name: parity min even {}\nAcceptance: {} {}\n",
-                    zero_based_range + 1,
-                    zero_based_range + 1,
-                    build_parity_condition_hoa(*low, *high)
-                )
-            }
-            OmegaAcceptanceCondition::Buchi => {
-                write!(w, "acc-name: Buchi\nAcceptance: 1 Inf(0)\n")
-            }
-            _ => todo!("Can not yet deal with other acceptance types"),
+            OmegaAcceptanceCondition::Parity(low, high) => Ok(write_parity_hoa(w, *low, *high)?),
+            OmegaAcceptanceCondition::Buchi => Ok(write_buchi_hoa(w)?),
+            other => Err(HoaError::UnsupportedAcceptance(format!("{other:?}"))),
         }
     }
 }
@@ -130,7 +142,7 @@ impl<A: HoaSuitableAlphabet> WriteHoa for DBA<A> {
     }
 
     fn write_acceptance<W: std::fmt::Write>(&self, w: &mut W) -> Result {
-        OmegaAcceptanceCondition::Buchi.write_hoa(w)
+        write_buchi_hoa(w)
     }
 }
 
@@ -162,7 +174,7 @@ impl<A: HoaSuitableAlphabet> WriteHoa for DPA<A> {
     fn write_acceptance<W: std::fmt::Write>(&self, w: &mut W) -> Result {
         let (low, high) = self.low_and_high_priority();
 
-        OmegaAcceptanceCondition::Parity(low, high).write_hoa(w)
+        write_parity_hoa(w, low, high)
     }
 }
 
@@ -217,41 +229,66 @@ impl HoaSuitableAlphabet for PropAlphabet {
 fn build_parity_condition_hoa(low: Int, high: Int) -> String {
     let parity = low % 2;
 
+    let even = parity == 0;
+
     if high <= low {
-        return match parity {
-            0 => "t".to_string(),
-            1 => "f".to_string(),
-            _ => unreachable!(),
-        };
+        return if even { "t" } else { "f" }.to_string();
     }
 
     match high - low {
-        0 => match parity {
-            0 => format!("Inf({low})"),
-            1 => format!("Fin({low})"),
-            _ => unreachable!(),
-        },
-        1 => match parity {
-            0 => format!("Inf({low}) | Fin({high})"),
-            1 => format!("Fin({low}) & Inf({high})"),
-            _ => unreachable!(),
-        },
-        _ => match parity {
-            0 => format!(
-                "Inf({low}) | ({})",
-                build_parity_condition_hoa(low + 1, high)
-            ),
-            1 => format!(
-                "Fin({low}) & ({})",
-                build_parity_condition_hoa(low + 1, high)
-            ),
-            _ => unreachable!(),
-        },
+        0 => {
+            if even {
+                format!("Inf({low})")
+            } else {
+                format!("Fin({low})")
+            }
+        }
+        1 => {
+            if even {
+                format!("Inf({low}) | Fin({high})")
+            } else {
+                format!("Fin({low}) & Inf({high})")
+            }
+        }
+        _ => {
+            let rest = build_parity_condition_hoa(low + 1, high);
+            if even {
+                format!("Inf({low}) | ({rest})")
+            } else {
+                format!("Fin({low}) & ({rest})")
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn only_buchi_and_parity_can_be_written() {
+        use crate::automaton::OmegaAcceptanceCondition;
+        use crate::hoa::HoaError;
+
+        let mut out = String::new();
+        assert!(OmegaAcceptanceCondition::Buchi.write_hoa(&mut out).is_ok());
+        assert!(
+            OmegaAcceptanceCondition::Parity(0, 2)
+                .write_hoa(&mut out)
+                .is_ok()
+        );
+        for unsupported in [
+            OmegaAcceptanceCondition::CoBuchi,
+            OmegaAcceptanceCondition::Rabin,
+            OmegaAcceptanceCondition::Streett,
+            OmegaAcceptanceCondition::Reachability,
+            OmegaAcceptanceCondition::Safety,
+        ] {
+            assert!(matches!(
+                unsupported.write_hoa(&mut String::new()),
+                Err(HoaError::UnsupportedAcceptance(_))
+            ));
+        }
+    }
+
     use super::WriteHoa;
     use crate::ts::TSBuilder;
 
