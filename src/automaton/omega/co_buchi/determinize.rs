@@ -1,0 +1,502 @@
+//! Language containment between states and semantic determinization \[AK22, Theorem 2.2\].
+//!
+//! \[AK22\] Bader Abu Radi, Orna Kupferman: *Minimization and Canonization of GFG
+//! Transition-Based Automata*. Log. Methods Comput. Sci. 18(3) (2022)
+//!
+//! \[KS15\] Denis Kuperberg, Michal Skrzypczak: *On Determinisation of Good-for-Games
+//! Automata*. ICALP (2) 2015: 299-310
+use super::CoBuchiCondition;
+use crate::games::{ParityGame, Player};
+use crate::ts::{Shrinkable, Sproutable};
+use crate::{Automaton, TransitionSystem};
+use crate::{
+    Color,
+    alphabet::{Alphabet, Expression},
+};
+use rustc_hash::FxHashMap;
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
+use std::hash::Hash;
+
+impl<A, Q, D> Automaton<A, CoBuchiCondition, Q, bool, D, true, true>
+where
+    A: Alphabet,
+    Q: Color,
+    D: TransitionSystem<Alphabet = A, StateColor = Q, EdgeColor = bool>,
+{
+    /// Computes the language containment relation between the states of `self`, which is
+    /// assumed to be a GFG-tNCW.
+    /// The result contains the pair `(q, s)` iff `L(A^q) ⊆ L(A^s)`,
+    /// where `A^q` is `self` with initial state `q`.
+    ///
+    /// Following \[KS15, Theorem 13\], containment is decided with the game `G(A^s, A^q)`,
+    /// played on pairs of states `(p, r)` (starting in `(s, q)`). In every round
+    /// 1. Spoiler picks a letter `σ`,
+    /// 2. Duplicator picks a transition `⟨p, σ, p'⟩`,
+    /// 3. Spoiler picks a transition `⟨r, σ, r'⟩`,
+    ///
+    /// and the game continues in `(p', r')`. Duplicator wins a play iff her run (from `s`) is
+    /// accepting or Spoiler's run (from `q`) is rejecting, i.e. iff Spoiler's run takes
+    /// `α`-transitions infinitely often whenever Duplicator's run does. This is a parity
+    /// condition with three priorities (see `Vertex`), and all pairs are decided at once by
+    /// solving a single [`ParityGame`]. To keep the arena total, missing transitions are
+    /// treated as `α`-transitions into an implicit rejecting sink.
+    ///
+    /// If Duplicator wins, then `L(A^q) ⊆ L(A^s)` holds regardless of GFGness. The converse
+    /// (and hence exactness of the relation) requires that `A^s` is GFG: Duplicator then wins
+    /// by following the strategy that witnesses `A^s`'s GFGness. Note that a GFG-tNCW may
+    /// contain states that are not GFG (e.g. states that are never used by the witnessing
+    /// strategy); for pairs `(q, s)` with such an `s`, the returned relation may miss
+    /// containments, but never contains a wrong one.
+    pub fn gfg_containment_relation(&self) -> BTreeSet<(D::StateIndex, D::StateIndex)> {
+        let states: Vec<D::StateIndex> = self.state_indices().collect();
+        let letters: Vec<_> = self.alphabet().universe().collect();
+        if letters.is_empty() {
+            // there are no infinite words, so all languages are empty and hence equal
+            return states
+                .iter()
+                .flat_map(|&q| states.iter().map(move |&s| (q, s)))
+                .collect();
+        }
+
+        // all `(is_α, p')` with `⟨p, a, p'⟩` in δ, where `None` is the implicit rejecting sink
+        let mut transitions: FxHashMap<(Option<D::StateIndex>, A::Symbol), Vec<_>> =
+            FxHashMap::default();
+        for &q in &states {
+            for (_, sym, color, target) in self.transitions_from(q) {
+                transitions
+                    .entry((Some(q), sym))
+                    .or_default()
+                    .push((color, Some(target)));
+            }
+        }
+        let into_sink = [(true, None)];
+        let successors = |p, a| {
+            transitions
+                .get(&(p, a))
+                .map_or(&into_sink[..], Vec::as_slice)
+        };
+
+        // Duplicator plays in `A^s`, Spoiler in `A^q` (as we check for `L(A^q) ⊆ L(A^s)`).
+        // Whether the initial vertex has priority 0 or 2 (spo_alpha = true) is irrelevant,
+        // as the winning condition is prefix-independent
+        let initial = |q, s| Vertex::ChooseLetter {
+            dup: Some(s),
+            spo: Some(q),
+            spo_alpha: false,
+        };
+
+        let mut arena = Arena::new();
+        for &q in &states {
+            for &s in &states {
+                arena.vertex(initial(q, s));
+            }
+        }
+        while let Some((v, source)) = arena.unexplored.pop() {
+            match v {
+                Vertex::ChooseLetter { dup, spo, .. } => {
+                    for &letter in &letters {
+                        arena.edge(source, Vertex::DuplicatorMoves { dup, spo, letter });
+                    }
+                }
+                Vertex::DuplicatorMoves { dup, spo, letter } => {
+                    for &(dup_alpha, dup) in successors(dup, letter) {
+                        let target = Vertex::SpoilerMoves {
+                            dup,
+                            dup_alpha,
+                            spo,
+                            letter,
+                        };
+                        arena.edge(source, target);
+                    }
+                }
+                Vertex::SpoilerMoves {
+                    dup, spo, letter, ..
+                } => {
+                    for &(spo_alpha, spo) in successors(spo, letter) {
+                        let target = Vertex::ChooseLetter {
+                            dup,
+                            spo,
+                            spo_alpha,
+                        };
+                        arena.edge(source, target);
+                    }
+                }
+            }
+        }
+
+        let winner = arena.game.solve();
+        let mut relation = BTreeSet::new();
+        for &q in &states {
+            for &s in &states {
+                if winner[arena.index[&initial(q, s)]] == Player::Even {
+                    relation.insert((q, s));
+                }
+            }
+        }
+        relation
+    }
+
+    /// Returns `true` iff `self`, which is assumed to be a GFG-tNCW, is semantically
+    /// deterministic. Following \[AK22\], this is the case if different nondeterministic
+    /// choices lead to equivalent states: for every state `q` and letter `σ`, and all
+    /// transitions `⟨q, σ, s⟩` and `⟨q, σ, s'⟩` (of any color), we have `L(A^s) = L(A^s')`.
+    ///
+    /// Language equivalence is decided with [`Self::gfg_containment_relation`], so the result
+    /// is exact if all `σ`-successors of all states are GFG. Otherwise, some equivalences might
+    /// be missed, in which case `false` may be returned for a semantically deterministic
+    /// automaton; a returned `true` is always correct.
+    pub fn is_semantically_deterministic(&self) -> bool {
+        let contained = self.gfg_containment_relation();
+        let equivalent = |s, t| contained.contains(&(s, t)) && contained.contains(&(t, s));
+        self.state_indices().all(|q| {
+            let mut successors: BTreeMap<_, Vec<D::StateIndex>> = BTreeMap::new();
+            for (_, sym, _, target) in self.transitions_from(q) {
+                successors.entry(sym).or_default().push(target);
+            }
+            successors
+                .values()
+                .all(|targets| targets.iter().all(|&s| equivalent(targets[0], s)))
+        })
+    }
+
+    /// Semantically determinizes `self`, which is assumed to be a GFG-tNCW, by removing all
+    /// transitions that are not covering. Following \[AK22\], a transition `⟨q, σ, s⟩` is
+    /// *covering* if for every transition `⟨q, σ, s'⟩`, it holds that `L(A^s') ⊆ L(A^s)`.
+    ///
+    /// Since the transitions used by a strategy witnessing GFGness are covering \[KS15\], this
+    /// neither changes the language nor the GFGness of `self`, and afterwards all remaining
+    /// `σ`-successors of a state are equivalent, i.e. [`Self::is_semantically_deterministic`]
+    /// holds. Removing transitions also preserves safe determinism.
+    ///
+    /// Covering is decided with [`Self::gfg_containment_relation`], so this requires that all
+    /// states of `self` are GFG (which is why \[AK22, Theorem 2.2\] removes non-GFG states
+    /// first). Otherwise, containments might be missed and covering transitions removed.
+    ///
+    /// Edges whose expression matches several symbols are kept as they are if they are
+    /// covering for all of them, and are otherwise replaced by one edge for each symbol they
+    /// are covering for.
+    pub fn semantically_determinize(&mut self)
+    where
+        D: Shrinkable + Sproutable,
+    {
+        let contained = self.gfg_containment_relation();
+        self.semantically_determinize_with(&contained);
+    }
+
+    /// Does the same as [`Self::semantically_determinize`], but decides covering with the given
+    /// containment relation `contained` (as computed by [`Self::gfg_containment_relation`])
+    /// instead of computing it, so that [`NCW::minimize`](super::NCW::minimize) can reuse it
+    /// for the later steps.
+    pub(super) fn semantically_determinize_with(
+        &mut self,
+        contained: &BTreeSet<(D::StateIndex, D::StateIndex)>,
+    ) where
+        D: Shrinkable + Sproutable,
+    {
+        let states: Vec<D::StateIndex> = self.state_indices().collect();
+        for q in states {
+            let mut successors: BTreeMap<_, BTreeSet<D::StateIndex>> = BTreeMap::new();
+            for (_, sym, _, target) in self.transitions_from(q) {
+                successors.entry(sym).or_default().insert(target);
+            }
+            let covering = |sym: &A::Symbol, s: D::StateIndex| {
+                successors[sym].iter().all(|&t| contained.contains(&(t, s)))
+            };
+
+            let edges = self
+                .remove_edges_from(q)
+                .expect("state was obtained from state_indices");
+            for (source, expression, color, target) in edges {
+                let symbols: Vec<A::Symbol> = expression.symbols().collect();
+                if symbols.iter().all(|sym| covering(sym, target)) {
+                    self.add_edge((source, expression, color, target));
+                    continue;
+                }
+                for sym in symbols.into_iter().filter(|sym| covering(sym, target)) {
+                    let expression = self.alphabet().make_expression(sym);
+                    self.add_edge((source, expression, color, target));
+                }
+            }
+        }
+    }
+}
+
+/// The partition of the states of a GFG-tNCW into classes of language-equivalent states, i.e.
+/// `q` and `s` are in the same class iff `L(A^q) = L(A^s)`. Each state is mapped to the smallest
+/// state of its class, which identifies the class.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct LanguageClasses<S>(BTreeMap<S, S>);
+
+impl<S: Ord + Copy> LanguageClasses<S> {
+    /// Builds the partition of `states` from the containment relation `contained` (see
+    /// [`Automaton::gfg_containment_relation`]), where `q` and `s` are equivalent if they are
+    /// connected by a chain of mutually contained states. As the containment relation never
+    /// contains a wrong pair, every such chain witnesses a real equivalence, so this is exact
+    /// whenever `contained` is, and may only find more equivalences otherwise.
+    pub(super) fn from_containment(
+        contained: &BTreeSet<(S, S)>,
+        states: impl IntoIterator<Item = S>,
+    ) -> Self {
+        let mut mutual: BTreeMap<S, Vec<S>> = states.into_iter().map(|q| (q, vec![])).collect();
+        for &(q, s) in contained {
+            if q != s
+                && mutual.contains_key(&s)
+                && contained.contains(&(s, q))
+                && let Some(equivalent) = mutual.get_mut(&q)
+            {
+                equivalent.push(s);
+            }
+        }
+
+        let mut class = BTreeMap::new();
+        // the states are visited in ascending order, so `q` is the smallest state of its class
+        for &q in mutual.keys() {
+            if class.contains_key(&q) {
+                continue;
+            }
+            class.insert(q, q);
+            let mut stack = vec![q];
+            while let Some(p) = stack.pop() {
+                for &s in &mutual[&p] {
+                    if let Entry::Vacant(entry) = class.entry(s) {
+                        entry.insert(q);
+                        stack.push(s);
+                    }
+                }
+            }
+        }
+        Self(class)
+    }
+
+    /// Returns `true` iff `q` and `s` are in the same class.
+    ///
+    /// # Panics
+    /// If `q` or `s` was not among the states the partition was built from.
+    pub(super) fn equivalent(&self, q: S, s: S) -> bool {
+        self.class(q) == self.class(s)
+    }
+
+    /// Returns the smallest state of the class of `q`, which identifies the class.
+    ///
+    /// # Panics
+    /// If `q` was not among the states the partition was built from.
+    pub(super) fn class(&self, q: S) -> S {
+        self.0[&q]
+    }
+}
+
+/// A vertex of the containment game `G(A^s, A^q)`, where `dup` and `spo` are the current states
+/// of Duplicator and Spoiler, respectively, and `None` is the implicit rejecting sink.
+///
+/// A round visits [`Vertex::ChooseLetter`], [`Vertex::DuplicatorMoves`] and
+/// [`Vertex::SpoilerMoves`] in this order. Its greatest priority is 2 if Spoiler took an
+/// `α`-transition, otherwise 1 if Duplicator took one, and otherwise 0. Hence, Duplicator
+/// ([`Player::Even`]) wins iff Spoiler takes `α`-transitions infinitely often whenever
+/// Duplicator does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Vertex<S, L> {
+    /// Spoiler picks a letter. `spo_alpha` is `true` iff Spoiler's last transition was an
+    /// `α`-transition, which gives this vertex priority 2.
+    ChooseLetter {
+        dup: Option<S>,
+        spo: Option<S>,
+        spo_alpha: bool,
+    },
+    /// Duplicator picks a `letter`-transition from `dup`.
+    DuplicatorMoves {
+        dup: Option<S>,
+        spo: Option<S>,
+        letter: L,
+    },
+    /// Spoiler picks a `letter`-transition from `spo`. `dup_alpha` is `true` iff the transition
+    /// that Duplicator just took to `dup` is an `α`-transition, which gives this vertex
+    /// priority 1.
+    SpoilerMoves {
+        dup: Option<S>,
+        dup_alpha: bool,
+        spo: Option<S>,
+        letter: L,
+    },
+}
+
+impl<S, L> Vertex<S, L> {
+    fn owner(&self) -> Player {
+        match self {
+            Vertex::DuplicatorMoves { .. } => Player::Even,
+            Vertex::ChooseLetter { .. } | Vertex::SpoilerMoves { .. } => Player::Odd,
+        }
+    }
+    fn priority(&self) -> usize {
+        match *self {
+            Vertex::ChooseLetter { spo_alpha, .. } => 2 * spo_alpha as usize,
+            Vertex::DuplicatorMoves { .. } => 0,
+            Vertex::SpoilerMoves { dup_alpha, .. } => dup_alpha as usize,
+        }
+    }
+}
+
+/// A [`ParityGame`] whose arena is built on the fly, starting from the initial vertices.
+///
+/// Every [`Vertex`] is added to `game` the first time it is encountered, with `index` mapping
+/// it to its index in `game`. It is also pushed onto the stack `unexplored`, which will be
+/// popped until empty, adding the outgoing edges of each popped vertex (and thereby discovering
+/// new vertices), so that afterwards all reachable vertices and their edges are in `game`.
+struct Arena<S, L> {
+    game: ParityGame,
+    index: FxHashMap<Vertex<S, L>, usize>,
+    unexplored: Vec<(Vertex<S, L>, usize)>,
+}
+
+impl<S: Copy + Eq + Hash, L: Copy + Eq + Hash> Arena<S, L> {
+    fn new() -> Self {
+        Self {
+            game: ParityGame::new(),
+            index: FxHashMap::default(),
+            unexplored: Vec::new(),
+        }
+    }
+
+    /// Returns the index of `v` in the game, adding it first if necessary.
+    fn vertex(&mut self, v: Vertex<S, L>) -> usize {
+        if let Some(&i) = self.index.get(&v) {
+            return i;
+        }
+        let i = self.game.add_vertex(v.owner(), v.priority());
+        self.index.insert(v, i);
+        self.unexplored.push((v, i));
+        i
+    }
+
+    /// Adds an edge from the vertex with index `source` to `target`.
+    fn edge(&mut self, source: usize, target: Vertex<S, L>) {
+        let target = self.vertex(target);
+        self.game.add_edge(source, target);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::NCW;
+    use super::super::ak22_examples::{
+        AK22_FIGURE_4, ak22_figure_1, ak22_figure_2, non_covering_ncw, sorted_transitions,
+    };
+    use crate::TransitionSystem;
+
+    #[test]
+    fn gfg_containment_relation_of_simple_languages() {
+        // 0 is universal, 1 is empty, 2 accepts "finitely many `a`s", and 3 is empty via the
+        // implicit rejecting sink on `b`
+        let ncw = NCW::builder()
+            .with_edges([
+                (0, 'a', false, 0),
+                (0, 'b', false, 0),
+                (1, 'a', true, 1),
+                (1, 'b', true, 1),
+                (2, 'a', true, 2),
+                (2, 'b', false, 2),
+                (3, 'a', true, 3),
+            ])
+            .into_ncw(0);
+        let contained = ncw.gfg_containment_relation();
+        for q in 0..4 {
+            assert!(contained.contains(&(q, q)));
+            assert!(contained.contains(&(1, q)));
+            assert!(contained.contains(&(3, q)));
+            assert!(contained.contains(&(q, 0)));
+        }
+        assert!(!contained.contains(&(0, 2)));
+        assert!(!contained.contains(&(0, 1)));
+        assert!(!contained.contains(&(2, 1)));
+        assert!(!contained.contains(&(2, 3)));
+    }
+
+    #[test]
+    fn ak22_figure_2_states_are_equivalent() {
+        // AK22, Example 3.1
+        let dcw = ak22_figure_2();
+        assert_eq!(dcw.gfg_containment_relation().len(), 9);
+        assert!(dcw.is_semantically_deterministic());
+    }
+
+    #[test]
+    fn semantically_determinize_dcw_is_identity() {
+        let dcw = ak22_figure_1();
+        assert!(dcw.is_semantically_deterministic());
+        let mut determinized = dcw.clone();
+        determinized.semantically_determinize();
+        assert_eq!(sorted_transitions(&determinized), sorted_transitions(&dcw));
+    }
+
+    #[test]
+    fn semantically_determinize_keeps_equivalent_successors() {
+        // all nondeterministic choices lead to equivalent states, so every transition is
+        // covering: in AK22, Figure 4 all states are equivalent, and in the second automaton,
+        // 1 and 2 both accept "finitely many `a`s", but in structurally different ways
+        let figure_4 = NCW::builder().with_edges(AK22_FIGURE_4).into_ncw(0);
+        assert_eq!(figure_4.gfg_containment_relation().len(), 4);
+        let structurally_different = NCW::builder()
+            .with_edges([
+                (0, 'a', true, 1),
+                (0, 'a', true, 2),
+                (0, 'b', false, 0),
+                (1, 'a', true, 1),
+                (1, 'b', false, 1),
+                (2, 'a', true, 3),
+                (2, 'b', false, 2),
+                (3, 'a', true, 2),
+                (3, 'b', false, 3),
+            ])
+            .into_ncw(0);
+        for ncw in [figure_4, structurally_different] {
+            assert!(ncw.is_semantically_deterministic());
+            let mut determinized = ncw.clone();
+            determinized.semantically_determinize();
+            assert_eq!(sorted_transitions(&determinized), sorted_transitions(&ncw));
+        }
+    }
+
+    #[test]
+    fn semantically_determinize_removes_non_covering_transition() {
+        let mut ncw = non_covering_ncw();
+        assert!(ncw.is_safe_deterministic());
+        assert!(!ncw.is_semantically_deterministic());
+        ncw.semantically_determinize();
+        assert!(ncw.is_semantically_deterministic());
+        assert_eq!(
+            sorted_transitions(&ncw),
+            vec![
+                (0, 'a', false, 1),
+                (0, 'b', false, 0),
+                (1, 'a', false, 1),
+                (1, 'b', false, 1),
+                (2, 'a', true, 2),
+                (2, 'b', true, 2),
+            ]
+        );
+    }
+
+    #[test]
+    fn semantically_determinize_keeps_greatest_successor() {
+        // 0 reads `a` into 1 (finitely many `a`s), 2 (universal) and 3 (empty), and only the
+        // transition to 2 is covering, as `L(3) ⊊ L(1) ⊊ L(2)`
+        let mut ncw = NCW::builder()
+            .with_edges([
+                (0, 'a', true, 1),
+                (0, 'a', true, 2),
+                (0, 'a', false, 3),
+                (0, 'b', false, 0),
+                (1, 'a', true, 1),
+                (1, 'b', false, 1),
+                (2, 'a', false, 2),
+                (2, 'b', false, 2),
+                (3, 'a', true, 3),
+                (3, 'b', true, 3),
+            ])
+            .into_ncw(0);
+        ncw.semantically_determinize();
+        let mut from_0: Vec<_> = ncw.transitions_from(0).collect();
+        from_0.sort();
+        assert_eq!(from_0, vec![(0, 'a', true, 2), (0, 'b', false, 0)]);
+        assert!(ncw.is_semantically_deterministic());
+    }
+}
