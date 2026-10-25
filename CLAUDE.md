@@ -47,6 +47,6 @@ Features: `default = ["hoa", "random", "render"]`, plus `graphviz`, `petgraph`, 
 ## Known sharp edges
 
 - `Automaton` has seven generic parameters; type errors can be long.
-- `--no-default-features` does not compile yet (an ungated `hoars` use); see `PLAN.md`.
+- Features must stay independent: code using an optional dependency needs the matching `#[cfg(feature = "...")]` (`scripts/check` builds with `--no-default-features` too).
 - Heavy rendering dependencies are in `default` features.
 - ~320 `unwrap`/`expect` and ~65 `panic!` calls in library code; many `#[allow(missing_docs)]`.

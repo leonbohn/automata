@@ -5,7 +5,11 @@ cargo fmt --check
 echo "cargo fmt --check --all passed"
 cargo clippy --all-targets --all-features -- -D warnings
 echo "cargo clippy --all -- -D warnings passed"
+cargo clippy --all-targets --no-default-features -- -D warnings
+echo "cargo clippy --no-default-features passed"
 cargo doc --no-deps
 echo "doc tests passed"
 cargo test
-echo "cargo test --all passed"
+echo "cargo test passed"
+cargo test --no-default-features
+echo "cargo test --no-default-features passed"

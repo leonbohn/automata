@@ -37,9 +37,13 @@ jobs:
         run: cargo fmt --all --check
       - name: Ensure that clippy is happy
         run: cargo clippy --all-targets -- -D warnings
+      - name: Ensure that clippy is happy without default features
+        run: cargo clippy --all-targets --no-default-features -- -D warnings
       - name: Verify that documentation contains no invalid links
         run: cargo doc --no-deps
       - name: Compile
         run: cargo build
       - name: Run all tests and see that there are no regressions
         run: cargo test --all
+      - name: Run all tests without default features
+        run: cargo test --no-default-features

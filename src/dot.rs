@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
 use std::fmt::{Debug, Display};
+#[cfg(feature = "render")]
 use thiserror::Error;
 
 use crate::automaton::{DFA, IntoDPA, IntoMealyMachine, IntoMooreMachine};
@@ -527,8 +528,11 @@ fn sanitize_dot_ident(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "render")]
     use super::Dottable;
+    #[cfg(feature = "render")]
     use crate::DTS;
+    #[cfg(feature = "render")]
     use crate::core::Void;
     use crate::ts::TSBuilder;
 

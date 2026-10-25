@@ -55,6 +55,7 @@ impl Show for AcceptanceMask {
     }
 }
 
+#[cfg(feature = "hoa")]
 impl From<&hoars::AcceptanceSignature> for AcceptanceMask {
     fn from(value: &hoars::AcceptanceSignature) -> Self {
         Self(BitSet::from_iter(value.iter().map(|&i| {

@@ -9,7 +9,7 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 - [ ] Flatten `src/core/` into top-level modules (`automata::alphabet`, `automata::word`, `automata::math`, ...), dropping the `core` indirection. Keep `Color`, `Lattice`, `Void`, `Show` at sensible paths. This is a breaking path change; do it before 0.1.0 is released.
 - [x] `hoars` 0.3.0 is released (own repo `leonbohn/hoars`); this crate depends on it from crates.io. `biodivine-lib-bdd` is on 0.6 to match (its `Bdd` type is shared via `hoars`), plus `itertools` 0.15 and `resvg`/`usvg` 0.49.
 - [ ] Remaining dependency upgrades: `rand` 0.8 to 0.10 (and `rand_distr` accordingly) and `tabled` 0.16 to 0.22; both need API migrations.
-- [ ] Fix `--no-default-features`: `src/automaton/omega/acceptance_mask.rs` uses `hoars` without `#[cfg(feature = "hoa")]`, and `thiserror::Error` is an unused import in that configuration. Add a no-default-features build to CI once fixed.
+- [x] Fixed `--no-default-features` (ungated `hoars` impl in `acceptance_mask.rs`, unused imports in `dot.rs`); all feature combinations build, pass clippy and tests. `scripts/check` and CI now cover it. Still to do: a full feature matrix (`cargo hack --each-feature`) in CI.
 - [ ] Switch `frieda`'s `automata-learning` and binaries to depend on this crate instead of their path copy; then delete `crates/automata` and `crates/automata-core` from `frieda`.
 - [ ] Add `rust-version` (MSRV) and verify it in CI with `cargo-msrv`.
 - [ ] Push `main` to `github.com/leonbohn/automata`, set up docs.rs metadata (`all-features = true`).
