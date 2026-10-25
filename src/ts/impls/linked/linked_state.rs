@@ -126,7 +126,7 @@ impl<Q> LinkedListTransitionSystemState<Q> {
     pub fn set_prev_vacancy(&mut self, prev: Option<usize>) {
         match self {
             Occupied(_, _, _) => panic!("attempted to set prev vacancy on existing state"),
-            Vacant(p, n) => *p = prev,
+            Vacant(p, _) => *p = prev,
         }
     }
 
@@ -211,7 +211,7 @@ impl<Q: Debug> Debug for LinkedListTransitionSystemState<Q> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Vacant(prev, next) => write!(f, "Vacant[{:?}|{:?}]", prev, next),
-            Occupied(c, first_out, first_in) => {
+            Occupied(_, first_out, first_in) => {
                 write!(f, "Occupied[out:{first_out:?}|in:{first_in:?}]")
             }
         }

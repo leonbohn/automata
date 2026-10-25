@@ -1,11 +1,9 @@
-use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash};
 
 use crate::ts::{
     Builder, DefaultIdType, Deterministic, EdgeColor, EdgeExpression, EdgeTuple, ForAlphabet,
     IntoEdgeTuple, IsEdge, ScalarIndexType, Shrinkable, Sproutable, StateColor, StateIndex,
 };
-use itertools::Itertools;
-use owo_colors::OwoColorize;
 
 mod linked_state;
 pub use linked_state::{
@@ -17,7 +15,7 @@ use crate::TransitionSystem;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::{
     Color, Show, Void,
-    alphabet::{Alphabet, CharAlphabet, Expression, Matcher},
+    alphabet::{Alphabet, CharAlphabet, Matcher},
     math,
 };
 pub use linked_edge::LinkedListTransitionSystemEdge;
@@ -270,17 +268,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         }
     }
 
-    fn in_edge_position(&self, matcher: impl Matcher<A::Expression>, to: usize) -> Option<usize> {
-        let mut idx = self.states.get(to)?.first_in_edge()?;
-        loop {
-            // FIXME: Make this be a match
-            if matcher.matches((&self.edges[idx]).expression()) {
-                return Some(idx);
-            }
-            idx = self.edges[idx].in_next?;
-        }
-    }
-
     /// Builds a new non-deterministic transition system for the given alphabet with a specified capacity.
     pub fn with_capacity(alphabet: A, cap: usize) -> Self {
         Self {
@@ -311,36 +298,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
 
     fn first_in_edge(&self, idx: usize) -> Option<usize> {
         self.states.get(idx)?.first_in_edge()
-    }
-
-    fn last_out_edge(&self, idx: usize) -> Option<usize> {
-        let mut current = self.states.get(idx)?.first_out_edge()?;
-        loop {
-            assert!(
-                current < self.edges.len(),
-                "Edge with id {current} does not exist"
-            );
-            if let Some(x) = self.edges[current].out_next {
-                current = x;
-            } else {
-                return Some(current);
-            }
-        }
-    }
-
-    fn last_in_edge(&self, idx: usize) -> Option<usize> {
-        let mut current = self.states.get(idx)?.first_in_edge()?;
-        loop {
-            assert!(
-                current < self.edges.len(),
-                "Edge with id {current} does not exist"
-            );
-            if let Some(x) = self.edges[current].in_next {
-                current = x;
-            } else {
-                return Some(current);
-            }
-        }
     }
 
     /// Builds a new [`crate::NTS`] from its constituent parts.
@@ -442,17 +399,6 @@ pub type IntoLinkedListNondeterministic<D> = (
 
 pub type LinkedListNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
     LinkedListTransitionSystem<A, Q, C, false>;
-pub type LinkedListDeterministic<A = CharAlphabet, Q = Void, C = Void> =
-    LinkedListTransitionSystem<A, Q, C, true>;
-
-/// Type alias to create a deterministic transition with the same alphabet, state and edge color
-/// as the given [`Ts`](`crate::TransitionSystem`).
-pub type CollectLinkedList<Ts, const DET: bool = true> = LinkedListTransitionSystem<
-    <Ts as TransitionSystem>::Alphabet,
-    <Ts as TransitionSystem>::StateColor,
-    <Ts as TransitionSystem>::EdgeColor,
-    DET,
->;
 
 impl<A: Alphabet, Q: Color, C: Color> Deterministic for LinkedListTransitionSystem<A, Q, C> {}
 
@@ -829,9 +775,9 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
 
 #[cfg(test)]
 mod tests {
+    use crate::TransitionSystem;
     use crate::alphabet::CharAlphabet;
     use crate::ts::{Builder, Deterministic, ForAlphabet, Sproutable};
-    use crate::{TransitionSystem, ts::impls::LinkedListDeterministic};
 
     #[test]
     fn dts_equality() {
@@ -858,7 +804,7 @@ mod tests {
 
     #[test]
     fn remove_edge() {
-        let mut ts = LinkedListDeterministic::for_alphabet(CharAlphabet::of_size(2));
+        let mut ts = crate::DTS::for_alphabet(CharAlphabet::of_size(2));
 
         ts.add_state(0);
         ts.add_state(1);

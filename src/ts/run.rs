@@ -351,7 +351,6 @@ pub trait RunResult: Sized {
     type StateIndex: IndexType;
     /// The type of symbol over which the input word operates.
     type Symbol: Symbol;
-    // fn reduced<R:
 }
 
 pub enum FiniteRunOutput<T: TransitionSystem, W: Word<Symbol = SymbolOf<T>>, O: Observer<T>> {
@@ -360,22 +359,7 @@ pub enum FiniteRunOutput<T: TransitionSystem, W: Word<Symbol = SymbolOf<T>>, O: 
 }
 
 impl<T: TransitionSystem, W: Word<Symbol = SymbolOf<T>>, O: Observer<T>> FiniteRunOutput<T, W, O> {
-    /// Returns the state from which the transition system is left.
-    #[allow(unused)]
-    fn escape_state(&self) -> Option<StateIndex<T>> {
-        match self {
-            FiniteRunOutput::Reached(_, _) => None,
-            FiniteRunOutput::Failed(state, _) => Some(*state),
-        }
-    }
-    /// Returns the [`EscapePrefix`] with which the ts is left.
-    #[allow(unused)]
-    fn escape_prefix(&self) -> Option<&EscapePrefix<W>> {
-        match self {
-            FiniteRunOutput::Reached(_, _) => None,
-            FiniteRunOutput::Failed(_state, ep) => Some(ep),
-        }
-    }
+    /// Returns the reached state, or `None` if the run escaped.
     pub fn into_reached_state(self) -> Option<StateIndex<T>> {
         match self {
             FiniteRunOutput::Reached(r, _) => Some(r),

@@ -2,14 +2,13 @@
 use crate::alphabet::{Alphabet, CharAlphabet};
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
 use crate::representation::IntoTs;
-use crate::ts::{DefaultIdType, Deterministic, ForAlphabet, Shrinkable, Sproutable, StateIndex};
+use crate::ts::{DefaultIdType, ForAlphabet, Shrinkable, Sproutable, StateIndex};
 use crate::word::ReducedOmegaWord;
 use crate::{DTS, TransitionSystem};
-use crate::{Int, Void, math, upw};
+use crate::{Int, Void, math};
 use math::sample_continuous_bernoulli;
-use rand::{Rng, rngs::ThreadRng, thread_rng};
+use rand::{Rng, thread_rng};
 use std::cmp::min;
-use tracing::{debug, info};
 
 /// Uses sprout-like algorithm to generate a random transition system. `symbols` determines the
 /// number of distinct symbols in the [`CharAlphabet`]. `probability` determines the probability
@@ -111,7 +110,7 @@ pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, StateIndex
     let alphabet = CharAlphabet::of_size(symbols);
     let mut dts = DTS::for_alphabet(alphabet.clone());
     // add states
-    for i in 0..size {
+    for _ in 0..size {
         dts.add_state(Void);
     }
     // add edges
@@ -214,8 +213,6 @@ pub fn generate_random_omega_word(
     min_len_cycle: usize,
     max_len_cycle: usize,
 ) -> ReducedOmegaWord<char> {
-    let charset: Vec<char> = alphabet.universe().collect();
-
     assert!(min_len_spoke <= max_len_spoke);
     assert!(min_len_cycle <= max_len_cycle);
     assert!(min_len_cycle > 0);
@@ -254,133 +251,17 @@ pub fn generate_random_omega_words(
     word_set
 }
 
-struct BenchmarkAverages {
-    total_runs: usize,
-    counted_runs: usize,
-    states: f64,
-    scc_count: f64,
-    maximal_scc_size: f64,
-    nontrivial_scc_size: f64,
-    nontrivial_count: f64,
-}
-
-impl BenchmarkAverages {
-    fn new(total_runs: usize) -> Self {
-        Self {
-            counted_runs: 0,
-            total_runs,
-            states: 0.0,
-            scc_count: 0.0,
-            maximal_scc_size: 0.0,
-            nontrivial_scc_size: 0.0,
-            nontrivial_count: 0.0,
-        }
-    }
-
-    pub fn append<D: Deterministic>(&mut self, det: D) {
-        let states = det.size();
-
-        let tjdag = det.sccs();
-
-        let mut maximal_scc_size = 0;
-        let mut scc_count = 0;
-        let mut non_trivial_scc_sizes = vec![];
-        for (i, scc) in tjdag.iter() {
-            scc_count += 1;
-            if scc.is_trivial() {
-                continue;
-            }
-
-            let size = scc.size();
-            non_trivial_scc_sizes.push(size);
-            maximal_scc_size = std::cmp::max(maximal_scc_size, size);
-        }
-
-        let nontrivial_count = non_trivial_scc_sizes.len();
-        let nontrivial_average = non_trivial_scc_sizes
-            .into_iter()
-            .map(|x| x as f64 / nontrivial_count as f64)
-            .sum::<f64>();
-
-        let factor = 1.0 / self.total_runs as f64;
-        self.nontrivial_scc_size += factor * nontrivial_average;
-        self.nontrivial_count += factor * nontrivial_count as f64;
-        self.maximal_scc_size += factor * maximal_scc_size as f64;
-        self.states += factor * states as f64;
-        self.scc_count += factor * scc_count as f64;
-        self.counted_runs += 1;
-    }
-}
-
-pub(crate) fn print_random_ts_benchmark(
-    symbols: &[usize],
-    reciprocals: &[usize],
-    experiment_count: usize,
-) -> Vec<Vec<f64>> {
-    info!("Running {experiment_count} experiments for determining average sizes");
-    let mut averages = vec![];
-
-    // let mut builder = tabled::builder::Builder::default();
-    // builder.push_record(
-    //     std::iter::once("symbols".to_string())
-    //         .chain(reciprocals.iter().map(|i| format!("p: 1/{i}"))),
-    // );
-
-    for symbol_count in symbols {
-        let mut row = [symbol_count.to_string()];
-
-        for reciprocal in reciprocals {
-            let mut averages = BenchmarkAverages::new(experiment_count);
-
-            for i in 0..experiment_count {
-                if i % 10 == 0 && i > 0 {
-                    debug!("{i}% done for {symbol_count} symbols and probability 1/{reciprocal}");
-                }
-                let probability = 1f64 / *reciprocal as f64;
-                let (ts, initial) = generate_random_ts(*symbol_count, probability);
-
-                assert!((&ts).with_initial(initial).is_accessible());
-                averages.append(&ts);
-            }
-
-            info!("Results for {symbol_count} symbols and probability 1/{reciprocal}.");
-            info!(
-                "States {:.2} | nontrivial SCCs {:.2}/{:.2} | average SCC size {:.2} | average maximal SCC size {:.2}",
-                averages.states,
-                averages.nontrivial_count,
-                averages.scc_count,
-                averages.nontrivial_scc_size,
-                averages.maximal_scc_size
-            );
-        }
-    }
-
-    averages
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
-        generate_random_dba, generate_random_dfa, generate_random_dpa, generate_random_omega_words,
-        generate_random_ts_sized, generate_random_words, print_random_ts_benchmark,
+        generate_random_dba, generate_random_dpa, generate_random_omega_words,
+        generate_random_ts_sized, generate_random_words,
     };
-    use crate::{
-        TransitionSystem,
-        dot::Dottable,
-        random::{CharAlphabet, draw_priority},
-    };
-    use std::collections::HashMap;
-
-    #[test]
-    #[ignore]
-    fn bench_random_ts() {
-        let recips_of_2: Vec<_> = (1..=6).map(|i| 2usize.saturating_pow(i)).collect();
-        print_random_ts_benchmark(&[2, 4, 6], &[2, 4, 8, 16, 32, 320], 100);
-    }
+    use crate::{TransitionSystem, random::CharAlphabet};
 
     #[test]
     fn random_ts_sized() {
-        let (dts, initial) = generate_random_ts_sized(2, 4);
+        let (dts, _initial) = generate_random_ts_sized(2, 4);
         assert_eq!(dts.size(), 4);
     }
 
@@ -403,5 +284,6 @@ mod tests {
         let omega_word_set = generate_random_omega_words(&alphabet, 0, 5, 1, 5, 20);
 
         assert_eq!(word_set.len(), 20);
+        assert_eq!(omega_word_set.len(), 20);
     }
 }

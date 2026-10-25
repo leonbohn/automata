@@ -11,20 +11,10 @@ pub type FORC<A = CharAlphabet, Q = Void, C = Void> =
 pub type FDFA<A = CharAlphabet> = Family<RightCongruence<A>, DFA<A>>;
 pub type FWPM<A = CharAlphabet, C = Int> = Family<RightCongruence<A>, MealyMachine<A, Void, C>>;
 
-mod fdfa;
-#[allow(unused)]
-pub use fdfa::*;
-
-mod fwpm;
-#[allow(unused)]
-pub use fwpm::*;
-
 mod convert;
 use crate::automaton::{DFA, MealyMachine};
 use crate::ts::{StateIndex, SymbolOf};
 use crate::{Congruence, RightCongruence};
-#[allow(unused)]
-pub use convert::*;
 
 /// Represents a family indexed by a transition system. For every
 /// state/class of the leading ts, there exists an element of type `X`.

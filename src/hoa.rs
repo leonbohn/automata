@@ -47,7 +47,7 @@ pub use error::HoaError;
 
 pub mod input;
 pub use input::{
-    HoaAutomatonStream, IntoDeterministicHoaAutomatonStream, NoneterministicHoaAutomatonStream,
+    HoaAutomatonStream, IntoDeterministicHoaAutomatonStream, NondeterministicHoaAutomatonStream,
 };
 
 pub mod output;

@@ -1,14 +1,9 @@
-#![allow(dead_code)]
-
+use crate::alphabet::{Alphabet, CharAlphabet, Directional, InvertibleChar};
 use crate::ts::{
     Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, EdgeReference, StateColor,
-    StateIndex, SymbolOf,
+    StateIndex,
 };
 use crate::{Pointed, TransitionSystem};
-use crate::{
-    alphabet::{Alphabet, CharAlphabet, Directional, InvertibleChar},
-    math,
-};
 
 use super::{Accumulates, RunProfile, TransitionMonoid};
 
@@ -34,7 +29,6 @@ where
     Ts::StateColor: Accumulates,
 {
     alphabet: Directional,
-    expressions: math::OrderedMap<SymbolOf<Self>, EdgeExpression<Self>>,
     m: TransitionMonoid<Ts>,
 }
 
@@ -42,7 +36,6 @@ where
 /// the transition profiles of the ts as nodes. See [`Cayley`] for more details.
 #[derive(Clone)]
 pub struct RightCayley<Ts: TransitionSystem + Pointed> {
-    expressions: math::OrderedMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
     m: TransitionMonoid<Ts>,
 }
 
@@ -122,7 +115,6 @@ where
     pub fn new(ts: Ts) -> Self {
         let alphabet = Directional::from_iter(ts.alphabet().universe());
         Cayley {
-            expressions: alphabet.expression_map(),
             m: TransitionMonoid::new(ts),
             alphabet,
         }
@@ -138,11 +130,7 @@ where
     /// Builds a new Cayley graph from the given transition system and transition monoid.
     pub fn from(ts: Ts, m: TransitionMonoid<Ts>) -> Self {
         let alphabet = Directional::from_iter(ts.alphabet().universe());
-        Self {
-            expressions: alphabet.expression_map(),
-            alphabet,
-            m,
-        }
+        Self { alphabet, m }
     }
 }
 
@@ -221,11 +209,8 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
-    /// Builds a new right Cayley graph from the given transition system and transition monoid.
-    pub fn from(ts: Ts, m: TransitionMonoid<Ts>) -> Self {
-        Self {
-            expressions: ts.alphabet().expression_map(),
-            m,
-        }
+    /// Builds a new right Cayley graph from the given transition monoid.
+    pub fn from(m: TransitionMonoid<Ts>) -> Self {
+        Self { m }
     }
 }

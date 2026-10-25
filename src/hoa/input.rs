@@ -43,7 +43,8 @@ impl<R: BufRead> Iterator for IntoDeterministicHoaAutomatonStream<R> {
     }
 }
 
-pub type NoneterministicHoaAutomatonStream<R> = HoaAutomatonStream<R, false>;
+/// A stream of HOA automata that are not necessarily deterministic.
+pub type NondeterministicHoaAutomatonStream<R> = HoaAutomatonStream<R, false>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HoaAutomatonStream<R, const DET: bool = true> {
