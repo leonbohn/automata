@@ -23,7 +23,7 @@ use crate::{
 pub use linked_edge::LinkedListTransitionSystemEdge;
 use tracing::{trace, warn};
 
-/// Represents a non-deterministic transition system. It stores an [`Alphabet`], a list of [`LinkedListTransitionSystemState`]s and a list of [`LinkedListTransitionSystemEdge`]s.
+/// Represents a non-deterministic transition system. It stores an [`Alphabet`], a list of `LinkedListTransitionSystemState`s and a list of `LinkedListTransitionSystemEdge`s.
 #[derive(Clone)]
 pub struct LinkedListTransitionSystem<
     A: Alphabet = CharAlphabet,
@@ -831,7 +831,7 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
 mod tests {
     use crate::alphabet::CharAlphabet;
     use crate::ts::{Builder, Deterministic, ForAlphabet, Sproutable};
-    use crate::{TransitionSystem, ts::LinkedListDeterministic};
+    use crate::{TransitionSystem, ts::impls::LinkedListDeterministic};
 
     #[test]
     fn dts_equality() {
