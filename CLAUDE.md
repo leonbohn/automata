@@ -6,7 +6,7 @@ Guidance for working in this repository. See `PLAN.md` for the roadmap and known
 
 `automata` is a single Rust crate for working with transition systems and automata over finite and infinite (omega) words. It was extracted, with history, from `leonbohn/frieda` (where it lived as `crates/automata` plus `crates/automata-core`). `automata-core` is now the `src/core/` module. Edition 2024, version 0.1.0.
 
-Related crates that stay elsewhere: `hoars` (HOA parser, currently a git dependency on `leonbohn/frieda`, to be released/extracted on its own) and `automata-learning` (learning algorithms, in `leonbohn/frieda`).
+Related crates that stay elsewhere: `hoars` (HOA parser, `leonbohn/hoars`, depended on from crates.io, currently 0.3) and `automata-learning` (learning algorithms, in `leonbohn/frieda`).
 
 ## Commands
 
@@ -47,6 +47,6 @@ Features: `default = ["hoa", "random", "render"]`, plus `graphviz`, `petgraph`, 
 ## Known sharp edges
 
 - `Automaton` has seven generic parameters; type errors can be long.
-- `hoars` is a git dependency, so this crate cannot be published until `hoars` is released.
+- `--no-default-features` does not compile yet (an ungated `hoars` use); see `PLAN.md`.
 - Heavy rendering dependencies are in `default` features.
 - ~320 `unwrap`/`expect` and ~65 `panic!` calls in library code; many `#[allow(missing_docs)]`.
