@@ -549,77 +549,56 @@ fn sanitize_dot_ident(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "render")]
     use super::Dottable;
-    #[cfg(feature = "render")]
-    use crate::DTS;
-    #[cfg(feature = "render")]
-    use crate::Void;
     use crate::ts::Builder;
 
-    #[test_log::test]
-    #[cfg(feature = "render")]
-    #[ignore]
-    fn render_dfa() {
-        let dfa = DTS::builder()
-            .with_transitions([
-                (0, 'a', Void, 0),
-                (0, 'b', Void, 1),
-                (1, 'a', Void, 1),
-                (1, 'b', Void, 0),
-            ])
-            .with_state_colors([false, true])
-            .into_dfa(0);
-        dfa.display_rendered().unwrap();
-    }
-
     #[test]
-    #[ignore]
-    fn display_forc() {
-        let _cong = Builder::without_colors()
-            .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
-            .into_right_congruence(0);
+    fn dot_representation_of_a_dfa() {
+        let dfa = Builder::without_edge_colors()
+            .with_state_colors([true, false])
+            .with_transitions([(0, 'a', 1), (1, 'a', 0), (1, 'b', 1)])
+            .into_dfa(0);
 
-        let _prc_e = Builder::without_colors()
-            .with_edges([
-                (0, 'a', 1),
-                (0, 'b', 2),
-                (1, 'a', 1),
-                (1, 'b', 2),
-                (2, 'a', 2),
-                (2, 'b', 2),
-            ])
-            .into_right_congruence(0);
-
-        let _prc_a = Builder::without_colors()
-            .with_edges([
-                (0, 'a', 1),
-                (0, 'b', 2),
-                (1, 'a', 3),
-                (1, 'b', 2),
-                (2, 'a', 1),
-                (2, 'b', 2),
-                (3, 'a', 3),
-                (3, 'b', 3),
-            ])
-            .into_right_congruence(0);
-
-        // let _forc = FORC::from_iter(cong, [(0, prc_e), (1, prc_a)].iter().cloned());
-        todo!("Learn how to render FORC!")
+        let dot = dfa.dot_representation();
+        assert!(dot.starts_with("digraph"), "{dot}");
+        assert!(dot.contains(r#"q0 [shape="doublecircle""#), "{dot}");
+        assert!(dot.contains(r#"q1 [shape="circle""#), "{dot}");
+        assert!(dot.contains(r#"q0 -> q1 [label="a"]"#), "{dot}");
+        assert!(dot.contains(r#"q1 -> q1 [label="b"]"#), "{dot}");
     }
 
-    #[test_log::test]
-    #[ignore]
     #[cfg(feature = "render")]
-    fn svg_open_dpa() {
-        let dpa = Builder::without_state_colors()
-            .with_edges([
-                (0, 'a', 1, 0),
-                (0, 'b', 2, 1),
-                (1, 'a', 0, 1),
-                (1, 'b', 2, 0),
-            ])
-            .into_dpa(0);
-        dpa.try_open_svg_in_firefox().unwrap();
+    mod render {
+        use super::super::Dottable;
+        use crate::ts::Builder;
+
+        fn dpa() -> crate::automaton::DPA {
+            Builder::without_state_colors()
+                .with_transitions([
+                    (0, 'a', 1, 0),
+                    (0, 'b', 2, 1),
+                    (1, 'a', 0, 1),
+                    (1, 'b', 2, 0),
+                ])
+                .into_dpa(0)
+        }
+
+        #[test]
+        fn svg_is_rendered_without_external_tools() {
+            let svg = dpa().try_svg().expect("rendering to SVG works");
+            assert!(svg.contains("<svg"), "{svg}");
+        }
+
+        #[test]
+        fn png_is_rendered_without_external_tools() {
+            let png = dpa().render().expect("rendering to PNG works");
+            assert!(png.starts_with(&[0x89, b'P', b'N', b'G']));
+        }
+
+        #[test]
+        fn data_url_encodes_the_svg() {
+            let url = dpa().try_data_url().expect("rendering to a data URL works");
+            assert!(url.starts_with("data:image/svg+xml;base64,"), "{url}");
+        }
     }
 }
