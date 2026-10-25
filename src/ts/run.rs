@@ -250,8 +250,7 @@ impl<W: Word> EscapePrefix<W> {
         self.shortest_escaping_length - 1
     }
     pub fn is_empty(&self) -> bool {
-        assert!(self.len() > 0);
-        false
+        self.len() == 0
     }
     pub fn with_length(self, len: usize) -> Self {
         Self {
@@ -594,16 +593,14 @@ mod impls {
     }
     impl<T: Deterministic<StateColor: Lattice>, const MAX: bool> InfiniteObserver<T>
         for StateColorLimit<T, MAX>
-    where
-        StateColor<T>: Default + Ord,
     {
         #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            seq[time..]
-                .iter()
-                .min()
-                .expect("looping sequence must not be empty")
-                .clone()
+            if MAX {
+                Lattice::join_iter(seq[time..].iter())
+            } else {
+                Lattice::meet_iter(seq[time..].iter())
+            }
         }
     }
 
@@ -963,5 +960,42 @@ mod tests {
             dts.omega_escape_prefix(&w1),
             Some(EscapePrefix::new(&w1, 2))
         );
+    }
+
+    #[test]
+    fn escape_prefix_of_length_zero_is_empty() {
+        let dts = Builder::without_colors()
+            .with_transitions([(0, 'a', 1), (1, 'a', 0)])
+            .into_dts_with_initial(0);
+        let word = upw!("b");
+        let escape = dts.omega_escape_prefix(&word).expect("must escape");
+        assert_eq!(escape.len(), 0);
+        assert!(escape.is_empty());
+        let longer = dts.omega_escape_prefix(upw!("a", "b")).unwrap();
+        assert_eq!(longer.len(), 1);
+        assert!(!longer.is_empty());
+    }
+
+    #[test]
+    fn state_color_limits_of_infinite_runs() {
+        use crate::ts::run::{GreatestStateColor, LeastStateColor};
+
+        // the cycle 1 -> 2 -> 3 -> 1 has the state colors 2, 7, 4, state 0 (color 1) is left for good
+        let dts = Builder::without_edge_colors()
+            .with_state_colors([1u8, 2, 7, 4])
+            .with_transitions([(0, 'a', 1), (1, 'a', 2), (2, 'a', 3), (3, 'a', 1)])
+            .into_dts_with_initial(0);
+
+        let word = upw!("a");
+        let greatest = dts
+            .omega_run::<_, GreatestStateColor<_>>(&word)
+            .into_output()
+            .unwrap();
+        let least = dts
+            .omega_run::<_, LeastStateColor<_>>(&word)
+            .into_output()
+            .unwrap();
+        assert_eq!(greatest, 7);
+        assert_eq!(least, 2);
     }
 }
