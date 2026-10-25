@@ -49,4 +49,4 @@ Features: `default = ["hoa"]`; opt-in: `random`, `render` (SVG/PNG via `resvg`/`
 
 - `Automaton` has seven generic parameters; type errors can be long.
 - Features must stay independent: code using an optional dependency needs the matching `#[cfg(feature = "...")]` (`scripts/check` builds with `--no-default-features` too).
-- ~320 `unwrap`/`expect` and ~65 `panic!` calls in library code; many `#[allow(missing_docs)]`.
+- Many `unwrap`/`expect` calls remain in library code (see issue #7 for the audit status).

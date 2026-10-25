@@ -159,19 +159,22 @@ where
     }
 }
 
-#[allow(missing_docs)]
 impl<Ts: TransitionSystem, F> RestrictByStateIndex<Ts, F> {
+    /// Restricts `ts` to those states whose index satisfies the `filter`.
     pub fn new(ts: Ts, filter: F) -> Self {
         Self { ts, filter }
     }
+    /// Consumes `self` and returns the underlying transition system and the filter.
     pub fn into_parts(self) -> (Ts, F) {
         (self.ts, self.filter)
     }
 
+    /// Returns a reference to the filter that decides which states are kept.
     pub fn filter(&self) -> &F {
         &self.filter
     }
 
+    /// Returns a reference to the underlying transition system.
     pub fn ts(&self) -> &Ts {
         &self.ts
     }
@@ -202,8 +205,8 @@ pub struct RestrictedEdgesFromIter<'a, Ts: TransitionSystem + 'a, F> {
     it: Ts::EdgesFromIter<'a>,
 }
 
-#[allow(missing_docs)]
 impl<'a, Ts: TransitionSystem + 'a, F> RestrictedEdgesFromIter<'a, Ts, F> {
+    /// Wraps an iterator over edges, keeping only those whose target satisfies the `filter`.
     pub fn new(it: Ts::EdgesFromIter<'a>, filter: &'a F) -> Self {
         Self { filter, it }
     }
@@ -240,8 +243,8 @@ where
     }
 }
 
-#[allow(missing_docs)]
 impl<'a, Ts: PredecessorIterable + 'a, F> RestrictedEdgesToIter<'a, Ts, F> {
+    /// Wraps an iterator over incoming edges, keeping only those whose source satisfies the `filter`.
     pub fn new(it: Ts::EdgesToIter<'a>, filter: &'a F) -> Self {
         Self { filter, it }
     }

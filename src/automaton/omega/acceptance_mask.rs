@@ -26,18 +26,24 @@ pub enum AcceptanceError {
     },
 }
 
+/// The set of acceptance sets (numbered `0, 1, ...`) that an edge belongs to, as they are used
+/// by the HOA format. Büchi conditions only use the set `0`, parity conditions require every
+/// edge to belong to exactly one set, which is then interpreted as its priority.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AcceptanceMask(BitSet);
 
 impl AcceptanceMask {
+    /// Returns the largest acceptance set of the mask, or `None` if it is empty.
     pub fn max(&self) -> Option<Int> {
         self.iter().max()
     }
 
+    /// Iterates over the acceptance sets of the mask in increasing order.
     pub fn iter(&self) -> impl Iterator<Item = Int> + '_ {
         self.0.iter().map(|x| x as Int)
     }
 
+    /// Returns the smallest acceptance set of the mask, or `None` if it is empty.
     pub fn min(&self) -> Option<Int> {
         self.iter().min()
     }
@@ -69,6 +75,8 @@ impl AcceptanceMask {
         Ok(priority)
     }
 
+    /// Interprets the mask as a boolean for Büchi-like conditions: `false` if the edge belongs
+    /// to no acceptance set and `true` otherwise (the only expected set is `0`).
     pub fn as_bool(&self) -> bool {
         let Some(next) = self.iter().next() else {
             return false;

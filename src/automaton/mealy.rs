@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 use itertools::Itertools;
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
@@ -17,6 +16,9 @@ use crate::{DTS, Pointed, TransitionSystem};
 #[derive(Debug, Clone)]
 pub struct MealySemantics<C>(PhantomData<C>);
 
+/// Marker trait for deterministic, pointed transition systems whose edge colors form a
+/// [`Lattice`]. Such transition systems can be interpreted as Mealy machines. This trait is
+/// implemented automatically.
 pub trait MealyLike: TransitionSystem<EdgeColor: Lattice> + Deterministic + Pointed {}
 impl<T: TransitionSystem<EdgeColor: Lattice> + Deterministic + Pointed> MealyLike for T {}
 

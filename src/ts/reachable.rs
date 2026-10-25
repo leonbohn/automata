@@ -14,11 +14,12 @@ pub struct LengthLexicographicMinimalRepresentatives<'a, Ts: TransitionSystem> {
     queue: BTreeMap<MinimalRepresentative<Ts>, StateIndex<Ts>>,
 }
 
-#[allow(missing_docs)]
 impl<'a, Ts> LengthLexicographicMinimalRepresentatives<'a, Ts>
 where
     Ts: TransitionSystem,
 {
+    /// Creates an iterator over the length-lexicographically minimal representatives of the
+    /// states that are reachable from `origin`, in increasing order.
     pub fn new(ts: &'a Ts, origin: Ts::StateIndex) -> Self {
         let seen = OrderedSet::from_iter([origin]);
         let queue = [(MinimalRepresentative::new(vec![], origin), origin)]

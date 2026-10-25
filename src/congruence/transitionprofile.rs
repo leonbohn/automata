@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
 use crate::ts::{Deterministic, EdgeColor, IndexType, IsEdge, StateColor, SymbolOf};
@@ -52,13 +51,16 @@ pub trait Accumulates: Sized + Clone + Eq + Hash + Ord {
     fn from_iter<'a, I: IntoIterator<Item = &'a Self>>(iter: I) -> Self
     where
         Self: 'a;
+    /// Turns a single color into an accumulator holding just that color.
     fn from(x: Self) -> Self;
+    /// Like [`Self::from`], but yields the neutral element if there is no color.
     fn from_or_neutral(x: Option<Self>) -> Self {
         match x {
             Some(x) => Self::from(x),
             None => Self::neutral(),
         }
     }
+    /// Returns the accumulated value.
     fn result(&self) -> &Self;
 }
 
@@ -140,24 +142,30 @@ impl Accumulates for usize {
 pub struct RunSignature<Idx, Q, C>(Idx, Q, C);
 
 impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
+    /// The state that is reached at the end of the run piece.
     pub fn state(&self) -> Idx {
         self.0
     }
 
+    /// The accumulated state colors of the states visited during the run piece.
     pub fn sc(&self) -> &Q {
         self.1.result()
     }
 
+    /// The accumulated edge colors of the edges taken during the run piece.
     pub fn ec(&self) -> &C {
         self.2.result()
     }
 }
 
 impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
+    /// The signature of the empty run piece that starts and ends in `q`.
     pub fn empty_from(q: Idx) -> Self {
         Self(q, Q::neutral(), C::neutral())
     }
 
+    /// Extends the run piece by one transition on `symbol`. Returns `None` if there is no such
+    /// transition in `ts`.
     pub fn extend_in<Ts>(&self, ts: &Ts, symbol: SymbolOf<Ts>) -> Option<Self>
     where
         Ts: Deterministic<StateIndex = Idx, StateColor = Q, EdgeColor = C>,
@@ -175,6 +183,8 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
             None => None,
         }
     }
+    /// Iterates over all extensions of the run piece by one transition, together with the symbol
+    /// that is taken.
     pub fn all_extensions<
         'a,
         Ts: Deterministic<StateIndex = Idx, StateColor = Q, EdgeColor = C>,
@@ -188,10 +198,13 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
     }
 }
 
+/// The run signatures of the runs starting from each of the states of a transition system on a
+/// fixed word, ordered by the starting state. This is an element of the [`TransitionMonoid`].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RunProfile<Idx, Q, C>(Vec<RunSignature<Idx, Q, C>>);
 
 impl<Idx, Q, C> RunProfile<Idx, Q, C> {
+    /// Iterates over the signatures, one for each starting state.
     pub fn iter(&self) -> impl Iterator<Item = &'_ RunSignature<Idx, Q, C>> + '_ {
         self.0.iter()
     }
@@ -217,6 +230,7 @@ where
 }
 
 impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
+    /// Creates a profile from tuples `(state, state color, edge color)`, one for each start state.
     pub fn new<I: IntoIterator<Item = (Idx, Q, C)>>(iter: I) -> Self {
         Self(
             iter.into_iter()
@@ -225,12 +239,14 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
         )
     }
 
+    /// The profile of the empty word on the transition system `ts`.
     pub fn empty<Ts: TransitionSystem<StateIndex = Idx, StateColor = Q, EdgeColor = C>>(
         ts: Ts,
     ) -> Self {
         Self::empty_for_states(ts.state_indices().collect())
     }
 
+    /// The profile of the empty word for the given states.
     pub fn empty_for_states(states: Vec<Idx>) -> Self {
         Self(
             states
@@ -241,6 +257,12 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
         )
     }
 
+    /// Extends every run of the profile by one transition on `sym`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a state of the profile has no transition on `sym`, i.e. if the transition system
+    /// is not complete.
     pub fn extend_in<Ts>(&self, ts: &Ts, sym: SymbolOf<Ts>) -> Self
     where
         Ts: Deterministic<StateIndex = Idx, StateColor = Q, EdgeColor = C>,
@@ -256,6 +278,12 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
         )
     }
 
+    /// Iterates over the profiles obtained by extending with each symbol of the alphabet, together
+    /// with that symbol.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the transition system is not complete, see [`Self::extend_in`].
     pub fn all_extensions<
         'a,
         Ts: Deterministic<StateIndex = Idx, StateColor = Q, EdgeColor = C>,
@@ -298,10 +326,12 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
+    /// Returns the transition system that the monoid was built from.
     pub fn ts(&self) -> &Ts {
         &self.ts
     }
 
+    /// Returns the number of elements (profiles) of the monoid.
     pub fn elements(&self) -> usize {
         self.tps.len()
     }
@@ -313,6 +343,12 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
+    /// Builds the transition monoid of `ts`, by exploring words in length-lexicographic order until
+    /// no new profile appears.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `ts` is not complete.
     pub fn new(ts: Ts) -> Self {
         Self::build(ts)
     }
@@ -324,6 +360,7 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
+    /// Returns the profile with the given index, together with the shortest word that produces it.
     #[allow(clippy::type_complexity)]
     pub fn get_profile(
         &self,
@@ -337,12 +374,16 @@ where
         Some((tp, word))
     }
 
+    /// Returns the explored word with the given index, together with the index of its profile.
     pub fn get_string(&self, idx: usize) -> Option<(&[SymbolOf<Ts>], usize)> {
         self.strings
             .get(idx)
             .map(|(word, profile)| (word.as_slice(), profile.into()))
     }
 
+    /// Returns the index of the profile of `word`. This only works for words that were explored
+    /// while building the monoid (the shortest word of each profile and its one-symbol extensions
+    /// that lead to known profiles), otherwise `None` is returned.
     pub fn profile_for<W: FiniteWord<Symbol = SymbolOf<Ts>>>(&self, word: W) -> Option<usize> {
         let (_tp, pe) = self
             .strings
@@ -354,6 +395,11 @@ where
         }
     }
 
+    /// Returns the profile of `word`, see [`Self::profile_for`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `profile_for` returns `None` for `word`.
     pub fn profile<W: FiniteWord<Symbol = SymbolOf<Ts>>>(
         &self,
         word: W,
@@ -362,6 +408,7 @@ where
         &self.tps[idx].0
     }
 
+    /// Returns the range of the indices of all profiles.
     pub fn profile_indices(&self) -> std::ops::Range<usize> {
         0..self.tps.len()
     }

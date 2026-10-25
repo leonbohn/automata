@@ -45,7 +45,7 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 
 ## Phase 4: quality bar
 
-- [ ] Remove blanket `allow(missing_docs)` (34 uses) and `allow(unused)`; document every public item.
+- [x] Removed all `allow(missing_docs)`, `allow(unused)` and `allow(dead_code)` attributes (34 uses) and documented every public item (about 260 items); dead code that surfaced was deleted (unused `random` benchmark helpers, linked-list helpers, empty `families` modules). Quality of the documentation is still uneven: many items have one-line descriptions, richer docs with examples are still wanted for the main entry points.
 - [ ] Integration tests in `tests/`, property tests (`proptest`): `minimize(A) ≡ A`, `A ∪ ¬A` accepts everything, HOA round trips.
 - [x] No `ignore`d doctests left (README rewritten, all snippets run). Still to decide: the 4 `#[ignore]`d unit tests (3 rendering tests, see #16, and one `random` benchmark-style test).
 - [ ] `criterion` benchmarks in `benches/` (product, determinize, minimize, SCC).

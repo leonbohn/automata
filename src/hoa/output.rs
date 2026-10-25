@@ -11,7 +11,9 @@ use crate::{
     ts::{EdgeColor, EdgeExpression, IsEdge},
 };
 
+/// Automata that can be written in the [HOA format](https://adl.github.io/hoaf/).
 pub trait WriteHoa: TransitionSystem + Pointed {
+    /// Writes the automaton in the HOA format to the given writer.
     fn write_hoa<W: Write>(&self, w: &mut W) -> Result {
         w.write_str("HOA: v1\n")?;
 
@@ -49,24 +51,30 @@ pub trait WriteHoa: TransitionSystem + Pointed {
         Ok(())
     }
 
+    /// Writes the color of an edge, i.e. the acceptance sets it belongs to.
     fn write_edge_color<W: std::fmt::Write>(&self, w: &mut W, label: EdgeColor<Self>) -> Result;
 
+    /// Writes the label of an edge.
     fn write_expression<W: std::fmt::Write>(
         &self,
         w: &mut W,
         expr: &EdgeExpression<Self>,
     ) -> Result;
 
+    /// Writes the identifier of a state.
     fn write_state_id<W: std::fmt::Write>(
         &self,
         w: &mut W,
         id: Self::StateIndex,
     ) -> std::fmt::Result;
 
+    /// Writes the `AP` header item describing the atomic propositions.
     fn write_alphabet_description<W: std::fmt::Write>(&self, w: &mut W) -> Result;
 
+    /// Writes the acceptance condition (the `acc-name` and `Acceptance` header items).
     fn write_acceptance<W: std::fmt::Write>(&self, w: &mut W) -> Result;
 
+    /// Returns the automaton in the HOA format as a string.
     fn to_hoa(&self) -> String {
         let mut w = String::new();
         self.write_hoa(&mut w)
@@ -107,8 +115,11 @@ impl OmegaAcceptanceCondition {
     }
 }
 
+/// Alphabets whose expressions can be written as edge labels in the HOA format.
 pub trait HoaSuitableAlphabet: Alphabet {
+    /// Writes an expression as an edge label (without the surrounding brackets).
     fn write_expression<W: std::fmt::Write>(&self, w: &mut W, expr: &Self::Expression) -> Result;
+    /// Writes the `AP` header item for the atomic propositions of the alphabet.
     fn write_alphabet_description<W: std::fmt::Write>(&self, w: &mut W) -> Result;
 }
 

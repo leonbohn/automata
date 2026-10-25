@@ -11,7 +11,6 @@ pub use rabin::*;
 mod muller;
 pub use muller::*;
 
-#[allow(missing_docs)]
 mod acceptance_mask;
 use super::InfiniteWordAutomaton;
 use crate::Error;
@@ -42,15 +41,24 @@ pub type OmegaAutomaton<A, const DET: bool = true> =
 /// the exact type is not known beforehand (such as when parsing an automaton). Usually
 /// one should prefer using specific automaton types such as [`DBA`]/[`DPA`] etc.
 #[derive(Debug, Clone, Eq, Copy, PartialEq, Ord, PartialOrd)]
-#[allow(missing_docs)]
 pub enum OmegaAcceptanceCondition {
+    /// Parity condition on the priorities `low..=high` (usually `0..=n`): the smallest priority
+    /// that is seen infinitely often has to be even.
     Parity(Int, Int),
+    /// Büchi condition: the edges in acceptance set `0` are seen infinitely often.
     Buchi,
+    /// Rabin condition (not supported by most operations yet).
     Rabin,
+    /// Streett condition (not supported by most operations yet).
     Streett,
+    /// Parity condition on the priorities `low..=high` where the *largest* priority that is seen
+    /// infinitely often decides: a run is accepting if `high` minus that priority is even.
     MaxParity(Int, Int),
+    /// Co-Büchi condition: the edges in acceptance set `0` are seen only finitely often.
     CoBuchi,
+    /// Reachability condition (not supported by most operations yet).
     Reachability,
+    /// Safety condition (not supported by most operations yet).
     Safety,
 }
 

@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 use crate::{
     Color,
     alphabet::Symbol,
@@ -11,11 +10,20 @@ use std::{fmt::Debug, marker::PhantomData};
 use crate::TransitionSystem;
 use crate::ts::{Deterministic, EdgeColor, IndexType, StateColor, StateIndex, SymbolOf};
 
+/// Observes a run on a [`TransitionSystem`] and collects information about it, for example the
+/// state that is reached or the colors that are seen. A run feeds the symbols of a word one by
+/// one to the observer, which can also decide to stop the run.
 pub trait Observer<T: TransitionSystem>: Sized {
+    /// The information that the observer has collected so far.
     type Current;
+    /// Returns the information collected so far.
     fn current(&self) -> &Self::Current;
+    /// Consumes the observer and returns the collected information.
     fn into_current(self) -> Self::Current;
+    /// Creates an observer for a run that starts in `state`.
     fn begin(ts: &T, state: StateIndex<T>) -> Self;
+    /// Observes a transition on `sym` taken from `state` and returns the state that is reached, or
+    /// `None` if there is no such transition (the run escapes the transition system).
     fn observe_one(
         &mut self,
         ts: &T,
@@ -24,29 +32,46 @@ pub trait Observer<T: TransitionSystem>: Sized {
     ) -> Option<StateIndex<T>>;
 }
 
+/// An [`Observer`] that can also summarize an infinite run, which ends up in a cycle.
 pub trait InfiniteObserver<T: TransitionSystem>: Observer<T> {
+    /// Summarizes the infinite run from the observations `seq` of the iterations of the loop; the
+    /// run enters the cycle (the part that repeats forever) at iteration `time`.
     fn loop_back(seq: &[Self::Current], ts: &T, time: usize) -> Self::Current;
 }
 
+/// Observes nothing, only the success of the run matters.
 #[derive(Debug, Clone, Copy)]
 pub struct NoObserver;
+/// Observes the state that is reached.
 #[derive(Debug, Clone, Copy)]
 pub struct ReachedState<Idx>(Idx);
+/// Observes the color of the last edge that was taken.
 #[derive(Debug, Clone)]
 pub struct ReachedEdgeColor<T: TransitionSystem>(Option<EdgeColor<T>>);
+/// Observes the color of the state that is reached.
 #[derive(Debug, Clone)]
 pub struct ReachedStateColor<T: TransitionSystem>(StateColor<T>);
 
+/// Observes the smallest state color that was seen.
 pub type LeastStateColor<T> = StateColorLimit<T, false>;
+/// Observes the greatest state color that was seen.
 pub type GreatestStateColor<T> = StateColorLimit<T, true>;
+/// Observes the smallest (`MAX = false`) or greatest (`MAX = true`) state color that was seen.
+/// For infinite runs only the colors that appear infinitely often are considered.
 #[derive(Debug, Clone)]
 pub struct StateColorLimit<T: TransitionSystem, const MAX: bool = false>(pub StateColor<T>);
 
+/// Observes the smallest edge color that was seen.
 pub type LeastEdgeColor<T> = EdgeColorLimit<T, false>;
+/// Observes the greatest edge color that was seen.
 pub type GreatestEdgeColor<T> = EdgeColorLimit<T, true>;
+/// Observes the smallest (`MAX = false`) or greatest (`MAX = true`) edge color that was seen.
+/// For infinite runs only the colors that appear infinitely often are considered.
 #[derive(Debug, Clone)]
 pub struct EdgeColorLimit<T: TransitionSystem, const MAX: bool = false>(pub EdgeColor<T>);
 
+/// Observes the set of states that were visited. For infinite runs these are the states that
+/// are visited infinitely often.
 #[derive(Clone, Debug)]
 pub struct StateSet<T: TransitionSystem>(pub(crate) math::OrderedSet<StateIndex<T>>);
 impl<T: TransitionSystem> std::ops::Deref for StateSet<T> {
@@ -56,6 +81,8 @@ impl<T: TransitionSystem> std::ops::Deref for StateSet<T> {
     }
 }
 
+/// Observes the sequence of visited states. For infinite runs these are the states along
+/// one traversal of the loop.
 pub struct StateSequence<T: TransitionSystem>(Vec<StateIndex<T>>);
 impl<T: TransitionSystem> std::ops::Deref for StateSequence<T> {
     type Target = Vec<StateIndex<T>>;
@@ -64,6 +91,8 @@ impl<T: TransitionSystem> std::ops::Deref for StateSequence<T> {
     }
 }
 
+/// Observes the sequence of colors of the visited states. For infinite runs these are the
+/// colors along one traversal of the loop.
 pub struct StateColorSequence<T: TransitionSystem>(Vec<StateColor<T>>);
 impl<T: TransitionSystem> std::ops::Deref for StateColorSequence<T> {
     type Target = Vec<StateColor<T>>;
@@ -72,6 +101,8 @@ impl<T: TransitionSystem> std::ops::Deref for StateColorSequence<T> {
     }
 }
 
+/// Observes the set of colors of visited states. For infinite runs these are the colors
+/// that are seen infinitely often.
 pub struct StateColorSet<T: TransitionSystem>(math::Set<StateColor<T>>);
 impl<T: TransitionSystem> std::ops::Deref for StateColorSet<T> {
     type Target = math::Set<StateColor<T>>;
@@ -80,6 +111,8 @@ impl<T: TransitionSystem> std::ops::Deref for StateColorSet<T> {
     }
 }
 
+/// Observes the set of colors of the taken edges. For infinite runs these are the colors
+/// that are seen infinitely often.
 #[derive(Debug)]
 pub struct EdgeColorSet<T: TransitionSystem>(pub(crate) math::Set<EdgeColor<T>>);
 impl<T: TransitionSystem> std::ops::Deref for EdgeColorSet<T> {
@@ -89,6 +122,8 @@ impl<T: TransitionSystem> std::ops::Deref for EdgeColorSet<T> {
     }
 }
 
+/// Observes the sequence of colors of the taken edges. For infinite runs these are the
+/// colors along one traversal of the loop.
 #[derive(Debug)]
 pub struct EdgeColorSequence<T: TransitionSystem>(pub(crate) Vec<EdgeColor<T>>);
 impl<T: TransitionSystem> std::ops::Deref for EdgeColorSequence<T> {
@@ -98,6 +133,8 @@ impl<T: TransitionSystem> std::ops::Deref for EdgeColorSequence<T> {
     }
 }
 
+/// Observes the set of pairs `(state, symbol)` of transitions that were taken. For infinite
+/// runs these are the transitions that are taken infinitely often.
 #[derive(Debug, Clone)]
 pub struct Triggers<T: TransitionSystem>(math::OrderedSet<(StateIndex<T>, SymbolOf<T>)>);
 impl<T: TransitionSystem> std::ops::Deref for Triggers<T> {
@@ -107,6 +144,9 @@ impl<T: TransitionSystem> std::ops::Deref for Triggers<T> {
     }
 }
 
+/// The run of a deterministic transition system on a word, from a given start state. The
+/// constant `FINITE` says whether the word is finite. The observer `O` collects information
+/// about the run. Call `evaluate` to execute it.
 pub struct Run<
     'ts,
     T: Deterministic,
@@ -132,6 +172,7 @@ impl<T: Deterministic, W: Word<Symbol = SymbolOf<T>>, const FINITE: bool, O: Obs
 impl<'ts, T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>, O: Observer<T>>
     Run<'ts, T, W, true, O>
 {
+    /// Creates the run of `ts` on the finite word `word` starting in `start`.
     pub fn new_finite(ts: &'ts T, start: StateIndex<T>, word: W) -> Run<'ts, T, W, true, O> {
         Run {
             ts,
@@ -140,6 +181,8 @@ impl<'ts, T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>, O: Observer<T>>
             observer: PhantomData,
         }
     }
+    /// Executes the run. It either reaches a state, or it escapes the transition system on a
+    /// symbol for which no transition exists.
     pub fn evaluate(self) -> FiniteRunOutput<T, W, O> {
         let mut taken = 0;
         let mut observer = O::begin(self.ts, self.start);
@@ -155,6 +198,7 @@ impl<'ts, T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>, O: Observer<T>>
         }
         FiniteRunOutput::Reached(current, observer.into_current())
     }
+    /// Returns true if the run does not escape the transition system.
     pub fn is_successful(self) -> bool {
         matches!(self.evaluate(), FiniteRunOutput::Reached(_, _))
     }
@@ -163,6 +207,7 @@ impl<'ts, T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>, O: Observer<T>>
 impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserver<T>>
     Run<'ts, T, W, false, O>
 {
+    /// Creates the run of `ts` on the omega word `word` starting in `start`.
     pub fn new_infinite(ts: &'ts T, start: StateIndex<T>, word: W) -> Run<'ts, T, W, false, O> {
         Run {
             ts,
@@ -171,6 +216,8 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
             observer: PhantomData,
         }
     }
+    /// Executes the run. It either ends up looping in the transition system, or it escapes it on a
+    /// symbol for which no transition exists.
     pub fn evaluate(self) -> InfiniteRunOutput<T, W, O> {
         let spoke = self.word.spoke_vec();
         // first evaluate the finite run piece
@@ -217,11 +264,15 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
             }
         }
     }
+    /// Returns true if the run does not escape the transition system.
     pub fn is_successful(self) -> bool {
         matches!(self.evaluate(), InfiniteRunOutput::Successful(_))
     }
 }
 
+/// The shortest prefix of a word on which a run leaves a transition system, i.e. after which
+/// the next symbol, the *escape symbol*, has no transition. Two escape prefixes are equal if
+/// they consist of the same symbols, independent of the word they were taken from.
 #[derive(Clone)]
 pub struct EscapePrefix<W> {
     word: W,
@@ -229,6 +280,11 @@ pub struct EscapePrefix<W> {
 }
 
 impl<W: Word> EscapePrefix<W> {
+    /// Creates an escape prefix of the given `length` (which includes the escape symbol).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `length` is zero.
     pub fn new(word: W, length: usize) -> Self {
         assert!(length > 0);
         Self {
@@ -236,28 +292,34 @@ impl<W: Word> EscapePrefix<W> {
             shortest_escaping_length: length,
         }
     }
+    /// Returns the prefix of the word up to and including the escape symbol.
     pub fn as_prefix(&self) -> Infix<'_, W> {
         self.word.prefix(self.shortest_escaping_length)
     }
 
+    /// Replaces the underlying word, keeping the length of the prefix.
     pub fn with_word<V>(self, word: V) -> EscapePrefix<V> {
         EscapePrefix {
             word,
             shortest_escaping_length: self.shortest_escaping_length,
         }
     }
+    /// Returns the number of symbols before the escape symbol.
     pub fn len(&self) -> usize {
         self.shortest_escaping_length - 1
     }
+    /// Returns true if the escape symbol is the very first symbol of the word.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+    /// Sets the length of the prefix, which includes the escape symbol.
     pub fn with_length(self, len: usize) -> Self {
         Self {
             word: self.word,
             shortest_escaping_length: len,
         }
     }
+    /// Returns the part of the word that comes after the escape symbol.
     pub fn suffix<S: Symbol>(self) -> ReducedOmegaWord<S>
     where
         W: OmegaWord<Symbol = S>,
@@ -265,6 +327,7 @@ impl<W: Word> EscapePrefix<W> {
         Word::skip(&self.word, self.shortest_escaping_length).reduced()
     }
 
+    /// Returns the symbol on which the transition system is left.
     pub fn escape_symbol(&self) -> W::Symbol {
         self.word.nth(self.shortest_escaping_length - 1).unwrap()
     }
@@ -290,6 +353,7 @@ impl<W: Word> FiniteWord for EscapePrefix<W> {
         EscapePrefixSymbols(self, 0)
     }
 }
+/// Iterator over the symbols of an [`EscapePrefix`], excluding the escape symbol.
 pub struct EscapePrefixSymbols<'a, W: Word>(&'a EscapePrefix<W>, usize);
 impl<W: Word> Iterator for EscapePrefixSymbols<'_, W> {
     type Item = W::Symbol;
@@ -342,6 +406,7 @@ impl<W: Debug> Debug for EscapePrefix<W> {
     }
 }
 
+/// Describes the types that appear in the result of a run.
 pub trait RunResult: Sized {
     /// The type of the state colors.
     type StateColor: Color;
@@ -353,8 +418,11 @@ pub trait RunResult: Sized {
     type Symbol: Symbol;
 }
 
+/// The result of running a finite word.
 pub enum FiniteRunOutput<T: TransitionSystem, W: Word<Symbol = SymbolOf<T>>, O: Observer<T>> {
+    /// The run did not escape, it reached the given state with the given observation.
     Reached(StateIndex<T>, O::Current),
+    /// The run escaped the transition system from the given state on the given escape prefix.
     Failed(StateIndex<T>, EscapePrefix<W>),
 }
 
@@ -366,6 +434,7 @@ impl<T: TransitionSystem, W: Word<Symbol = SymbolOf<T>>, O: Observer<T>> FiniteR
             _ => None,
         }
     }
+    /// Returns the observation, or `None` if the run escaped.
     pub fn into_output(self) -> Option<O::Current> {
         match self {
             FiniteRunOutput::Reached(_, o) => Some(o),
@@ -374,12 +443,15 @@ impl<T: TransitionSystem, W: Word<Symbol = SymbolOf<T>>, O: Observer<T>> FiniteR
     }
 }
 
+/// The result of running an omega word.
 pub enum InfiniteRunOutput<
     T: TransitionSystem,
     W: OmegaWord<Symbol = SymbolOf<T>>,
     O: InfiniteObserver<T>,
 > {
+    /// The run loops in the transition system, with the given observation of the loop.
     Successful(O::Current),
+    /// The run escaped the transition system from the given state on the given escape prefix.
     Failed(StateIndex<T>, EscapePrefix<W>),
 }
 
@@ -402,14 +474,17 @@ where
 impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserver<T>>
     InfiniteRunOutput<T, W, O>
 {
+    /// Returns true if the run does not escape the transition system.
     #[inline(always)]
     pub fn is_successful(&self) -> bool {
         matches!(self, InfiniteRunOutput::Successful(_))
     }
+    /// Returns true if the run escapes the transition system.
     #[inline(always)]
     pub fn is_escaping(&self) -> bool {
         !self.is_successful()
     }
+    /// Returns the observation, or `None` if the run escaped.
     #[inline(always)]
     pub fn into_output(self) -> Option<O::Current> {
         match self {
@@ -417,6 +492,7 @@ impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserve
             _ => None,
         }
     }
+    /// Returns the state from which the run escaped, or `None` if it did not.
     #[inline(always)]
     pub fn into_escape_state(self) -> Option<StateIndex<T>> {
         match self {
@@ -424,6 +500,7 @@ impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserve
             _ => None,
         }
     }
+    /// Returns the escape prefix, or `None` if the run did not escape.
     #[inline(always)]
     pub fn into_escape_prefix(self) -> Option<EscapePrefix<W>> {
         match self {

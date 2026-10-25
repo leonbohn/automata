@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use crate::{Color, Int, Void, math};
 
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
@@ -9,17 +7,29 @@ use crate::ts::{
 };
 use crate::{Congruence, DTS, Pointed, RightCongruence, TransitionSystem};
 
+/// Marker trait for transition systems whose states are colored with `Q`.
 pub trait StateColored<Q: Color = Int> {}
 impl<T: TransitionSystem> StateColored<StateColor<T>> for T {}
 
+/// Marker trait for transition systems whose edges are colored with `C`.
 pub trait EdgeColored<C: Color = Int> {}
 impl<T: TransitionSystem> EdgeColored<EdgeColor<T>> for T {}
 
+/// Collects (a reference to) any transition system into a concrete data structure or automaton,
+/// which evaluates all lazy operations that are applied to it. The states of the result are
+/// numbered `0, 1, ...` in the order of the original indices, so the indices may change.
+///
+/// The methods with a `_preserving` suffix keep the original index of each state as the first
+/// component of its color. Methods that need an initial state are only available for
+/// [`Pointed`] transition systems.
 #[allow(clippy::type_complexity)]
 pub trait CollectTs: TransitionSystem {
+    /// Collects into a deterministic transition system; the state indices may change.
     fn collect_dts(&self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
         self.collect_dts_preserving().unzip_state_color()
     }
+    /// Collects into a deterministic transition system and returns the index that the initial state
+    /// has in the result.
     fn collect_dts_and_initial(
         &self,
     ) -> (
@@ -43,6 +53,8 @@ pub trait CollectTs: TransitionSystem {
             .expect("old initial state did not exist");
         (preserving.unzip_state_color(), new_initial)
     }
+    /// Collects into a deterministic transition system whose state colors are pairs of the original
+    /// state index and the original color.
     fn collect_dts_preserving(
         &self,
     ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
@@ -87,6 +99,7 @@ pub trait CollectTs: TransitionSystem {
         restricted.collect_dts_and_initial()
     }
 
+    /// Collects into a [`DFA`], with the initial state of `self`. Edge colors are dropped.
     fn collect_dfa(&self) -> DFA<Self::Alphabet>
     where
         Self: Pointed<StateColor = bool>,
@@ -95,6 +108,7 @@ pub trait CollectTs: TransitionSystem {
         DFA::from_parts(ts, initial)
     }
 
+    /// Collects into a [`MooreMachine`], with the initial state of `self`. Edge colors are dropped.
     fn collect_moore(&self) -> MooreMachine<Self::Alphabet, StateColor<Self>>
     where
         Self: Pointed,
@@ -102,6 +116,7 @@ pub trait CollectTs: TransitionSystem {
         let (ts, initial) = self.erase_edge_colors().collect_dts_and_initial();
         MooreMachine::from_parts(ts, initial)
     }
+    /// Collects into a [`MealyMachine`], with the initial state of `self`.
     fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
     where
         Self: Pointed,
@@ -109,6 +124,7 @@ pub trait CollectTs: TransitionSystem {
         let (ts, initial) = self.collect_dts_and_initial();
         MealyMachine::from_parts(ts, initial)
     }
+    /// Collects into a [`DBA`], with the initial state of `self`. State colors are dropped.
     fn collect_dba(&self) -> DBA<Self::Alphabet>
     where
         Self: Pointed<EdgeColor = bool>,
@@ -116,6 +132,7 @@ pub trait CollectTs: TransitionSystem {
         let (ts, initial) = self.erase_state_colors().collect_dts_and_initial();
         DBA::from_parts(ts, initial)
     }
+    /// Collects into a [`DPA`], with the initial state of `self`. State colors are dropped.
     fn collect_dpa(&self) -> DPA<Self::Alphabet>
     where
         Self: Pointed<EdgeColor = Int>,
@@ -123,6 +140,7 @@ pub trait CollectTs: TransitionSystem {
         let (ts, initial) = self.erase_state_colors().collect_dts_and_initial();
         DPA::from_parts(ts, initial)
     }
+    /// Collects into a [`RightCongruence`], with the initial state of `self`.
     fn collect_right_congruence(
         &self,
     ) -> RightCongruence<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
@@ -135,12 +153,15 @@ pub trait CollectTs: TransitionSystem {
 }
 impl<Ts: TransitionSystem> CollectTs for Ts {}
 
+/// Like [`CollectTs`], but consumes the transition system.
 #[allow(clippy::type_complexity)]
 pub trait IntoTs: TransitionSystem {
+    /// Turns `self` into a deterministic transition system; the state indices may change.
     fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
         self.into_dts_preserving().unzip_state_color()
     }
 
+    /// Like [`Self::into_dts_preserving`], additionally returning the new index of the initial state.
     fn into_dts_preserving_and_initial(
         self,
     ) -> (
@@ -165,6 +186,7 @@ pub trait IntoTs: TransitionSystem {
         (preserving, new_initial)
     }
 
+    /// Like [`Self::into_dts`], additionally returning the new index of the initial state.
     fn into_dts_and_initial(
         self,
     ) -> (
@@ -178,12 +200,15 @@ pub trait IntoTs: TransitionSystem {
         (preserving.unzip_state_color(), initial)
     }
 
+    /// Turns `self` into a deterministic transition system whose state colors are pairs of the
+    /// original state index and the original color.
     fn into_dts_preserving(
         self,
     ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
         self.collect_dts_preserving()
     }
 
+    /// Turns `self` into a [`MooreMachine`] with the initial state of `self`. Edge colors are dropped.
     fn into_moore(self) -> MooreMachine<Self::Alphabet, StateColor<Self>>
     where
         Self: Pointed,
@@ -192,6 +217,7 @@ pub trait IntoTs: TransitionSystem {
         self.into_moore_with_initial(initial)
     }
 
+    /// Turns `self` into a [`MooreMachine`] with the given initial state. Edge colors are dropped.
     fn into_moore_with_initial(
         self,
         state: StateIndex<Self>,
@@ -200,6 +226,11 @@ pub trait IntoTs: TransitionSystem {
         assert!(ts.size() > 0);
         MooreMachine::from_parts(ts.linked_map_edges(|_, e, _, _| (e, Void)), initial)
     }
+    /// Turns `self` into a [`MealyMachine`] with state `0` as initial state. State colors are dropped.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` has no states.
     fn into_mealy(self) -> MealyMachine<Self::Alphabet, Void, EdgeColor<Self>> {
         let ts = self.into_dts().linked_map_states(|_, _| Void);
         assert!(ts.size() > 0);
@@ -218,6 +249,8 @@ pub trait IntoTs: TransitionSystem {
         DFA::from_parts(dts, initial)
     }
 
+    /// Collects the transition system representing `self` and builds a new [`DFA`], with the initial
+    /// state of `self`.
     fn into_dfa(self) -> DFA<Self::Alphabet>
     where
         Self: Pointed + Congruence<StateColor = bool>,

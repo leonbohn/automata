@@ -36,6 +36,8 @@ pub struct LinkedListTransitionSystem<
 }
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSystem<A, Q, C, DET> {
+    /// Pairs the color of every state with its index, so that afterwards the original indices
+    /// can be recovered even if states are removed or renumbered.
     pub fn zip_state_indices(self) -> LinkedListTransitionSystem<A, (DefaultIdType, Q), C, DET> {
         LinkedListTransitionSystem {
             alphabet: self.alphabet,
@@ -50,6 +52,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         }
     }
 
+    /// Maps the colors of the states with `state_f`, which also gets the index of the state.
     pub fn linked_map_states<QQ: Color, StateF>(
         self,
         state_f: StateF,
@@ -60,6 +63,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         self.linked_map(state_f, |_q, a: <A as Alphabet>::Expression, c, _p| (a, c))
     }
 
+    /// Maps the edges with `edge_f`, which gets source, expression, color and target of an edge and
+    /// returns its new expression and color.
     pub fn linked_map_edges<CC: Color, EdgeF>(
         self,
         edge_f: EdgeF,
@@ -75,6 +80,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         self.linked_map(|_idx, c| c, edge_f)
     }
 
+    /// Maps states and edges at once, see [`Self::linked_map_states`] and [`Self::linked_map_edges`].
     pub fn linked_map<QQ: Color, CC: Color, StateF, EdgeF>(
         self,
         state_f: StateF,
@@ -288,6 +294,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         }
     }
 
+    /// Forgets that `self` is deterministic.
     pub fn into_nondeterministic(self) -> LinkedListNondeterministic<A, Q, C> {
         recast(self)
     }
@@ -364,6 +371,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color>
     LinkedListTransitionSystem<A, (X, Q), C, DET>
 {
+    /// Drops the first component of the state colors, the inverse of pairing them (see
+    /// [`Self::zip_state_indices`]).
     pub fn unzip_state_color(self) -> LinkedListTransitionSystem<A, Q, C, DET> {
         LinkedListTransitionSystem {
             alphabet: self.alphabet,
@@ -373,17 +382,20 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color>
         }
     }
 
+    /// Returns the position of the first state whose color has `first` as its first component.
     pub fn position_by_first(self, first: X) -> Option<usize> {
         self.states
             .iter()
             .position(|s| s.is_occupied() && s.occupation().unwrap().0.0.eq(&first))
     }
 
+    /// Returns the index of the first state whose color has `left` as its first component.
     pub fn old_to_new(&self, left: X) -> Option<StateIndex<Self>> {
         self.state_indices_with_color()
             .find_map(|(i, c)| if c.0.eq(&left) { Some(i) } else { None })
     }
 
+    /// Returns the first component of the color of the state with the given index.
     pub fn new_to_old(&self, right: StateIndex<Self>) -> Option<X> {
         self.state_color(right).map(|c| c.0)
     }

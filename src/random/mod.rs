@@ -1,4 +1,3 @@
-#![allow(unused)]
 use crate::alphabet::{Alphabet, CharAlphabet};
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
 use crate::representation::IntoTs;

@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::{
     fmt::Display,
     hash::Hash,
@@ -38,11 +36,22 @@ pub enum PropAlphabetError {
     },
 }
 
+/// The integer type that stores a valuation of the atomic propositions as a bit vector: bit
+/// `i` is set if the proposition with index `i` holds. Implemented for the unsigned integers.
 pub trait RawSymbolRepr: std::fmt::Debug + Hash + Eq + Ord + Copy {
+    /// Returns the stored bits as a `usize`.
     fn as_usize(&self) -> usize;
+    /// Creates a value from the given bits.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value does not fit.
     fn from_usize(from: usize) -> Self;
+    /// Returns true if the bit `n` (the proposition with index `n`) is set.
     fn bit(&self, n: usize) -> bool;
+    /// Sets the bit `n`, i.e. makes the proposition with index `n` true.
     fn set(&mut self, n: usize);
+    /// The maximum number of atomic propositions that can be stored.
     fn max_aps() -> usize;
 }
 
@@ -73,6 +82,8 @@ macro_rules! impl_raw_symbol_repr {
 }
 impl_raw_symbol_repr!(u8, u16, u32, u64, u128, usize);
 
+/// A symbol of a [`PropAlphabet`]: a valuation of its atomic propositions, i.e. a choice of
+/// which of them are true.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub struct PropSymbol<RawTy: RawSymbolRepr = u32> {
     num_aps: u8,
@@ -80,9 +91,11 @@ pub struct PropSymbol<RawTy: RawSymbolRepr = u32> {
 }
 
 impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
+    /// Turns the symbol into the expression that is satisfied by exactly this valuation.
     pub fn as_expression(&self) -> PropExpression<RawTy> {
         PropExpression::from_parts(self.num_aps, self.as_bdd_valuation().into())
     }
+    /// Returns the letter `a`, `b`, ... that represents the valuation (its bits as a number).
     pub fn as_char(&self) -> char {
         (b'a' + ((self.raw.as_usize() as u8) & 0b1111)) as char
     }
@@ -144,9 +157,11 @@ impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
             raw,
         }
     }
+    /// Converts the symbol into a valuation of the variables of a BDD.
     pub fn as_bdd_valuation(&self) -> BddValuation {
         BddValuation::new(self.as_bools())
     }
+    /// Creates a symbol from a valuation of the variables of a BDD.
     pub fn from_bdd_valuation(val: BddValuation) -> Self {
         Self::from_bools(val.into_vector())
     }
@@ -170,6 +185,8 @@ impl<RawTy: RawSymbolRepr> Show for PropSymbol<RawTy> {
     }
 }
 
+/// An expression over the atomic propositions of a [`PropAlphabet`]: a boolean formula,
+/// represented as a BDD. It is satisfied by a set of [`PropSymbol`]s.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PropExpression<RawTy: RawSymbolRepr = u32> {
     num_aps: u8,
@@ -178,6 +195,7 @@ pub struct PropExpression<RawTy: RawSymbolRepr = u32> {
 }
 
 impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
+    /// Creates an expression over `num_aps` atomic propositions from the given BDD.
     pub fn from_parts(num_aps: u8, bdd: Bdd) -> Self {
         Self {
             num_aps,
@@ -185,13 +203,21 @@ impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
             _ty: PhantomData,
         }
     }
+    /// Parses an expression over `num_aps` atomic propositions, whose variables are named `x_0`,
+    /// `x_1`, ..., for example `x_0 & !x_1`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `string` is not a valid expression.
     pub fn new(num_aps: u8, string: &str) -> PropExpression<RawTy> {
         let vars = BddVariableSet::new_anonymous(num_aps as u16);
         Self::from_parts(num_aps, vars.eval_expression_string(string))
     }
+    /// Returns the underlying BDD.
     pub fn into_bdd(self) -> Bdd {
         self.bdd
     }
+    /// Returns the expression that is satisfied by every symbol over `num_aps` atomic propositions.
     pub fn universal(num_aps: u8) -> Self {
         let vars = BddVariableSet::new_anonymous(num_aps as u16);
         Self {
@@ -200,6 +226,7 @@ impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
             _ty: PhantomData,
         }
     }
+    /// Iterates over the symbols that satisfy the expression.
     pub fn sat_vals(&self) -> PropExpressionSymbols<'_, RawTy> {
         PropExpressionSymbols {
             iter: self.bdd.sat_valuations(),
@@ -221,6 +248,7 @@ impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
             _ty: PhantomData,
         }
     }
+    /// Iterates over the letters that represent the symbols satisfying the expression.
     pub fn chars_iter(&self) -> impl Iterator<Item = char> + '_ {
         PropExpressionSymbols {
             iter: self.bdd.sat_valuations(),
@@ -370,6 +398,7 @@ impl<RawTy: RawSymbolRepr> Expression for PropExpression<RawTy> {
     }
 }
 
+/// An iterator over the [`PropSymbol`]s that satisfy a [`PropExpression`].
 pub struct PropExpressionSymbols<'a, RawTy: RawSymbolRepr> {
     iter: BddSatisfyingValuations<'a>,
     _ty: PhantomData<RawTy>,
@@ -443,6 +472,7 @@ impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
         })
     }
 
+    /// Returns the number of atomic propositions.
     pub fn aps(&self) -> u8 {
         self.aps.len() as u8
     }
@@ -475,11 +505,13 @@ impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
         (b'a' + (sym.raw.as_usize() as u8)) as char
     }
 
+    /// Returns the number of symbols of the alphabet, `2^n` for `n` atomic propositions.
     pub fn size(&self) -> usize {
         2u32.saturating_pow(self.aps() as u32)
             .try_into()
             .expect("Cannot fit value into usize")
     }
+    /// Returns the names of the atomic propositions.
     pub fn apnames(&self) -> &[String] {
         &self.aps
     }

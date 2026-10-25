@@ -13,12 +13,15 @@ use tracing::{trace, warn};
 
 use super::{HoaError, HoaString};
 
+/// Reads HOA automata from a stream and yields the deterministic ones, nondeterministic and
+/// invalid automata are skipped with a warning.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct IntoDeterministicHoaAutomatonStream<R> {
     base: HoaAutomatonStream<R, false>,
 }
 
 impl<R> IntoDeterministicHoaAutomatonStream<R> {
+    /// Creates a new stream from the given reader.
     pub fn new(read: R) -> IntoDeterministicHoaAutomatonStream<R> {
         Self {
             base: HoaAutomatonStream::new(read),
@@ -46,6 +49,8 @@ impl<R: BufRead> Iterator for IntoDeterministicHoaAutomatonStream<R> {
 /// A stream of HOA automata that are not necessarily deterministic.
 pub type NondeterministicHoaAutomatonStream<R> = HoaAutomatonStream<R, false>;
 
+/// Reads HOA automata from a stream. If `DET` is true, automata that are not deterministic
+/// are rejected.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HoaAutomatonStream<R, const DET: bool = true> {
     read: R,
@@ -102,6 +107,7 @@ impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
 }
 
 impl<R, const DET: bool> HoaAutomatonStream<R, DET> {
+    /// Creates a new stream from the given reader.
     pub fn new(read: R) -> Self {
         Self {
             read,
@@ -111,6 +117,12 @@ impl<R, const DET: bool> HoaAutomatonStream<R, DET> {
     }
 }
 
+/// Parses the part `hoa[start..end]` of the given string as an omega automaton.
+///
+/// # Errors
+///
+/// Returns a [`HoaError`] if the part is not a valid HOA automaton, if it uses an unsupported
+/// feature, or (for `DET`) if it is not deterministic. The error contains the range.
 pub fn parse_omega_automaton_range<const DET: bool>(
     hoa: &str,
     start: usize,
@@ -125,6 +137,8 @@ pub fn parse_omega_automaton_range<const DET: bool>(
     OmegaAutomaton::try_from(aut).map_err(in_range)
 }
 
+/// Removes the first valid deterministic automaton from `hoa`. Returns it together with the
+/// remaining string, or `None` if there is no such automaton.
 pub fn pop_deterministic_omega_automaton(
     hoa: HoaString,
 ) -> Option<(DeterministicOmegaAutomaton<PropAlphabet>, HoaString)> {

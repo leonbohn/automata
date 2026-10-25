@@ -38,18 +38,19 @@
 //!
 //! Only deterministic Büchi and parity automata are supported so far. Reading fails with a
 //! [`HoaError`] for other acceptance conditions, alternating automata and unsupported inputs.
-#![allow(missing_docs)]
 
 use tracing::{trace, warn};
 
 mod error;
 pub use error::HoaError;
 
+/// Reading automata from a stream or a string.
 pub mod input;
 pub use input::{
     HoaAutomatonStream, IntoDeterministicHoaAutomatonStream, NondeterministicHoaAutomatonStream,
 };
 
+/// Writing automata in the HOA format.
 pub mod output;
 pub use output::WriteHoa;
 
@@ -57,16 +58,22 @@ pub use hoars::*;
 
 use crate::alphabet::PropAlphabet;
 
+/// An omega automaton over a propositional alphabet, as it is obtained from the HOA format. The
+/// constant `DET` indicates whether it is known to be deterministic.
 pub type HoaAutomaton<const DET: bool> = crate::automaton::OmegaAutomaton<PropAlphabet, DET>;
 
+/// A string that contains HOA automata, one after the other.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HoaString(pub(crate) String);
 
 impl HoaString {
+    /// Returns the underlying string.
     pub fn into_inner(self) -> String {
         self.0
     }
 
+    /// Removes the first valid automaton from the string and returns it. Parts of the string that
+    /// cannot be parsed as an automaton (or are not deterministic, if `DET` is true) are skipped.
     pub fn pop<const DET: bool>(&mut self) -> Option<HoaAutomaton<DET>> {
         const END_LEN: usize = "--END--".len();
         const ABORT_LEN: usize = "--ABORT--".len();

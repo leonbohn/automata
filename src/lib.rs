@@ -49,7 +49,8 @@ pub type NTS<A = alphabet::CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, false
 #[cfg(feature = "hoa")]
 pub mod hoa;
 
-#[allow(missing_docs)]
+/// Families of objects that are indexed by the classes of a right congruence, for example
+/// families of DFAs (`FDFA`) or of weak priority mappings (`FWPM`), and conversions between them.
 pub mod families;
 
 /// This module defines transition systems and successor functions and such.

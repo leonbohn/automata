@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::fmt::{Debug, Display};
 #[cfg(feature = "render")]
 use thiserror::Error;
@@ -10,27 +8,39 @@ use crate::{Color, Int, Show, alphabet::Alphabet};
 use crate::{Pointed, TransitionSystem};
 use itertools::Itertools;
 
+/// Errors that can occur while rendering a transition system as an image.
 #[cfg(feature = "render")]
 #[derive(Error, Debug)]
 pub enum RenderError {
     #[error("encountered SVG rendering error: \"{0:?}\"")]
     // we let `thiserror` implement From<resvg::usvg::Error>
+    /// The generated SVG could not be processed.
     SvgError(#[from] resvg::usvg::Error),
+    /// The pixmap for the rendered image could not be allocated.
     #[error("could not allocate pixmap")]
     PixmapAllocationError,
+    /// The rendered image could not be encoded as a PNG.
     #[error("could not encode PNG: \"{0:?}\"")]
     PngEncodingError(String),
+    /// The rendered image could not be written or displayed.
     #[error("error when displaying PNG: \"{0:?}\"")]
     PngDisplayError(#[from] std::io::Error),
+    /// The DOT representation could not be rendered to SVG.
     #[error("could not render to SVG: \"{0}\"")]
     RenderToSvgError(String),
+    /// The SVG document could not be created from the DOT representation.
     #[error("Could not create VSVG document: \"{0}\"")]
     VsvgDocumentError(String),
+    /// An external process (the graphviz `dot` executable) finished with a non-zero exit status.
     #[error("Child process had non-zero exit status \"{0}\"")]
     NonZeroExit(std::process::ExitStatus),
 }
 
+/// Transition systems that can be written in the [DOT](https://graphviz.org/doc/info/lang.html)
+/// format. [`Self::dot_representation`] is always available; rendering to images is experimental
+/// and needs the features `render` or `graphviz`.
 pub trait Dottable: TransitionSystem {
+    /// Renders the DOT representation to an SVG document (experimental, feature `render`).
     #[cfg(feature = "render")]
     fn try_svg(&self) -> Result<String, RenderError> {
         use layout::backends::svg::SVGWriter;
@@ -53,6 +63,8 @@ pub trait Dottable: TransitionSystem {
         Ok(svg.finalize())
     }
 
+    /// Renders the DOT representation to an SVG and encodes it as a `data:` URL (experimental,
+    /// feature `render`).
     #[cfg(feature = "render")]
     fn try_data_url(&self) -> Result<String, RenderError> {
         Ok(format!(
@@ -66,6 +78,7 @@ pub trait Dottable: TransitionSystem {
         ))
     }
 
+    /// Opens the rendered SVG in Firefox, which has to be installed (experimental, feature `render`).
     #[cfg(feature = "render")]
     fn try_open_svg_in_firefox(&self) -> Result<(), RenderError> {
         let url = self.try_data_url()?;
@@ -116,19 +129,25 @@ pub trait Dottable: TransitionSystem {
         lines.join("\n")
     }
 
+    /// Additional statements for the header of the DOT graph, none by default.
     fn dot_header_statements(&self) -> impl IntoIterator<Item = String> {
         []
     }
 
+    /// The name of the graph, if any.
     fn dot_name(&self) -> Option<String>;
 
+    /// Additional attributes of the DOT edge that represents the given edge, none by default.
     fn dot_transition_attributes<'a>(
         &'a self,
         _t: Self::EdgeRef<'a>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         []
     }
+    /// The identifier of the DOT node that represents the state with the given index.
     fn dot_state_ident(&self, idx: Self::StateIndex) -> String;
+    /// Additional attributes of the DOT node that represents the state with the given index, none
+    /// by default.
     fn dot_state_attributes(
         &self,
         _idx: Self::StateIndex,
@@ -456,8 +475,10 @@ impl Display for DotStateAttribute {
     }
 }
 
+/// An attribute of an edge in the DOT representation.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DotTransitionAttribute {
+    /// The label of the edge.
     Label(String),
 }
 

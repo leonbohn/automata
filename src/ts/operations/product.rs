@@ -181,8 +181,8 @@ pub struct ProductTransition<'a, LI, RI, E, LC, RC> {
     color: (LC, RC),
 }
 
-#[allow(missing_docs)]
 impl<'a, LI, RI, E, LC, RC> ProductTransition<'a, LI, RI, E, LC, RC> {
+    /// Creates the transition of the product from the transitions of both components.
     pub fn new(
         source: ProductIndex<LI, RI>,
         expression: &'a E,
@@ -234,8 +234,8 @@ pub struct ProductEdgesFrom<'a, L: TransitionSystem, R: TransitionSystem> {
     position: usize,
 }
 
-#[allow(missing_docs)]
 impl<'a, L: TransitionSystem, R: TransitionSystem> ProductEdgesFrom<'a, L, R> {
+    /// Creates an iterator over the edges of the product that start in the state `(left, right)`.
     pub fn new(
         left: &'a L,
         right: &'a R,
@@ -328,8 +328,8 @@ where
     }
 }
 
-#[allow(missing_docs)]
 impl<'a, LI, RI, E, LC, RC> ProductPreTransition<'a, LI, RI, E, LC, RC> {
+    /// Creates the pre-transition of the product from the pre-transitions of both components.
     pub fn new(
         source: ProductIndex<LI, RI>,
         expression: &'a E,
@@ -397,8 +397,8 @@ where
     }
 }
 
-#[allow(missing_docs)]
 impl<'a, L: PredecessorIterable, R: PredecessorIterable> ProductEdgesTo<'a, L, R> {
+    /// Creates an iterator over the edges of the product that lead to the state `(left, right)`.
     pub fn new(
         left: &'a L,
         right: &'a R,

@@ -5,10 +5,14 @@ use crate::{
     word::FiniteWord,
 };
 
+/// A family of right congruences, indexed by the classes of a leading right congruence.
 pub type FORC<A = CharAlphabet, Q = Void, C = Void> =
     Family<RightCongruence<A>, RightCongruence<A, Q, C>>;
 
+/// A family of DFAs (an FDFA): a leading right congruence and a DFA for each of its classes.
 pub type FDFA<A = CharAlphabet> = Family<RightCongruence<A>, DFA<A>>;
+/// A family of weak priority mappings (an FWPM): a leading right congruence and a Mealy machine
+/// without state colors for each of its classes.
 pub type FWPM<A = CharAlphabet, C = Int> = Family<RightCongruence<A>, MealyMachine<A, Void, C>>;
 
 mod convert;
@@ -25,12 +29,16 @@ pub struct Family<T: Congruence, X> {
 }
 
 impl<T: Congruence, X> Family<T, X> {
+    /// Returns the element belonging to the class that is reached by reading `word` in the leading
+    /// transition system, or `None` if there is no such class.
     pub fn get<W>(&self, word: W) -> Option<&X>
     where
         W: FiniteWord<Symbol = SymbolOf<T>>,
     {
         self.progress.get(&self.leading.reached_state_index(word)?)
     }
+    /// Replaces the element belonging to the class that is reached by reading `word` and returns the
+    /// old one. Returns `None` if there is no such class.
     pub fn set<W>(&mut self, word: W, new_x: X) -> Option<X>
     where
         W: FiniteWord<Symbol = SymbolOf<T>>,
@@ -38,6 +46,8 @@ impl<T: Congruence, X> Family<T, X> {
         self.progress
             .insert(self.leading.reached_state_index(word)?, new_x)
     }
+    /// Returns a mutable reference to the element belonging to the class that is reached by reading
+    /// `word`, or `None` if there is no such class.
     pub fn get_mut<W>(&mut self, word: W) -> Option<&mut X>
     where
         W: FiniteWord<Symbol = SymbolOf<T>>,
@@ -52,6 +62,7 @@ impl<T: Congruence, X> Family<T, X> {
         assert_eq!(leading.size(), progress.len());
         Self { leading, progress }
     }
+    /// Creates a family from the leading transition system and the elements for its classes.
     pub fn from_iter<I: IntoIterator<Item = (StateIndex<T>, X)>>(leading: T, prog_iter: I) -> Self {
         Self {
             leading,
@@ -75,6 +86,7 @@ impl<T: Congruence, X> std::ops::IndexMut<StateIndex<T>> for Family<T, X> {
 }
 
 impl<A: Alphabet, X> Family<RightCongruence<A>, X> {
+    /// Creates a family whose leading congruence has just a single class, with the given element.
     pub fn trivial(alphabet: A, progress: X) -> Self {
         let leading = RightCongruence::new_trivial_with_initial_color(alphabet, Void, Void);
         Self::from_parts(leading, [(0, progress)].into_iter().collect())

@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::collections::VecDeque;
 
 use itertools::Itertools;
@@ -8,16 +6,31 @@ use crate::show::Show;
 
 use super::{Alphabet, Expression, Matcher, Symbol};
 
+/// An alphabet of individual symbols that are their own expressions, i.e. every edge is labeled
+/// by a single symbol. The symbols are numbered in a fixed order.
 pub trait SimpleAlphabet: Alphabet
 where
     Self: Alphabet<Expression = <Self as Alphabet>::Symbol>,
 {
+    /// Returns the expression that matches exactly the given symbol.
     fn express(&self, sym: Self::Symbol) -> &Self::Expression;
+    /// Returns the `pos`-th symbol of the alphabet, or `None` if `pos` is out of range.
     fn try_nth(&self, pos: usize) -> Option<Self::Symbol>;
+    /// Returns the `pos`-th symbol of the alphabet.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `pos` is out of range, see [`Self::try_nth`].
     fn nth(&self, pos: usize) -> Self::Symbol {
         self.try_nth(pos).unwrap()
     }
+    /// Returns the position of the given symbol in the alphabet, or `None` if it is not part of it.
     fn try_position(&self, symbol: Self::Symbol) -> Option<usize>;
+    /// Returns the position of the given symbol in the alphabet.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the symbol is not part of the alphabet, see [`Self::try_position`].
     fn position(&self, symbol: Self::Symbol) -> usize {
         self.try_position(symbol).unwrap()
     }

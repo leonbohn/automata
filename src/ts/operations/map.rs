@@ -274,20 +274,23 @@ pub struct MapEdgeColor<Ts, F> {
     f: F,
 }
 
-#[allow(missing_docs)]
 impl<Ts, F> MapEdgeColor<Ts, F> {
+    /// Creates a new transition system that applies `f` to the color of every edge of `ts`.
     pub fn new(ts: Ts, f: F) -> Self {
         Self { ts, f }
     }
 
+    /// Returns a reference to the function that is applied to the edge colors.
     pub fn f(&self) -> &F {
         &self.f
     }
 
+    /// Returns a reference to the underlying transition system.
     pub fn ts(&self) -> &Ts {
         &self.ts
     }
 
+    /// Consumes `self` and returns the underlying transition system and the mapping function.
     pub fn into_parts(self) -> (Ts, F) {
         (self.ts, self.f)
     }
@@ -357,8 +360,8 @@ pub struct MappedTransition<T, F, C> {
     _old_color: PhantomData<C>,
 }
 
-#[allow(missing_docs)]
 impl<T, F, C> MappedTransition<T, F, C> {
+    /// Wraps a transition so that its color is mapped with `f`.
     pub fn new(transition: T, f: F) -> Self {
         Self {
             transition,
@@ -412,8 +415,8 @@ where
     }
 }
 
-#[allow(missing_docs)]
 impl<'a, I, F, C> MappedEdgesFromIter<'a, I, F, C> {
+    /// Wraps an iterator over transitions, mapping the color of each with `f`.
     pub fn new(it: I, f: &'a F) -> Self {
         Self {
             it,
@@ -453,8 +456,8 @@ impl<'a, Idx: IndexType, E, C: Color, D: Color, F: Fn(C) -> D, T: IsEdge<'a, E, 
     }
 }
 
-#[allow(missing_docs)]
 impl<T, F, C> MappedPreTransition<T, F, C> {
+    /// Wraps a pre-transition so that its color is mapped with `f`.
     pub fn new(pre_transition: T, f: F) -> Self {
         Self {
             pre_transition,
@@ -482,8 +485,8 @@ where
     }
 }
 
-#[allow(missing_docs)]
 impl<'a, I, F, C> MappedTransitionsToIter<'a, I, F, C> {
+    /// Wraps an iterator over pre-transitions, mapping the color of each with `f`.
     pub fn new(it: I, f: &'a F) -> Self {
         Self {
             it,
@@ -500,20 +503,23 @@ pub struct MapStateColor<Ts, F> {
     f: F,
 }
 
-#[allow(missing_docs)]
 impl<Ts, F> MapStateColor<Ts, F> {
+    /// Creates a new transition system that applies `f` to the color of every state of `ts`.
     pub fn new(ts: Ts, f: F) -> Self {
         Self { ts, f }
     }
 
+    /// Returns a reference to the underlying transition system.
     pub fn ts(&self) -> &Ts {
         &self.ts
     }
 
+    /// Consumes `self` and returns the underlying transition system and the mapping function.
     pub fn into_parts(self) -> (Ts, F) {
         (self.ts, self.f)
     }
 
+    /// Returns a reference to the function that is applied to the state colors.
     pub fn f(&self) -> &F {
         &self.f
     }
