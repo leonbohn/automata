@@ -39,7 +39,7 @@ mod deterministic;
 pub use deterministic::Deterministic;
 
 mod builder;
-pub use builder::TSBuilder;
+pub use builder::{BuilderError, TSBuilder};
 
 /// Deals with analysing reachability in transition systems.
 pub mod reachable;

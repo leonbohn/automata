@@ -10,6 +10,9 @@ pub enum Error {
     /// An alphabet could not be converted into a propositional alphabet.
     #[error(transparent)]
     PropAlphabet(#[from] crate::alphabet::PropAlphabetError),
+    /// A transition system could not be built from a builder.
+    #[error(transparent)]
+    Builder(#[from] crate::ts::BuilderError),
     /// The acceptance sets of an edge are not valid for the acceptance condition.
     #[error(transparent)]
     Acceptance(#[from] crate::automaton::AcceptanceError),

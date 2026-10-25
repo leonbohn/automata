@@ -6,6 +6,37 @@ use crate::representation::IntoTs;
 use crate::{Color, Int, Void, alphabet::CharAlphabet, math::OrderedSet};
 use crate::{DTS, NTS, RightCongruence, TS, TransitionSystem};
 use itertools::Itertools;
+use thiserror::Error;
+
+/// Errors that can occur when turning a [`TSBuilder`] into a transition system or automaton.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum BuilderError {
+    /// A state has no color and no default color was given.
+    #[error(
+        "state {0} has no color: set one with `color` or `with_state_colors`, or provide a `default_color`"
+    )]
+    MissingStateColor(DefaultIdType),
+    /// An added edge overlaps with an edge that was added before.
+    #[error(
+        "the edge from {source_state} on {expression} to {target} overlaps with an existing edge to {existing_target}"
+    )]
+    OverlappingEdge {
+        /// The source state of the edge that could not be added.
+        source_state: DefaultIdType,
+        /// The expression (symbol) on the edge.
+        expression: String,
+        /// The target state of the edge that could not be added.
+        target: DefaultIdType,
+        /// The target of the existing edge with which it overlaps.
+        existing_target: DefaultIdType,
+    },
+}
+
+#[track_caller]
+fn or_panic<T>(result: Result<T, BuilderError>) -> T {
+    result.unwrap_or_else(|error| panic!("{error}"))
+}
 
 /// Helper struct for the construction of non-deterministic transition systems. It stores a list of edges, a list of colors and a default color.
 /// This can also be used to construct deterministic transition systems, deterministic parity automata and Mealy machines.
@@ -110,7 +141,23 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
     }
 
     /// Creates an instance of a non-deterministic [`TS`] from `self`.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
     pub fn into_ts<const DOUT: bool>(self) -> TS<CharAlphabet, Q, C, DOUT> {
+        or_panic(self.try_into_ts())
+    }
+
+    /// Creates an instance of a [`TS`] from `self`.
+    ///
+    /// # Errors
+    /// - [`BuilderError::MissingStateColor`] if a state has no color and there is no default color,
+    /// - [`BuilderError::OverlappingEdge`] if an edge overlaps with a previously added one (this
+    ///   can only happen when building a deterministic transition system).
+    pub fn try_into_ts<const DOUT: bool>(
+        self,
+    ) -> Result<TS<CharAlphabet, Q, C, DOUT>, BuilderError> {
         let alphabet =
             CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
 
@@ -122,43 +169,62 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
             .count();
         let mut ts = TS::for_alphabet_size_hint(alphabet, num_states);
 
-        let mut created_states_number = 0;
         for i in 0..num_states {
             let i = i as DefaultIdType;
-            if self.colors.iter().all(|(q, _)| *q != i) && self.default.is_none() {
-                panic!("Default is needed as some states (specifically {i:?}) have no color",);
-            }
-
-            ts.add_state(
-                self.colors
-                    .iter()
-                    .find_map(|(q, c)| if *q == i { Some(c.clone()) } else { None })
-                    .unwrap_or_else(|| self.default.clone().unwrap()),
-            );
-            created_states_number += 1;
+            let color = self
+                .colors
+                .iter()
+                .find_map(|(q, c)| (*q == i).then(|| c.clone()))
+                .or_else(|| self.default.clone())
+                .ok_or(BuilderError::MissingStateColor(i))?;
+            ts.add_state(color);
         }
-        assert_eq!(created_states_number, num_states);
 
         for (q, e, c, p) in self.edges {
-            if let Some((q, e, d, pp)) = ts.add_edge((q, e, c.clone(), p)) {
-                panic!(
-                    "Failed to add edge from {q:?} on {e} to {p:?} with color {c:?}, it is overlapping an existing edge with color {d:?} to {pp:?}"
-                )
+            if let Some((_, _, _, existing_target)) = ts.add_edge((q, e, c, p)) {
+                return Err(BuilderError::OverlappingEdge {
+                    source_state: q,
+                    expression: e.to_string(),
+                    target: p,
+                    existing_target,
+                });
             }
         }
-        ts
+        Ok(ts)
     }
 
     /// Builds a [NondeterministicTransitionSystem](`NTS`) from `self`.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
     pub fn into_nts(self) -> NTS<CharAlphabet, Q, C> {
-        self.into_ts()
+        or_panic(self.try_into_nts())
     }
+
+    /// Fallible version of [`Self::into_nts`].
+    pub fn try_into_nts(self) -> Result<NTS<CharAlphabet, Q, C>, BuilderError> {
+        self.try_into_ts()
+    }
+
     /// Builds a [NondeterministicTransitionSystem](`NTS`) from `self` with an initial state.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
     pub fn into_nts_with_initial(
         self,
         initial: DefaultIdType,
     ) -> WithInitial<NTS<CharAlphabet, Q, C>> {
-        self.into_ts().with_initial(initial)
+        or_panic(self.try_into_nts_with_initial(initial))
+    }
+
+    /// Fallible version of [`Self::into_nts_with_initial`].
+    pub fn try_into_nts_with_initial(
+        self,
+        initial: DefaultIdType,
+    ) -> Result<WithInitial<NTS<CharAlphabet, Q, C>>, BuilderError> {
+        Ok(self.try_into_ts()?.with_initial(initial))
     }
 
     /// Assigns the given `color` to the state with the given index `idx`.
@@ -239,11 +305,25 @@ impl<Q: Color, C: Color, const DET: bool> TSBuilder<Q, C, DET> {
 
 impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     /// Builds an instance of [`DTS`] from `self`.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
     pub fn into_dts(self) -> DTS<CharAlphabet, Q, C> {
-        self.into_ts()
+        or_panic(self.try_into_dts())
     }
+
+    /// Fallible version of [`Self::into_dts`].
+    pub fn try_into_dts(self) -> Result<DTS<CharAlphabet, Q, C>, BuilderError> {
+        self.try_into_ts()
+    }
+
     /// Builds an instance of [`DTS`] from `self` and sets the given `initial` state
     /// as the designated initial state of the output object.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
     pub fn into_dts_with_initial(
         self,
         initial: DefaultIdType,
@@ -251,73 +331,213 @@ impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     where
         C: Hash + Eq,
     {
-        self.into_dts().with_initial(initial)
+        or_panic(self.try_into_dts_with_initial(initial))
     }
 
-    /// Turns `self` into a [`RightCongruence`] with the given initial state. Panics if `self` is not deterministic.
+    /// Fallible version of [`Self::into_dts_with_initial`].
+    pub fn try_into_dts_with_initial(
+        self,
+        initial: DefaultIdType,
+    ) -> Result<WithInitial<DTS<CharAlphabet, Q, C>>, BuilderError>
+    where
+        C: Hash + Eq,
+    {
+        Ok(self.try_into_dts()?.with_initial(initial))
+    }
+
+    /// Turns `self` into a [`RightCongruence`] with the given initial state.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
     pub fn into_right_congruence(
         self,
         initial: DefaultIdType,
     ) -> RightCongruence<CharAlphabet, Q, C> {
-        self.into_dts()
+        or_panic(self.try_into_right_congruence(initial))
+    }
+
+    /// Fallible version of [`Self::into_right_congruence`].
+    pub fn try_into_right_congruence(
+        self,
+        initial: DefaultIdType,
+    ) -> Result<RightCongruence<CharAlphabet, Q, C>, BuilderError> {
+        Ok(self
+            .try_into_dts()?
             .with_initial(initial)
-            .into_right_congruence()
-    }
-}
-
-impl TSBuilder<bool, Void, true> {
-    /// Tries to turn `self` into a deterministic finite automaton. Panics if `self` is not deterministic.
-    pub fn into_dfa(self, initial: DefaultIdType) -> DFA<CharAlphabet> {
-        self.into_dts().with_initial(initial).into_dfa()
-    }
-}
-
-impl TSBuilder<Void, bool, true> {
-    /// Attempts to turn `self` into a deterministic Büchi automaton. Panics if `self` is not deterministic.
-    pub fn into_dba(self, initial: DefaultIdType) -> DBA<CharAlphabet> {
-        self.default_color(Void)
-            .into_dts()
-            .with_initial(initial)
-            .into_dba()
-    }
-}
-
-impl TSBuilder<Void, Int, true> {
-    /// Attempts to turn `self` into a deterministic parity automaton. Panics if `self` is not deterministic.
-    pub fn into_dpa(self, initial: DefaultIdType) -> DPA<CharAlphabet> {
-        self.default_color(Void)
-            .into_dts()
-            .with_initial(initial)
-            .into_dpa()
+            .into_right_congruence())
     }
 
-    /// Builds a Mealy machine from `self`. Panics if `self` is not deterministic.
-    pub fn into_mealy(self, initial: DefaultIdType) -> MealyMachine<CharAlphabet> {
-        self.default_color(Void)
-            .into_dts()
-            .with_initial(initial)
-            .into_mealy()
-    }
-}
-
-impl TSBuilder<Int, Void, true> {
-    /// Builds a Moore machine from `self`. Panics if `self` is not deterministic.
-    pub fn into_moore(self, initial: DefaultIdType) -> MooreMachine<CharAlphabet> {
-        self.into_dts().with_initial(initial).into_moore()
-    }
-}
-
-impl<Q: Color, C: Color> TSBuilder<Q, C, true> {
     /// Turns `self` into a [`RightCongruence`] with the given initial state while also erasing all state and edge
-    /// colors. Panics if `self` is not deterministic.
+    /// colors.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
     pub fn into_right_congruence_bare(
         self,
         initial: DefaultIdType,
     ) -> RightCongruence<CharAlphabet> {
-        self.into_dts()
+        or_panic(self.try_into_right_congruence_bare(initial))
+    }
+
+    /// Fallible version of [`Self::into_right_congruence_bare`].
+    pub fn try_into_right_congruence_bare(
+        self,
+        initial: DefaultIdType,
+    ) -> Result<RightCongruence<CharAlphabet>, BuilderError> {
+        Ok(self
+            .try_into_dts()?
             .with_initial(initial)
             .erase_state_colors()
             .erase_edge_colors()
-            .into_right_congruence()
+            .into_right_congruence())
+    }
+}
+
+impl TSBuilder<bool, Void, true> {
+    /// Turns `self` into a deterministic finite automaton.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
+    pub fn into_dfa(self, initial: DefaultIdType) -> DFA<CharAlphabet> {
+        or_panic(self.try_into_dfa(initial))
+    }
+
+    /// Fallible version of [`Self::into_dfa`].
+    pub fn try_into_dfa(self, initial: DefaultIdType) -> Result<DFA<CharAlphabet>, BuilderError> {
+        Ok(self.try_into_dts()?.with_initial(initial).into_dfa())
+    }
+}
+
+impl TSBuilder<Void, bool, true> {
+    /// Turns `self` into a deterministic Büchi automaton.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
+    pub fn into_dba(self, initial: DefaultIdType) -> DBA<CharAlphabet> {
+        or_panic(self.try_into_dba(initial))
+    }
+
+    /// Fallible version of [`Self::into_dba`].
+    pub fn try_into_dba(self, initial: DefaultIdType) -> Result<DBA<CharAlphabet>, BuilderError> {
+        Ok(self
+            .default_color(Void)
+            .try_into_dts()?
+            .with_initial(initial)
+            .into_dba())
+    }
+}
+
+impl TSBuilder<Void, Int, true> {
+    /// Turns `self` into a deterministic parity automaton.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
+    pub fn into_dpa(self, initial: DefaultIdType) -> DPA<CharAlphabet> {
+        or_panic(self.try_into_dpa(initial))
+    }
+
+    /// Fallible version of [`Self::into_dpa`].
+    pub fn try_into_dpa(self, initial: DefaultIdType) -> Result<DPA<CharAlphabet>, BuilderError> {
+        Ok(self
+            .default_color(Void)
+            .try_into_dts()?
+            .with_initial(initial)
+            .into_dpa())
+    }
+
+    /// Builds a Mealy machine from `self`.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
+    pub fn into_mealy(self, initial: DefaultIdType) -> MealyMachine<CharAlphabet> {
+        or_panic(self.try_into_mealy(initial))
+    }
+
+    /// Fallible version of [`Self::into_mealy`].
+    pub fn try_into_mealy(
+        self,
+        initial: DefaultIdType,
+    ) -> Result<MealyMachine<CharAlphabet>, BuilderError> {
+        Ok(self
+            .default_color(Void)
+            .try_into_dts()?
+            .with_initial(initial)
+            .into_mealy())
+    }
+}
+
+impl TSBuilder<Int, Void, true> {
+    /// Builds a Moore machine from `self`.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
+    #[track_caller]
+    pub fn into_moore(self, initial: DefaultIdType) -> MooreMachine<CharAlphabet> {
+        or_panic(self.try_into_moore(initial))
+    }
+
+    /// Fallible version of [`Self::into_moore`].
+    pub fn try_into_moore(
+        self,
+        initial: DefaultIdType,
+    ) -> Result<MooreMachine<CharAlphabet>, BuilderError> {
+        Ok(self.try_into_dts()?.with_initial(initial).into_moore())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BuilderError, TSBuilder};
+
+    #[test]
+    fn building_reports_missing_state_colors() {
+        // state 1 has no color and there is no default
+        let builder = TSBuilder::without_edge_colors()
+            .color(0, true)
+            .with_transitions([(0, 'a', 1), (1, 'a', 0)]);
+        assert_eq!(
+            builder.try_into_dfa(0).err(),
+            Some(BuilderError::MissingStateColor(1))
+        );
+
+        let with_default = TSBuilder::without_edge_colors()
+            .color(0, true)
+            .default_color(false)
+            .with_transitions([(0, 'a', 1), (1, 'a', 0)]);
+        assert!(with_default.try_into_dfa(0).is_ok());
+    }
+
+    #[test]
+    fn building_reports_overlapping_edges() {
+        let builder = TSBuilder::without_colors().with_transitions([(0, 'a', 1), (0, 'a', 0)]);
+        assert_eq!(
+            builder.try_into_dts().err(),
+            Some(BuilderError::OverlappingEdge {
+                source_state: 0,
+                expression: "a".to_string(),
+                target: 0,
+                existing_target: 1,
+            })
+        );
+        // the same edges are fine in a nondeterministic transition system
+        let nondeterministic = TSBuilder::<crate::Void, crate::Void, false>::without_colors()
+            .with_transitions([(0, 'a', 1), (0, 'a', 0)])
+            .try_into_nts();
+        assert!(nondeterministic.is_ok());
+    }
+
+    #[test]
+    #[should_panic(expected = "has no color")]
+    fn into_panics_where_try_into_returns_an_error() {
+        let _ = TSBuilder::without_edge_colors()
+            .color(0, true)
+            .with_transitions([(0, 'a', 1)])
+            .into_dfa(0);
     }
 }
