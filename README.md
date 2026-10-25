@@ -134,7 +134,7 @@ assert!(dpa.accepts(&word));
 
 Büchi, Rabin and Muller conditions are available as `DBA`, `DRA` and `DMA`; parity automata are the best supported ones.
 
-More runnable programs are in the [`examples/`](examples) directory, for example `cargo run --example dfa` or `cargo run --example parity`.
+More runnable programs are in the [`examples/`](https://github.com/leonbohn/automata/tree/main/examples) directory, for example `cargo run --example dfa` or `cargo run --example parity`.
 
 ## Transition systems and lazy operations
 
