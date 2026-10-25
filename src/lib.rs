@@ -46,7 +46,6 @@ pub type DTS<A = alphabet::CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, true>
 /// **now known to be** [`Deterministic`].
 pub type NTS<A = alphabet::CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, false>;
 
-/// implements the interface to the `hoars` package. Is only available on create feature `hoa`.
 #[cfg(feature = "hoa")]
 pub mod hoa;
 

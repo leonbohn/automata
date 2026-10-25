@@ -1,3 +1,43 @@
+//! Reading and writing automata in the [HOA format](https://adl.github.io/hoaf/), using the
+//! [`hoars`](https://github.com/leonbohn/hoars) crate. Only available with the feature `hoa`.
+//!
+//! Deterministic Büchi and parity automata can be parsed from a [`HoaString`] and written back
+//! with [`WriteHoa::to_hoa`]. Edges of parsed automata are labeled by formulas over the atomic
+//! propositions (a [`PropAlphabet`]).
+//!
+//! ```
+//! use automata::{TransitionSystem, hoa::{HoaString, WriteHoa}};
+//!
+//! let text = r#"HOA: v1
+//! States: 2
+//! Start: 0
+//! acc-name: parity min even 3
+//! Acceptance: 3 Inf(0) | (Fin(1) & Inf(2))
+//! AP: 2 "a" "b"
+//! --BODY--
+//! State: 0
+//! [0 & !1] 1 {1}
+//! [!0 & 1] 0 {0}
+//! State: 1
+//! [0 & !1] 0 {1}
+//! [!0 & 1] 1 {2}
+//! --END--
+//! "#;
+//!
+//! // a string may contain several automata, `pop` removes the first one
+//! let mut hoa = HoaString::from(text.to_string());
+//! let automaton = hoa.pop::<true>().expect("a valid deterministic automaton");
+//! assert_eq!(automaton.size(), 2);
+//!
+//! // convert to a deterministic parity automaton and write it back
+//! let dpa = automaton.into_dpa().expect("a parity automaton");
+//! let written = dpa.to_hoa();
+//! assert!(written.contains("acc-name: parity min even 3"));
+//! assert!(written.contains("[0 & !1] 1 {1}"));
+//! ```
+//!
+//! Only deterministic Büchi and parity automata are supported so far. Reading fails with a
+//! [`HoaError`] for other acceptance conditions, alternating automata and unsupported inputs.
 #![allow(missing_docs)]
 
 use tracing::{trace, warn};

@@ -47,13 +47,13 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 
 - [ ] Remove blanket `allow(missing_docs)` (34 uses) and `allow(unused)`; document every public item.
 - [ ] Integration tests in `tests/`, property tests (`proptest`): `minimize(A) ≡ A`, `A ∪ ¬A` accepts everything, HOA round trips.
-- [ ] Un-ignore or delete every `#[ignore]` test and every `ignore`d doctest (4 unit, 6 doc).
+- [x] No `ignore`d doctests left (README rewritten, all snippets run). Still to decide: the 4 `#[ignore]`d unit tests (3 rendering tests, see #16, and one `random` benchmark-style test).
 - [ ] `criterion` benchmarks in `benches/` (product, determinize, minimize, SCC).
 - [ ] CI: Linux/macOS/Windows test matrix, `--no-default-features` and `--all-features`, MSRV job, `cargo doc -D warnings`, `cargo deny`, `cargo semver-checks`, coverage. The current workflow only builds on Windows and macOS.
 
 ## Phase 5: documentation
 
-- [ ] README: pitch, feature table, `cargo add`, runnable quick start, HOA I/O and rendering example, comparison with alternatives (Spot, `regex-automata`), badges.
+- [x] README rewritten (pitch, feature table, install, runnable quick starts for DFAs and DPAs, lazy transition-system operations, DOT output, concepts). The HOA example lives in the `hoa` module docs (it needs the `hoa` feature, README doctests run without features). Still to do at release time: switch the install instructions from the git dependency to `cargo add automata`, add crates.io / docs.rs badges, and add a comparison with alternatives (Spot, `regex-automata`).
 - [ ] Crate-level rustdoc tour (alphabet, word, transition system, automaton, acceptance, operations) with runnable examples; examples on all major public functions.
 - [ ] `examples/` (build a DFA, minimize, boolean ops, parse HOA and render, omega acceptance).
 - [ ] mdBook guide in `docs/`, deployed via GitHub Pages; `CHANGELOG.md`, `CONTRIBUTING.md`.

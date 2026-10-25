@@ -40,7 +40,7 @@ Features: `default = ["hoa"]`; opt-in: `random`, `render` (SVG/PNG via `resvg`/`
 
 ## Conventions
 
-- `#![deny(missing_docs)]` and `deny(rustdoc::broken_intra_doc_links)` are on; README is `include_str!`ed into the crate docs, so README code blocks are doctests.
+- `#![deny(missing_docs)]` and `deny(rustdoc::broken_intra_doc_links)` are on; README is `include_str!`ed into the crate docs, so README code blocks are doctests. They run in every feature configuration, so README examples must not need optional features (HOA examples live in the `hoa` module docs).
 - Use `tracing` for logging in library code.
 - Do not panic in library code: return `Result` with typed errors (`src/error.rs` has the crate-wide `#[non_exhaustive]` `Error`; domain errors such as `PropAlphabetError`, `NotPeriodicError`, `hoa::HoaError` convert into it; never use `String` as an error type); use `Error::NotYetImplemented` instead of `todo!()`/`unimplemented!()`. Existing panics are being removed (see `PLAN.md`).
 - Ask before committing or pushing.
