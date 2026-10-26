@@ -89,14 +89,44 @@ where
     }
 
     /// Checks whether `self` is equivalent to `other`, i.e. whether the two DFAs accept
-    /// the same language. The product is explored lazily, so the search stops at the first
-    /// reachable pair of states on which the two automata disagree.
+    /// the same language. Equivalent to [`Self::symmetric_difference_is_empty`].
     pub fn equivalent<E>(&self, other: E) -> bool
     where
         E: Congruence<Alphabet = D::Alphabet, StateColor = bool>,
     {
-        self.product_has_reachable_state(other, |a, b| a != b)
-            .is_none()
+        self.symmetric_difference_is_empty(other)
+    }
+
+    /// Returns true if and only if the symmetric difference of the languages of `self` and `other`
+    /// is empty. The product is explored lazily, so the search stops at the first reachable pair of
+    /// states on which the two automata disagree.
+    pub fn symmetric_difference_is_empty<E>(&self, other: E) -> bool
+    where
+        E: Congruence<Alphabet = D::Alphabet, StateColor = bool>,
+    {
+        self.product_witness(other, |a, b| a != b).is_none()
+    }
+
+    /// Returns a length-lexicographically minimal word that is accepted by exactly one of `self`
+    /// and `other`, or `None` if the symmetric difference of their languages is empty.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::{automaton::DFA, ts::Builder};
+    ///
+    /// let ts = Builder::without_colors()
+    ///     .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 1), (1, 'b', 0)])
+    ///     .into_dts_with_initial(0);
+    /// let ends_in_a = DFA::from_ts(&ts, [1]);
+    /// let anything = DFA::from_ts(&ts, [0, 1]);
+    /// assert_eq!(ends_in_a.symmetric_difference_word(&anything), Some(vec![]));
+    /// assert_eq!(ends_in_a.symmetric_difference_word(&ends_in_a), None);
+    /// ```
+    pub fn symmetric_difference_word<E>(&self, other: E) -> Option<Vec<SymbolOf<Self>>>
+    where
+        E: Congruence<Alphabet = D::Alphabet, StateColor = bool>,
+    {
+        self.product_witness(other, |a, b| a != b)
     }
 
     /// Returns true if and only if the intersection of the languages of `self` and `other` is
@@ -106,15 +136,16 @@ where
     where
         E: Congruence<Alphabet = D::Alphabet, StateColor = bool>,
     {
-        self.product_has_reachable_state(other, |a, b| a && b)
-            .is_none()
+        self.product_witness(other, |a, b| a && b).is_none()
     }
 
-    fn product_has_reachable_state<E>(
+    /// Finds a minimal word leading to a reachable pair of states in the product of `self` and
+    /// `other` whose colors satisfy `pred`.
+    fn product_witness<E>(
         &self,
         other: E,
         pred: impl Fn(bool, bool) -> bool,
-    ) -> Option<()>
+    ) -> Option<Vec<SymbolOf<Self>>>
     where
         E: Congruence<Alphabet = D::Alphabet, StateColor = bool>,
     {
@@ -126,7 +157,7 @@ where
             let (a, b) = product
                 .state_color(rep.state_index())
                 .expect("Every state must be colored");
-            pred(a, b).then_some(())
+            pred(a, b).then(|| rep.into_inner())
         })
     }
 
@@ -234,6 +265,12 @@ mod tests {
         assert!(!some.equivalent(&all));
         assert!(all.intersection_is_empty(DFA::from_ts(&ts, [])));
         assert!(!all.intersection_is_empty(&some));
+        assert!(all.symmetric_difference_is_empty(&all));
+        assert!(!all.symmetric_difference_is_empty(&some));
+        assert_eq!(all.symmetric_difference_word(&all), None);
+        // 'b' leads to state 1 which is only accepted by `all`
+        assert_eq!(all.symmetric_difference_word(&some), Some(vec!['b']));
+        assert_eq!(some.symmetric_difference_word(&all), Some(vec!['b']));
     }
 
     #[test]
