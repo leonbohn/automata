@@ -1,6 +1,8 @@
 # automata
 
 [![CI](https://github.com/leonbohn/automata/actions/workflows/ci.yml/badge.svg)](https://github.com/leonbohn/automata/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/automata.svg)](https://crates.io/crates/automata)
+[![docs.rs](https://img.shields.io/docsrs/automata)](https://docs.rs/automata)
 ![MSRV](https://img.shields.io/badge/rustc-1.88+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
