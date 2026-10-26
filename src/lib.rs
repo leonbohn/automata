@@ -78,7 +78,6 @@ pub mod minimization;
 #[cfg(feature = "random")]
 pub mod random;
 
-/// This module deals with transforming a transition system (or similar) into a representation in the dot (graphviz) format.
 pub mod dot;
 
 #[cfg(test)]
