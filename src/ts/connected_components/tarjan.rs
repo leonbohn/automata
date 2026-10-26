@@ -1,14 +1,11 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use super::SccDecomposition;
 use crate::TransitionSystem;
 use crate::ts::connected_components::Scc;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{IndexType, IsEdge, StateIndex};
-use crate::{
-    alphabet::Expression,
-    math::{OrderedMap, OrderedSet},
-};
+use crate::{alphabet::Expression, math::OrderedMap};
 
 #[derive(Debug, Clone)]
 struct TarjanData {
@@ -140,47 +137,58 @@ where
 }
 
 /// Implementation of Kosaraju's algorithm for computing the SCC decomposition.
+/// Only states reachable from `start` are considered.
 pub fn kosaraju<Ts>(ts: &Ts, start: Ts::StateIndex) -> SccDecomposition<'_, Ts>
 where
     Ts: TransitionSystem + PredecessorIterable,
 {
-    let mut visited = OrderedSet::from_iter([start]);
-    let mut l = VecDeque::with_capacity(ts.size());
-    let mut queue = Vec::with_capacity(ts.size());
+    // first pass: dfs on the forward graph, recording states in order of finishing
+    let mut ids: HashMap<Ts::StateIndex, usize> = HashMap::new();
+    let mut states = vec![start];
+    ids.insert(start, 0);
+    let mut finished = Vec::new();
+    let mut queue = vec![(start, ts.edges_from(start).unwrap())];
 
-    queue.push((start, ts.edges_from(start).unwrap()));
-
-    'outer: while let Some((q, mut edges)) = queue.pop() {
+    while let Some((q, edges)) = queue.last_mut() {
+        let q = *q;
         if let Some(edge) = edges.next() {
-            // we proceed dfs-like on the edge
             let target = edge.target();
-            if visited.insert(target) {
-                queue.extend([(q, edges), (target, ts.edges_from(target).unwrap())]);
-            } else {
-                queue.push((q, edges));
+            if let std::collections::hash_map::Entry::Vacant(e) = ids.entry(target) {
+                e.insert(states.len());
+                states.push(target);
+                queue.push((target, ts.edges_from(target).unwrap()));
             }
-            continue 'outer;
+        } else {
+            queue.pop();
+            finished.push(ids[&q]);
         }
-        // no more edges left, push q to front of l
-        l.push_front(q);
     }
 
-    // trace!("Computation for L gave {:?}", l);
-
-    // now we do backwards dfs starting from the first element of l
-    let reversed = (&ts).reversed();
+    // second pass: backward dfs in decreasing order of finishing time, restricted to
+    // states that have not been assigned to an scc yet
+    let mut assigned = vec![false; states.len()];
     let mut sccs = vec![];
+    let mut work = vec![];
 
-    while let Some(next) = l.pop_front() {
-        let mut scc = vec![next];
-        for v in reversed.reachable_state_indices_from(next) {
-            // trace!("{v:?} is backward reachable from {next:?}");
-            if let Some(pos) = l.iter().position(|x| x == &v) {
-                l.remove(pos);
-                scc.push(v);
+    for &root in finished.iter().rev() {
+        if assigned[root] {
+            continue;
+        }
+        assigned[root] = true;
+        work.push(root);
+        let mut scc = vec![];
+        while let Some(v) = work.pop() {
+            let q = states[v];
+            scc.push(q);
+            for edge in ts.predecessors(q).into_iter().flatten() {
+                if let Some(&u) = ids.get(&edge.source())
+                    && !assigned[u]
+                {
+                    assigned[u] = true;
+                    work.push(u);
+                }
             }
         }
-        assert!(scc.contains(&next));
         sccs.push(Scc::new(ts, scc));
     }
 
@@ -304,6 +312,41 @@ mod tests {
         predecessors::PredecessorIterable,
     };
     use tracing::debug;
+
+    #[test]
+    fn kosaraju_agrees_with_tarjan() {
+        // state 5 is not reachable from 0 but has an edge into the reachable part
+        let ts = Builder::without_colors()
+            .with_transitions([
+                (0, 'a', Void, 1),
+                (0, 'b', Void, 2),
+                (1, 'a', Void, 0),
+                (1, 'b', Void, 3),
+                (2, 'a', Void, 2),
+                (2, 'b', Void, 4),
+                (3, 'a', Void, 4),
+                (3, 'b', Void, 3),
+                (4, 'a', Void, 2),
+                (4, 'b', Void, 4),
+                (5, 'a', Void, 0),
+                (5, 'b', Void, 5),
+            ])
+            .into_right_congruence(0);
+
+        let mut expected: Vec<Vec<_>> = tarjan_scc_iterative(&ts)
+            .sccs_iter()
+            .map(|scc| scc.iter().copied().collect())
+            .filter(|scc: &Vec<_>| !scc.contains(&5))
+            .collect();
+        let mut actual: Vec<Vec<_>> = kosaraju(&ts, 0)
+            .sccs_iter()
+            .map(|scc| scc.iter().copied().collect())
+            .collect();
+        expected.sort();
+        actual.sort();
+        assert_eq!(actual, expected);
+        assert_eq!(actual, vec![vec![0, 1], vec![2, 4], vec![3]]);
+    }
 
     #[test]
     fn tarjan_iterative() {
