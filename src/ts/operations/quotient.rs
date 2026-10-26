@@ -26,6 +26,7 @@ pub struct Quotient<Ts: TransitionSystem> {
     ts: Ts,
     expressions: math::OrderedMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
     partition: Partition<Ts::StateIndex>,
+    class_of: math::Map<Ts::StateIndex, usize>,
 }
 
 impl<Ts: Deterministic + Pointed> Pointed for Quotient<Ts> {
@@ -67,7 +68,7 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
     /// Tries to find the id of the quotient class containing the given state `q`. If
     /// the state is not in the partition, `None` is returned.
     pub fn find_id_by_state(&self, q: Ts::StateIndex) -> Option<usize> {
-        self.partition.iter().position(|o| o.contains(&q))
+        self.class_of.get(&q).copied()
     }
 
     /// Extracts the underlying right congruence by erasing the state and edge colors and then collecting
@@ -83,7 +84,13 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
 
     /// Creates a new quotient of the given transition system by the give [`Partition`].
     pub fn new(ts: Ts, partition: Partition<Ts::StateIndex>) -> Self {
+        let class_of = partition
+            .iter()
+            .enumerate()
+            .flat_map(|(i, class)| class.iter().map(move |q| (*q, i)))
+            .collect();
         Self {
+            class_of,
             expressions: ts
                 .alphabet()
                 .universe()

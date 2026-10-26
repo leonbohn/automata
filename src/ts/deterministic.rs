@@ -55,9 +55,6 @@ pub trait Deterministic: TransitionSystem {
         state: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        if !self.contains_state_index(state) {
-            return None;
-        }
         let mut it = self
             .edges_from(state)?
             .filter(|e| matcher.matches(e.expression()));

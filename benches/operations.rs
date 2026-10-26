@@ -36,7 +36,7 @@ fn reachability(c: &mut Criterion) {
 
 fn dfa_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("dfa");
-    for n in [50, 200, 1_000] {
+    for n in [50, 200, 1_000, 5_000, 20_000] {
         let a = dfa(n, 3);
         group.bench_with_input(BenchmarkId::new("minimize", n), &a, |b, a| {
             b.iter(|| black_box(a.clone().minimize().size()))

@@ -641,6 +641,12 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         self.states.get(state.into_usize())?.color().cloned()
     }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        self.states
+            .get(index.into_usize())
+            .is_some_and(|s| s.is_occupied())
+    }
 }
 
 pub struct LinkedStateIndices<'ts, Q: Color>(&'ts [LinkedListTransitionSystemState<Q>], usize);
