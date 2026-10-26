@@ -38,8 +38,8 @@ The minimum supported Rust version is **1.88**.
 | ------- | ------- | ----------- |
 | `hoa` | yes | reading and writing automata in the [HOA format](https://adl.github.io/hoaf/), using the [`hoars`](https://github.com/leonbohn/hoars) crate |
 | `random` | no | generation of random transition systems and words |
-| `render` | no | rendering automata to SVG/PNG without external tools (experimental, pulls in `resvg`, `usvg` and `layout-rs`) |
-| `graphviz` | no | rendering and displaying automata with an installed [graphviz](https://graphviz.org/) `dot` executable (experimental, implies `render`) |
+| `render` | no | rendering automata to SVG/PNG and `data:` URLs without external tools, and displaying them in the viewer of the system (experimental, pulls in `resvg`, `usvg` and `layout-rs`) |
+| `graphviz` | no | the same with an installed [graphviz](https://graphviz.org/) `dot` executable (experimental, independent of `render`, nicer layouts) |
 
 The textual DOT output needs no feature.
 
@@ -198,6 +198,18 @@ assert!(dot.contains("q0 -> q1"));
 ```
 
 The experimental features `render` and `graphviz` additionally render automata to images directly.
+Both offer the same operations, the `graphviz` variants carry the suffix `_graphviz`:
+
+| | `render` (pure Rust, `layout-rs`) | `graphviz` (needs `dot` in the `PATH`) |
+| --- | --- | --- |
+| SVG document | `try_svg()` | `try_svg_graphviz()` |
+| `data:` URL | `try_data_url()` | `try_data_url_graphviz()` |
+| PNG bytes | `render()` | `render_graphviz()` |
+| open in a viewer | `display_rendered()` | `display_rendered_graphviz()` |
+
+`render_to_file_name` (`graphviz`) writes the result of `dot` to a file, the format is taken from the extension.
+Displaying writes an SVG to a temporary file and opens it with the default program of your system (`xdg-open`, `open` or `start`).
+Set the environment variable `IMAGE_VIEWER` to use a different program, it is called with the path of the file.
 
 ## Concepts
 

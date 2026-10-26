@@ -43,8 +43,8 @@ test-log = { version = "0.2", features = ["trace"] }
 default = ["hoa"]
 random = ["dep:rand_distr"]
 hoa = ["dep:hoars"]
-graphviz = ["dep:tempfile", "dep:open", "render"]
-render = ["dep:layout-rs", "dep:base64", "dep:resvg", "dep:open", "dep:usvg"]
+graphviz = ["dep:tempfile", "dep:open", "dep:base64"]
+render = ["dep:layout-rs", "dep:base64", "dep:resvg", "dep:open", "dep:tempfile", "dep:usvg"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -52,3 +52,4 @@ all-features = true
 [[example]]
 name = "hoa"
 required-features = ["hoa"]
+

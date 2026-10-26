@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Display};
-#[cfg(feature = "render")]
+#[cfg(any(feature = "render", feature = "graphviz"))]
 use thiserror::Error;
 
 use crate::automaton::{DFA, IntoDPA, IntoMealyMachine, IntoMooreMachine};
@@ -8,32 +8,45 @@ use crate::{Color, Int, Show, alphabet::Alphabet};
 use crate::{Pointed, TransitionSystem};
 use itertools::Itertools;
 
-/// Errors that can occur while rendering a transition system as an image.
-#[cfg(feature = "render")]
+/// Errors that can occur while rendering a transition system as an image or while displaying it.
+#[cfg(any(feature = "render", feature = "graphviz"))]
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum RenderError {
+    /// The generated SVG could not be processed (feature `render`).
+    #[cfg(feature = "render")]
     #[error("encountered SVG rendering error: \"{0:?}\"")]
-    // we let `thiserror` implement From<resvg::usvg::Error>
-    /// The generated SVG could not be processed.
     SvgError(#[from] resvg::usvg::Error),
-    /// The pixmap for the rendered image could not be allocated.
+    /// The pixmap for the rendered image could not be allocated (feature `render`).
+    #[cfg(feature = "render")]
     #[error("could not allocate pixmap")]
     PixmapAllocationError,
-    /// The rendered image could not be encoded as a PNG.
+    /// The rendered image could not be encoded as a PNG (feature `render`).
+    #[cfg(feature = "render")]
     #[error("could not encode PNG: \"{0:?}\"")]
     PngEncodingError(String),
-    /// The rendered image could not be written or displayed.
-    #[error("error when displaying PNG: \"{0:?}\"")]
-    PngDisplayError(#[from] std::io::Error),
-    /// The DOT representation could not be rendered to SVG.
+    /// The DOT representation could not be rendered to SVG (feature `render`).
+    #[cfg(feature = "render")]
     #[error("could not render to SVG: \"{0}\"")]
     RenderToSvgError(String),
-    /// The SVG document could not be created from the DOT representation.
-    #[error("Could not create VSVG document: \"{0}\"")]
-    VsvgDocumentError(String),
-    /// An external process (the graphviz `dot` executable) finished with a non-zero exit status.
-    #[error("Child process had non-zero exit status \"{0}\"")]
-    NonZeroExit(std::process::ExitStatus),
+    /// A file could not be written or a viewer could not be started.
+    #[error("I/O error while rendering or displaying: \"{0}\"")]
+    Io(#[from] std::io::Error),
+    /// The graphviz `dot` executable could not be found in the `PATH` (feature `graphviz`).
+    #[cfg(feature = "graphviz")]
+    #[error(
+        "the graphviz `dot` executable was not found, install graphviz and make sure it is in the PATH"
+    )]
+    DotNotFound,
+    /// The graphviz `dot` executable finished with a non-zero exit status (feature `graphviz`).
+    #[cfg(feature = "graphviz")]
+    #[error("`dot` exited with {status}: {stderr}")]
+    DotFailed {
+        /// The exit status of the process.
+        status: std::process::ExitStatus,
+        /// What `dot` printed to its standard error.
+        stderr: String,
+    },
 }
 
 /// Transition systems that can be written in the [DOT](https://graphviz.org/doc/info/lang.html)
@@ -67,23 +80,23 @@ pub trait Dottable: TransitionSystem {
     /// feature `render`).
     #[cfg(feature = "render")]
     fn try_data_url(&self) -> Result<String, RenderError> {
-        Ok(format!(
-            "data:image/svg+xml;base64,{}",
-            base64::Engine::encode(
-                &base64::prelude::BASE64_STANDARD_NO_PAD,
-                self.try_svg()?
-                    .strip_prefix(r#"<?xml version="1.0" encoding="UTF-8" standalone="no"?>"#)
-                    .unwrap()
-            ),
-        ))
+        Ok(svg_to_data_url(&self.try_svg()?))
     }
 
-    /// Opens the rendered SVG in Firefox, which has to be installed (experimental, feature `render`).
-    #[cfg(feature = "render")]
-    fn try_open_svg_in_firefox(&self) -> Result<(), RenderError> {
-        let url = self.try_data_url()?;
-        tracing::info!("opening data url\n{url}");
-        Ok(open::with(url, "firefox")?)
+    /// Like [`Self::try_svg`], but uses the `dot` executable of an installed
+    /// [graphviz](https://graphviz.org/) (experimental, feature `graphviz`).
+    #[cfg(feature = "graphviz")]
+    fn try_svg_graphviz(&self) -> Result<String, RenderError> {
+        let svg = run_dot(&self.dot_representation(), "svg")?;
+        String::from_utf8(svg)
+            .map_err(|e| RenderError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+    }
+
+    /// Like [`Self::try_data_url`], but uses the `dot` executable of an installed
+    /// [graphviz](https://graphviz.org/) (experimental, feature `graphviz`).
+    #[cfg(feature = "graphviz")]
+    fn try_data_url_graphviz(&self) -> Result<String, RenderError> {
+        Ok(svg_to_data_url(&self.try_svg_graphviz()?))
     }
 
     /// Compute the graphviz representation, for more information on the DOT format,
@@ -181,96 +194,41 @@ pub trait Dottable: TransitionSystem {
             .map_err(|e| RenderError::PngEncodingError(format!("{:?}", e)))
     }
 
-    /// Renders the object visually (as PNG) and returns a vec of bytes/u8s encoding
-    /// the rendered image. This method is only available on the `graphviz` crate feature
-    /// and makes use of temporary files.
+    /// Renders the object visually (as PNG) with the `dot` executable of an installed
+    /// [graphviz](https://graphviz.org/) and returns the bytes of the image (feature `graphviz`).
     #[cfg(feature = "graphviz")]
     fn render_graphviz(&self) -> Result<Vec<u8>, RenderError> {
-        use std::io::{Read, Write};
-
-        use tracing::trace;
-        let dot = self.dot_representation();
-        trace!("writing dot representation\n{}", dot);
-
-        let mut child = std::process::Command::new("dot")
-            .arg("-Tpng")
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .spawn()?;
-
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(dot.as_bytes())?;
-        }
-
-        let mut output = Vec::new();
-        if let Some(mut stdout) = child.stdout.take() {
-            stdout.read_to_end(&mut output)?;
-        }
-
-        let status = child.wait()?;
-        if !status.success() {
-            return Err(RenderError::NonZeroExit(status));
-        }
-
-        Ok(output)
+        run_dot(&self.dot_representation(), "png")
     }
 
-    /// Attempts to render the object to a file with the given filename. This method
-    /// is only available on the `graphviz` crate feature and makes use of temporary files.
+    /// Renders the object with `dot` and writes the result to the file with the given name.
+    /// The output format is derived from the file extension (for example `svg`, `png` or `pdf`),
+    /// it defaults to `png` (feature `graphviz`).
     #[cfg(feature = "graphviz")]
     fn render_to_file_name(&self, filename: &str) -> Result<(), std::io::Error> {
-        use std::io::{Read, Write};
-        use tracing::trace;
-
-        trace!("Outputting dot and rendering to png");
-        let dot = self.dot_representation();
-        let mut tempfile = tempfile::NamedTempFile::new()?;
-
-        tempfile.write_all(dot.as_bytes())?;
-        let tempfile_name = tempfile.path();
-
-        let mut child = std::process::Command::new("dot")
-            .arg("-Tpng")
-            .arg("-o")
-            .arg(filename)
-            .arg(tempfile_name)
-            .spawn()?;
-        if !child.wait()?.success() {
-            Err(std::io::Error::other(child.stdout.map_or(
-                "Error in dot...".to_string(),
-                |mut err| {
-                    let mut buf = String::new();
-                    if let Err(e) = err.read_to_string(&mut buf) {
-                        buf = format!("Could not read from stdout: {e}");
-                    }
-                    buf
-                },
-            )))
-        } else {
-            Ok(())
-        }
+        let format = std::path::Path::new(filename)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("png");
+        let bytes = run_dot(&self.dot_representation(), format).map_err(|e| match e {
+            RenderError::Io(e) => e,
+            other => std::io::Error::other(other),
+        })?;
+        std::fs::write(filename, bytes)
     }
 
-    /// First creates a rendered PNG using [`Self::render()`], after which the rendered
-    /// image is displayed via by using a locally installed image viewer.
-    /// This method is only available on the `render` crate feature.
-    ///
-    /// # Image viewer
-    /// On Macos, the Preview app is used, while on Linux and Windows, the image viewer
-    /// can be configured by setting the `IMAGE_VIEWER` environment variable. If it is not set,
-    /// then the display command of ImageMagick will be used.
+    /// Renders the object to an SVG with `dot` and opens it in the default viewer of the system,
+    /// see [`open_in_viewer`] (feature `graphviz`).
     #[cfg(feature = "graphviz")]
     fn display_rendered_graphviz(&self) -> Result<(), RenderError> {
-        display_png(self.render_graphviz()?)?;
-
-        Ok(())
+        open_in_viewer(self.try_svg_graphviz()?.as_bytes(), "svg")
     }
-    /// See [`Self::display_rendered`] but with a native rendering backend.
+
+    /// Renders the object to an SVG with the native backend and opens it in the default viewer
+    /// of the system, see [`open_in_viewer`] (feature `render`).
     #[cfg(feature = "render")]
     fn display_rendered(&self) -> Result<(), RenderError> {
-        display_png(self.render()?)?;
-
-        Ok(())
+        open_in_viewer(self.try_svg()?.as_bytes(), "svg")
     }
 }
 
@@ -490,44 +448,85 @@ impl Display for DotTransitionAttribute {
     }
 }
 
-/// Displays a png given as a vector of bytes by calling an image viewer.
-/// On Macos, that is the Preview app, while on Linux and Windows this can be configured by
-/// setting the IMAGE_VIEWER environment variable. If it is not set, then the display command
-/// of ImageMagick will be used.
-#[cfg(feature = "render")]
-fn display_png(contents: Vec<u8>) -> Result<(), RenderError> {
-    use std::{io::Write, process::Stdio};
+/// Encodes an SVG document as a `data:` URL that can be pasted into the address bar of a browser.
+#[cfg(any(feature = "render", feature = "graphviz"))]
+pub fn svg_to_data_url(svg: &str) -> String {
+    format!(
+        "data:image/svg+xml;base64,{}",
+        base64::Engine::encode(&base64::prelude::BASE64_STANDARD, svg)
+    )
+}
 
-    use tracing::trace;
-    let mut child = if cfg!(target_os = "linux") || cfg!(target_os = "windows") {
-        let image_viewer = std::env::var("IMAGE_VIEWER").unwrap_or("display".to_string());
-
-        std::process::Command::new(image_viewer)
-            .stdin(Stdio::piped())
-            .spawn()?
-    } else if cfg!(target_os = "macos") {
-        std::process::Command::new("open")
-            .arg("-a")
-            .arg("Preview.app")
-            .arg("-f")
-            .stdin(Stdio::piped())
-            .spawn()?
-    } else {
-        unreachable!("Platform not supported! please open a ticket")
-    };
-
-    let mut stdin = child.stdin.take().unwrap();
-    std::thread::spawn(move || {
-        stdin
-            .write_all(&contents)
-            .expect("Could not write file to stdin");
-        let output = child
-            .wait_with_output()
-            .expect("Error in display child process!");
-        trace!("png display command exited with {}", output.status);
-    });
-
+/// Writes `contents` to a temporary file with the given extension and opens it in the viewer of
+/// the system, which is `xdg-open` on Linux, `open` on macOS and `start` on Windows. Another
+/// program can be chosen by setting the `IMAGE_VIEWER` environment variable, it is then called
+/// with the path of the file as its only argument.
+///
+/// The file is not deleted, as the viewer may still be reading it when this function returns.
+#[cfg(any(feature = "render", feature = "graphviz"))]
+pub fn open_in_viewer(contents: &[u8], extension: &str) -> Result<(), RenderError> {
+    let path = write_temporary_file(contents, extension)?;
+    tracing::debug!("opening {} in the viewer", path.display());
+    match std::env::var_os("IMAGE_VIEWER") {
+        Some(viewer) => {
+            let mut child = std::process::Command::new(viewer).arg(&path).spawn()?;
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+        }
+        None => open::that_detached(&path)?,
+    }
     Ok(())
+}
+
+#[cfg(any(feature = "render", feature = "graphviz"))]
+fn write_temporary_file(
+    contents: &[u8],
+    extension: &str,
+) -> Result<std::path::PathBuf, std::io::Error> {
+    use std::io::Write;
+    let mut file = tempfile::Builder::new()
+        .prefix("automata-")
+        .suffix(&format!(".{extension}"))
+        .tempfile()?;
+    file.write_all(contents)?;
+    let (_, path) = file.keep().map_err(std::io::Error::from)?;
+    Ok(path)
+}
+
+/// Runs `dot -T<format>` on the given DOT source and returns its standard output.
+#[cfg(feature = "graphviz")]
+fn run_dot(dot: &str, format: &str) -> Result<Vec<u8>, RenderError> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    tracing::trace!("running dot -T{format} on\n{dot}");
+    let mut child = Command::new("dot")
+        .arg(format!("-T{format}"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => RenderError::DotNotFound,
+            _ => RenderError::Io(e),
+        })?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let dot = dot.to_owned();
+        // written from a separate thread so that large inputs cannot deadlock against the output
+        std::thread::spawn(move || stdin.write_all(dot.as_bytes()));
+    }
+
+    let output = child.wait_with_output()?;
+    if output.status.success() {
+        Ok(output.stdout)
+    } else {
+        Err(RenderError::DotFailed {
+            status: output.status,
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        })
+    }
 }
 
 fn sanitize_dot_ident(name: &str) -> String {
@@ -599,6 +598,68 @@ mod tests {
         fn data_url_encodes_the_svg() {
             let url = dpa().try_data_url().expect("rendering to a data URL works");
             assert!(url.starts_with("data:image/svg+xml;base64,"), "{url}");
+        }
+    }
+
+    #[cfg(any(feature = "render", feature = "graphviz"))]
+    #[test]
+    fn data_url_is_decodable() {
+        use base64::Engine;
+        let url = super::svg_to_data_url("<svg/>");
+        let payload = url.strip_prefix("data:image/svg+xml;base64,").unwrap();
+        let decoded = base64::prelude::BASE64_STANDARD.decode(payload).unwrap();
+        assert_eq!(decoded, b"<svg/>");
+    }
+
+    #[cfg(any(feature = "render", feature = "graphviz"))]
+    #[test]
+    fn temporary_file_keeps_extension_and_contents() {
+        let path = super::write_temporary_file(b"hello", "svg").unwrap();
+        assert_eq!(path.extension().unwrap(), "svg");
+        assert_eq!(std::fs::read(&path).unwrap(), b"hello");
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(feature = "graphviz")]
+    mod graphviz {
+        use super::super::{Dottable, RenderError};
+        use crate::ts::Builder;
+
+        fn dot_is_installed() -> bool {
+            std::process::Command::new("dot").arg("-V").output().is_ok()
+        }
+
+        fn dfa() -> crate::automaton::DFA {
+            Builder::without_edge_colors()
+                .with_state_colors([true, false])
+                .with_transitions([(0, 'a', 1), (1, 'a', 0), (1, 'b', 1)])
+                .into_dfa(0)
+        }
+
+        #[test]
+        fn graphviz_renders_svg_png_and_data_url() {
+            if !dot_is_installed() {
+                eprintln!("skipping, `dot` is not installed");
+                return;
+            }
+            let dfa = dfa();
+            assert!(dfa.try_svg_graphviz().unwrap().contains("<svg"));
+            assert!(
+                dfa.render_graphviz()
+                    .unwrap()
+                    .starts_with(&[0x89, b'P', b'N', b'G'])
+            );
+            let url = dfa.try_data_url_graphviz().unwrap();
+            assert!(url.starts_with("data:image/svg+xml;base64,"), "{url}");
+        }
+
+        #[test]
+        fn graphviz_reports_invalid_dot() {
+            if !dot_is_installed() {
+                return;
+            }
+            let err = super::super::run_dot("this is not dot", "svg").unwrap_err();
+            assert!(matches!(err, RenderError::DotFailed { .. }), "{err}");
         }
     }
 }
