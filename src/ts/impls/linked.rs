@@ -697,8 +697,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
         assert!(state.into_usize() < self.states.len());
 
         Some(LinkedListTransitionSystemEdgesToIter::new(
-            self,
-            state.into_usize(),
+            &self.edges,
+            self.first_in_edge(state.into_usize()),
         ))
     }
 }

@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use super::{LinkedListTransitionSystem, LinkedListTransitionSystemEdge};
+use super::LinkedListTransitionSystemEdge;
 use crate::Color;
 
 /// Stores information characterizing a state in a non-deterministic transition system, see [`crate::NTS`].
@@ -10,7 +10,6 @@ pub enum LinkedListTransitionSystemState<Q> {
     Occupied(Q, Option<usize>, Option<usize>),
     Vacant(Option<usize>, Option<usize>),
 }
-use crate::alphabet::Alphabet;
 use LinkedListTransitionSystemState::*;
 use tracing::warn;
 
@@ -183,26 +182,25 @@ impl<'a, E, C> NTSEdgesFromIter<'a, E, C> {
 
 /// Iterator over the edges in a [`crate::NTS`] that reach a certain state.
 pub struct LinkedListTransitionSystemEdgesToIter<'a, E, C, const DET: bool> {
-    edges: std::slice::Iter<'a, LinkedListTransitionSystemEdge<E, C>>,
-    target: usize,
+    edges: &'a [LinkedListTransitionSystemEdge<E, C>],
+    current: Option<usize>,
 }
 
 impl<'a, E, C, const DET: bool> Iterator for LinkedListTransitionSystemEdgesToIter<'a, E, C, DET> {
     type Item = &'a LinkedListTransitionSystemEdge<E, C>;
     fn next(&mut self) -> Option<Self::Item> {
-        self.edges.find(|e| e.target == self.target)
+        let e = &self.edges[self.current?];
+        self.current = e.in_next;
+        Some(e)
     }
 }
 
 impl<'a, E, C, const DET: bool> LinkedListTransitionSystemEdgesToIter<'a, E, C, DET> {
     /// Creates a new iterator over the edges reaching a state.
-    pub fn new<A: Alphabet<Expression = E>, Q: Clone>(
-        nts: &'a LinkedListTransitionSystem<A, Q, C, DET>,
-        target: usize,
-    ) -> Self {
+    pub fn new(edges: &'a [LinkedListTransitionSystemEdge<E, C>], first_in: Option<usize>) -> Self {
         Self {
-            edges: nts.edges.iter(),
-            target,
+            edges,
+            current: first_in,
         }
     }
 }

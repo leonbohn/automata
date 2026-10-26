@@ -154,16 +154,18 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ts::Builder;
     use crate::ts::predecessors::PredecessorIterable;
+    use crate::ts::{Builder, IsEdge};
 
     #[test]
     fn predecessor_iterable() {
         let ts = Builder::without_state_colors()
             .with_transitions([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (2, 'a', 0)])
             .into_dts();
+        let mut predecessors = ts.predecessors(0).unwrap().collect::<Vec<_>>();
+        predecessors.sort_by_key(|e| e.source());
         assert_eq!(
-            ts.predecessors(0).unwrap().collect::<Vec<_>>(),
+            predecessors,
             vec![(0, 'b', 0), (1, 'a', 0), (2u32, 'a', 0u32)]
         );
     }
