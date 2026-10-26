@@ -21,11 +21,11 @@ Build a DFA or a parity automaton in a few lines, combine automata with boolean 
 
 ## Installation
 
-`automata` is not on crates.io yet, add it as a git dependency:
+`automata` has been published on crates.io, so you can add it as dependency as so:
 
 ```toml
 [dependencies]
-automata = { git = "https://github.com/leonbohn/automata" }
+automata = { version = "0.1" }
 ```
 
 The minimum supported Rust version is **1.88**.
