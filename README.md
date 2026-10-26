@@ -39,7 +39,7 @@ The minimum supported Rust version is **1.88**.
 | `hoa` | yes | reading and writing automata in the [HOA format](https://adl.github.io/hoaf/), using the [`hoars`](https://github.com/leonbohn/hoars) crate |
 | `random` | no | generation of random transition systems and words |
 | `render` | no | rendering automata to SVG/PNG and `data:` URLs without external tools, and displaying them in the viewer of the system (experimental, pulls in `resvg`, `usvg` and `layout-rs`) |
-| `graphviz` | no | the same with an installed [graphviz](https://graphviz.org/) `dot` executable (experimental, independent of `render`, nicer layouts) |
+| `graphviz` | no | the same with an installed [graphviz](https://graphviz.org/) `dot` executable (experimental, independent of `render`, recommended, nicer layouts) |
 
 The textual DOT output needs no feature.
 
@@ -198,6 +198,9 @@ assert!(dot.contains("q0 -> q1"));
 ```
 
 The experimental features `render` and `graphviz` additionally render automata to images directly.
+
+**Which one to use?** `graphviz` is the recommended route: it produces better layouts, especially for larger automata, and needs the `dot` executable of an installed [graphviz](https://graphviz.org/) in the `PATH` (`dot` is reported as `RenderError::DotNotFound` if it is missing). `render` needs no external tools, but its layouts are simpler and it is less tested.
+Both have been tried on Linux; the CI only checks that `render` and `graphviz` build and pass their tests on Linux, not on macOS or Windows. Opening an image in a viewer needs a desktop environment with a default program for SVG files.
 Both offer the same operations, the `graphviz` variants carry the suffix `_graphviz`:
 
 | | `render` (pure Rust, `layout-rs`) | `graphviz` (needs `dot` in the `PATH`) |
