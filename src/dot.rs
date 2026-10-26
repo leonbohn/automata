@@ -108,6 +108,16 @@ pub trait Dottable: TransitionSystem {
         ))
         .chain(self.dot_header_statements());
 
+        let initial = self.dot_initial_state().into_iter().flat_map(|q| {
+            [
+                format!("{DOT_INITIAL_NODE} [shape=\"point\", label=\"\"]"),
+                format!(
+                    "{DOT_INITIAL_NODE} -> {}",
+                    sanitize_dot_ident(&self.dot_state_ident(q))
+                ),
+            ]
+        });
+
         let states = self.state_indices().map(|q| {
             format!(
                 "{} [{}]",
@@ -136,6 +146,7 @@ pub trait Dottable: TransitionSystem {
         });
 
         let mut lines = header
+            .chain(initial)
             .chain(states)
             .chain(transitions)
             .chain(std::iter::once("}".to_string()));
@@ -145,6 +156,12 @@ pub trait Dottable: TransitionSystem {
     /// Additional statements for the header of the DOT graph, none by default.
     fn dot_header_statements(&self) -> impl IntoIterator<Item = String> {
         []
+    }
+
+    /// The state that is marked as initial in the drawing by an arrow without source, none by
+    /// default.
+    fn dot_initial_state(&self) -> Option<Self::StateIndex> {
+        None
     }
 
     /// The name of the graph, if any.
@@ -240,6 +257,10 @@ where
         Some("DFA".into())
     }
 
+    fn dot_initial_state(&self) -> Option<Self::StateIndex> {
+        Some(self.initial())
+    }
+
     fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
         format!("q{}", idx.show())
     }
@@ -275,6 +296,10 @@ where
 {
     fn dot_name(&self) -> Option<String> {
         Some("Congruence".into())
+    }
+
+    fn dot_initial_state(&self) -> Option<Self::StateIndex> {
+        Some(self.initial())
     }
 
     fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
@@ -313,6 +338,10 @@ where
         Some("DPA".into())
     }
 
+    fn dot_initial_state(&self) -> Option<Self::StateIndex> {
+        Some(self.initial())
+    }
+
     fn dot_state_attributes(
         &self,
         idx: Self::StateIndex,
@@ -345,6 +374,10 @@ where
 {
     fn dot_name(&self) -> Option<String> {
         Some("DPA".into())
+    }
+
+    fn dot_initial_state(&self) -> Option<Self::StateIndex> {
+        Some(self.initial())
     }
 
     fn dot_state_attributes(
@@ -383,6 +416,10 @@ where
 {
     fn dot_name(&self) -> Option<String> {
         Some("DPA".into())
+    }
+
+    fn dot_initial_state(&self) -> Option<Self::StateIndex> {
+        Some(self.initial())
     }
 
     fn dot_state_attributes(
@@ -529,6 +566,9 @@ fn run_dot(dot: &str, format: &str) -> Result<Vec<u8>, RenderError> {
     }
 }
 
+/// The name of the node that only exists to draw the arrow into the initial state.
+const DOT_INITIAL_NODE: &str = "init";
+
 fn sanitize_dot_ident(name: &str) -> String {
     name.chars()
         .filter_map(|chr| match chr {
@@ -564,6 +604,7 @@ mod tests {
         assert!(dot.contains(r#"q1 [shape="circle""#), "{dot}");
         assert!(dot.contains(r#"q0 -> q1 [label="a"]"#), "{dot}");
         assert!(dot.contains(r#"q1 -> q1 [label="b"]"#), "{dot}");
+        assert!(dot.contains("init -> q0"), "{dot}");
     }
 
     #[cfg(feature = "render")]
