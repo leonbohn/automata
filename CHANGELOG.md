@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Dottable::dot_initial_state`: the initial state is marked in the DOT output by an arrow without source (an `init` node with an edge into the initial state). Implemented for DFAs, right congruences, Moore and Mealy machines and DPAs.
 - `RenderError::DotNotFound` and `RenderError::DotFailed { status, stderr }` for problems with the `dot` executable.
 - `examples/dot.rs` takes `--show` and `--show-graphviz` to open the rendered automaton in a viewer.
-- Criterion benchmarks (`cargo bench`) for SCC decompositions on several graph shapes and for common operations (reachability, minimization, products, subset construction). `scripts/bench` runs them and writes the median times to `BENCHMARKS.md`.
+- Criterion benchmarks (`cargo bench`) for SCC decompositions on several graph shapes and for common operations (reachability, minimization, products, subset construction).
 - README: table of the rendering functions, a recommendation of `graphviz`, and the prerequisites; crates.io and docs.rs badges.
 
 ### Changed
