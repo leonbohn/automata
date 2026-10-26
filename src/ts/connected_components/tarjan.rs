@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 use super::SccDecomposition;
 use crate::TransitionSystem;
@@ -7,10 +7,8 @@ use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{IndexType, IsEdge, StateIndex};
 use crate::{
     alphabet::Expression,
-    math,
     math::{OrderedMap, OrderedSet},
 };
-use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 struct TarjanData {
@@ -198,119 +196,88 @@ where
 }
 
 /// Iterative application of Tarjan's algorithm form computing the SCC decomposition.
+/// Only states reachable from `iter` through states contained in `iter` are considered.
 pub fn tarjan_scc_iterative_from<Ts, I>(ts: &Ts, iter: I) -> SccDecomposition<'_, Ts>
 where
     Ts: TransitionSystem,
     I: IntoIterator<Item = StateIndex<Ts>>,
 {
-    let mut current: usize;
-    let mut sccs = vec![];
-
-    let mut indices = OrderedMap::default();
-    let mut low = OrderedMap::default();
-    let mut stack = vec![];
-    let mut on_stack = OrderedSet::default();
-    let mut unvisited = iter.into_iter().collect::<BTreeSet<_>>();
-
-    if unvisited.is_empty() {
-        return SccDecomposition::from_sccs(ts, sccs);
-    };
-    let mut queue = Vec::new();
+    const UNVISITED: usize = usize::MAX;
 
     let start_time = std::time::Instant::now();
+    let roots: Vec<_> = iter.into_iter().collect();
 
-    // we do an outermost loop that executes as long as states have not seen all states
-    while let Some(&next) = unvisited.first() {
-        assert!(queue.is_empty());
-        // trace!("adding {next:?} to queue");
-        current = 0;
-        queue.push((
-            next,
-            ts.edges_from(next).expect("state is known to exist"),
-            current,
+    // dense numbering of the considered states, so that all bookkeeping can use plain vectors
+    let mut ids: HashMap<StateIndex<Ts>, usize> = HashMap::with_capacity(roots.len());
+    let mut states = Vec::with_capacity(roots.len());
+    for &q in &roots {
+        ids.entry(q).or_insert_with(|| {
+            states.push(q);
+            states.len() - 1
+        });
+    }
+    let n = states.len();
+
+    let mut index = vec![UNVISITED; n];
+    let mut low = vec![0usize; n];
+    let mut on_stack = vec![false; n];
+    let mut stack: Vec<usize> = Vec::new();
+    let mut call_stack = Vec::new();
+    let mut counter = 0usize;
+    let mut sccs = Vec::new();
+
+    for root in 0..n {
+        if index[root] != UNVISITED {
+            continue;
+        }
+        index[root] = counter;
+        low[root] = counter;
+        counter += 1;
+        stack.push(root);
+        on_stack[root] = true;
+        call_stack.push((
+            root,
+            ts.edges_from(states[root])
+                .expect("state is known to exist"),
         ));
 
-        // loop through the current queue
-        'outer: while let Some((q, mut edges, min)) = queue.pop() {
-            // trace!(
-            //     "considering state {q:?} with stored min {min}\nstack: {{{}}}\ton_stack: {{{}}}\nlows:{}",
-            //     stack
-            //         .iter()
-            //         .map(|idx: &Ts::StateIndex| format!("{idx:?}"))
-            //         .join(", "),
-            //     on_stack
-            //         .iter()
-            //         .map(|idx: &Ts::StateIndex| format!("{idx:?}"))
-            //         .join(", "),
-            //     low.iter()
-            //         .map(|(k, v): (&Ts::StateIndex, &usize)| format!("{k:?} -> {v}"))
-            //         .join(", ")
-            // );
-            unvisited.remove(&q);
-
-            if on_stack.insert(q) {
-                stack.push(q);
+        while let Some((v, edges)) = call_stack.last_mut() {
+            let v = *v;
+            if let Some(edge) = edges.next() {
+                let Some(&w) = ids.get(&edge.target()) else {
+                    continue;
+                };
+                if index[w] == UNVISITED {
+                    index[w] = counter;
+                    low[w] = counter;
+                    counter += 1;
+                    stack.push(w);
+                    on_stack[w] = true;
+                    call_stack.push((
+                        w,
+                        ts.edges_from(states[w]).expect("state is known to exist"),
+                    ));
+                } else if on_stack[w] {
+                    low[v] = low[v].min(index[w]);
+                }
+                continue;
             }
 
-            if let math::ordered_map::Entry::Vacant(e) = indices.entry(q) {
-                // trace!("assigning index {current} to state {q:?}");
-                e.insert(current);
-                low.insert(q, current);
-                current += 1;
+            call_stack.pop();
+            if let Some(&(parent, _)) = call_stack.last() {
+                low[parent] = low[parent].min(low[v]);
             }
-
-            'inner: while let Some(edge) = edges.next() {
-                // we skip self loops
-                if edge.target() == q {
-                    continue 'inner;
-                }
-
-                // trace!(
-                //     "considering edge {:?} --{}--> {:?}",
-                //     edge.source(),
-                //     edge.expression().show(),
-                //     edge.target()
-                // );
-                let target = edge.target();
-                if unvisited.contains(&target) {
-                    // trace!(
-                    //     "successor {target:?} on {} has not been visited, descending",
-                    //     edge.expression().show()
-                    // );
-                    queue.push((q, edges, min));
-                    queue.push((target, ts.edges_from(target).unwrap(), current));
-                    continue 'outer;
-                }
-                if on_stack.contains(&target) {
-                    let new_low = std::cmp::min(*low.get(&q).unwrap(), *low.get(&target).unwrap());
-                    let (it, _itt) = stack.iter().skip_while(|&x| x != &target).tee();
-
-                    // TODO: Could there be a more performant way of doing this?
-                    for x in it {
-                        *low.get_mut(x).unwrap() = new_low;
-                    }
-                    // trace!(
-                    //     "successor {target:?} on {} was alread seen, assigning new minimum {new_low} to states {}",
-                    //     edge.expression().show(),
-                    //     itt.into_iter().map(|x| format!("{x:?}")).join(", ")
-                    // );
-                }
-            }
-
-            // reached when all edges have been explored
-            let low_q = *low.get(&q).unwrap();
-            if low_q == *indices.get(&q).unwrap() {
-                // trace!("{q:?} has matching index and low {low_q}, extracting scc",);
+            if low[v] == index[v] {
                 let mut scc = vec![];
-                while on_stack.contains(&q) {
-                    let top = stack.pop().unwrap();
-                    low.insert(top, low_q);
-                    on_stack.remove(&top);
-                    scc.push(top);
+                loop {
+                    let top = stack.pop().expect("root of scc is on the stack");
+                    on_stack[top] = false;
+                    scc.push(states[top]);
+                    if top == v {
+                        break;
+                    }
                 }
-                let scc = Scc::new(ts, scc);
-                // trace!("identified scc {:?}", scc);
-                sccs.push(scc);
+                sccs.push(Scc::new(ts, scc));
             }
         }
     }

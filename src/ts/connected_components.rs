@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::hash::Hash;
 
 use crate::dag::Dag;
@@ -10,7 +11,7 @@ pub use scc::Scc;
 
 mod tarjan;
 use crate::TransitionSystem;
-use crate::ts::{EdgeColor, IsEdge, StateIndex};
+use crate::ts::{EdgeColor, IsEdge};
 pub use tarjan::{kosaraju, tarjan_scc_iterative, tarjan_scc_iterative_from, tarjan_scc_recursive};
 
 /// Newtype wrapper for storing indices of SCCs.
@@ -40,6 +41,7 @@ impl std::ops::DerefMut for SccIndex {
 pub struct SccDecomposition<'a, Ts: TransitionSystem> {
     ts: &'a Ts,
     dag: Dag<Scc<'a, Ts>>,
+    index_of: HashMap<Ts::StateIndex, usize>,
 }
 
 impl<'a, Ts: TransitionSystem> std::ops::Deref for SccDecomposition<'a, Ts> {
@@ -50,29 +52,27 @@ impl<'a, Ts: TransitionSystem> std::ops::Deref for SccDecomposition<'a, Ts> {
     }
 }
 
-#[inline(always)]
-fn find_index<T: TransitionSystem>(sccs: &[Scc<'_, T>], state: StateIndex<T>) -> Option<usize> {
-    sccs.iter()
-        .enumerate()
-        .find_map(|(i, scc)| if scc.contains(&state) { Some(i) } else { None })
-}
-
 impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     /// Creates a new SCC decomposition from a transition system and a vector of SCCs.
     pub fn from_sccs(ts: &'a Ts, sccs: Vec<Scc<'a, Ts>>) -> Self {
+        let mut index_of = HashMap::new();
+        for (i, scc) in sccs.iter().enumerate() {
+            index_of.extend(scc.iter().map(|q| (*q, i)));
+        }
         let mut edges = Vec::new();
+        let mut targets = math::Set::new();
         for (i, source) in sccs.iter().enumerate() {
             trace!(
                 "Processing SCC {i} with states {}",
                 source.iter().map(|q| format!("{q:?}")).join(", ")
             );
+            targets.clear();
             for q in source.iter() {
                 let Some(it) = ts.successor_indices(*q) else {
                     continue;
                 };
-                let mut targets = math::Set::new();
                 for target in it {
-                    let Some(target_scc_index) = find_index(&sccs, target) else {
+                    let Some(&target_scc_index) = index_of.get(&target) else {
                         panic!("could not find SCC index for state {target:?}");
                     };
                     // no self loops and check that no such edge is present, already
@@ -86,6 +86,7 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
         Self {
             ts,
             dag: Dag::from_parts(sccs, edges),
+            index_of,
         }
     }
 
@@ -120,7 +121,7 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
 
     /// Returns the index of the SCC containing the given state, if it exists.
     pub fn scc_index_of(&self, state: Ts::StateIndex) -> Option<SccIndex> {
-        self.dag.find(|scc| scc.contains(&state)).map(SccIndex)
+        self.index_of.get(&state).copied().map(SccIndex)
     }
 
     /// Returns an iterator over sccs which are reachable from the given source scc.
