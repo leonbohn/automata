@@ -36,7 +36,7 @@ fn reachability(c: &mut Criterion) {
 
 fn dfa_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("dfa");
-    for n in [50, 200, 1_000] {
+    for n in [50, 200, 1_000, 5_000, 20_000] {
         let a = dfa(n, 3);
         group.bench_with_input(BenchmarkId::new("minimize", n), &a, |b, a| {
             b.iter(|| black_box(a.clone().minimize().size()))
@@ -47,11 +47,25 @@ fn dfa_operations(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("intersection_is_empty", n),
             &(a.clone(), b.clone()),
+            |bench, (a, b)| bench.iter(|| black_box(a.intersection_is_empty(b))),
+        );
+        group.bench_with_input(
+            BenchmarkId::new("intersection_materialized", n),
+            &(a.clone(), b.clone()),
             |bench, (a, b)| bench.iter(|| black_box(a.intersection(b).is_empty_language())),
         );
         group.bench_with_input(
             BenchmarkId::new("equivalent", n),
             &(a, b),
+            |bench, (a, b)| bench.iter(|| black_box(a.equivalent(b))),
+        );
+    }
+    // equal languages force the search to visit the whole (diagonal of the) product
+    for n in [50, 200, 1_000, 5_000] {
+        let a = dfa(n, 6);
+        group.bench_with_input(
+            BenchmarkId::new("equivalent_identical", n),
+            &(a.clone(), a),
             |bench, (a, b)| bench.iter(|| black_box(a.equivalent(b))),
         );
     }

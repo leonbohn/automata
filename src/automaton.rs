@@ -450,6 +450,10 @@ where
     fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         self.ts.state_color(state)
     }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        self.ts.contains_state_index(index)
+    }
 }
 
 impl<A, Z, Q, C, D, const OMEGA: bool, const DET: bool> std::fmt::Debug
