@@ -19,9 +19,9 @@ biodivine-lib-bdd = "0.6"
 itertools = "0.15"
 indexmap = "2.7"
 bimap = "0.6"
-rand = "0.8.5"
+rand = "0.10"
 thiserror = "2.0"
-tabled = { version = "0.16", features = ["ansi"] }
+tabled = { version = "0.22", features = ["ansi"] }
 
 hoars = { version = "0.3", optional = true }
 

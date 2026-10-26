@@ -8,7 +8,7 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 
 - [x] Flattened `src/core/` into top-level modules (`automata::alphabet`, `automata::word`, `automata::math`, `automata::dag`) with `Color`, `Lattice`, `Void`, `Int`, `Show` re-exported at the crate root (issue #9). `automata-learning` needs matching path updates.
 - [x] `hoars` 0.3.0 is released (own repo `leonbohn/hoars`); this crate depends on it from crates.io. `biodivine-lib-bdd` is on 0.6 to match (its `Bdd` type is shared via `hoars`), plus `itertools` 0.15 and `resvg`/`usvg` 0.49.
-- [ ] Remaining dependency upgrades: `rand` 0.8 to 0.10 (and `rand_distr` accordingly) and `tabled` 0.16 to 0.22; both need API migrations.
+- [x] Dependency upgrades: `rand` 0.10 (with `rand_distr` 0.6) and `tabled` 0.22. `rand` 0.8 stays in the tree through `biodivine-lib-bdd`.
 - [x] Fixed `--no-default-features` (ungated `hoars` impl in `acceptance_mask.rs`, unused imports in `dot.rs`); all feature combinations build, pass clippy and tests. `scripts/check` and CI now cover it. Still to do: a full feature matrix (`cargo hack --each-feature`) in CI.
 - [ ] Switch `frieda`'s `automata-learning` and binaries to depend on this crate instead of their path copy; then delete `crates/automata` and `crates/automata-core` from `frieda`.
 - [x] `rust-version = "1.88"` (the floor set by `biodivine-lib-bdd` 0.6 and let-chains); verified by the `msrv` CI job and clippy's `incompatible_msrv` lint. Revisit when dependencies raise their minimum.

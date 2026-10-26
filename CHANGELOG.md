@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Data URLs are encoded with padded base64 and keep the XML prolog of the SVG.
 - `src/dot.rs` was split into the module `dot` (`attributes`, `impls`, `native`, `graphviz`, `render`); the public paths are unchanged.
 
+- Dependencies: `rand` 0.8 to 0.10 (the `random` module uses `rand::rng()` and `RngExt`) and `tabled` 0.16 to 0.22. No public signatures change; the output of the transition tables is unchanged.
+
 ### Removed
 
 - **Breaking:** `Dottable::try_open_svg_in_firefox`, use `display_rendered` or `display_rendered_graphviz`.
