@@ -56,7 +56,7 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 - [x] README rewritten (pitch, feature table, install, runnable quick starts for DFAs and DPAs, lazy transition-system operations, DOT output, concepts). The HOA example lives in the `hoa` module docs (it needs the `hoa` feature, README doctests run without features). Still to do at release time: switch the install instructions from the git dependency to `cargo add automata`, add crates.io / docs.rs badges, and add a comparison with alternatives (Spot, `regex-automata`).
 - [ ] Crate-level rustdoc tour (alphabet, word, transition system, automaton, acceptance, operations) with runnable examples; examples on all major public functions.
 - [x] `examples/` (`dfa`, `parity`, `transition_system`, `dot`, `hoa`), run by CI.
-- [ ] mdBook guide in `docs/`, deployed via GitHub Pages; `CONTRIBUTING.md`; a `CHANGELOG.md` starts with the release after 0.1.0 (there is nothing to compare 0.1.0 against).
+- [ ] mdBook guide in `docs/`, deployed via GitHub Pages; `CONTRIBUTING.md`; `CHANGELOG.md` is kept up to date under "Unreleased" (add an entry with every user-visible change).
 - [ ] Keep `CLAUDE.md` in sync.
 
 ## Phase 6: release
