@@ -89,13 +89,45 @@ where
     }
 
     /// Checks whether `self` is equivalent to `other`, i.e. whether the two DFAs accept
-    /// the same language. This is done by negating `self` and then verifying that the intersection
-    /// of the negated automaton with `other` is empty.
+    /// the same language. The product is explored lazily, so the search stops at the first
+    /// reachable pair of states on which the two automata disagree.
     pub fn equivalent<E>(&self, other: E) -> bool
     where
         E: Congruence<Alphabet = D::Alphabet, StateColor = bool>,
     {
-        self.negation().intersection(other).is_empty_language()
+        self.product_has_reachable_state(other, |a, b| a != b)
+            .is_none()
+    }
+
+    /// Returns true if and only if the intersection of the languages of `self` and `other` is
+    /// empty. Unlike `self.intersection(other).is_empty_language()`, this does not materialize
+    /// the product and stops at the first reachable pair of accepting states.
+    pub fn intersection_is_empty<E>(&self, other: E) -> bool
+    where
+        E: Congruence<Alphabet = D::Alphabet, StateColor = bool>,
+    {
+        self.product_has_reachable_state(other, |a, b| a && b)
+            .is_none()
+    }
+
+    fn product_has_reachable_state<E>(
+        &self,
+        other: E,
+        pred: impl Fn(bool, bool) -> bool,
+    ) -> Option<()>
+    where
+        E: Congruence<Alphabet = D::Alphabet, StateColor = bool>,
+    {
+        let other_initial = other.initial();
+        let product = self
+            .ts_product(other)
+            .with_initial(ProductIndex(self.initial, other_initial));
+        product.minimal_representatives_iter().find_map(|rep| {
+            let (a, b) = product
+                .state_color(rep.state_index())
+                .expect("Every state must be colored");
+            pred(a, b).then_some(())
+        })
     }
 
     /// Tries to construct a (finite) word witnessing that the accepted language is empty. If such a word exists,
@@ -189,6 +221,20 @@ where
 mod tests {
     use crate::automaton::DFA;
     use crate::ts::Builder;
+
+    #[test]
+    fn equivalence_is_symmetric_and_checks_both_directions() {
+        let ts = Builder::without_colors()
+            .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
+            .into_dts_with_initial(0);
+        let all = DFA::from_ts(&ts, [0, 1]);
+        let some = DFA::from_ts(&ts, [0]);
+        assert!(all.equivalent(&all));
+        assert!(!all.equivalent(&some));
+        assert!(!some.equivalent(&all));
+        assert!(all.intersection_is_empty(DFA::from_ts(&ts, [])));
+        assert!(!all.intersection_is_empty(&some));
+    }
 
     #[test]
     fn dfa_from_ts() {
