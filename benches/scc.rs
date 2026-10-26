@@ -22,9 +22,12 @@ fn bench_family(
         group.bench_with_input(BenchmarkId::new("tarjan_recursive", n), &ts, |b, ts| {
             b.iter(|| black_box(ts.sccs_recursive().size()))
         });
-        group.bench_with_input(BenchmarkId::new("kosaraju", n), &ts, |b, ts| {
-            b.iter(|| black_box(ts.sccs_kosaraju(0).size()))
-        });
+        // Kosaraju is quadratic (see the issue about it), 5000 states take minutes
+        if n <= 1_000 {
+            group.bench_with_input(BenchmarkId::new("kosaraju", n), &ts, |b, ts| {
+                b.iter(|| black_box(ts.sccs_kosaraju(0).size()))
+            });
+        }
     }
     group.finish();
 }
