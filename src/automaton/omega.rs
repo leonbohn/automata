@@ -56,31 +56,71 @@ pub enum OmegaAcceptanceCondition {
     MaxParity(Int, Int),
     /// Co-Büchi condition: the edges in acceptance set `0` are seen only finitely often.
     CoBuchi,
-    /// Reachability condition (not supported by most operations yet).
+    /// Reachability condition: the edges in acceptance set `0` are the goal edges. Like
+    /// [`OmegaAcceptanceCondition::Buchi`] it only looks at the edges seen infinitely often, so
+    /// it is meant for automata in which goal edges lead into an accepting sink.
     Reachability,
-    /// Safety condition (not supported by most operations yet).
+    /// Safety condition: the edges in acceptance set `0` are the violating edges. Like
+    /// [`OmegaAcceptanceCondition::CoBuchi`] it only looks at the edges seen infinitely often, so
+    /// it is meant for automata in which violating edges lead into a rejecting sink.
     Safety,
 }
 
 impl OmegaAcceptanceCondition {
     /// Returns true if and only if the condition is satisfied by the given set of
-    /// [`AcceptanceMask`]s.
+    /// [`AcceptanceMask`]s, which are the masks of the edges seen infinitely often by a run.
+    ///
+    /// [`OmegaAcceptanceCondition::Reachability`] and [`OmegaAcceptanceCondition::Safety`] are
+    /// evaluated like [`OmegaAcceptanceCondition::Buchi`] and
+    /// [`OmegaAcceptanceCondition::CoBuchi`], respectively, which matches the behaviour of
+    /// [`DeterministicOmegaAutomaton::into_dpa`].
     ///
     /// # Errors
-    /// Currently only [`OmegaAcceptanceCondition::Parity`] is supported, all other
-    /// conditions yield [`Error::NotYetImplemented`].
+    /// For the parity conditions every mask needs exactly one acceptance set within the range
+    /// of the condition, otherwise an [`Error::Acceptance`] is returned.
+    /// [`OmegaAcceptanceCondition::Rabin`] and [`OmegaAcceptanceCondition::Streett`] yield
+    /// [`Error::NotYetImplemented`].
     pub fn satisfied(&self, infset: &OrderedSet<AcceptanceMask>) -> Result<bool, Error> {
         match self {
-            OmegaAcceptanceCondition::Parity(_low, _high) => Ok(infset
-                .iter()
-                .map(|x| x.as_priority())
-                .min()
-                .map(|x| x % 2 == 0)
-                .unwrap_or(false)),
-            _ => Err(Error::NotYetImplemented(
-                "checking satisfaction for this acceptance condition",
-            )),
+            OmegaAcceptanceCondition::Parity(low, high) => {
+                let min = Self::priorities(infset, *low, *high)?.into_iter().min();
+                Ok(min.is_some_and(|x| x % 2 == 0))
+            }
+            OmegaAcceptanceCondition::MaxParity(low, high) => {
+                let max = Self::priorities(infset, *low, *high)?.into_iter().max();
+                Ok(max.is_some_and(|x| (high - x) % 2 == 0))
+            }
+            OmegaAcceptanceCondition::Buchi | OmegaAcceptanceCondition::Reachability => {
+                Ok(infset.iter().any(AcceptanceMask::as_bool))
+            }
+            OmegaAcceptanceCondition::CoBuchi | OmegaAcceptanceCondition::Safety => {
+                Ok(!infset.iter().any(AcceptanceMask::as_bool))
+            }
+            OmegaAcceptanceCondition::Rabin | OmegaAcceptanceCondition::Streett => Err(
+                Error::NotYetImplemented("checking satisfaction for Rabin and Streett conditions"),
+            ),
         }
+    }
+
+    fn priorities(
+        infset: &OrderedSet<AcceptanceMask>,
+        low: Int,
+        high: Int,
+    ) -> Result<Vec<Int>, AcceptanceError> {
+        infset
+            .iter()
+            .map(|mask| {
+                let priority = mask.try_as_priority()?;
+                if priority < low || priority > high {
+                    return Err(AcceptanceError::PriorityOutOfRange {
+                        priority,
+                        low,
+                        high,
+                    });
+                }
+                Ok(priority)
+            })
+            .collect()
     }
 }
 
@@ -145,9 +185,12 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
     /// For parity conditions every edge needs exactly one acceptance set that lies within
     /// the range of the condition, otherwise an [`Error::Acceptance`] is returned.
     ///
-    /// The conversion is not implemented for [`OmegaAcceptanceCondition::Rabin`],
-    /// [`OmegaAcceptanceCondition::Streett`], [`OmegaAcceptanceCondition::Reachability`]
-    /// and [`OmegaAcceptanceCondition::Safety`]; these yield [`Error::NotYetImplemented`].
+    /// [`OmegaAcceptanceCondition::Reachability`] and [`OmegaAcceptanceCondition::Safety`] are
+    /// converted like [`OmegaAcceptanceCondition::Buchi`] and
+    /// [`OmegaAcceptanceCondition::CoBuchi`], respectively.
+    ///
+    /// The conversion is not implemented for [`OmegaAcceptanceCondition::Rabin`] and
+    /// [`OmegaAcceptanceCondition::Streett`]; these yield [`Error::NotYetImplemented`].
     pub fn into_dpa(self) -> Result<DPA<A>, Error> {
         match self.acceptance {
             OmegaAcceptanceCondition::Parity(low, high) => self.check_priorities(low, high)?,
@@ -160,12 +203,12 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
                 .map_edge_colors(|mask| mask.as_priority())
                 .with_initial(self.initial)
                 .into_dpa()),
-            OmegaAcceptanceCondition::Buchi => Ok(self
+            OmegaAcceptanceCondition::Buchi | OmegaAcceptanceCondition::Reachability => Ok(self
                 .ts
                 .map_edge_colors(|mask| if mask.as_bool() { 0 } else { 1 })
                 .with_initial(self.initial)
                 .into_dpa()),
-            OmegaAcceptanceCondition::CoBuchi => Ok(self
+            OmegaAcceptanceCondition::CoBuchi | OmegaAcceptanceCondition::Safety => Ok(self
                 .ts
                 .map_edge_colors(|mask| if mask.as_bool() { 1 } else { 0 })
                 .with_initial(self.initial)
@@ -189,12 +232,6 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
             )),
             OmegaAcceptanceCondition::Streett => Err(Error::NotYetImplemented(
                 "conversion of Streett automata into DPA",
-            )),
-            OmegaAcceptanceCondition::Reachability => Err(Error::NotYetImplemented(
-                "conversion of reachability automata into DPA",
-            )),
-            OmegaAcceptanceCondition::Safety => Err(Error::NotYetImplemented(
-                "conversion of safety automata into DPA",
             )),
         }
     }
@@ -271,17 +308,91 @@ mod tests {
         DeterministicOmegaAutomaton::new(ts, q, acceptance)
     }
 
+    fn infset(masks: &[&[Int]]) -> OrderedSet<AcceptanceMask> {
+        masks
+            .iter()
+            .map(|m| AcceptanceMask::from_iter(m.iter().copied()))
+            .collect()
+    }
+
+    #[test]
+    fn satisfied_parity() {
+        use OmegaAcceptanceCondition::{MaxParity, Parity};
+        assert_eq!(Parity(0, 2).satisfied(&infset(&[])), Ok(false));
+        assert_eq!(Parity(0, 2).satisfied(&infset(&[&[0], &[1]])), Ok(true));
+        assert_eq!(Parity(0, 2).satisfied(&infset(&[&[1], &[2]])), Ok(false));
+        assert_eq!(MaxParity(0, 2).satisfied(&infset(&[&[2], &[1]])), Ok(true));
+        assert_eq!(MaxParity(0, 2).satisfied(&infset(&[&[0], &[1]])), Ok(false));
+        assert_eq!(MaxParity(0, 2).satisfied(&infset(&[])), Ok(false));
+        assert_eq!(
+            Parity(0, 2).satisfied(&infset(&[&[3]])),
+            Err(Error::Acceptance(AcceptanceError::PriorityOutOfRange {
+                priority: 3,
+                low: 0,
+                high: 2
+            }))
+        );
+        assert_eq!(
+            MaxParity(0, 2).satisfied(&infset(&[&[]])),
+            Err(Error::Acceptance(AcceptanceError::NoAcceptanceSet))
+        );
+    }
+
+    #[test]
+    fn satisfied_buchi_like() {
+        use OmegaAcceptanceCondition::{Buchi, CoBuchi, Reachability, Safety};
+        for good in [Buchi, Reachability] {
+            assert_eq!(good.satisfied(&infset(&[])), Ok(false));
+            assert_eq!(good.satisfied(&infset(&[&[]])), Ok(false));
+            assert_eq!(good.satisfied(&infset(&[&[], &[0]])), Ok(true));
+        }
+        for bad in [CoBuchi, Safety] {
+            assert_eq!(bad.satisfied(&infset(&[])), Ok(true));
+            assert_eq!(bad.satisfied(&infset(&[&[]])), Ok(true));
+            assert_eq!(bad.satisfied(&infset(&[&[], &[0]])), Ok(false));
+        }
+    }
+
     #[test]
     fn satisfied_reports_unsupported_conditions() {
-        let empty = OrderedSet::new();
-        assert_eq!(
-            OmegaAcceptanceCondition::Parity(0, 1).satisfied(&empty),
-            Ok(false)
-        );
-        assert!(matches!(
-            OmegaAcceptanceCondition::Buchi.satisfied(&empty),
-            Err(Error::NotYetImplemented(_))
-        ));
+        for unsupported in [
+            OmegaAcceptanceCondition::Rabin,
+            OmegaAcceptanceCondition::Streett,
+        ] {
+            assert!(matches!(
+                unsupported.satisfied(&infset(&[])),
+                Err(Error::NotYetImplemented(_))
+            ));
+        }
+    }
+
+    /// `into_dpa` and `satisfied` have to agree on a one-state automaton that loops on `mask`.
+    #[test]
+    fn into_dpa_agrees_with_satisfied() {
+        use OmegaAcceptanceCondition::*;
+        let cases = [
+            (Parity(0, 2), vec![0], true),
+            (Parity(0, 2), vec![1], false),
+            (MaxParity(0, 2), vec![2], true),
+            (MaxParity(0, 2), vec![1], false),
+            (Buchi, vec![0], true),
+            (Buchi, vec![], false),
+            (CoBuchi, vec![0], false),
+            (CoBuchi, vec![], true),
+            (Reachability, vec![0], true),
+            (Reachability, vec![], false),
+            (Safety, vec![0], false),
+            (Safety, vec![], true),
+        ];
+        for (acc, mask, expected) in cases {
+            let mask = AcceptanceMask::from_iter(mask);
+            let set: OrderedSet<_> = [mask.clone()].into_iter().collect();
+            assert_eq!(acc.satisfied(&set), Ok(expected), "{acc:?} {mask:?}");
+
+            let dpa = two_state_automaton(acc, mask).into_dpa().unwrap();
+            let word = crate::upw!("a");
+            assert_eq!(dpa.accepts(&word), expected, "{acc:?}");
+        }
     }
 
     fn two_state_automaton(
@@ -344,8 +455,6 @@ mod tests {
         for unsupported in [
             OmegaAcceptanceCondition::Rabin,
             OmegaAcceptanceCondition::Streett,
-            OmegaAcceptanceCondition::Reachability,
-            OmegaAcceptanceCondition::Safety,
         ] {
             assert!(matches!(
                 single_state_automaton(unsupported).into_dpa(),
@@ -356,6 +465,8 @@ mod tests {
             OmegaAcceptanceCondition::Buchi,
             OmegaAcceptanceCondition::CoBuchi,
             OmegaAcceptanceCondition::Parity(0, 1),
+            OmegaAcceptanceCondition::Reachability,
+            OmegaAcceptanceCondition::Safety,
         ] {
             assert!(single_state_automaton(supported).into_dpa().is_ok());
         }
