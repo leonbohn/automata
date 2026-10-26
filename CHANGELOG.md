@@ -12,10 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Dottable::dot_initial_state`: the initial state is marked in the DOT output by an arrow without source (an `init` node with an edge into the initial state). Implemented for DFAs, right congruences, Moore and Mealy machines and DPAs.
 - `RenderError::DotNotFound` and `RenderError::DotFailed { status, stderr }` for problems with the `dot` executable.
 - `examples/dot.rs` takes `--show` and `--show-graphviz` to open the rendered automaton in a viewer.
+- Criterion benchmarks (`cargo bench`) for SCC decompositions on several graph shapes and for common operations (reachability, minimization, products, subset construction).
 - README: table of the rendering functions, a recommendation of `graphviz`, and the prerequisites; crates.io and docs.rs badges.
 
 ### Changed
 
+- `IntoTs::into_dfa_with_initial` only requires `Deterministic<StateColor = bool>` instead of `Congruence`, since the initial state is given explicitly.
 - **Breaking:** `display_rendered` and `display_rendered_graphviz` now write an SVG to a temporary file and open it with the default program of the system (`xdg-open` on Linux, `open` on macOS, `start` on Windows) instead of piping a PNG to ImageMagick's `display`. This works on Wayland. The `IMAGE_VIEWER` environment variable is still honored, the program is now called with the path of the file instead of reading from stdin. The temporary file is not deleted.
 - **Breaking:** the `graphviz` feature no longer implies `render`; it does not pull in `layout-rs`, `resvg` and `usvg` anymore.
 - **Breaking:** `RenderError` is `#[non_exhaustive]`, `PngDisplayError` was renamed to `Io` and `NonZeroExit` was replaced by `DotFailed`. Variants that belong to the native backend only exist with the feature `render`.

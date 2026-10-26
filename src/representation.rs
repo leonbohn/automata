@@ -240,7 +240,7 @@ pub trait IntoTs: TransitionSystem {
     /// Collects the transition system representing `self` and builds a new [`DFA`].
     fn into_dfa_with_initial(self, initial: StateIndex<Self>) -> DFA<Self::Alphabet>
     where
-        Self: Congruence<StateColor = bool>,
+        Self: Deterministic<StateColor = bool>,
     {
         let (dts, initial) = self
             .with_initial(initial)
