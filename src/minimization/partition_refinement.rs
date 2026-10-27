@@ -287,13 +287,16 @@ where
 
     let start = Instant::now();
 
+    // The edge colors are irrelevant for a Moore machine. Erasing them before taking the
+    // quotient avoids collecting the edge colors of every class, the quotient then only
+    // carries (zero-sized) `Void` colors that are dropped when collecting.
     let (ts, initial) = mm
+        .erase_edge_colors()
         .quotient(partition)
         .map_state_colors(|c| {
             // assert!(c.iter().all_equal());
             c[0].clone()
         })
-        // TODO: Should we not get rid of the edge colors entirely?
         .erase_edge_colors()
         .collect_dts_and_initial();
     debug!(

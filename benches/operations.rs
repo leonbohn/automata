@@ -3,7 +3,7 @@
 mod common;
 
 use automata::TransitionSystem;
-use automata::automaton::DFA;
+use automata::automaton::{DFA, MooreMachine};
 use automata::representation::{CollectTs, IntoTs};
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
@@ -72,6 +72,23 @@ fn dfa_operations(c: &mut Criterion) {
     group.finish();
 }
 
+/// Minimizing a Moore machine whose edges carry colors, which are irrelevant for the result (#14).
+fn moore_minimize_colored_edges(c: &mut Criterion) {
+    let mut group = c.benchmark_group("moore");
+    for n in [1_000, 10_000, 100_000] {
+        let ts = common::random_dts(n, 6)
+            .map_edge_colors(|_| 7u32)
+            .collect_dts();
+        let mm = MooreMachine::from_parts(ts, 0);
+        group.bench_with_input(
+            BenchmarkId::new("minimize_colored_edges", n),
+            &mm,
+            |b, mm| b.iter(|| black_box(mm.minimize().size())),
+        );
+    }
+    group.finish();
+}
+
 fn subset_construction(c: &mut Criterion) {
     let mut group = c.benchmark_group("subset_construction");
     group.sample_size(20);
@@ -92,5 +109,11 @@ fn subset_construction(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, reachability, dfa_operations, subset_construction);
+criterion_group!(
+    benches,
+    reachability,
+    dfa_operations,
+    subset_construction,
+    moore_minimize_colored_edges
+);
 criterion_main!(benches);

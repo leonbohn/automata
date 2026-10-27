@@ -70,6 +70,28 @@ fn edge_removal(c: &mut Criterion) {
     group.finish();
 }
 
+/// P3: removing many states together with their incident edges (#11). Two edges per state.
+fn state_removal(c: &mut Criterion) {
+    let mut group = c.benchmark_group("baseline/remove_state_x1000");
+    group.sample_size(10);
+    for edges in [20_000, 200_000] {
+        let n = edges / 2;
+        let ts = common::random_dts(n, 8);
+        group.bench_with_input(BenchmarkId::from_parameter(edges), &ts, |b, ts| {
+            b.iter_batched_ref(
+                || ts.clone(),
+                |ts| {
+                    for i in 0..1_000 {
+                        black_box(ts.remove_state((i * (n / 1_000)) as u32));
+                    }
+                },
+                BatchSize::LargeInput,
+            )
+        });
+    }
+    group.finish();
+}
+
 /// P4: cloning versus collecting a transition system.
 fn collect(c: &mut Criterion) {
     let mut group = c.benchmark_group("baseline/collect");
@@ -202,6 +224,7 @@ criterion_group!(
     subset_construction,
     dpa_normalized,
     edge_removal,
+    state_removal,
     collect,
     product_successor_index,
     run_throughput,
