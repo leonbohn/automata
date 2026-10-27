@@ -16,7 +16,7 @@ cargo test                         # 68 unit tests, 45 doctests (some ignored)
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
-./scripts/check                    # same as CI: fmt, clippy, doc, per-feature check (needs cargo-hack), tests in three feature configurations
+./scripts/check                    # same as CI (also checks tools/bench): fmt, clippy, doc, per-feature check (needs cargo-hack), tests in three feature configurations
 ```
 
 ## Layout
@@ -39,6 +39,9 @@ Edges are labeled with alphabet *expressions*; a *transition* is the concrete (s
 
 Features: `default = ["hoa"]`; opt-in: `random`, `render` (SVG/PNG via `resvg`/`layout-rs`, experimental), `graphviz` (calls the `dot` executable, implies `render`). Text `dot` output is always available.
 
+- `benches/`: criterion benchmarks with deterministic generators in `benches/common`. `baseline.rs` is the set from #32 (problems P1 to P5 of #30); `scc.rs` and `operations.rs` are the broader suites. Benchmarks must only use public API.
+- `tools/bench/`: separate crate (own `Cargo.lock`, not part of the library) `automata-bench`: runs benches for two revisions in alternating rounds (`compare`, `run`), keeps history in SQLite and renders a static dashboard, and as `serve` receives GitHub webhooks. `flake.nix` and `nix/` package it and provide the NixOS module. See `docs/benchmarking.md`.
+
 ## Conventions
 
 - `#![deny(missing_docs)]` and `deny(rustdoc::broken_intra_doc_links)` are on; README is `include_str!`ed into the crate docs, so README code blocks are doctests. They run in every feature configuration, so README examples must not need optional features (HOA examples live in the `hoa` module docs).
@@ -52,3 +55,4 @@ Features: `default = ["hoa"]`; opt-in: `random`, `render` (SVG/PNG via `resvg`/`
 - `Automaton` has seven generic parameters; type errors can be long.
 - Features must stay independent: code using an optional dependency needs the matching `#[cfg(feature = "...")]` (`scripts/check` builds with `--no-default-features` too).
 - Many `unwrap`/`expect` calls remain in library code (see issue #7 for the audit status).
+- Pull requests that are meant to change performance get the `performance` label; the benchmark service then comments before/after numbers. Benchmark names are tracked over time, so rename them only deliberately.

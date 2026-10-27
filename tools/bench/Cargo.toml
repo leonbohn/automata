@@ -1,0 +1,26 @@
+[package]
+name = "automata-bench"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Benchmark runner, history database, dashboard and webhook service for the automata crate."
+license = "MIT"
+publish = false
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+hex = "0.4"
+hmac = "0.12"
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tiny_http = "0.12"
+toml = "0.9"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ureq = { version = "2", features = ["json"] }
+
+# keep this crate out of the workspace of the library, it has its own lock file
+[workspace]

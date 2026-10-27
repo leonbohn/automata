@@ -29,4 +29,6 @@ for example in examples/*.rs; do
 done
 echo "examples ran"
 cargo test --all-features
+(cd tools/bench && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test)
+echo "benchmark tooling passed"
 echo "cargo test passed (default, no default, all features)"
