@@ -16,6 +16,7 @@ set -euo pipefail
 OUT=${1:-benches/fixtures}
 
 MAX_STATES=200            # fixtures should stay small, callgrind is slow
+MAX_APS=6                 # the HOA reader supports at most 6 atomic propositions
 PATTERNS_PER_COLLECTION=4 # how many automata we take from each collection of LTL patterns
 
 # Spot can blow up on some formulas, so every translation gets a time and memory limit.
@@ -24,8 +25,11 @@ translate() { timeout 10 ltl2tgba "$@"; }
 
 # Turns whatever comes in on stdin into a deterministic, complete, colored min-even parity
 # automaton without unreachable states. Extra arguments are passed on to autfilt.
+# `--hoaf=t` forces priorities on edges: by default Spot puts them on states when it can.
+# `--split-edges` makes every edge label a conjunction that mentions all atomic propositions,
+# the HOA reader of this crate does not accept labels with disjunctions.
 to_dpa() {
-  autfilt --deterministic --complete --colored-parity='min even' \
+  autfilt --hoaf=t --split-edges --deterministic --complete --colored-parity='min even' \
           --remove-unreachable-states "$@"
 }
 
@@ -66,7 +70,7 @@ for family in "${ltl_families[@]}"; do
     genltl "$option=$n" \
       | translate --deterministic --generic \
       | to_dpa --name="$name-$n" \
-      | autfilt --states="2..$MAX_STATES" --output="$OUT/ltl/$name-$n.hoa" \
+      | autfilt --hoaf=t --ap="..$MAX_APS" --states="2..$MAX_STATES" --output="$OUT/ltl/$name-$n.hoa" \
       || true   # a formula whose automaton is too large is simply skipped
   done
 done
@@ -82,7 +86,7 @@ for collection in "${pattern_collections[@]}"; do
   genltl "--$collection" \
     | translate --deterministic --generic \
     | to_dpa \
-    | autfilt --states="5..$MAX_STATES" --acc-sets=3..8 --max-count="$PATTERNS_PER_COLLECTION" \
+    | autfilt --hoaf=t --ap="..$MAX_APS" --states="5..$MAX_STATES" --acc-sets=3..8 --max-count="$PATTERNS_PER_COLLECTION" \
               --name="$collection-%l" --output="$OUT/ltl/$collection-%l.hoa" \
     || true
 done
@@ -109,7 +113,7 @@ for config in "${random_automata[@]}"; do
     name="n$states-a$aps-p$priorities-s$seed"
     randaut --deterministic --colored --states="$states" --density="$density" \
             --acceptance="parity min even $priorities" --seed="$seed" "$aps" \
-      | autfilt --invert-match --is-empty --states="$((states / 2))".. --unique \
+      | autfilt --hoaf=t --invert-match --is-empty --states="$((states / 2))".. --unique \
       | to_dpa --name="random-$name" --output="$OUT/random/$name.hoa" \
       || true
   done
@@ -134,5 +138,9 @@ for case in "${hard_cases[@]}"; do
     genaut "$option=$n" | to_dpa --name="$name-$n" --output="$OUT/hard/$name-$n.hoa"
   done
 done
+
+# The HOA parser (hoars) does not know some of the (purely informative) properties that Spot
+# writes, so they are removed from the files.
+find "$OUT" -name '*.hoa' -exec sed -i -E 's/ (stutter-sensitive|terminal|very-weak|weak|inherently-weak)\b//g' {} +
 
 echo "wrote $(find "$OUT" -name '*.hoa' | wc -l) fixtures to $OUT"

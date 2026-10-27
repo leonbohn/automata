@@ -6,7 +6,7 @@ AP: 1 "a"
 acc-name: parity min even 3
 Acceptance: 3 Inf(0) | (Fin(1) & Inf(2))
 properties: trans-labels explicit-labels trans-acc colored complete
-properties: deterministic stutter-sensitive
+properties: deterministic
 --BODY--
 State: 0
 [0] 1 {1}
@@ -48,5 +48,6 @@ State: 12
 [0] 1 {2}
 [!0] 13 {2}
 State: 13
-[t] 13 {1}
+[!0] 13 {1}
+[0] 13 {1}
 --END--

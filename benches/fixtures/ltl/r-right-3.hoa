@@ -5,20 +5,43 @@ Start: 1
 AP: 3 "p3" "p2" "p1"
 acc-name: parity min even 2
 Acceptance: 2 Inf(0) | Fin(1)
-properties: trans-labels explicit-labels state-acc colored complete
-properties: deterministic stutter-invariant very-weak
+properties: trans-labels explicit-labels trans-acc colored complete
+properties: deterministic stutter-invariant
 --BODY--
-State: 0 {0}
-[t] 0
-State: 1 {0}
-[0&1&2] 0
-[0&!2] 1
-[0&!1&2] 2
-[!0] 3
-State: 2 {0}
-[0&1] 0
-[0&!1] 2
-[!0] 3
-State: 3 {1}
-[t] 3
+State: 0
+[!0&!1&!2] 0 {0}
+[!0&!1&2] 0 {0}
+[!0&1&!2] 0 {0}
+[!0&1&2] 0 {0}
+[0&!1&!2] 0 {0}
+[0&!1&2] 0 {0}
+[0&1&!2] 0 {0}
+[0&1&2] 0 {0}
+State: 1
+[0&1&2] 0 {0}
+[0&!1&!2] 1 {0}
+[0&1&!2] 1 {0}
+[0&!1&2] 2 {0}
+[!0&!1&!2] 3 {0}
+[!0&!1&2] 3 {0}
+[!0&1&!2] 3 {0}
+[!0&1&2] 3 {0}
+State: 2
+[0&1&!2] 0 {0}
+[0&1&2] 0 {0}
+[0&!1&!2] 2 {0}
+[0&!1&2] 2 {0}
+[!0&!1&!2] 3 {0}
+[!0&!1&2] 3 {0}
+[!0&1&!2] 3 {0}
+[!0&1&2] 3 {0}
+State: 3
+[!0&!1&!2] 3 {1}
+[!0&!1&2] 3 {1}
+[!0&1&!2] 3 {1}
+[!0&1&2] 3 {1}
+[0&!1&!2] 3 {1}
+[0&!1&2] 3 {1}
+[0&1&!2] 3 {1}
+[0&1&2] 3 {1}
 --END--

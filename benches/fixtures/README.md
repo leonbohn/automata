@@ -9,13 +9,21 @@ benchmark inputs, so it invalidates the history of the benchmarks.
 
 Every fixture is deterministic, complete, colored (exactly one priority per edge), uses
 `parity min even`, has one initial state and no unreachable states
-(`autfilt --deterministic --complete --colored-parity='min even' --remove-unreachable-states`).
+(`autfilt --deterministic --complete --colored-parity='min even' --remove-unreachable-states`),
+priorities are on the edges (`--hoaf=t`), and every edge label is a conjunction that mentions all
+atomic propositions (`--split-edges`).
+
+Three limitations of the HOA reader shape the files, none of them of Spot: it accepts at most 6
+atomic propositions (automata with more are left out), it does not accept edge labels with
+disjunctions (hence `--split-edges`), and the parser rejects the informative properties
+`stutter-sensitive`, `terminal`, `very-weak`, `weak` and `inherently-weak`, which are therefore
+removed from the files by the script.
 
 | Directory | How it was obtained | Files | States |
 |---|---|---|---|
-| `ltl/` | Formulas from `genltl` (parametrised families for n = 1 to 3 and the first four larger automata of each pattern collection), translated with `ltl2tgba --deterministic --generic`, then converted with `autfilt` | 53 | 2 to 152 |
+| `ltl/` | Formulas from `genltl` (parametrised families for n = 1 to 3 and the first four larger automata of each pattern collection), translated with `ltl2tgba --deterministic --generic`, then converted with `autfilt` | 51 | 2 to 111 |
 | `random/` | `randaut --deterministic --colored --acceptance='parity min even P'` with fixed seeds, non-empty languages only. The seed is part of the file name. | 13 | 16 to 256 |
-| `hard/` | `genaut --m-nba`, `--l-nba`, `--ks-nca`, `--l-dsa` for n = 2 and 3, converted to parity with `autfilt`. These force many states and priorities. | 8 | 7 to 726 |
+| `hard/` | `genaut --m-nba`, `--l-nba`, `--ks-nca`, `--l-dsa` for n = 2 and 3, converted to parity with `autfilt`. These force many states and priorities. | 8 | 16 to 726 |
 
 File names say what they are: `ltl/gh-r-2.hoa` is `genltl --gh-r=2`,
 `random/n64-a2-p4-s1.hoa` has 64 states, 2 atomic propositions, 4 priorities and seed 1. The
