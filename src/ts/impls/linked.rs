@@ -765,13 +765,13 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const 
                 .edges_from_iter(&self.edges)
                 .expect("the state exists")
                 .map(|e| (&e.expression, &e.color, e.target))
-                .collect::<math::Set<_>>();
+                .collect::<math::FxIndexSet<_>>();
 
             let other_edges = y
                 .edges_from_iter(&other.edges)
                 .expect("state exists")
                 .map(|e| (&e.expression, &e.color, e.target))
-                .collect::<math::Set<_>>();
+                .collect::<math::FxIndexSet<_>>();
 
             edges == other_edges
         })

@@ -3,8 +3,9 @@ use std::hash::Hash;
 use super::{DefaultIdType, ForAlphabet, IntoEdgeTuple, Sproutable};
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine, WithInitial};
 use crate::representation::IntoTs;
-use crate::{Color, Int, Void, alphabet::CharAlphabet, math::OrderedSet};
+use crate::{Color, Int, Void, alphabet::CharAlphabet};
 use crate::{DTS, NTS, RightCongruence, TS, TransitionSystem};
+use std::collections::BTreeSet;
 use thiserror::Error;
 
 /// Errors that can occur when turning a [`Builder`] into a transition system or automaton.
@@ -58,7 +59,7 @@ fn or_panic<T>(result: Result<T, BuilderError>) -> T {
 ///     .into_dfa(0); // 0 is the initial state
 /// ```
 pub struct Builder<Q = Void, C = Void, const DET: bool = true> {
-    symbols: OrderedSet<char>,
+    symbols: BTreeSet<char>,
     edges: Vec<(DefaultIdType, char, C, DefaultIdType)>,
     default: Option<Q>,
     colors: Vec<(DefaultIdType, Q)>,
@@ -68,7 +69,7 @@ impl<C, const DET: bool> Builder<Void, C, DET> {
     /// Creates an empty instance of `Self`, where states are uncolored (have color [`Void`])
     pub fn without_state_colors() -> Self {
         Builder {
-            symbols: OrderedSet::default(),
+            symbols: BTreeSet::default(),
             edges: vec![],
             default: Some(Void),
             colors: vec![],
@@ -79,7 +80,7 @@ impl<Q, const DET: bool> Builder<Q, Void, DET> {
     /// Creates an empty instance of `Self`, where edges are uncolored (have color [`Void`])
     pub fn without_edge_colors() -> Self {
         Builder {
-            symbols: OrderedSet::default(),
+            symbols: BTreeSet::default(),
             edges: vec![],
             default: None,
             colors: vec![],
@@ -92,7 +93,7 @@ impl<const DET: bool> Builder<Void, Void, DET> {
     /// are colored [`Void`]).
     pub fn without_colors() -> Self {
         Self {
-            symbols: OrderedSet::default(),
+            symbols: BTreeSet::default(),
             edges: vec![],
             default: Some(Void),
             colors: vec![],
@@ -103,7 +104,7 @@ impl<const DET: bool> Builder<Void, Void, DET> {
 impl<Q, C, const DET: bool> Default for Builder<Q, C, DET> {
     fn default() -> Self {
         Self {
-            symbols: OrderedSet::default(),
+            symbols: BTreeSet::default(),
             edges: vec![],
             default: None,
             colors: vec![],

@@ -186,8 +186,8 @@ pub fn generate_random_words(
     min_len: usize,
     max_len: usize,
     number: usize,
-) -> math::Set<String> {
-    let mut word_set = math::Set::with_capacity(number);
+) -> math::FxIndexSet<String> {
+    let mut word_set = math::FxIndexSet::with_capacity_and_hasher(number, Default::default());
 
     while word_set.len() < number {
         let random_word = generate_random_word(alphabet, min_len, max_len);
@@ -233,8 +233,8 @@ pub fn generate_random_omega_words(
     min_len_cycle: usize,
     max_len_cycle: usize,
     number: usize,
-) -> math::Set<ReducedOmegaWord<char>> {
-    let mut word_set = math::Set::with_capacity(number);
+) -> math::FxIndexSet<ReducedOmegaWord<char>> {
+    let mut word_set = math::FxIndexSet::with_capacity_and_hasher(number, Default::default());
 
     while word_set.len() < number {
         let random_word = generate_random_omega_word(

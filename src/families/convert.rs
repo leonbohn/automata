@@ -18,7 +18,7 @@ impl<A: Alphabet> From<FWPM<A>> for FDFA<A> {
         let progress = progress
             .into_iter()
             .map(|(i, pmm)| {
-                let mut coloring = math::Map::new();
+                let mut coloring = math::FxIndexMap::default();
 
                 let sccs = pmm.sccs();
                 // preallocate, in the worst case each SCC is transient
@@ -77,7 +77,7 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
             .map(|(i, progress_dfa)| {
                 let scc_dag = progress_dfa.sccs();
                 let minimal_representatives = progress_dfa.canonical_naming();
-                let mut classifications = math::Map::new();
+                let mut classifications = math::FxIndexMap::default();
 
                 for (scc_index, scc) in scc_dag.dag().iter() {
                     for state_index in scc.iter() {
@@ -97,7 +97,7 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
                 }
                 trace!("computed SCC classifications\n{:?}", classifications);
 
-                let mut coloring = math::Map::new();
+                let mut coloring = math::FxIndexMap::default();
                 let dag = scc_dag.dag();
                 loop {
                     if coloring.len() == dag.size() {

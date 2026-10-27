@@ -1,4 +1,6 @@
-use crate::{Color, Int, Void, math};
+use crate::{Color, Int, Void};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
 use crate::ts::{
@@ -59,7 +61,7 @@ pub trait CollectTs: TransitionSystem {
         &self,
     ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
         let mut out = DTS::for_alphabet_size_hint(self.alphabet().clone(), self.size());
-        let mut map = math::OrderedMap::default();
+        let mut map = BTreeMap::default();
 
         for (q, c) in self.state_indices_with_color() {
             map.insert(q, out.add_state((q, c)));
@@ -92,9 +94,7 @@ pub trait CollectTs: TransitionSystem {
     where
         Self: Pointed,
     {
-        let reachable_indices = self
-            .reachable_state_indices()
-            .collect::<math::OrderedSet<_>>();
+        let reachable_indices = self.reachable_state_indices().collect::<BTreeSet<_>>();
         let restricted = self.restrict_state_indices(|idx| reachable_indices.contains(&idx));
         restricted.collect_dts_and_initial()
     }

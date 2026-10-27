@@ -21,7 +21,7 @@ pub type IntoDMA<T> = DMA<<T as TransitionSystem>::Alphabet, StateColor<T>, Edge
 /// is satisfied by a set (usually the set of colors that appear infinitely often in a run),
 /// if it contains the set.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct MullerCondition<C: Color>(Vec<math::Set<C>>);
+pub struct MullerCondition<C: Color>(Vec<math::FxIndexSet<C>>);
 
 impl<C: Color + Ord> MullerCondition<C> {
     /// Builds a new instance from an iterator that yields iterators that yield colors
@@ -47,7 +47,7 @@ impl<C: Color + Ord> MullerCondition<C> {
 
     /// Returns `true` if the given `set` of colors satisfies this condition,
     /// i.e. if `self` contains `set`.
-    pub fn satisfied_by_set(&self, set: &math::Set<C>) -> bool {
+    pub fn satisfied_by_set(&self, set: &math::FxIndexSet<C>) -> bool {
         self.0.contains(set)
     }
 
@@ -57,7 +57,7 @@ impl<C: Color + Ord> MullerCondition<C> {
     }
 
     /// Creates a new instance from a set of sets of colors.
-    pub fn new(sets: Vec<math::Set<C>>) -> Self {
+    pub fn new(sets: Vec<math::FxIndexSet<C>>) -> Self {
         Self(sets)
     }
 }

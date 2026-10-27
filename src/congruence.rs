@@ -3,10 +3,11 @@ mod class;
 use crate::{
     Color, Void,
     alphabet::{Alphabet, CharAlphabet},
-    math, word,
+    word,
     word::OmegaWord,
 };
 pub use class::Class;
+use std::collections::BTreeMap;
 
 mod transitionprofile;
 pub use transitionprofile::{Accumulates, RunProfile, RunSignature, TransitionMonoid};
@@ -59,7 +60,7 @@ pub trait Congruence: Deterministic + Pointed {
     {
         let mut cur = self.reached_state_index(word.spoke())?;
         let mut count = 0;
-        let mut map = math::OrderedMap::default();
+        let mut map = BTreeMap::default();
         loop {
             match map.insert(cur, count) {
                 None => {

@@ -157,13 +157,13 @@ let aut = Builder::without_edge_colors()
 
 // all four states are reachable from the initial state ...
 assert_eq!(
-    aut.reachable_state_indices().collect::<math::Set<_>>(),
-    math::Set::from_iter([0, 1, 2, 3])
+    aut.reachable_state_indices().collect::<math::FxIndexSet<_>>(),
+    math::FxIndexSet::from_iter([0, 1, 2, 3])
 );
 // ... but only state 3 is reachable from state 3
 assert_eq!(
-    aut.reachable_state_indices_from(3).collect::<math::Set<_>>(),
-    math::Set::from_iter([3])
+    aut.reachable_state_indices_from(3).collect::<math::FxIndexSet<_>>(),
+    math::FxIndexSet::from_iter([3])
 );
 
 // strongly connected components: {0, 1, 2} and the sink {3}

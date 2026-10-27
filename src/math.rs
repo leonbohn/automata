@@ -3,79 +3,19 @@ pub use probability::{
     continuous_bernoulli_mean, sample_continuous_bernoulli,
 };
 
-use std::collections::BTreeMap;
-use std::{collections::BTreeSet, hash::Hash};
-
 pub use indexmap::Equivalent;
 pub use indexmap::map;
 pub use indexmap::set;
-pub use std::collections::btree_map as ordered_map;
-pub use std::collections::btree_set as ordered_set;
+pub use rustc_hash::FxBuildHasher;
 
-/// Type alias for sets, we use this to hide which type of `HashSet` we are actually using.
-pub type OrderedSet<S> = BTreeSet<S>;
-/// Type alias for sets that are unordered.
-pub type Set<S> = indexmap::IndexSet<S>;
-
-/// Type alias for maps, we use this to hide which type of `HashMap` we are actually using.
-pub type OrderedMap<K, V> = BTreeMap<K, V>;
-/// Type alias for maps that are unordered.
-pub type Map<K, V> = indexmap::IndexMap<K, V>;
-
-/// Represents a bijective mapping between `L` and `R`, that is a mapping which associates
-/// each `L` with precisely one `R` and vice versa.
-pub type Bijection<L, R> = bimap::BiBTreeMap<L, R>;
-
-/// A partition is a different view on a congruence relation, by grouping elements of
-/// type `I` into their respective classes under the relation.
-#[derive(Debug, Clone)]
-pub struct Partition<I: Hash + Eq>(Vec<BTreeSet<I>>);
-
-impl<I: Hash + Eq> std::ops::Deref for Partition<I> {
-    type Target = Vec<BTreeSet<I>>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'a, I: Hash + Eq> IntoIterator for &'a Partition<I> {
-    type Item = &'a BTreeSet<I>;
-    type IntoIter = std::slice::Iter<'a, BTreeSet<I>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl<I: Hash + Eq> PartialEq for Partition<I> {
-    fn eq(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().all(|o| other.contains(o))
-    }
-}
-impl<I: Hash + Eq> Eq for Partition<I> {}
-
-impl<I: Hash + Eq + Ord> Partition<I> {
-    /// Returns the size of the partition, i.e. the number of classes.
-    pub fn size(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Builds a new congruence relation from an iterator that yields iterators
-    /// which yield elements of type `I`.
-    pub fn new<X: IntoIterator<Item = I>, Y: IntoIterator<Item = X>>(iter: Y) -> Self {
-        Self(
-            iter.into_iter()
-                .map(|it| it.into_iter().collect::<BTreeSet<_>>())
-                .collect(),
-        )
-    }
-}
-
-impl<I: Hash + Eq + Ord> From<Vec<BTreeSet<I>>> for Partition<I> {
-    fn from(value: Vec<BTreeSet<I>>) -> Self {
-        Self(value)
-    }
-}
+/// An insertion-ordered [`indexmap::IndexMap`] with the deterministic [`FxBuildHasher`].
+/// Unlike the default hasher, it is not randomly seeded, so iteration order and
+/// instruction counts are reproducible between runs. Construct it with `default()`
+/// or `with_capacity_and_hasher(n, FxBuildHasher)`.
+pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
+/// An insertion-ordered [`indexmap::IndexSet`] with the deterministic [`FxBuildHasher`],
+/// see [`FxIndexMap`].
+pub type FxIndexSet<T> = indexmap::IndexSet<T, FxBuildHasher>;
 
 mod probability {
     /// Computes the inverse cumulative density function of the continuous bernoulli distribution

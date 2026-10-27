@@ -28,9 +28,9 @@ fn main() {
         ])
         .into_dfa(0);
 
-    let reachable: math::Set<_> = dfa.reachable_state_indices().collect();
+    let reachable: math::FxIndexSet<_> = dfa.reachable_state_indices().collect();
     println!("reachable from the initial state: {reachable:?}");
-    let from_sink: math::Set<_> = dfa.reachable_state_indices_from(3).collect();
+    let from_sink: math::FxIndexSet<_> = dfa.reachable_state_indices_from(3).collect();
     println!("reachable from state 3:           {from_sink:?}");
 
     let sccs = dfa.sccs();

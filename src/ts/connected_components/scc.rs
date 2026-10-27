@@ -1,34 +1,31 @@
+use std::collections::BTreeMap;
 use std::{cell::OnceCell, collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use crate::congruence::MinimalRepresentative;
 use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
-use crate::{
-    alphabet::Expression,
-    math,
-    math::{OrderedSet, Set},
-};
+use crate::{alphabet::Expression, math::FxIndexSet};
 use itertools::Itertools;
 
-type InteriorEdgeSet<Ts> = Set<(
+type InteriorEdgeSet<Ts> = FxIndexSet<(
     <Ts as TransitionSystem>::StateIndex,
     EdgeExpression<Ts>,
     <Ts as TransitionSystem>::EdgeColor,
     <Ts as TransitionSystem>::StateIndex,
 )>;
-type InteriorTransitionSet<Ts> = Set<(
+type InteriorTransitionSet<Ts> = FxIndexSet<(
     <Ts as TransitionSystem>::StateIndex,
     SymbolOf<Ts>,
     <Ts as TransitionSystem>::EdgeColor,
     <Ts as TransitionSystem>::StateIndex,
 )>;
-type BorderEdgeSet<Ts> = Set<(
+type BorderEdgeSet<Ts> = FxIndexSet<(
     <Ts as TransitionSystem>::StateIndex,
     EdgeExpression<Ts>,
     <Ts as TransitionSystem>::EdgeColor,
     <Ts as TransitionSystem>::StateIndex,
 )>;
-type BorderTransitionSet<Ts> = Set<(
+type BorderTransitionSet<Ts> = FxIndexSet<(
     <Ts as TransitionSystem>::StateIndex,
     SymbolOf<Ts>,
     <Ts as TransitionSystem>::EdgeColor,
@@ -42,7 +39,7 @@ pub struct Scc<'a, Ts: TransitionSystem> {
     states: BTreeSet<Ts::StateIndex>,
     interior_transitions: OnceCell<InteriorTransitionSet<Ts>>,
     interior_edges: OnceCell<InteriorEdgeSet<Ts>>,
-    edge_colors: OnceCell<Set<Ts::EdgeColor>>,
+    edge_colors: OnceCell<FxIndexSet<Ts::EdgeColor>>,
     minimal_representative: OnceCell<Option<MinimalRepresentative<Ts>>>,
     border_edges: OnceCell<BorderEdgeSet<Ts>>,
     border_transitions: OnceCell<BorderTransitionSet<Ts>>,
@@ -155,7 +152,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         EdgeColor<Ts>: Hash + Eq,
     {
         self.border_edges.get_or_init(|| {
-            let mut edges = Set::default();
+            let mut edges = FxIndexSet::default();
             for q in &self.states {
                 let it = self.ts.edges_from(*q).expect("State must exist");
                 for edge in it {
@@ -176,7 +173,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         EdgeColor<Ts>: Hash + Eq,
     {
         self.border_transitions.get_or_init(|| {
-            let mut edges = Set::default();
+            let mut edges = FxIndexSet::default();
             for q in &self.states {
                 let it = self.ts.edges_from(*q).expect("State must exist");
                 for edge in it {
@@ -201,7 +198,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         EdgeColor<Ts>: Hash + Eq,
     {
         self.interior_edges.get_or_init(|| {
-            let mut edges = Set::default();
+            let mut edges = FxIndexSet::default();
             for q in &self.states {
                 let it = self.ts.edges_from(*q).expect("State must exist");
                 for edge in it {
@@ -224,7 +221,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         EdgeColor<Ts>: Hash + Eq,
     {
         self.interior_transitions.get_or_init(|| {
-            let mut edges = Set::default();
+            let mut edges = FxIndexSet::default();
             for q in &self.states {
                 let it = self.ts.edges_from(*q).expect("State must exist");
                 for edge in it {
@@ -258,7 +255,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
 
     /// Returns an iterator yielding the colors of edges whose source and target states are
     /// in the SCC.
-    pub fn interior_edge_colors(&self) -> &Set<Ts::EdgeColor>
+    pub fn interior_edge_colors(&self) -> &FxIndexSet<Ts::EdgeColor>
     where
         EdgeColor<Ts>: Hash + Eq,
     {
@@ -302,11 +299,11 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         let ts = self.ts;
         debug_assert!(!self.is_empty());
 
-        let mut queue = math::OrderedMap::default();
+        let mut queue = BTreeMap::default();
         for (p, a, _, q) in self.interior_transitions() {
             queue
                 .entry(*p)
-                .or_insert_with(OrderedSet::default)
+                .or_insert_with(BTreeSet::default)
                 .insert((*a, *q));
         }
         if queue.is_empty() {
@@ -426,7 +423,7 @@ impl<Ts: TransitionSystem> Debug for Scc<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use crate::math::Set;
+    use crate::math::FxIndexSet;
     use crate::{DTS, TransitionSystem};
 
     #[test]
@@ -438,7 +435,7 @@ mod tests {
             (1, 'b', 0, 0),
         ]
         .into_iter()
-        .collect::<Set<_>>();
+        .collect::<FxIndexSet<_>>();
         let ts = DTS::builder()
             .default_color(())
             .with_transitions(&transitions)
@@ -447,14 +444,17 @@ mod tests {
         let first = sccs.first();
 
         assert_eq!(&transitions, first.interior_transitions());
-        assert_eq!(first.interior_edge_colors(), &Set::from_iter([0, 1, 2]));
+        assert_eq!(
+            first.interior_edge_colors(),
+            &FxIndexSet::from_iter([0, 1, 2])
+        );
 
         let color_restricted = (&ts).edge_color_restricted(1, 2);
         let sccs = color_restricted.sccs();
-        assert_eq!(sccs[0].interior_transitions(), &Set::default());
+        assert_eq!(sccs[0].interior_transitions(), &FxIndexSet::default());
         assert_eq!(
             sccs[1].interior_transitions(),
-            &Set::from_iter([(1, 'a', 2, 1)])
+            &FxIndexSet::from_iter([(1, 'a', 2, 1)])
         );
     }
 }

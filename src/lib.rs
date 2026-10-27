@@ -27,6 +27,9 @@ pub mod word;
 /// sets and mappings.
 pub mod math;
 
+/// Partitions of a set into classes, e.g. induced by a congruence.
+pub mod partition;
+
 /// Defines a representation of directed, acyclic graphs. These are for example
 /// used for the representation of the strongly connected components of a transition system.
 pub mod dag;

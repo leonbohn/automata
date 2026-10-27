@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use crate::automaton::{InfiniteWordAutomaton, Semantics};
 use crate::ts::run::Observer;
 use crate::ts::{Deterministic, EdgeColor, StateColor, run};
-use crate::{Color, Void, alphabet::CharAlphabet, math::OrderedSet};
+use crate::{Color, Void, alphabet::CharAlphabet};
 use crate::{DTS, TransitionSystem};
 
 /// A deterministic Rabin automaton (DRA) uses a [`RabinCondition`] to determine acceptance.
@@ -20,7 +20,7 @@ pub type IntoDRA<T> = DRA<<T as TransitionSystem>::Alphabet, StateColor<T>, Edge
 /// Represents a Rabin condition, which is a set of [`RabinPair`]s. Such a condition is satisfied
 /// if at least one of its pairs is satisfied.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct RabinCondition<C: Color + Ord>(OrderedSet<RabinPair<C>>);
+pub struct RabinCondition<C: Color + Ord>(BTreeSet<RabinPair<C>>);
 
 /// A Rabin pair over some [`Color`] `C` consists of a set `fin` and a set `inf` of elements of type `C`.
 /// A pair is satisfied by a set (usually the set of colors that appear infinitely often in a run),

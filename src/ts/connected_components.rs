@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::hash::Hash;
 
 use crate::dag::Dag;
@@ -41,7 +41,7 @@ impl std::ops::DerefMut for SccIndex {
 pub struct SccDecomposition<'a, Ts: TransitionSystem> {
     ts: &'a Ts,
     dag: Dag<Scc<'a, Ts>>,
-    index_of: HashMap<Ts::StateIndex, usize>,
+    index_of: FxHashMap<Ts::StateIndex, usize>,
 }
 
 impl<'a, Ts: TransitionSystem> std::ops::Deref for SccDecomposition<'a, Ts> {
@@ -55,12 +55,12 @@ impl<'a, Ts: TransitionSystem> std::ops::Deref for SccDecomposition<'a, Ts> {
 impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     /// Creates a new SCC decomposition from a transition system and a vector of SCCs.
     pub fn from_sccs(ts: &'a Ts, sccs: Vec<Scc<'a, Ts>>) -> Self {
-        let mut index_of = HashMap::new();
+        let mut index_of = FxHashMap::default();
         for (i, scc) in sccs.iter().enumerate() {
             index_of.extend(scc.iter().map(|q| (*q, i)));
         }
         let mut edges = Vec::new();
-        let mut targets = math::Set::new();
+        let mut targets = math::FxIndexSet::default();
         for (i, source) in sccs.iter().enumerate() {
             trace!(
                 "Processing SCC {i} with states {}",
@@ -268,7 +268,7 @@ impl<Ts: TransitionSystem> PartialEq for SccDecomposition<'_, Ts> {
 mod tests {
     use crate::Void;
     use crate::alphabet::CharAlphabet;
-    use crate::math::Set;
+    use crate::math::FxIndexSet;
 
     use crate::ts::Builder;
     use crate::{
@@ -307,11 +307,11 @@ mod tests {
 
         assert_eq!(
             scc2.interior_transitions(),
-            &Set::from_iter([(1, 'a', Void, 1), (1, 'b', Void, 1)])
+            &FxIndexSet::from_iter([(1, 'a', Void, 1), (1, 'b', Void, 1)])
         );
         assert_eq!(
             scc3.interior_transitions(),
-            &Set::from_iter([
+            &FxIndexSet::from_iter([
                 (2, 'a', Void, 3),
                 (2, 'b', Void, 2),
                 (3, 'a', Void, 3),

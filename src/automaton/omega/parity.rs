@@ -1,5 +1,6 @@
+use rustc_hash::FxHashMap;
 use std::{
-    collections::{BTreeSet, HashMap, VecDeque},
+    collections::{BTreeSet, VecDeque},
     fmt::Debug,
     hash::Hash,
 };
@@ -14,7 +15,7 @@ use crate::{DTS, Pointed, TransitionSystem, automaton::InfiniteWordAutomaton, ts
 use crate::{
     Int, Show, Void,
     alphabet::CharAlphabet,
-    math::Partition,
+    partition::Partition,
     word::{FiniteWord, ReducedOmegaWord},
 };
 use itertools::Itertools;
@@ -497,7 +498,7 @@ where
             .into_dts_and_initial();
         let mut ts = out.clone();
 
-        let mut recoloring: HashMap<_, Int> = HashMap::new();
+        let mut recoloring: FxHashMap<_, Int> = Default::default();
         let mut remove_states = Vec::new();
         let mut remove_edges = Vec::new();
 

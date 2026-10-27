@@ -10,7 +10,7 @@ use std::{collections::BTreeSet, time::Instant};
 use crate::automaton::{MealyMachine, MooreMachine};
 use crate::representation::{CollectTs, IntoTs};
 use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor};
-use crate::{Color, math, math::Partition};
+use crate::{Color, math, partition::Partition};
 use crate::{Congruence, TransitionSystem};
 use itertools::Itertools;
 use tracing::{debug, trace};
@@ -134,7 +134,7 @@ fn refine(n: usize, labels: usize, pre: Vec<Predecessors>, initial: Vec<usize>) 
 }
 
 fn collect_partition<I: crate::ts::IndexType>(states: &[I], block_of: &[usize]) -> Partition<I> {
-    let mut blocks: math::Map<usize, BTreeSet<I>> = math::Map::default();
+    let mut blocks: math::FxIndexMap<usize, BTreeSet<I>> = math::FxIndexMap::default();
     for (q, b) in states.iter().zip(block_of) {
         blocks.entry(*b).or_default().insert(*q);
     }
@@ -154,10 +154,10 @@ where
 {
     let start = Instant::now();
     let states: Vec<_> = mm.state_indices().collect();
-    let ids: math::Map<_, usize> = states.iter().enumerate().map(|(i, q)| (*q, i)).collect();
+    let ids: math::FxIndexMap<_, usize> = states.iter().enumerate().map(|(i, q)| (*q, i)).collect();
     let symbols: Vec<_> = mm.symbols().collect();
 
-    let mut labels: math::Map<EdgeColor<D>, usize> = math::Map::default();
+    let mut labels: math::FxIndexMap<EdgeColor<D>, usize> = math::FxIndexMap::default();
     let mut raw = vec![Vec::new(); symbols.len()];
     for (s, sym) in symbols.iter().enumerate() {
         for (q, state) in states.iter().enumerate() {
@@ -231,10 +231,10 @@ where
 {
     let start = Instant::now();
     let states: Vec<_> = mm.state_indices().collect();
-    let ids: math::Map<_, usize> = states.iter().enumerate().map(|(i, q)| (*q, i)).collect();
+    let ids: math::FxIndexMap<_, usize> = states.iter().enumerate().map(|(i, q)| (*q, i)).collect();
     let symbols: Vec<_> = mm.symbols().collect();
 
-    let mut classes: math::Map<StateColor<D>, usize> = math::Map::default();
+    let mut classes: math::FxIndexMap<StateColor<D>, usize> = math::FxIndexMap::default();
     let initial = mm
         .state_indices_with_color()
         .map(|(_, c)| {

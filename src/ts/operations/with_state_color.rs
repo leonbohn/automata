@@ -8,7 +8,7 @@ use std::hash::Hash;
 /// the output color is given by the associated type `Color`.
 ///
 /// Naturally, a color itself provides a state color, namely by
-/// associating each state with itself. Similarly, a [`math::Map`]
+/// associating each state with itself. Similarly, a [`math::FxIndexMap`]
 /// using `Idx` as key and `Color` as value provides a color for
 /// each state, provided it is complete (in the sense that it has
 /// an entry for each state index). Finally, it is possible to
@@ -38,7 +38,7 @@ impl<Idx, C: Color> ProvidesStateColor<Idx> for UniformColor<C> {
     }
 }
 
-impl<Idx: Hash + Eq, C: Color> ProvidesStateColor<Idx> for math::Map<Idx, C> {
+impl<Idx: Hash + Eq, C: Color> ProvidesStateColor<Idx> for math::FxIndexMap<Idx, C> {
     type Color = C;
 
     fn state_color(&self, state: Idx) -> Self::Color {
@@ -55,23 +55,23 @@ impl<Idx, C: Color, F: Fn(Idx) -> C> ProvidesStateColor<Idx> for F {
     }
 }
 
-/// Augments a [`math::Map`] with a default color for missing
+/// Augments a [`math::FxIndexMap`] with a default color for missing
 /// entries. This struct implements [`ProvidesStateColor`] and
 /// wrapping an incomplete map is its only purpose.
 ///
-/// Specifically, it returns the color stored in the [`math::Map`]
+/// Specifically, it returns the color stored in the [`math::FxIndexMap`]
 /// it wraps for a `state` if present and the stored `default`
 /// value otherwise.
 #[derive(Clone, Eq, PartialEq)]
 pub struct DefaultIfMissing<X: Hash + Eq, Y> {
-    map: math::Map<X, Y>,
+    map: math::FxIndexMap<X, Y>,
     default: Y,
 }
 
 impl<X: Hash + Eq, Y: Color> DefaultIfMissing<X, Y> {
     /// Creates a new instance of `Self` from a given (partial)
     /// map and default value.
-    pub fn new(map: math::Map<X, Y>, default: Y) -> Self {
+    pub fn new(map: math::FxIndexMap<X, Y>, default: Y) -> Self {
         Self { map, default }
     }
 }

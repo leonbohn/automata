@@ -102,7 +102,7 @@ pub struct SubsetConstruction<Ts: TransitionSystem> {
     /// Maps the id of a subset to the subset itself.
     states: RefCell<Vec<StateSet<Ts>>>,
     /// Maps a subset to its id, the inverse of `states`.
-    ids: RefCell<math::Map<StateSet<Ts>, usize>>,
+    ids: RefCell<math::FxIndexMap<StateSet<Ts>, usize>>,
     /// The expression of each symbol of the alphabet, computed once.
     expressions: Vec<EdgeExpression<Ts>>,
 }
@@ -238,7 +238,7 @@ impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
     fn from_initial(ts: Ts, initial: StateSet<Ts>) -> Self {
         Self {
             expressions: ts.alphabet().expression_map().into_values().collect(),
-            ids: math::Map::from_iter([(initial.clone(), 0)]).into(),
+            ids: math::FxIndexMap::from_iter([(initial.clone(), 0)]).into(),
             states: vec![initial].into(),
             ts,
         }

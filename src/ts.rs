@@ -4,7 +4,7 @@ use tracing::trace;
 use crate::{
     Color, Show, Void,
     alphabet::{Alphabet, Expression, Matcher},
-    math::Partition,
+    partition::Partition,
 };
 use crate::{DTS, congruence::StateNaming};
 use std::{collections::BTreeSet, hash::Hash};

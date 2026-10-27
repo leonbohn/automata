@@ -1,10 +1,10 @@
 use crate::alphabet::{Alphabet, CharAlphabet, Directional, InvertibleChar, Matcher};
-use crate::math::OrderedMap;
 use crate::ts::{
     Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, EdgeReference, StateColor,
     StateIndex, SymbolOf,
 };
 use crate::{Pointed, TransitionSystem};
+use std::collections::BTreeMap;
 
 use super::{Accumulates, RunProfile, TransitionMonoid};
 
@@ -38,7 +38,7 @@ where
 /// the transition profiles of the ts as nodes. See [`Cayley`] for more details.
 #[derive(Clone)]
 pub struct RightCayley<Ts: TransitionSystem + Pointed> {
-    expressions: OrderedMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
+    expressions: BTreeMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
     m: TransitionMonoid<Ts>,
 }
 

@@ -10,7 +10,8 @@ use itertools::Itertools;
 use thiserror::Error;
 use tracing::trace;
 
-use crate::{math::OrderedSet, show::Show};
+use crate::show::Show;
+use std::collections::BTreeSet;
 
 use super::{Alphabet, CharAlphabet, Expression, Matcher};
 
@@ -435,7 +436,7 @@ impl<RawTy: RawSymbolRepr> Iterator for PropExpressionSymbols<'_, RawTy> {
 pub struct PropAlphabet<RawTy: RawSymbolRepr = u32> {
     aps: Vec<String>,
     universal: PropExpression<RawTy>,
-    expressions: Arc<Mutex<OrderedSet<PropExpression<RawTy>>>>,
+    expressions: Arc<Mutex<BTreeSet<PropExpression<RawTy>>>>,
 }
 
 impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
@@ -466,7 +467,7 @@ impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
 
         let universal = PropExpression::<RawTy>::universal(aps.len() as u8);
         Ok(Self {
-            expressions: Arc::new(Mutex::new(OrderedSet::from_iter([universal.clone()]))),
+            expressions: Arc::new(Mutex::new(BTreeSet::from_iter([universal.clone()]))),
             universal,
             aps,
         })
