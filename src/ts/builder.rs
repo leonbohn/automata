@@ -5,7 +5,6 @@ use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine, WithInitial};
 use crate::representation::IntoTs;
 use crate::{Color, Int, Void, alphabet::CharAlphabet, math::OrderedSet};
 use crate::{DTS, NTS, RightCongruence, TS, TransitionSystem};
-use itertools::Itertools;
 use thiserror::Error;
 
 /// Errors that can occur when turning a [`Builder`] into a transition system or automaton.
@@ -152,7 +151,9 @@ impl<Q: Color, C: Color, const DET: bool> Builder<Q, C, DET> {
     /// Creates an instance of a [`TS`] from `self`.
     ///
     /// # Errors
-    /// - [`BuilderError::MissingStateColor`] if a state has no color and there is no default color,
+    /// - [`BuilderError::MissingStateColor`] if a state has no color and there is no default color
+    ///   (the states are `0..=m` where `m` is the largest id, so gaps in the ids need a default
+    ///   color),
     /// - [`BuilderError::OverlappingEdge`] if an edge overlaps with a previously added one (this
     ///   can only happen when building a deterministic transition system).
     pub fn try_into_ts<const DOUT: bool>(
@@ -161,22 +162,26 @@ impl<Q: Color, C: Color, const DET: bool> Builder<Q, C, DET> {
         let alphabet =
             CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
 
+        // state ids need not be contiguous: there is a state for every id up to the maximal one
         let num_states = self
             .edges
             .iter()
             .flat_map(|(q, _, _, p)| [*p, *q])
-            .unique()
-            .count();
+            .max()
+            .map_or(0, |max| max as usize + 1);
         let mut ts = TS::for_alphabet_size_hint(alphabet, num_states);
 
-        for i in 0..num_states {
-            let i = i as DefaultIdType;
-            let color = self
-                .colors
-                .iter()
-                .find_map(|(q, c)| (*q == i).then(|| c.clone()))
+        // if a state is given a color multiple times, the first one counts
+        let mut colors: Vec<Option<Q>> = vec![None; num_states];
+        for (q, c) in self.colors {
+            if let Some(slot @ None) = colors.get_mut(q as usize) {
+                *slot = Some(c);
+            }
+        }
+        for (i, color) in colors.into_iter().enumerate() {
+            let color = color
                 .or_else(|| self.default.clone())
-                .ok_or(BuilderError::MissingStateColor(i))?;
+                .ok_or(BuilderError::MissingStateColor(i as DefaultIdType))?;
             ts.add_state(color);
         }
 
@@ -498,6 +503,33 @@ impl Builder<Int, Void, true> {
 #[cfg(test)]
 mod tests {
     use super::{Builder, BuilderError};
+    use crate::TransitionSystem;
+
+    #[test]
+    fn non_contiguous_state_ids_with_default_color() {
+        let ts = Builder::<_, _, false>::without_edge_colors()
+            .default_color(false)
+            .color(5, true)
+            .with_transitions([(0, 'a', 5)])
+            .try_into_nts()
+            .unwrap();
+        assert_eq!(ts.state_indices().count(), 6);
+        assert_eq!(ts.state_color(5), Some(true));
+        assert_eq!(ts.state_color(3), Some(false));
+    }
+
+    #[test]
+    fn non_contiguous_state_ids_without_default_color() {
+        // the gap states 1..=4 have no color
+        let builder = Builder::<_, _, false>::without_edge_colors()
+            .color(0, true)
+            .color(5, true)
+            .with_transitions([(0, 'a', 5)]);
+        assert_eq!(
+            builder.try_into_nts().err(),
+            Some(BuilderError::MissingStateColor(1))
+        );
+    }
 
     #[test]
     fn building_reports_missing_state_colors() {
