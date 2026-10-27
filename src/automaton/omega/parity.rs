@@ -193,13 +193,79 @@ where
     }
 
     /// Builds the complement of `self`, i.e. the DPA that accepts the complement of the language
-    /// accepted by `self`. This is a cheap operation as it only requires to increment all edge
-    /// colors by one.
-    pub fn complement(self) -> DPA<D::Alphabet> {
+    /// accepted by `self`.
+    ///
+    /// The complement is obtained by flipping the parity of every priority, which means shifting
+    /// all priorities by one. To make sure that this cannot overflow, the priorities are always
+    /// [normalized](Self::normalized) first. This yields the minimal number of distinct
+    /// priorities, so the shift only fails if all of the `Int::MAX + 1` priorities `0..=Int::MAX`
+    /// are needed. If the least priority of the normalized automaton is positive, we shift down
+    /// instead of up, which cannot fail.
+    ///
+    /// Note that normalizing is more expensive than just shifting the priorities. If you do not
+    /// want this, use [`Self::complement_without_normalizing`].
+    ///
+    /// # Panics
+    /// Panics if the complement cannot be represented, i.e. if the language needs `Int::MAX + 1`
+    /// distinct priorities, beginning at 0. Such an automaton has at least that many states.
+    pub fn complement(self) -> DPA<D::Alphabet>
+    where
+        EdgeColor<Self>: Eq + Hash + Clone + Ord,
+        D: Clone + IntoTs,
+    {
+        self.normalized()
+            .complement_without_normalizing()
+            .unwrap_or_else(|| {
+                panic!(
+                    "cannot complement a DPA that needs all priorities 0..={}",
+                    Int::MAX
+                )
+            })
+    }
+
+    /// Builds the complement of `self` by shifting all priorities by one, without normalizing
+    /// them first. This is cheap, but the priorities of the result are only as small as those of
+    /// `self`. Prefer [`Self::complement`] unless you know that the priorities are already
+    /// normalized or want to keep them as they are.
+    ///
+    /// If the least priority is positive, all priorities are shifted down by one, otherwise they
+    /// are shifted up by one. Returns `None` if the latter is necessary but impossible, which
+    /// is the case if both `0` and `Int::MAX` occur as priorities.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::ts::{Deterministic, Builder, TransitionSystem};
+    ///
+    /// let dpa = Builder::without_state_colors()
+    ///     .with_transitions([(0, 'a', 255, 0), (0, 'b', 254, 0)])
+    ///     .into_dpa(0);
+    /// let complement = dpa.complement_without_normalizing().unwrap();
+    /// assert_eq!(complement.low_and_high_priority(), (253, 254));
+    ///
+    /// let dpa = Builder::without_state_colors()
+    ///     .with_transitions([(0, 'a', 255, 0), (0, 'b', 0, 0)])
+    ///     .into_dpa(0);
+    /// assert!(dpa.complement_without_normalizing().is_none());
+    /// ```
+    pub fn complement_without_normalizing(self) -> Option<DPA<D::Alphabet>> {
+        let (low, high) = self.low_and_high_priority();
         let initial = self.initial;
-        self.map_edge_colors(|c| c + 1)
-            .with_initial(initial)
-            .collect_dpa()
+        if low > 0 {
+            // also covers the case of no edges, where `low == Int::MAX`
+            Some(
+                self.map_edge_colors(|c| c - 1)
+                    .with_initial(initial)
+                    .collect_dpa(),
+            )
+        } else if high < Int::MAX {
+            Some(
+                self.map_edge_colors(|c| c + 1)
+                    .with_initial(initial)
+                    .collect_dpa(),
+            )
+        } else {
+            None
+        }
     }
 
     /// Gives a witness for the fact that `left` and `right` are not language-equivalent. This is
@@ -606,6 +672,42 @@ mod tests {
                 (2, 'c', 6, 0),
             ])
             .into_dpa(0)
+    }
+
+    #[test]
+    fn complement_with_maximal_priority() {
+        // priorities 254 and 255 normalize to 0 and 1
+        let dpa = Builder::without_state_colors()
+            .with_transitions([(0, 'a', 254, 0), (0, 'b', 255, 0)])
+            .into_dpa(0);
+        let complement = dpa.clone().complement();
+        assert!(!complement.language_equivalent(&dpa));
+        assert!(complement.clone().complement().language_equivalent(&dpa));
+        assert_eq!(complement.low_and_high_priority(), (1, 2));
+
+        // every run is rejecting, so the complement is universal. All priorities are positive
+        // here, so the complement shifts down instead of up.
+        let dpa = Builder::without_state_colors()
+            .with_transitions([(0, 'a', 1, 0), (0, 'b', 255, 0)])
+            .into_dpa(0);
+        let complement = dpa.complement();
+        assert!(complement.give_rejected_word().is_none());
+        assert!(complement.give_accepted_word().is_some());
+    }
+
+    #[test]
+    fn complement_without_normalizing_keeps_priorities() {
+        let dpa = Builder::without_state_colors()
+            .with_transitions([(0, 'a', 254, 0), (0, 'b', 255, 0)])
+            .into_dpa(0);
+        let complement = dpa.clone().complement_without_normalizing().unwrap();
+        assert_eq!(complement.low_and_high_priority(), (253, 254));
+        assert!(complement.language_equivalent(&dpa.complement()));
+
+        let dpa = Builder::without_state_colors()
+            .with_transitions([(0, 'a', 0, 0), (0, 'b', 255, 0)])
+            .into_dpa(0);
+        assert!(dpa.complement_without_normalizing().is_none());
     }
 
     #[test]
