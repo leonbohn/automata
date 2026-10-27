@@ -39,6 +39,8 @@ rand_distr = { version = "0.6", optional = true }
 [dev-dependencies]
 test-log = { version = "0.2", features = ["trace"] }
 criterion = "0.8"
+# the runner (gungraun-runner) must have exactly this version
+gungraun = "=0.20.0"
 
 [features]
 default = ["hoa"]
@@ -60,7 +62,11 @@ name = "scc"
 harness = false
 
 [[bench]]
-name = "operations"
+name = "ts"
+harness = false
+
+[[bench]]
+name = "runs"
 harness = false
 
 [[bench]]
@@ -68,5 +74,9 @@ name = "dpa"
 harness = false
 
 [[bench]]
-name = "baseline"
+name = "dfa"
+harness = false
+
+[[bench]]
+name = "wallclock"
 harness = false
