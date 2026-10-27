@@ -96,6 +96,17 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --all-features
 
+  benches:
+    name: Benchmarks compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --no-self-update
+      - uses: Swatinem/rust-cache@v2
+      # running them needs valgrind and the matching gungraun-runner, which is done on the
+      # benchmark machine (see docs/benchmarking.md)
+      - run: cargo bench --no-run
+
   bench-tools:
     name: Benchmark tooling
     runs-on: ubuntu-latest

@@ -11,9 +11,6 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct Engine {
@@ -35,25 +32,13 @@ pub struct Measurement {
     pub env: EnvInfo,
 }
 
-/// Lets a caller stop a running measurement and follow what it does.
+/// Where the output of the builds and benchmarks goes, so that it can be followed while a run
+/// is going.
 #[derive(Debug, Clone, Default)]
 pub struct Control {
-    pub cancel: Arc<AtomicBool>,
     /// Output of the builds and benchmarks is appended here.
     pub log: Option<PathBuf>,
 }
-
-/// The error of a measurement that was stopped on request.
-#[derive(Debug)]
-pub struct Cancelled;
-
-impl std::fmt::Display for Cancelled {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "cancelled")
-    }
-}
-
-impl std::error::Error for Cancelled {}
 
 impl Control {
     fn note(&self, line: &str) {
@@ -73,41 +58,19 @@ impl Control {
             .unwrap_or_else(Stdio::null)
     }
 
-    /// Runs a command to completion in its own process group, which is killed on cancellation.
-    /// Returns its standard output; standard error goes to the log.
+    /// Runs a command to completion. Returns its standard output; standard error goes to the log.
     pub fn run(&self, cmd: &mut Command, what: &str) -> Result<String> {
-        use std::os::unix::process::CommandExt;
-        if self.cancel.load(Ordering::SeqCst) {
-            return Err(Cancelled.into());
-        }
         let stdout_path = std::env::temp_dir().join(format!(
             "automata-bench-{}-{}.out",
             std::process::id(),
             std::thread::current().name().unwrap_or("main")
         ));
-        let stdout = std::fs::File::create(&stdout_path)?;
-        let mut child = cmd
+        let status = cmd
             .stdin(Stdio::null())
-            .stdout(stdout)
+            .stdout(std::fs::File::create(&stdout_path)?)
             .stderr(self.stderr())
-            .process_group(0)
-            .spawn()
+            .status()
             .with_context(|| format!("starting {what}"))?;
-        let status = loop {
-            if let Some(status) = child.try_wait()? {
-                break status;
-            }
-            if self.cancel.load(Ordering::SeqCst) {
-                // a negative pid addresses the whole process group: cargo, the benchmark, valgrind
-                let _ = Command::new("kill")
-                    .args(["-KILL", &format!("-{}", child.id())])
-                    .status();
-                let _ = child.wait();
-                let _ = std::fs::remove_file(&stdout_path);
-                return Err(Cancelled.into());
-            }
-            std::thread::sleep(Duration::from_millis(200));
-        };
         let out = std::fs::read_to_string(&stdout_path).unwrap_or_default();
         let _ = std::fs::remove_file(&stdout_path);
         if !status.success() {
@@ -294,5 +257,27 @@ impl Engine {
             valgrind: sh("valgrind", &["--version"]),
             pinned_cpu: self.cpu.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_failing_command_reports_its_log() {
+        let dir = std::env::temp_dir().join(format!("ab-engine-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let control = Control {
+            log: Some(dir.join("log")),
+        };
+        let mut cmd = Command::new("sh");
+        cmd.args(["-c", "echo boom >&2; exit 3"]);
+        let err = control.run(&mut cmd, "failing").unwrap_err();
+        assert!(format!("{err:#}").contains("boom"), "{err:#}");
+        let mut ok = Command::new("sh");
+        ok.args(["-c", "echo hello"]);
+        assert_eq!(control.run(&mut ok, "echo").unwrap(), "hello");
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

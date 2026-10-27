@@ -12,16 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Dottable::dot_initial_state`: the initial state is marked in the DOT output by an arrow without source (an `init` node with an edge into the initial state). Implemented for DFAs, right congruences, Moore and Mealy machines and DPAs.
 - `RenderError::DotNotFound` and `RenderError::DotFailed { status, stderr }` for problems with the `dot` executable.
 - `examples/dot.rs` takes `--show` and `--show-graphviz` to open the rendered automaton in a viewer.
-- Baseline benchmarks (`cargo bench --bench baseline`) for the performance problems tracked in the 0.2 redesign: subset construction, `DPA::normalized`, edge removal, collecting, products, run throughput, edge insertion and lookup.
-- Benchmark tracking (see `docs/benchmarking.md`): `tools/bench` runs and compares benchmarks, a Nix flake provides it and a NixOS module that benchmarks `main` and pull requests labelled `performance` on a dedicated machine.
-- Criterion benchmark `dpa` (`cargo bench --bench dpa`) for DPA normalization, complement, witnesses and language comparison; it is part of the default benchmark set of `automata-bench` and the NixOS module.
-- Criterion benchmarks (`cargo bench`) for SCC decompositions on several graph shapes and for common operations (reachability, minimization, products, subset construction).
+- Deterministic benchmarks that count instructions with gungraun (`scc`, `ts`, `runs`, `dfa`, `dpa`; `cargo bench`, needs valgrind) on closed-form inputs and on 72 DPAs generated with Spot (`benches/fixtures`, `scripts/generate_benchmark_fixtures.sh`), and a criterion target for wall-clock times. There is no randomness in the benchmarks.
+- Benchmark tracking (see `docs/benchmarking.md`): `tools/bench` runs and compares the benchmarks (one execution per revision, 1 % threshold on instruction counts), a Nix flake provides it and a NixOS module that benchmarks `main` and pull requests labelled `performance` on a dedicated machine.
 - README: table of the rendering functions, a recommendation of `graphviz`, and the prerequisites; crates.io and docs.rs badges.
 
 ### Changed
 
 - `DPA::normalized` stores the recoloring in a `HashMap` instead of a linearly searched `Vec` and collects the transition system only once (#39).
-- The baseline benchmarks are smaller (no subset construction for n = 14, collecting up to 400k instead of 1M states), so that a benchmark round is shorter.
 - Removing edges and states of a `LinkedListTransitionSystem` (`remove_edges_from`, `remove_edges_to`, `remove_edges_between`, `remove_edges_from_matching`, `remove_edges_between_matching`, `remove_state`) walks the edge lists of the states involved instead of scanning all edges, so the cost is proportional to the degree. The order of the returned edges may differ.
 - `IntoTs::into_dfa_with_initial` only requires `Deterministic<StateColor = bool>` instead of `Congruence`, since the initial state is given explicitly.
 - **Breaking:** `display_rendered` and `display_rendered_graphviz` now write an SVG to a temporary file and open it with the default program of the system (`xdg-open` on Linux, `open` on macOS, `start` on Windows) instead of piping a PNG to ImageMagick's `display`. This works on Wayland. The `IMAGE_VIEWER` environment variable is still honored, the program is now called with the path of the file instead of reading from stdin. The temporary file is not deleted.

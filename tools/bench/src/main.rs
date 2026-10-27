@@ -120,10 +120,6 @@ enum Command {
         /// are only recorded.
         #[arg(long)]
         github_token_file: Option<PathBuf>,
-        /// File with the token that allows cancelling and discarding runs on the dashboard;
-        /// without it the dashboard is read-only.
-        #[arg(long)]
-        admin_token_file: Option<PathBuf>,
         /// Where the dashboard is reachable, used in links.
         #[arg(long, default_value = "")]
         public_url: String,
@@ -178,10 +174,7 @@ fn local_control(engine: &Engine) -> Control {
     let _ = std::fs::create_dir_all(&engine.work_dir);
     let _ = std::fs::remove_file(&log);
     eprintln!("output of the builds and benchmarks: {}", log.display());
-    Control {
-        log: Some(log),
-        ..Control::default()
-    }
+    Control { log: Some(log) }
 }
 
 /// Benchmarks that executed (almost) no instructions did not measure what they claim to.
@@ -310,7 +303,6 @@ fn main() -> Result<()> {
             allow_forks,
             webhook_secret_file,
             github_token_file,
-            admin_token_file,
             public_url,
             threshold,
             engine,
@@ -330,7 +322,6 @@ fn main() -> Result<()> {
                 allow_forks,
                 webhook_secret: read_secret(&webhook_secret_file)?,
                 github_token: github_token_file.as_ref().map(read_secret).transpose()?,
-                admin_token: admin_token_file.as_ref().map(read_secret).transpose()?,
                 public_url,
                 threshold,
                 engine,

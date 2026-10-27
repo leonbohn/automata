@@ -1,7 +1,7 @@
 //! The web server (webhooks, dashboard, controls) and the worker that processes queued runs.
 
 use crate::db::{Db, NewRun, Run};
-use crate::engine::{Cancelled, Control, Engine};
+use crate::engine::{Control, Engine};
 use crate::github::Github;
 use crate::model::{Measured, Metric};
 use crate::web::{self, Site};
@@ -9,11 +9,9 @@ use crate::{compare, report};
 use anyhow::{Context, Result, bail};
 use hmac::{Hmac, Mac};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use std::io::Read;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const HTMX: &[u8] = include_bytes!("../static/htmx.min.js");
@@ -31,9 +29,6 @@ pub struct Config {
     pub allow_forks: bool,
     pub webhook_secret: String,
     pub github_token: Option<String>,
-    /// Token that authorizes cancelling and discarding runs. Without it the controls of the
-    /// dashboard are disabled.
-    pub admin_token: Option<String>,
     pub public_url: String,
     pub threshold: f64,
     pub engine: Engine,
@@ -49,38 +44,6 @@ impl Config {
     fn logs(&self) -> PathBuf {
         self.state_dir.join("logs")
     }
-}
-
-/// The run that is being processed, so that it can be stopped from a request.
-#[derive(Default)]
-pub struct Shared {
-    running: Mutex<Option<(i64, Arc<AtomicBool>)>>,
-}
-
-impl Shared {
-    /// Asks the running run to stop. Returns whether `id` is the run that is going.
-    fn cancel(&self, id: i64) -> bool {
-        match &*self.running.lock().expect("lock") {
-            Some((running, flag)) if *running == id => {
-                flag.store(true, Ordering::SeqCst);
-                true
-            }
-            _ => false,
-        }
-    }
-}
-
-fn digest(s: &str) -> [u8; 32] {
-    Sha256::digest(s.as_bytes()).into()
-}
-
-/// Compares in constant time (of the digests, which hides the length too).
-fn token_matches(expected: &str, given: &str) -> bool {
-    digest(expected)
-        .iter()
-        .zip(digest(given))
-        .fold(0u8, |acc, (a, b)| acc | (a ^ b))
-        == 0
 }
 
 pub fn verify_signature(secret: &str, body: &[u8], header: &str) -> bool {
@@ -222,7 +185,6 @@ pub struct Req {
     pub method: String,
     /// Path and query.
     pub url: String,
-    pub authorization: String,
     pub signature: String,
     pub event: String,
     pub body: Vec<u8>,
@@ -282,7 +244,7 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-pub fn route(cfg: &Config, shared: &Shared, db: &Db, req: &Req) -> Reply {
+pub fn route(cfg: &Config, db: &Db, req: &Req) -> Reply {
     let (path, query) = req.url.split_once('?').unwrap_or((req.url.as_str(), ""));
     let site = Site {
         db,
@@ -312,20 +274,9 @@ pub fn route(cfg: &Config, shared: &Shared, db: &Db, req: &Req) -> Reply {
             });
         }
 
-        // everything that changes something needs the admin token
+        // the dashboard is read-only: apart from the webhook, nothing changes anything
         if method != "GET" {
-            match &cfg.admin_token {
-                None => return Ok(Reply::text(403, "no admin token is configured")),
-                Some(token) => {
-                    let given = req
-                        .authorization
-                        .strip_prefix("Bearer ")
-                        .unwrap_or_default();
-                    if !token_matches(token, given) {
-                        return Ok(Reply::text(401, "missing or wrong admin token"));
-                    }
-                }
-            }
+            return Ok(Reply::text(405, "the dashboard is read-only"));
         }
 
         Ok(match (method, segments.as_slice()) {
@@ -368,40 +319,6 @@ pub fn route(cfg: &Config, shared: &Shared, db: &Db, req: &Req) -> Reply {
                 body: STYLE.as_bytes().to_vec(),
             },
 
-            ("POST", ["runs", id, "cancel"]) => {
-                let id: i64 = id.parse().context("run id")?;
-                if !shared.cancel(id) {
-                    return Ok(Reply::text(409, "that run is not running"));
-                }
-                tracing::info!(id, "cancelling the running run");
-                Reply::html(site.queue()?)
-            }
-            ("DELETE", ["queue", id]) => {
-                let id: i64 = id.parse().context("run id")?;
-                if !db.discard(id)? {
-                    return Ok(Reply::text(409, "that run is not queued"));
-                }
-                tracing::info!(id, "discarded from the queue");
-                Reply::html(site.queue()?)
-            }
-            ("DELETE", ["queue"]) => {
-                let n = db.discard_all()?;
-                tracing::info!(n, "discarded everything that was queued");
-                Reply::html(site.queue()?)
-            }
-            ("POST", ["queue"]) => {
-                let sha = param(&String::from_utf8_lossy(&req.body), "sha");
-                if sha.len() < 7 || !sha.chars().all(|c| c.is_ascii_hexdigit()) {
-                    return Ok(Reply::text(400, "expected a commit hash"));
-                }
-                db.enqueue(&NewRun {
-                    kind: "main".into(),
-                    pr: None,
-                    title: "queued by hand".into(),
-                    head_sha: sha,
-                })?;
-                Reply::html(site.queue()?)
-            }
             _ => Reply::text(404, "not found"),
         })
     })();
@@ -416,12 +333,10 @@ pub fn serve(cfg: Config) -> Result<()> {
     std::fs::create_dir_all(cfg.logs())?;
     let db = cfg.db()?;
     db.recover()?;
-    let shared = Arc::new(Shared::default());
-
-    let (worker_cfg, worker_shared) = (cfg.clone(), shared.clone());
+    let worker_cfg = cfg.clone();
     std::thread::Builder::new()
         .name("worker".into())
-        .spawn(move || worker(worker_cfg, worker_shared))?;
+        .spawn(move || worker(worker_cfg))?;
 
     let server = tiny_http::Server::http(&cfg.listen).map_err(|e| anyhow::anyhow!("{e}"))?;
     tracing::info!(listen = %cfg.listen, repo = %cfg.repo, "serving the dashboard and webhooks");
@@ -437,7 +352,6 @@ pub fn serve(cfg: Config) -> Result<()> {
         let mut req = Req {
             method: request.method().as_str().to_string(),
             url: request.url().to_string(),
-            authorization: header("Authorization"),
             signature: header("X-Hub-Signature-256"),
             event: header("X-GitHub-Event"),
             body: Vec::new(),
@@ -450,7 +364,7 @@ pub fn serve(cfg: Config) -> Result<()> {
         {
             continue;
         }
-        let reply = route(&cfg, &shared, &db, &req);
+        let reply = route(&cfg, &db, &req);
         let content_type = tiny_http::Header::from_bytes("Content-Type", reply.content_type)
             .expect("static header");
         let _ = request.respond(
@@ -462,7 +376,7 @@ pub fn serve(cfg: Config) -> Result<()> {
     Ok(())
 }
 
-fn worker(cfg: Config, shared: Arc<Shared>) {
+fn worker(cfg: Config) {
     let db = match cfg.db() {
         Ok(db) => db,
         Err(e) => {
@@ -475,44 +389,26 @@ fn worker(cfg: Config, shared: Arc<Shared>) {
             Ok(Some(run)) => {
                 tracing::info!(id = run.id, kind = %run.kind, sha = %run.head_sha, pr = ?run.pr, "starting run");
                 let control = Control {
-                    cancel: Arc::new(AtomicBool::new(false)),
                     log: Some(cfg.logs().join(format!("{}.log", run.id))),
                 };
                 if let Some(log) = &control.log {
                     let _ = std::fs::remove_file(log);
                 }
-                *shared.running.lock().expect("lock") = Some((run.id, control.cancel.clone()));
-                let outcome = process(&cfg, &db, &run, &control);
-                *shared.running.lock().expect("lock") = None;
-                if let Err(e) = outcome {
-                    let gh = github(&cfg);
-                    if e.downcast_ref::<Cancelled>().is_some() {
-                        tracing::info!(id = run.id, "run cancelled");
-                        let _ = db.mark_cancelled(run.id);
-                        if let (Some(gh), Some(_)) = (gh, run.pr) {
-                            let _ = gh.set_status(
-                                &run.head_sha,
-                                "error",
-                                "benchmark run cancelled",
-                                &cfg.public_url,
-                            );
-                        }
-                    } else {
-                        tracing::error!(id = run.id, "run failed: {e:#}");
-                        let msg = format!("{e:#}");
-                        let _ = db.fail(run.id, &msg);
-                        if let (Some(gh), Some(pr)) = (gh, run.pr) {
-                            let _ = gh.upsert_comment(
-                                pr,
-                                &report::failure(&run.head_sha, &msg, &cfg.public_url),
-                            );
-                            let _ = gh.set_status(
-                                &run.head_sha,
-                                "error",
-                                "benchmark run failed",
-                                &cfg.public_url,
-                            );
-                        }
+                if let Err(e) = process(&cfg, &db, &run, &control) {
+                    tracing::error!(id = run.id, "run failed: {e:#}");
+                    let msg = format!("{e:#}");
+                    let _ = db.fail(run.id, &msg);
+                    if let (Some(gh), Some(pr)) = (github(&cfg), run.pr) {
+                        let _ = gh.upsert_comment(
+                            pr,
+                            &report::failure(&run.head_sha, &msg, &cfg.public_url),
+                        );
+                        let _ = gh.set_status(
+                            &run.head_sha,
+                            "error",
+                            "benchmark run failed",
+                            &cfg.public_url,
+                        );
                     }
                 }
             }
@@ -619,7 +515,6 @@ mod tests {
             allow_forks: false,
             webhook_secret: "s".into(),
             github_token: None,
-            admin_token: Some("tok".into()),
             public_url: String::new(),
             threshold: 1.0,
             engine: Engine {
@@ -710,15 +605,10 @@ mod tests {
         assert!(db.claim().unwrap().is_none());
     }
 
-    fn req(method: &str, url: &str, token: &str) -> Req {
+    fn req(method: &str, url: &str) -> Req {
         Req {
             method: method.into(),
             url: url.into(),
-            authorization: if token.is_empty() {
-                String::new()
-            } else {
-                format!("Bearer {token}")
-            },
             signature: String::new(),
             event: String::new(),
             body: Vec::new(),
@@ -744,9 +634,8 @@ mod tests {
     }
 
     #[test]
-    fn controls_need_the_admin_token() {
+    fn nothing_can_be_changed_through_the_dashboard() {
         let db = memory_db();
-        let shared = Shared::default();
         let id = db
             .enqueue(&NewRun {
                 kind: "main".into(),
@@ -756,52 +645,25 @@ mod tests {
             })
             .unwrap()
             .unwrap();
-        let path = format!("/queue/{id}");
-        assert_eq!(
-            route(&cfg(), &shared, &db, &req("DELETE", &path, "")).status,
-            401
-        );
-        assert_eq!(
-            route(&cfg(), &shared, &db, &req("DELETE", &path, "wrong")).status,
-            401
-        );
+        for method in ["POST", "DELETE", "PUT"] {
+            for url in [
+                format!("/queue/{id}"),
+                "/queue".into(),
+                format!("/runs/{id}/cancel"),
+            ] {
+                assert_eq!(
+                    route(&cfg(), &db, &req(method, &url)).status,
+                    405,
+                    "{method} {url}"
+                );
+            }
+        }
         assert_eq!(db.queue().unwrap().len(), 1);
-        assert_eq!(
-            route(&cfg(), &shared, &db, &req("DELETE", &path, "tok")).status,
-            200
-        );
-        assert!(db.queue().unwrap().is_empty());
-        // without a configured token nothing can be changed
-        let mut open = cfg();
-        open.admin_token = None;
-        assert_eq!(
-            route(&open, &shared, &db, &req("DELETE", "/queue", "tok")).status,
-            403
-        );
-    }
-
-    #[test]
-    fn cancelling_stops_only_the_running_run() {
-        let db = memory_db();
-        let shared = Shared::default();
-        let flag = Arc::new(AtomicBool::new(false));
-        *shared.running.lock().unwrap() = Some((5, flag.clone()));
-        assert_eq!(
-            route(&cfg(), &shared, &db, &req("POST", "/runs/6/cancel", "tok")).status,
-            409
-        );
-        assert!(!flag.load(Ordering::SeqCst));
-        assert_eq!(
-            route(&cfg(), &shared, &db, &req("POST", "/runs/5/cancel", "tok")).status,
-            200
-        );
-        assert!(flag.load(Ordering::SeqCst));
     }
 
     #[test]
     fn pages_render_on_an_empty_database() {
         let db = memory_db();
-        let shared = Shared::default();
         for url in [
             "/",
             "/fragments/queue",
@@ -810,17 +672,11 @@ mod tests {
             "/static/style.css",
             "/static/htmx.min.js",
         ] {
-            let reply = route(&cfg(), &shared, &db, &req("GET", url, ""));
+            let reply = route(&cfg(), &db, &req("GET", url));
             assert_eq!(reply.status, 200, "{url}");
         }
-        assert_eq!(
-            route(&cfg(), &shared, &db, &req("GET", "/run/99", "")).status,
-            404
-        );
-        assert_eq!(
-            route(&cfg(), &shared, &db, &req("GET", "/nothing", "")).status,
-            404
-        );
+        assert_eq!(route(&cfg(), &db, &req("GET", "/run/99")).status, 404);
+        assert_eq!(route(&cfg(), &db, &req("GET", "/nothing")).status, 404);
     }
 
     #[test]

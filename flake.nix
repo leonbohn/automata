@@ -17,7 +17,10 @@
         system: pkgs: rec {
           # The benchmark runner. It carries the toolchain that builds and benchmarks every
           # revision, so all commits are measured with the same compiler.
-          automata-bench = pkgs.callPackage ./nix/package.nix { };
+          gungraun-runner = pkgs.callPackage ./nix/gungraun-runner.nix { };
+          automata-bench = pkgs.callPackage ./nix/package.nix {
+            inherit (self.packages.${system}) gungraun-runner;
+          };
           default = automata-bench;
         }
       );
@@ -46,6 +49,8 @@
               pkgs.clippy
               pkgs.rustfmt
               pkgs.cargo-hack
+              pkgs.valgrind
+              self.packages.${system}.gungraun-runner
               self.packages.${system}.automata-bench
             ];
           };

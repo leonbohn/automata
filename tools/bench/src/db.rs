@@ -194,34 +194,6 @@ impl Db {
         Ok(())
     }
 
-    /// Removes a run from the queue. Returns whether it was queued.
-    pub fn discard(&self, id: i64) -> Result<bool> {
-        let n = self.0.execute(
-            "UPDATE runs SET status='cancelled', finished_at=?2, error='discarded from the queue'
-             WHERE id=?1 AND status='queued'",
-            params![id, now()],
-        )?;
-        Ok(n > 0)
-    }
-
-    /// Removes everything that waits in the queue. Returns the number of runs.
-    pub fn discard_all(&self) -> Result<usize> {
-        Ok(self.0.execute(
-            "UPDATE runs SET status='cancelled', finished_at=?1, error='discarded from the queue'
-             WHERE status='queued'",
-            [now()],
-        )?)
-    }
-
-    /// Records that a running run was stopped on request.
-    pub fn mark_cancelled(&self, id: i64) -> Result<()> {
-        self.0.execute(
-            "UPDATE runs SET status='cancelled', finished_at=?2, error='cancelled while running' WHERE id=?1",
-            params![id, now()],
-        )?;
-        Ok(())
-    }
-
     /// Takes the oldest queued run, marking it as running. Pull requests go first.
     pub fn claim(&self) -> Result<Option<Run>> {
         let run = self
@@ -531,25 +503,6 @@ mod tests {
         assert_eq!(db.results(id, "head").unwrap()["x"], metrics(5));
         assert_eq!(db.wall(id, "head").unwrap()["w"].mean_ns, 1.0);
         assert_eq!(db.pull_requests(1.0).unwrap().len(), 1);
-    }
-
-    #[test]
-    fn discarding_only_affects_queued_runs() {
-        let db = db();
-        let a = db.enqueue(&main_run("a")).unwrap().unwrap();
-        let b = db.enqueue(&main_run("b")).unwrap().unwrap();
-        let running = db.claim().unwrap().unwrap().id;
-        assert_eq!(running, a);
-        assert!(
-            !db.discard(a).unwrap(),
-            "a running run is cancelled, not discarded"
-        );
-        assert!(db.discard(b).unwrap());
-        assert!(db.queue().unwrap().iter().all(|r| r.id == a));
-        // a discarded commit can be queued again
-        assert!(db.enqueue(&main_run("b")).unwrap().is_some());
-        db.mark_cancelled(a).unwrap();
-        assert_eq!(db.run(a).unwrap().unwrap().status, "cancelled");
     }
 
     #[test]

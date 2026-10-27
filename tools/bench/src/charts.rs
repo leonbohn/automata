@@ -43,12 +43,16 @@ pub fn line(points: &[Point], threshold: f64) -> String {
     let (lo, hi) = points.iter().fold((u64::MAX, 0), |(lo, hi), p| {
         (lo.min(p.value), hi.max(p.value))
     });
-    // the axis starts at zero unless the values are close together, then the changes show up
+    // Counts are exact, so noise does not exist, but a tiny step should not look like a cliff
+    // either: the axis shows at least +-2 % around the middle (twice the usual threshold), a
+    // change below the threshold stays flat and one above it is visible. Series that vary a lot
+    // start at zero.
     let (lo, hi) = if (hi - lo) as f64 > hi as f64 * 0.2 {
         (0.0, hi as f64)
     } else {
-        let pad = (hi - lo).max(1) as f64 * 0.2;
-        (lo as f64 - pad, hi as f64 + pad)
+        let middle = (lo + hi) as f64 / 2.0;
+        let half = ((hi - lo) as f64 / 2.0 * 1.2).max(middle * 0.02).max(1.0);
+        (middle - half, middle + half)
     };
     let span = (hi - lo).max(1.0);
     let x = |i: usize| PAD + i as f64 / n * (W - 2.0 * PAD);
@@ -94,6 +98,11 @@ pub fn line(points: &[Point], threshold: f64) -> String {
     )
 }
 
+/// The color of the `k`-th band of a stacked chart, also used by its legend.
+pub fn hue(k: usize) -> usize {
+    (k * 47) % 360
+}
+
 /// One stacked band: a name and its value at every commit.
 pub struct Band {
     pub name: String,
@@ -137,7 +146,7 @@ pub fn stacked(commits: &[Point], bands: &[Band]) -> String {
         for (i, v) in below.iter().enumerate().rev() {
             let _ = write!(d, "L{:.1},{:.1}", x(i), y(*v));
         }
-        let hue = (k * 47) % 360;
+        let hue = hue(k);
         let _ = write!(
             out,
             r#"<path d="{d}Z" fill="hsl({hue} 55% 55%)" stroke="hsl({hue} 55% 35%)" stroke-width=".5"><title>{}</title></path>"#,

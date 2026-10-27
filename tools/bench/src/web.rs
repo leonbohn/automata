@@ -56,20 +56,6 @@ pub fn page(title: &str, body: &str) -> String {
 <body>
 <h1><a href="/">automata benchmarks</a></h1>
 {body}
-<script>
-// The buttons that change something need the admin token, it is kept in this browser only.
-document.body.addEventListener('htmx:config:request', (e) => {{
-  const token = localStorage.getItem('token');
-  if (token) e.detail.ctx.request.headers['Authorization'] = 'Bearer ' + token;
-}});
-document.body.addEventListener('htmx:response:error', (e) => {{
-  const status = e.detail.ctx.response.status;
-  if (status === 401 || status === 403) {{
-    const token = prompt('Admin token');
-    if (token) {{ localStorage.setItem('token', token); alert('Saved. Repeat the action.'); }}
-  }}
-}});
-</script>
 </body>
 </html>
 "#,
@@ -137,23 +123,12 @@ impl Site<'_> {
             return Ok(r#"<p class="mut">Nothing is running or waiting.</p>"#.into());
         }
         let mut out = String::from(
-            "<table><tr><th>run</th><th>commit</th><th>title</th><th>status</th><th></th></tr>",
+            "<table><tr><th>run</th><th>commit</th><th>title</th><th>status</th></tr>",
         );
         for run in &queue {
-            let action = if run.status == "running" {
-                format!(
-                    r##"<button class="danger" hx-post="/runs/{}/cancel" hx-target="#queue" hx-confirm="Stop the running execution?">cancel</button>"##,
-                    run.id
-                )
-            } else {
-                format!(
-                    r##"<button class="danger" hx-delete="/queue/{}" hx-target="#queue">discard</button>"##,
-                    run.id
-                )
-            };
             let _ = write!(
                 out,
-                r#"<tr><td><a href="/run/{id}">{what}</a></td><td>{sha}</td><td>{title}</td><td>{status}</td><td>{action}</td></tr>"#,
+                r#"<tr><td><a href="/run/{id}">{what}</a></td><td>{sha}</td><td>{title}</td><td>{status}</td></tr>"#,
                 id = run.id,
                 what = what(run),
                 sha = sha_link(self.repo, &run.head_sha),
@@ -162,9 +137,6 @@ impl Site<'_> {
             );
         }
         out += "</table>";
-        if queue.iter().filter(|r| r.status == "queued").count() > 1 {
-            out += r##"<p><button class="danger" hx-delete="/queue" hx-target="#queue" hx-confirm="Discard everything that is queued?">discard all queued</button></p>"##;
-        }
         Ok(out)
     }
 
@@ -267,8 +239,18 @@ impl Site<'_> {
             },
             charts::stacked(&commits, &bands)
         );
-        let legend: Vec<String> = bands.iter().map(|b| esc(&b.name)).collect();
-        let _ = write!(out, r#"<p class="mut">bands: {}</p>"#, legend.join(", "));
+        let legend: Vec<String> = bands
+            .iter()
+            .enumerate()
+            .map(|(k, b)| {
+                format!(
+                    r#"<span style="color: hsl({} 55% 55%)">■</span> {}"#,
+                    charts::hue(k),
+                    esc(&b.name)
+                )
+            })
+            .collect();
+        let _ = write!(out, r#"<p class="mut">{}</p>"#, legend.join(" · "));
 
         let mut current = "";
         for (shown, (name, points)) in matching.into_iter().enumerate() {
@@ -281,7 +263,14 @@ impl Site<'_> {
                 if !current.is_empty() {
                     out += "</div>";
                 }
-                let _ = write!(out, r#"<h3>{}</h3><div class="grid">"#, esc(file_group));
+                // module paths look like `file::group::function`, where file and group are
+                // usually the same word
+                let parts: Vec<&str> = file_group.split("::").collect();
+                let title = match parts.as_slice() {
+                    [file, group, function] if file == group => format!("{file} › {function}"),
+                    parts => parts.join(" › "),
+                };
+                let _ = write!(out, r#"<h3>{}</h3><div class="grid">"#, esc(&title));
                 current = file_group;
             }
             let last = points.last().expect("histories are not empty");
@@ -304,12 +293,7 @@ impl Site<'_> {
             let _ = write!(
                 out,
                 r#"<div class="card"><b>{}</b><br>{}{}{}</div>"#,
-                esc(name
-                    .rsplit("::")
-                    .next()
-                    .map(|id| format!("{}::{id}", file_group.rsplit("::").next().unwrap_or("")))
-                    .as_deref()
-                    .unwrap_or(name)),
+                esc(name.rsplit("::").next().unwrap_or(name)),
                 fmt_short(last.value),
                 delta,
                 charts::line(points, self.threshold),

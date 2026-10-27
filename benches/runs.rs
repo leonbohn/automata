@@ -24,20 +24,22 @@ fn dfa_with_words(count: usize) -> (DFA, Vec<String>) {
 
 // One long word: the cost per step, without the per-call overhead.
 #[library_benchmark(config = LibraryBenchmarkConfig::default().tool(Dhat::default()))]
-#[benches::len(args = [100, 10_000, 100_000], setup = dfa_with_word)]
+#[bench::len_100(args = (100), setup = dfa_with_word)]
+#[bench::len_10000(args = (10_000), setup = dfa_with_word)]
+#[bench::len_100000(args = (100_000), setup = dfa_with_word)]
 fn dfa_accepts_one_word((dfa, word): (DFA, Vec<char>)) -> bool {
     black_box(dfa.accepts(word.as_slice()))
 }
 
 // Many short words: the per-call overhead.
 #[library_benchmark(config = LibraryBenchmarkConfig::default().tool(Dhat::default()))]
-#[benches::count(args = [1_000], setup = dfa_with_words)]
+#[bench::count_1000(args = (1_000), setup = dfa_with_words)]
 fn dfa_accepts_many_words((dfa, words): (DFA, Vec<String>)) -> usize {
     black_box(words.iter().filter(|w| dfa.accepts(w.as_str())).count())
 }
 
 #[library_benchmark(config = LibraryBenchmarkConfig::default().tool(Dhat::default()))]
-#[benches::count(args = [1_000], setup = dfa_with_words)]
+#[bench::count_1000(args = (1_000), setup = dfa_with_words)]
 fn dfa_reached_state((dfa, words): (DFA, Vec<String>)) -> u64 {
     black_box(
         words

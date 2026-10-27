@@ -24,9 +24,11 @@ fn chain(n: usize) -> DPA {
 // ---- normalization -----------------------------------------------------------------------------
 
 #[library_benchmark]
-#[benches::scrambled(args = [1_000, 4_000], setup = scrambled)]
-#[benches::scrambled_k4(args = [1_000], setup = scrambled_k4)]
-#[benches::chain(args = [1_000, 4_000], setup = chain)]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
+#[bench::scrambled_k4_1000(args = (1_000), setup = scrambled_k4)]
+#[bench::chain_1000(args = (1_000), setup = chain)]
+#[bench::chain_4000(args = (4_000), setup = chain)]
 fn normalized(dpa: DPA) -> usize {
     black_box(dpa.normalized().size())
 }
@@ -41,14 +43,17 @@ fn normalized_fixtures(dpas: Vec<FixtureDpa>) -> usize {
 // ---- complement --------------------------------------------------------------------------------
 
 #[library_benchmark]
-#[benches::scrambled(args = [1_000, 4_000], setup = scrambled)]
-#[benches::chain(args = [1_000, 4_000], setup = chain)]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
+#[bench::chain_1000(args = (1_000), setup = chain)]
+#[bench::chain_4000(args = (4_000), setup = chain)]
 fn complement(dpa: DPA) -> usize {
     black_box(dpa.complement().size())
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [1_000, 4_000], setup = scrambled)]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
 fn complement_without_normalizing(dpa: DPA) -> Option<usize> {
     black_box(dpa.complement_without_normalizing().map(|d| d.size()))
 }
@@ -67,15 +72,19 @@ fn complement_fixtures(dpas: Vec<FixtureDpa>) -> usize {
 // ---- emptiness and witnesses -------------------------------------------------------------------
 
 #[library_benchmark]
-#[benches::scrambled(args = [100, 400], setup = scrambled)]
-#[benches::chain(args = [100, 400], setup = chain)]
+#[bench::scrambled_100(args = (100), setup = scrambled)]
+#[bench::scrambled_400(args = (400), setup = scrambled)]
+#[bench::chain_100(args = (100), setup = chain)]
+#[bench::chain_400(args = (400), setup = chain)]
 fn accepted_word(dpa: DPA) -> bool {
     black_box(dpa.give_accepted_word().is_some())
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [100, 400], setup = scrambled)]
-#[benches::chain(args = [100, 400], setup = chain)]
+#[bench::scrambled_100(args = (100), setup = scrambled)]
+#[bench::scrambled_400(args = (400), setup = scrambled)]
+#[bench::chain_100(args = (100), setup = chain)]
+#[bench::chain_400(args = (400), setup = chain)]
 fn rejected_word(dpa: DPA) -> bool {
     black_box(dpa.give_rejected_word().is_some())
 }
@@ -97,8 +106,10 @@ fn witnesses_fixtures(dpas: Vec<FixtureDpa>) -> usize {
 
 // For every priority, a word whose run sees it infinitely often as the smallest one.
 #[library_benchmark]
-#[benches::scrambled(args = [100, 400], setup = scrambled)]
-#[benches::chain(args = [100, 400], setup = chain)]
+#[bench::scrambled_100(args = (100), setup = scrambled)]
+#[bench::scrambled_400(args = (400), setup = scrambled)]
+#[bench::chain_100(args = (100), setup = chain)]
+#[bench::chain_400(args = (400), setup = chain)]
 fn witness_colors(dpa: DPA) -> usize {
     black_box(
         dpa.colors()
@@ -125,28 +136,42 @@ fn with_complement(n: usize) -> (DPA, DPA) {
 }
 
 #[library_benchmark]
-#[benches::normalized(args = [25, 50, 100], setup = with_normalization)]
-#[benches::complement(args = [25, 50, 100], setup = with_complement)]
+#[bench::normalized_25(args = (25), setup = with_normalization)]
+#[bench::normalized_50(args = (50), setup = with_normalization)]
+#[bench::normalized_100(args = (100), setup = with_normalization)]
+#[bench::complement_25(args = (25), setup = with_complement)]
+#[bench::complement_50(args = (50), setup = with_complement)]
+#[bench::complement_100(args = (100), setup = with_complement)]
 fn language_equivalent((a, b): (DPA, DPA)) -> bool {
     black_box(a.language_equivalent(&b))
 }
 
 #[library_benchmark]
-#[benches::normalized(args = [25, 50, 100], setup = with_normalization)]
-#[benches::complement(args = [25, 50, 100], setup = with_complement)]
+#[bench::normalized_25(args = (25), setup = with_normalization)]
+#[bench::normalized_50(args = (50), setup = with_normalization)]
+#[bench::normalized_100(args = (100), setup = with_normalization)]
+#[bench::complement_25(args = (25), setup = with_complement)]
+#[bench::complement_50(args = (50), setup = with_complement)]
+#[bench::complement_100(args = (100), setup = with_complement)]
 fn included_in((a, b): (DPA, DPA)) -> bool {
     black_box(a.included_in(&b))
 }
 
 #[library_benchmark]
-#[benches::normalized(args = [25, 50, 100], setup = with_normalization)]
-#[benches::complement(args = [25, 50, 100], setup = with_complement)]
+#[bench::normalized_25(args = (25), setup = with_normalization)]
+#[bench::normalized_50(args = (50), setup = with_normalization)]
+#[bench::normalized_100(args = (100), setup = with_normalization)]
+#[bench::complement_25(args = (25), setup = with_complement)]
+#[bench::complement_50(args = (50), setup = with_complement)]
+#[bench::complement_100(args = (100), setup = with_complement)]
 fn witness_not_subset_of((a, b): (DPA, DPA)) -> bool {
     black_box(a.witness_not_subset_of(&b).is_some())
 }
 
 #[library_benchmark]
-#[benches::complement(args = [25, 50, 100], setup = with_complement)]
+#[bench::complement_25(args = (25), setup = with_complement)]
+#[bench::complement_50(args = (50), setup = with_complement)]
+#[bench::complement_100(args = (100), setup = with_complement)]
 fn witness_inequivalence((a, b): (DPA, DPA)) -> bool {
     black_box(a.witness_inequivalence(&b).is_some())
 }
@@ -154,28 +179,34 @@ fn witness_inequivalence((a, b): (DPA, DPA)) -> bool {
 // ---- structure ---------------------------------------------------------------------------------
 
 #[library_benchmark]
-#[benches::scrambled(args = [1_000, 4_000], setup = scrambled)]
-#[benches::chain(args = [1_000, 4_000], setup = chain)]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
+#[bench::chain_1000(args = (1_000), setup = chain)]
+#[bench::chain_4000(args = (4_000), setup = chain)]
 fn sccs(dpa: DPA) -> usize {
     black_box(dpa.sccs().size())
 }
 
 // The congruence that the learning algorithms ask for.
 #[library_benchmark]
-#[benches::scrambled(args = [8, 16], setup = scrambled)]
-#[benches::chain(args = [8, 16], setup = chain)]
+#[bench::scrambled_8(args = (8), setup = scrambled)]
+#[bench::scrambled_16(args = (16), setup = scrambled)]
+#[bench::chain_8(args = (8), setup = chain)]
+#[bench::chain_16(args = (16), setup = chain)]
 fn prefix_partition(dpa: DPA) -> usize {
     black_box(dpa.prefix_partition().len())
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [1_000, 4_000], setup = scrambled)]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
 fn collect_dpa(dpa: DPA) -> DPA {
     black_box(dpa.collect_dpa())
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [1_000, 4_000], setup = scrambled)]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
 fn map_edge_colors_collect(dpa: DPA) -> usize {
     black_box(dpa.map_edge_colors(|c| c / 2 as Int).collect_dts().size())
 }

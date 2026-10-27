@@ -39,8 +39,8 @@ Edges are labeled with alphabet *expressions*; a *transition* is the concrete (s
 
 Features: `default = ["hoa"]`; opt-in: `random`, `render` (SVG/PNG via `resvg`/`layout-rs`, experimental), `graphviz` (calls the `dot` executable, implies `render`). Text `dot` output is always available.
 
-- `benches/`: criterion benchmarks with deterministic generators in `benches/common`. `baseline.rs` is the set from #32 (problems P1 to P5 of #30); `scc.rs`, `operations.rs` and `dpa.rs` are the broader suites. Benchmarks must only use public API.
-- `tools/bench/`: separate crate (own `Cargo.lock`, not part of the library) `automata-bench`: runs benches for two revisions in alternating rounds (`compare`, `run`), keeps history in SQLite and renders a static dashboard, and as `serve` receives GitHub webhooks. `flake.nix` and `nix/` package it and provide the NixOS module. See `docs/benchmarking.md`.
+- `benches/`: deterministic benchmarks that count instructions with `gungraun` (needs `valgrind` and the matching `gungraun-runner`), one target per area (`scc`, `ts`, `runs`, `dfa`, `dpa`), plus `wallclock` (criterion, informational). Inputs come from `benches/common` (closed-form families, no randomness) and from the Spot generated HOA files in `benches/fixtures` (`scripts/generate_benchmark_fixtures.sh`). Benchmarks must only use public API.
+- `tools/bench/`: separate crate (own `Cargo.lock`, not part of the library) `automata-bench`: runs the benchmarks of one revision once (`run`, `compare`, `check-determinism`), keeps history in SQLite, and as `serve` receives GitHub webhooks and serves the read-only dashboard (htmx 4, inline SVG). `flake.nix` and `nix/` package it with valgrind and the runner and provide the NixOS module. See `docs/benchmarking.md`.
 
 ## Conventions
 
@@ -55,4 +55,4 @@ Features: `default = ["hoa"]`; opt-in: `random`, `render` (SVG/PNG via `resvg`/`
 - `Automaton` has seven generic parameters; type errors can be long.
 - Features must stay independent: code using an optional dependency needs the matching `#[cfg(feature = "...")]` (`scripts/check` builds with `--no-default-features` too).
 - Many `unwrap`/`expect` calls remain in library code (see issue #7 for the audit status).
-- Pull requests that are meant to change performance get the `performance` label; the benchmark service then comments before/after numbers. Benchmark names are tracked over time, so rename them only deliberately.
+- Pull requests that are meant to change performance get the `performance` label; the benchmark service then comments before/after instruction counts. Benchmark names are tracked over time, so rename them only deliberately.

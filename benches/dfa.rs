@@ -50,9 +50,12 @@ fn with_empty(n: usize) -> (DFA, DFA) {
 
 // Nothing to merge: the counter is minimal.
 #[library_benchmark]
-#[benches::minimal(args = [1_000, 4_000], setup = counter)]
-#[benches::redundant(args = [1_000, 4_000], setup = redundant)]
-#[benches::scrambled(args = [1_000, 4_000], setup = scrambled)]
+#[bench::minimal_1000(args = (1_000), setup = counter)]
+#[bench::minimal_4000(args = (4_000), setup = counter)]
+#[bench::redundant_1000(args = (1_000), setup = redundant)]
+#[bench::redundant_4000(args = (4_000), setup = redundant)]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
 fn minimize(dfa: DFA) -> usize {
     black_box(dfa.minimize().size())
 }
@@ -66,7 +69,8 @@ fn moore_with_edge_colors(n: usize) -> MooreMachine<CharAlphabet, bool, u32> {
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [1_000, 4_000], setup = moore_with_edge_colors)]
+#[bench::scrambled_1000(args = (1_000), setup = moore_with_edge_colors)]
+#[bench::scrambled_4000(args = (4_000), setup = moore_with_edge_colors)]
 fn minimize_moore_with_edge_colors(mm: MooreMachine<CharAlphabet, bool, u32>) -> usize {
     black_box(mm.minimize().size())
 }
@@ -74,25 +78,29 @@ fn minimize_moore_with_edge_colors(mm: MooreMachine<CharAlphabet, bool, u32>) ->
 // ---- boolean operations ------------------------------------------------------------------------
 
 #[library_benchmark]
-#[benches::scrambled(args = [100, 200], setup = two_scrambled)]
+#[bench::scrambled_100(args = (100), setup = two_scrambled)]
+#[bench::scrambled_200(args = (200), setup = two_scrambled)]
 fn union((a, b): (DFA, DFA)) -> usize {
     black_box(a.union(&b).size())
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [100, 200], setup = two_scrambled)]
+#[bench::scrambled_100(args = (100), setup = two_scrambled)]
+#[bench::scrambled_200(args = (200), setup = two_scrambled)]
 fn intersection((a, b): (DFA, DFA)) -> usize {
     black_box(a.intersection(&b).size())
 }
 
 #[library_benchmark]
-#[benches::empty(args = [100, 200], setup = with_empty)]
+#[bench::empty_100(args = (100), setup = with_empty)]
+#[bench::empty_200(args = (200), setup = with_empty)]
 fn intersection_is_empty((a, b): (DFA, DFA)) -> bool {
     black_box(a.intersection_is_empty(&b))
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [1_000, 4_000], setup = scrambled)]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
 fn complement(dfa: DFA) -> usize {
     black_box(dfa.map_state_colors(|c| !c).collect_dfa().size())
 }
@@ -108,22 +116,28 @@ fn far(n: usize) -> DFA {
 
 // Finding a word in an automaton that accepts nothing visits all reachable states.
 #[library_benchmark]
-#[benches::empty(args = [1_000, 4_000], setup = empty)]
-#[benches::far(args = [1_000, 4_000], setup = far)]
+#[bench::empty_1000(args = (1_000), setup = empty)]
+#[bench::empty_4000(args = (4_000), setup = empty)]
+#[bench::far_1000(args = (1_000), setup = far)]
+#[bench::far_4000(args = (4_000), setup = far)]
 fn give_word(dfa: DFA) -> bool {
     black_box(dfa.give_word().is_some())
 }
 
 #[library_benchmark]
-#[benches::empty(args = [1_000, 4_000], setup = empty)]
+#[bench::empty_1000(args = (1_000), setup = empty)]
+#[bench::empty_4000(args = (4_000), setup = empty)]
 fn is_empty_language(dfa: DFA) -> bool {
     black_box(dfa.is_empty_language())
 }
 
 #[library_benchmark]
-#[benches::minimized(args = [100, 400], setup = with_minimized)]
-#[benches::deep_difference(args = [100, 400], setup = deep_difference)]
-#[benches::different(args = [100, 400], setup = two_scrambled)]
+#[bench::minimized_100(args = (100), setup = with_minimized)]
+#[bench::minimized_400(args = (400), setup = with_minimized)]
+#[bench::deep_difference_100(args = (100), setup = deep_difference)]
+#[bench::deep_difference_400(args = (400), setup = deep_difference)]
+#[bench::different_100(args = (100), setup = two_scrambled)]
+#[bench::different_400(args = (400), setup = two_scrambled)]
 fn equivalent((a, b): (DFA, DFA)) -> bool {
     black_box(a.equivalent(&b))
 }
@@ -138,7 +152,7 @@ fn dfa_and_words(n: usize) -> (DFA, Vec<Vec<char>>) {
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [1_000], setup = dfa_and_words)]
+#[bench::scrambled_1000(args = (1_000), setup = dfa_and_words)]
 fn accepts_many_words((dfa, words): (DFA, Vec<Vec<char>>)) -> usize {
     black_box(words.iter().filter(|w| dfa.accepts(w.as_slice())).count())
 }

@@ -88,8 +88,8 @@ fn builder_with_edges((n, _k, edges): (usize, usize, Vec<(u32, char, u32)>)) -> 
 // ---- lookups ---------------------------------------------------------------------------------
 
 #[library_benchmark]
-#[benches::scrambled(args = [2_000], setup = scrambled_k2)]
-#[benches::scrambled_k8(args = [2_000], setup = scrambled_k8)]
+#[bench::scrambled_2000(args = (2_000), setup = scrambled_k2)]
+#[bench::scrambled_k8_2000(args = (2_000), setup = scrambled_k8)]
 fn successor_index_all_pairs((ts, k): (Dts, usize)) -> u64 {
     let symbols = common::symbols(k);
     let mut sum = 0u64;
@@ -102,8 +102,8 @@ fn successor_index_all_pairs((ts, k): (Dts, usize)) -> u64 {
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [2_000], setup = scrambled_k2)]
-#[benches::scrambled_k8(args = [2_000], setup = scrambled_k8)]
+#[bench::scrambled_2000(args = (2_000), setup = scrambled_k2)]
+#[bench::scrambled_k8_2000(args = (2_000), setup = scrambled_k8)]
 fn edges_from_all_states((ts, _k): (Dts, usize)) -> usize {
     black_box(
         ts.state_indices()
@@ -142,19 +142,22 @@ fn matching_product_successor_index(
 // ---- traversal -------------------------------------------------------------------------------
 
 #[library_benchmark]
-#[benches::scrambled(args = [2_000, 8_000], setup = scrambled)]
+#[bench::scrambled_2000(args = (2_000), setup = scrambled)]
+#[bench::scrambled_8000(args = (8_000), setup = scrambled)]
 fn reachable_states(ts: Dts) -> usize {
     black_box(ts.reachable_state_indices_from(0).count())
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [2_000, 8_000], setup = dfa)]
+#[bench::scrambled_2000(args = (2_000), setup = dfa)]
+#[bench::scrambled_8000(args = (8_000), setup = dfa)]
 fn minimal_representatives(ts: automata::automaton::DFA) -> usize {
     black_box(ts.minimal_representatives_iter().count())
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [2_000, 8_000], setup = scrambled)]
+#[bench::scrambled_2000(args = (2_000), setup = scrambled)]
+#[bench::scrambled_8000(args = (8_000), setup = scrambled)]
 fn predecessors_of_all_states(ts: Dts) -> usize {
     black_box(
         ts.state_indices()
@@ -166,31 +169,34 @@ fn predecessors_of_all_states(ts: Dts) -> usize {
 // ---- collecting and mapping --------------------------------------------------------------------
 
 #[library_benchmark]
-#[benches::scrambled(args = [10_000, 40_000], setup = scrambled)]
+#[bench::scrambled_10000(args = (10_000), setup = scrambled)]
+#[bench::scrambled_40000(args = (40_000), setup = scrambled)]
 fn clone(ts: Dts) -> Dts {
     black_box(ts.clone())
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [10_000, 40_000], setup = scrambled)]
+#[bench::scrambled_10000(args = (10_000), setup = scrambled)]
+#[bench::scrambled_40000(args = (40_000), setup = scrambled)]
 fn collect_dts(ts: Dts) -> Dts {
     black_box(ts.collect_dts())
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [10_000, 40_000], setup = scrambled)]
+#[bench::scrambled_10000(args = (10_000), setup = scrambled)]
+#[bench::scrambled_40000(args = (40_000), setup = scrambled)]
 fn map_edge_colors_collect(ts: Dts) -> DTS<CharAlphabet, bool, Int> {
     black_box(ts.map_edge_colors(|_| 0 as Int).collect_dts())
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [10_000], setup = scrambled)]
+#[bench::scrambled_10000(args = (10_000), setup = scrambled)]
 fn erase_state_colors_collect(ts: Dts) -> DTS<CharAlphabet, Void, Void> {
     black_box(ts.erase_state_colors().collect_dts())
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [10_000], setup = scrambled)]
+#[bench::scrambled_10000(args = (10_000), setup = scrambled)]
 fn into_dfa(ts: Dts) -> automata::automaton::DFA {
     black_box(ts.into_dfa_with_initial(0))
 }
@@ -198,7 +204,8 @@ fn into_dfa(ts: Dts) -> automata::automaton::DFA {
 // ---- shrinking ---------------------------------------------------------------------------------
 
 #[library_benchmark]
-#[benches::scrambled(args = [10_000, 40_000], setup = scrambled)]
+#[bench::scrambled_10000(args = (10_000), setup = scrambled)]
+#[bench::scrambled_40000(args = (40_000), setup = scrambled)]
 fn remove_edges_from_matching(mut ts: Dts) -> Dts {
     let n = ts.size();
     for i in 0..1_000 {
@@ -208,7 +215,8 @@ fn remove_edges_from_matching(mut ts: Dts) -> Dts {
 }
 
 #[library_benchmark]
-#[benches::scrambled(args = [10_000, 40_000], setup = scrambled)]
+#[bench::scrambled_10000(args = (10_000), setup = scrambled)]
+#[bench::scrambled_40000(args = (40_000), setup = scrambled)]
 fn remove_state(mut ts: Dts) -> Dts {
     let n = ts.size();
     for i in 0..1_000 {
@@ -220,7 +228,9 @@ fn remove_state(mut ts: Dts) -> Dts {
 // ---- subset construction ---------------------------------------------------------------------
 
 #[library_benchmark]
-#[benches::nth_from_end(args = [8, 10, 12], setup = nth_from_end)]
+#[bench::nth_from_end_8(args = (8), setup = nth_from_end)]
+#[bench::nth_from_end_10(args = (10), setup = nth_from_end)]
+#[bench::nth_from_end_12(args = (12), setup = nth_from_end)]
 fn subset_construction(nts: automata::NTS<CharAlphabet, bool, Void>) -> usize {
     black_box(
         nts.with_initial(0)
