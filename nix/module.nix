@@ -204,7 +204,8 @@ in
         ProtectClock = true;
         RestrictSUIDSGID = true;
         RestrictNamespaces = true;
-        LockPersonality = true;
+        # gungraun runs benchmarks through `setarch`, which needs the personality syscall
+        LockPersonality = false;
         RestrictAddressFamilies = [
           "AF_INET"
           "AF_INET6"

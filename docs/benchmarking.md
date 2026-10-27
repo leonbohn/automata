@@ -13,7 +13,7 @@ There are three layers:
 2. **`automata-bench`** (`tools/bench`): runs the benchmarks of one revision, or of two revisions to
    compare them.
 3. **A service** (`automata-bench serve`, NixOS module in `flake.nix`) that does this on a dedicated
-   machine for every commit on `main` and for pull requests labelled `performance`, keeps the history in
+   machine for every push to `main` and for pull requests labelled `performance`, keeps the history in
    SQLite and serves a dashboard.
 
 ## The benchmarks
@@ -94,7 +94,7 @@ single benchmark below a few seconds under valgrind.
 
 Label a pull request that is meant to change performance with `performance`. The service then
 
-1. takes the measurement of the merge base from its history (every commit of `main` is measured), and
+1. takes the measurement of the merge base from its history (every push to `main` is measured), and
    benchmarks it only if it is missing,
 2. benchmarks the head of the pull request once,
 3. stores everything in its database, and
@@ -103,8 +103,8 @@ Label a pull request that is meant to change performance with `performance`. The
    merge on its own.
 
 Pushing to a labelled pull request runs it again; removing the label or closing the pull request
-cancels queued runs. Every commit of a push to `main` is benchmarked, oldest first, which gives one point
-per commit in the history.
+cancels queued runs. Only the head of a push to `main` is benchmarked, so a merged pull request gives one point in the
+history (its merge commit) and its intermediate commits give none.
 
 ### Trust
 

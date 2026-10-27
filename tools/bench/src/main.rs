@@ -90,7 +90,7 @@ enum Command {
         engine: EngineArgs,
     },
     /// Serve the dashboard, receive GitHub webhooks and run benchmarks for labelled pull requests
-    /// and for every commit of `main`.
+    /// and for every push to `main`.
     Serve {
         #[arg(long, env = "AUTOMATA_BENCH_LISTEN", default_value = "127.0.0.1:8742")]
         listen: String,
