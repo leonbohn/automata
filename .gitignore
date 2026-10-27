@@ -19,3 +19,7 @@ samples/*
 .venv
 .perf
 omega-learning-tasks/data
+
+# Nix
+result
+result-*

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>automata benchmarks</title>
+<style>
+  :root { color-scheme: light dark; --fg: #222; --bg: #fff; --mut: #777; --line: #ccc; --acc: #2a6fdb; --bad: #c62828; --good: #2e7d32; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #ddd; --bg: #151515; --mut: #999; --line: #333; --acc: #6ea8ff; --bad: #ef5350; --good: #66bb6a; } }
+  body { font: 15px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); max-width: 70rem; margin: 2rem auto; padding: 0 1rem; }
+  h1, h2, h3 { font-weight: 600; } h3 { margin: 1.5rem 0 .3rem; font-size: 1rem; }
+  table { border-collapse: collapse; width: 100%; } td, th { padding: .2rem .6rem; border-bottom: 1px solid var(--line); text-align: right; }
+  td:first-child, th:first-child { text-align: left; font-family: ui-monospace, monospace; font-size: .85rem; }
+  .mut { color: var(--mut); } .bad { color: var(--bad); } .good { color: var(--good); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: 1rem; }
+  .card { border: 1px solid var(--line); border-radius: 6px; padding: .5rem .7rem; }
+  .card b { font: .8rem ui-monospace, monospace; word-break: break-all; }
+  svg { width: 100%; height: 7rem; display: block; } svg .area { fill: var(--acc); opacity: .15; } svg .line { stroke: var(--acc); fill: none; stroke-width: 1.5; } svg circle { fill: var(--acc); }
+  details { margin: .3rem 0; } summary { cursor: pointer; }
+  code { font-size: .85em; }
+</style>
+</head>
+<body>
+<h1>automata benchmarks</h1>
+<p class="mut" id="meta"></p>
+<div id="queue"></div>
+<h2>Pull requests</h2>
+<div id="prs"></div>
+<h2>History of <code>main</code></h2>
+<p class="mut">Mean time per commit with the range over all rounds. Each commit is measured once, so compare neighbours with care.</p>
+<div id="history"></div>
+<script>
+const DATA = /*DATA*/null;
+const REPO = DATA.repo, el = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function fmt(ns) { for (const [u, s] of [['s', 1e9], ['ms', 1e6], ['µs', 1e3]]) if (ns >= s) return (ns / s).toFixed(2) + ' ' + u; return ns.toFixed(0) + ' ns'; }
+const day = (t) => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
+const sha = (s) => `<a href="https://github.com/${REPO}/commit/${s}">${s.slice(0, 8)}</a>`;
+
+el('meta').textContent = `Updated ${day(DATA.generated)} UTC` + (DATA.env ? ` · ${DATA.env.cpu} · ${DATA.env.rustc}` + (DATA.env.pinned_cpu ? ` · pinned to cpu ${DATA.env.pinned_cpu}` : '') : '');
+if (DATA.queue.length) el('queue').innerHTML = '<p>Queued or running: ' + DATA.queue.map(esc).join(', ') + '</p>';
+
+function prTable(rows) {
+  const cell = (e) => e ? fmt(e.mean_ns) : '–';
+  return '<table><tr><th>benchmark</th><th>base</th><th>head</th><th>change</th></tr>' + rows.map((r) => {
+    const cls = r.verdict === 'regression' ? 'bad' : r.verdict === 'improvement' ? 'good' : 'mut';
+    const ch = r.change == null ? r.verdict : (r.change >= 0 ? '+' : '') + r.change.toFixed(1) + ' %';
+    return `<tr><td>${esc(r.name)}</td><td>${cell(r.base)}</td><td>${cell(r.head)}</td><td class="${cls}">${ch}</td></tr>`;
+  }).join('') + '</table>';
+}
+el('prs').innerHTML = DATA.prs.length ? DATA.prs.map((p) => {
+  const n = (v) => p.rows.filter((r) => r.verdict === v).length;
+  const sum = p.status === 'done' ? `<span class="bad">${n('regression')} regressions</span>, <span class="good">${n('improvement')} improvements</span>, ${n('unchanged')} unchanged, ${n('new')} new` : esc(p.status) + (p.error ? ': ' + esc(p.error.split('\n')[0]) : '');
+  return `<details id="run-${p.id}"><summary><a href="https://github.com/${REPO}/pull/${p.pr}">#${p.pr}</a> ${esc(p.title)} · ${sha(p.head)} · ${day(p.time)} · ${sum}</summary>${p.rows.length ? prTable(p.rows) : ''}</details>`;
+}).join('') : '<p class="mut">No pull request has been benchmarked yet.</p>';
+
+function chart(points) {
+  const W = 300, H = 100, P = 4;
+  const t = points.map((p, i) => i), n = Math.max(1, points.length - 1);
+  const lo = Math.min(...points.map((p) => p.min)), hi = Math.max(...points.map((p) => p.max)), span = hi - lo || hi || 1;
+  const x = (i) => P + (i / n) * (W - 2 * P), y = (v) => H - P - ((v - lo) / span) * (H - 2 * P);
+  const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.mean).toFixed(1)}`).join('');
+  const area = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.max).toFixed(1)}`).join('') + points.slice().reverse().map((p, i) => `L${x(points.length - 1 - i).toFixed(1)},${y(p.min).toFixed(1)}`).join('') + 'Z';
+  const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.mean).toFixed(1)}" r="2.5"><title>${p.sha.slice(0, 8)} · ${day(p.time)} · ${fmt(p.mean)}</title></circle>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path class="area" d="${area}"/><path class="line" d="${line}" vector-effect="non-scaling-stroke"/>${dots}</svg>`;
+}
+const names = Object.keys(DATA.benches);
+const groups = {};
+for (const name of names) (groups[name.split('/').slice(0, -1).join('/')] ||= []).push(name);
+el('history').innerHTML = names.length ? Object.entries(groups).map(([g, ns]) => `<h3>${esc(g)}</h3><div class="grid">` + ns.map((name) => {
+  const pts = DATA.benches[name], last = pts[pts.length - 1], prev = pts[pts.length - 2];
+  const d = prev ? ((last.mean / prev.mean - 1) * 100) : null;
+  const dtxt = d == null ? '' : ` <span class="${d > 10 ? 'bad' : d < -10 ? 'good' : 'mut'}">${d >= 0 ? '+' : ''}${d.toFixed(1)} %</span>`;
+  return `<div class="card"><b>${esc(name.split('/').pop())}</b><br>${fmt(last.mean)}${dtxt} <span class="mut">${sha(last.sha)}</span>${chart(pts)}</div>`;
+}).join('') + '</div>').join('') : '<p class="mut">No results for <code>main</code> yet.</p>';
+</script>
+</body>
+</html>

@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Dottable::dot_initial_state`: the initial state is marked in the DOT output by an arrow without source (an `init` node with an edge into the initial state). Implemented for DFAs, right congruences, Moore and Mealy machines and DPAs.
 - `RenderError::DotNotFound` and `RenderError::DotFailed { status, stderr }` for problems with the `dot` executable.
 - `examples/dot.rs` takes `--show` and `--show-graphviz` to open the rendered automaton in a viewer.
+- Baseline benchmarks (`cargo bench --bench baseline`) for the performance problems tracked in the 0.2 redesign: subset construction, `DPA::normalized`, edge removal, collecting, products, run throughput, edge insertion and lookup.
+- Benchmark tracking (see `docs/benchmarking.md`): `tools/bench` runs and compares benchmarks, a Nix flake provides it and a NixOS module that benchmarks `main` and pull requests labelled `performance` on a dedicated machine.
 - Criterion benchmarks (`cargo bench`) for SCC decompositions on several graph shapes and for common operations (reachability, minimization, products, subset construction).
 - README: table of the rendering functions, a recommendation of `graphviz`, and the prerequisites; crates.io and docs.rs badges.
 
