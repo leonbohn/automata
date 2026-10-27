@@ -2,21 +2,43 @@ use std::{cell::RefCell, fmt::Debug};
 
 use crate::ts::{
     Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, IsEdge, Pointed, StateIndex,
-    SymbolOf, TransitionSystem, edge::TransitionOwnedColor,
+    TransitionSystem, edge::TransitionOwnedColor,
 };
 use crate::{
     alphabet::{Alphabet, Matcher},
     math,
-    math::OrderedSet,
 };
 use itertools::Itertools;
 
-#[derive(Clone, Eq)]
-pub struct StateSet<Ts: TransitionSystem>(OrderedSet<Ts::StateIndex>);
+/// A set of states, stored as a sorted, duplicate-free vector of state indices.
+pub struct StateSet<Ts: TransitionSystem>(Vec<Ts::StateIndex>);
+
+impl<Ts: TransitionSystem> Clone for StateSet<Ts> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<Ts: TransitionSystem> Eq for StateSet<Ts> {}
+
+impl<Ts: TransitionSystem> std::hash::Hash for StateSet<Ts> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state)
+    }
+}
+
+impl<Ts: TransitionSystem> StateSet<Ts> {
+    /// Restores the invariant that the underlying vector is sorted and duplicate-free.
+    fn normalize(&mut self) {
+        self.0.sort_unstable();
+        self.0.dedup();
+    }
+}
 
 impl<Ts: TransitionSystem> Extend<Ts::StateIndex> for StateSet<Ts> {
     fn extend<T: IntoIterator<Item = Ts::StateIndex>>(&mut self, iter: T) {
-        self.0.extend(iter)
+        self.0.extend(iter);
+        self.normalize();
     }
 }
 
@@ -28,12 +50,12 @@ impl<Ts: TransitionSystem> PartialEq for StateSet<Ts> {
 
 impl<Ts: TransitionSystem> Default for StateSet<Ts> {
     fn default() -> Self {
-        Self(OrderedSet::default())
+        Self(Vec::new())
     }
 }
 
 impl<Ts: TransitionSystem> IntoIterator for StateSet<Ts> {
-    type IntoIter = math::ordered_set::IntoIter<Ts::StateIndex>;
+    type IntoIter = std::vec::IntoIter<Ts::StateIndex>;
     type Item = Ts::StateIndex;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -42,13 +64,15 @@ impl<Ts: TransitionSystem> IntoIterator for StateSet<Ts> {
 
 impl<Ts: TransitionSystem> FromIterator<Ts::StateIndex> for StateSet<Ts> {
     fn from_iter<T: IntoIterator<Item = Ts::StateIndex>>(iter: T) -> Self {
-        Self(OrderedSet::from_iter(iter))
+        let mut set = Self(iter.into_iter().collect());
+        set.normalize();
+        set
     }
 }
 
 impl<Ts: TransitionSystem> StateSet<Ts> {
     pub fn singleton(q: Ts::StateIndex) -> Self {
-        Self(OrderedSet::from_iter([q]))
+        Self(vec![q])
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &'_ Ts::StateIndex> + '_ {
@@ -75,8 +99,12 @@ impl<Ts: TransitionSystem> std::fmt::Debug for StateSet<Ts> {
 #[derive(Clone)]
 pub struct SubsetConstruction<Ts: TransitionSystem> {
     ts: Ts,
+    /// Maps the id of a subset to the subset itself.
     states: RefCell<Vec<StateSet<Ts>>>,
-    expressions: math::OrderedMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
+    /// Maps a subset to its id, the inverse of `states`.
+    ids: RefCell<math::Map<StateSet<Ts>, usize>>,
+    /// The expression of each symbol of the alphabet, computed once.
+    expressions: Vec<EdgeExpression<Ts>>,
 }
 
 impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
@@ -85,7 +113,7 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
         source: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let (colorset, stateset): (Vec<Ts::EdgeColor>, StateSet<Ts>) = self
+        let (colorset, mut stateset): (Vec<Ts::EdgeColor>, StateSet<Ts>) = self
             .states
             .borrow()
             .get(source)?
@@ -100,18 +128,21 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
                 })
             })
             .unzip();
+        stateset.normalize();
         let expression = self
             .expressions
-            .values()
+            .iter()
             .find(|e| matcher.matches(e))
             .unwrap();
 
-        if let Some(pos) = self.states.borrow().iter().position(|s| stateset.eq(s)) {
-            return Some(TransitionOwnedColor::new(source, expression, colorset, pos));
+        if let Some(&id) = self.ids.borrow().get(&stateset) {
+            return Some(TransitionOwnedColor::new(source, expression, colorset, id));
         }
 
-        let id = self.states.borrow().len();
-        self.states.borrow_mut().push(stateset);
+        let mut states = self.states.borrow_mut();
+        let id = states.len();
+        self.ids.borrow_mut().insert(stateset.clone(), id);
+        states.push(stateset);
         Some(TransitionOwnedColor::new(source, expression, colorset, id))
     }
 }
@@ -195,19 +226,20 @@ where
 impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
     /// Creates a new subset construction from the given transition system starting from the given index.
     pub fn new_from(ts: Ts, idx: Ts::StateIndex) -> Self {
-        Self {
-            expressions: ts.alphabet().expression_map(),
-            states: vec![StateSet::singleton(idx)].into(),
-            ts,
-        }
+        Self::from_initial(ts, StateSet::singleton(idx))
     }
 
     /// Creates a new subset construction from the given transition system starting from the given
     /// indices.
     pub fn new<I: IntoIterator<Item = Ts::StateIndex>>(ts: Ts, iter: I) -> Self {
+        Self::from_initial(ts, StateSet::from_iter(iter))
+    }
+
+    fn from_initial(ts: Ts, initial: StateSet<Ts>) -> Self {
         Self {
-            expressions: ts.alphabet().expression_map(),
-            states: vec![StateSet::from_iter(iter)].into(),
+            expressions: ts.alphabet().expression_map().into_values().collect(),
+            ids: math::Map::from_iter([(initial.clone(), 0)]).into(),
+            states: vec![initial].into(),
             ts,
         }
     }
