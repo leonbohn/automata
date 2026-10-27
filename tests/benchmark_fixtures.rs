@@ -24,7 +24,7 @@ fn all_fixtures_are_deterministic_parity_automata() {
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("benches/fixtures"),
         &mut files,
     );
-    assert!(files.len() > 50, "only {} fixtures found", files.len());
+    assert!(files.len() >= 22, "only {} fixtures found", files.len());
     for file in files {
         let text = std::fs::read_to_string(&file).expect("readable fixture");
         let automaton = HoaString::from(text)

@@ -70,7 +70,7 @@ once; each is executed once. A revision uses *its own* `benches/`; benchmarks th
 show up as `new` or `removed`. A change is reported if the instruction count differs by more than the
 threshold (2 % by default) and by at least 1000 instructions.
 
-The whole suite takes about SUITE_MINUTES minutes on the development machine, most of it spent
+The whole suite takes about 9 minutes on the development machine (build and wall-clock target included), most of it spent
 parsing fixtures under valgrind.
 
 ### Adding a benchmark

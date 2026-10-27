@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Dottable::dot_initial_state`: the initial state is marked in the DOT output by an arrow without source (an `init` node with an edge into the initial state). Implemented for DFAs, right congruences, Moore and Mealy machines and DPAs.
 - `RenderError::DotNotFound` and `RenderError::DotFailed { status, stderr }` for problems with the `dot` executable.
 - `examples/dot.rs` takes `--show` and `--show-graphviz` to open the rendered automaton in a viewer.
-- Deterministic benchmarks that count instructions with gungraun (`scc`, `ts`, `runs`, `dfa`, `dpa`; `cargo bench`, needs valgrind) on closed-form inputs and on 72 DPAs generated with Spot (`benches/fixtures`, `scripts/generate_benchmark_fixtures.sh`), and a criterion target for wall-clock times. There is no randomness in the benchmarks.
+- Deterministic benchmarks that count instructions with gungraun (`scc`, `ts`, `runs`, `dfa`, `dpa`; `cargo bench`, needs valgrind) on closed-form inputs and on 22 DPAs generated with Spot (`benches/fixtures`, `scripts/generate_benchmark_fixtures.sh`), and a criterion target for wall-clock times. There is no randomness in the benchmarks.
 - Benchmark tracking (see `docs/benchmarking.md`): `tools/bench` runs and compares the benchmarks (one execution per revision, 2 % threshold on instruction counts), a Nix flake provides it and a NixOS module that benchmarks `main` and pull requests labelled `performance` on a dedicated machine.
 - README: table of the rendering functions, a recommendation of `graphviz`, and the prerequisites; crates.io and docs.rs badges.
 

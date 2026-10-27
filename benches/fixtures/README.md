@@ -21,9 +21,9 @@ removed from the files by the script.
 
 | Directory | How it was obtained | Files | States |
 |---|---|---|---|
-| `ltl/` | Formulas from `genltl` (parametrised families for n = 1 to 3 and the first four larger automata of each pattern collection), translated with `ltl2tgba --deterministic --generic`, then converted with `autfilt` | 51 | 2 to 111 |
-| `random/` | `randaut --deterministic --colored --acceptance='parity min even P'` with fixed seeds, non-empty languages only. The seed is part of the file name. | 13 | 16 to 256 |
-| `hard/` | `genaut --m-nba`, `--l-nba`, `--ks-nca`, `--l-dsa` for n = 2 and 3, converted to parity with `autfilt`. These force many states and priorities. | 8 | 16 to 726 |
+| `ltl/` | Formulas from `genltl` (parametrised families for n = 1 to 3 and the first four larger automata of each pattern collection), translated with `ltl2tgba --deterministic --generic`, then converted with `autfilt` | 15 | 2 to 25 |
+| `random/` | `randaut --deterministic --colored --acceptance='parity min even P'` with fixed seeds, non-empty languages only. The seed is part of the file name. | 4 | 16 to 256 |
+| `hard/` | `genaut --m-nba`, `--l-nba`, `--ks-nca`, `--l-dsa` for n = 2 and 3, converted to parity with `autfilt`. These force many states and priorities. | 3 | 29 to 121 |
 
 File names say what they are: `ltl/gh-r-2.hoa` is `genltl --gh-r=2`,
 `random/n64-a2-p4-s1.hoa` has 64 states, 2 atomic propositions, 4 priorities and seed 1. The
@@ -33,11 +33,10 @@ under valgrind, which is slow.
 
 References for the formula families are in `genltl --help` and the Spot documentation.
 
-## Which files the benchmarks use
+## Which files are kept
 
-Parsing HOA is slow (about 45 µs per edge, and a benchmark runs under valgrind, which is roughly
-100 times slower), and every benchmark runs in its own process and parses its inputs again. The
-benchmarks therefore use two selections, `LTL` and `SYNTHETIC` in `benches/common/mod.rs`, of
-15 and 7 files. The other files are exercised by `tests/benchmark_fixtures.rs`, which checks that all
-of them can be read, and are there for benchmarks that want other shapes (larger, or with more
-priorities, such as `hard/ks-nca-3` and `ltl/pps-arbiter-3`).
+The script generates a superset and then keeps only the files the benchmarks read (the lists `LTL`
+and `SYNTHETIC` in `benches/common/mod.rs`, which must match the list in the script). Parsing HOA is
+slow (about 45 µs per edge, and benchmarks run under valgrind, roughly 100 times slower), and every
+benchmark parses its inputs again, so the selection is small and avoids automata with many atomic
+propositions. `tests/benchmark_fixtures.rs` checks that all files can be read.

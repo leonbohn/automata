@@ -139,6 +139,38 @@ for case in "${hard_cases[@]}"; do
   done
 done
 
+# Everything above is a superset. The benchmarks only read the fixtures listed here (the
+# selections `LTL` and `SYNTHETIC` in benches/common/mod.rs, keep both in sync), because parsing
+# HOA is slow under valgrind. All others are deleted.
+used=(
+  "hard/l-dsa-3"
+  "hard/l-nba-2"
+  "hard/m-nba-3"
+  "ltl/and-gf-3"
+  "ltl/eh-patterns-0"
+  "ltl/gf-equiv-3"
+  "ltl/gf-implies-3"
+  "ltl/gh-q-3"
+  "ltl/gh-r-3"
+  "ltl/go-theta-3"
+  "ltl/lily-patterns-1"
+  "ltl/ms-phi-r-1"
+  "ltl/ms-phi-s-1"
+  "ltl/rv-counter-3"
+  "ltl/sb-patterns-0"
+  "ltl/sejk-k-2"
+  "ltl/tv-uu-3"
+  "ltl/u-left-3"
+  "random/n128-a2-p6-s1"
+  "random/n16-a1-p3-s1"
+  "random/n256-a2-p8-s1"
+  "random/n64-a2-p4-s1"
+)
+find "$OUT" -name '*.hoa' | while read -r file; do
+  name=${file#"$OUT"/}; name=${name%.hoa}
+  printf '%s\n' "${used[@]}" | grep -qx "$name" || rm "$file"
+done
+
 # The HOA parser (hoars) does not know some of the (purely informative) properties that Spot
 # writes, so they are removed from the files.
 find "$OUT" -name '*.hoa' -exec sed -i -E 's/ (stutter-sensitive|terminal|very-weak|weak|inherently-weak)\b//g' {} +
