@@ -25,7 +25,7 @@ struct Cli {
 #[derive(Args, Clone)]
 struct EngineArgs {
     /// Bench targets to run (those a revision does not define are skipped).
-    #[arg(long = "bench", default_values_t = ["baseline".to_string(), "scc".into(), "operations".into()])]
+    #[arg(long = "bench", default_values_t = ["baseline".to_string(), "scc".into(), "operations".into(), "dpa".into()])]
     benches: Vec<String>,
     /// Arguments passed to criterion.
     #[arg(long = "criterion-arg", default_values_t = ["--quick".to_string()], allow_hyphen_values = true)]

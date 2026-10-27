@@ -18,7 +18,7 @@ use std::hint::black_box;
 fn subset_construction(c: &mut Criterion) {
     let mut group = c.benchmark_group("baseline/subset_construction");
     group.sample_size(10);
-    for n in [8, 10, 12, 13, 14] {
+    for n in [8, 10, 12, 13] {
         let nts = common::nth_from_end(n);
         group.bench_with_input(BenchmarkId::from_parameter(n), &nts, |b, nts| {
             b.iter(|| {
@@ -74,7 +74,7 @@ fn edge_removal(c: &mut Criterion) {
 fn collect(c: &mut Criterion) {
     let mut group = c.benchmark_group("baseline/collect");
     group.sample_size(10);
-    for n in [100_000, 1_000_000] {
+    for n in [100_000, 400_000] {
         let ts = common::random_dts(n, 9);
         group.bench_with_input(BenchmarkId::new("clone", n), &ts, |b, ts| {
             b.iter(|| black_box(ts.clone()))

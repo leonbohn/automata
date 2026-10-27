@@ -4,8 +4,8 @@ Numbers from a single machine say little without something to compare against. T
 has three layers:
 
 1. **Criterion benchmarks** in `benches/`. They use deterministic generators (`benches/common`) and only
-   public API. `baseline.rs` is the set from #32 (the problems P1 to P5 of #30), `scc.rs` and
-   `operations.rs` are broader suites.
+   public API. `baseline.rs` is the set from #32 (the problems P1 to P5 of #30), `scc.rs`, `operations.rs` and
+   `dpa.rs` (parity automata) are broader suites.
 2. **`automata-bench`** (`tools/bench`): measures *two revisions against each other, on the same machine,
    in alternating rounds*, and reports the difference.
 3. **A service** (`automata-bench serve`, NixOS module in `flake.nix`) that does this on a dedicated machine
