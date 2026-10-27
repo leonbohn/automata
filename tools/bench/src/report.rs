@@ -14,7 +14,6 @@ pub fn comment(
     base: &str,
     env: &EnvInfo,
     threshold: f64,
-    rounds: u32,
     dashboard: &str,
 ) -> String {
     let mut out = format!(
@@ -38,8 +37,9 @@ pub fn comment(
         compare::table(rows)
     );
     out += &format!(
-        "<sub>{rounds} alternating rounds on {} ({}), {}. A change counts if it is above {threshold} % \
-         and outside the spread of all rounds. [History and details]({dashboard})</sub>\n",
+        "<sub>Instruction counts under valgrind on {} ({}), {}, one execution per revision. \
+         A change counts if it is above {threshold} %. Wall-clock times are on the \
+         [dashboard]({dashboard}).</sub>\n",
         env.host, env.cpu, env.rustc
     );
     out

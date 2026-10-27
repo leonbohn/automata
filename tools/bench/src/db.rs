@@ -1,7 +1,7 @@
 //! SQLite storage for runs and their results.
 
 use crate::compare::{self, Row};
-use crate::model::{EnvInfo, Estimate, Results, now};
+use crate::model::{EnvInfo, Measured, Metric, Metrics, Results, WallClock, WallResults, now};
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
@@ -26,36 +26,36 @@ pub struct Run {
     pub head_sha: String,
 }
 
-#[derive(Serialize)]
+/// A run as shown in lists.
+#[derive(Debug, Clone, Serialize)]
+pub struct RunInfo {
+    pub id: i64,
+    pub kind: String,
+    pub pr: Option<u64>,
+    pub title: String,
+    pub head_sha: String,
+    pub base_sha: Option<String>,
+    pub status: String,
+    pub created_at: i64,
+    pub started_at: Option<i64>,
+    pub finished_at: Option<i64>,
+    pub error: Option<String>,
+    pub env: Option<EnvInfo>,
+}
+
+/// One commit of `main` in the history of a benchmark.
+#[derive(Debug, Clone, Serialize)]
 pub struct Point {
     pub run: i64,
     pub sha: String,
     pub time: i64,
-    pub mean: f64,
-    pub min: f64,
-    pub max: f64,
+    pub value: u64,
 }
 
 #[derive(Serialize)]
 pub struct PrRun {
-    pub id: i64,
-    pub pr: u64,
-    pub title: String,
-    pub head: String,
-    pub base: Option<String>,
-    pub status: String,
-    pub time: i64,
-    pub error: Option<String>,
+    pub info: RunInfo,
     pub rows: Vec<Row>,
-}
-
-#[derive(Serialize)]
-pub struct DashboardData {
-    pub generated: i64,
-    pub benches: BTreeMap<String, Vec<Point>>,
-    pub prs: Vec<PrRun>,
-    pub queue: Vec<String>,
-    pub env: Option<EnvInfo>,
 }
 
 const SCHEMA: &str = "
@@ -77,16 +77,46 @@ CREATE TABLE IF NOT EXISTS results (
     run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
     role TEXT NOT NULL,             -- 'head' or 'base'
     bench TEXT NOT NULL,
+    instructions INTEGER NOT NULL,
+    estimated_cycles INTEGER NOT NULL,
+    l1_hits INTEGER NOT NULL,
+    ll_hits INTEGER NOT NULL,
+    ram_hits INTEGER NOT NULL,
+    heap_bytes INTEGER,
+    heap_blocks INTEGER,
+    PRIMARY KEY (run_id, role, bench)
+);
+CREATE TABLE IF NOT EXISTS wallclock (
+    run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    bench TEXT NOT NULL,
     mean_ns REAL NOT NULL,
-    min_ns REAL NOT NULL,
-    max_ns REAL NOT NULL,
-    median_ns REAL NOT NULL,
-    stddev_ns REAL NOT NULL,
-    rounds INTEGER NOT NULL,
+    lo_ns REAL NOT NULL,
+    hi_ns REAL NOT NULL,
     PRIMARY KEY (run_id, role, bench)
 );
 CREATE INDEX IF NOT EXISTS runs_head ON runs(head_sha);
 ";
+
+const RUN_COLUMNS: &str = "id, kind, pr, title, head_sha, base_sha, status, created_at, started_at, finished_at, error, env";
+
+fn run_info(r: &rusqlite::Row) -> rusqlite::Result<RunInfo> {
+    let env: Option<String> = r.get(11)?;
+    Ok(RunInfo {
+        id: r.get(0)?,
+        kind: r.get(1)?,
+        pr: r.get(2)?,
+        title: r.get(3)?,
+        head_sha: r.get(4)?,
+        base_sha: r.get(5)?,
+        status: r.get(6)?,
+        created_at: r.get(7)?,
+        started_at: r.get(8)?,
+        finished_at: r.get(9)?,
+        error: r.get(10)?,
+        env: env.and_then(|e| serde_json::from_str(&e).ok()),
+    })
+}
 
 impl Db {
     pub fn open(path: &Path) -> Result<Self> {
@@ -94,6 +124,15 @@ impl Db {
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.busy_timeout(std::time::Duration::from_secs(10))?;
+        // Databases of the criterion-based runner have a `results` table with wall-clock
+        // columns. Those numbers are not comparable with instruction counts, so the table is
+        // kept under another name and not shown anywhere.
+        let legacy: bool = conn
+            .prepare("SELECT 1 FROM pragma_table_info('results') WHERE name='mean_ns'")?
+            .exists([])?;
+        if legacy {
+            conn.execute_batch("ALTER TABLE results RENAME TO legacy_criterion_results;")?;
+        }
         conn.execute_batch(SCHEMA)?;
         Ok(Self(conn))
     }
@@ -155,6 +194,34 @@ impl Db {
         Ok(())
     }
 
+    /// Removes a run from the queue. Returns whether it was queued.
+    pub fn discard(&self, id: i64) -> Result<bool> {
+        let n = self.0.execute(
+            "UPDATE runs SET status='cancelled', finished_at=?2, error='discarded from the queue'
+             WHERE id=?1 AND status='queued'",
+            params![id, now()],
+        )?;
+        Ok(n > 0)
+    }
+
+    /// Removes everything that waits in the queue. Returns the number of runs.
+    pub fn discard_all(&self) -> Result<usize> {
+        Ok(self.0.execute(
+            "UPDATE runs SET status='cancelled', finished_at=?1, error='discarded from the queue'
+             WHERE status='queued'",
+            [now()],
+        )?)
+    }
+
+    /// Records that a running run was stopped on request.
+    pub fn mark_cancelled(&self, id: i64) -> Result<()> {
+        self.0.execute(
+            "UPDATE runs SET status='cancelled', finished_at=?2, error='cancelled while running' WHERE id=?1",
+            params![id, now()],
+        )?;
+        Ok(())
+    }
+
     /// Takes the oldest queued run, marking it as running. Pull requests go first.
     pub fn claim(&self) -> Result<Option<Run>> {
         let run = self
@@ -187,24 +254,31 @@ impl Db {
         id: i64,
         base_sha: Option<&str>,
         env: &EnvInfo,
-        results: &BTreeMap<String, Results>,
+        measured: &BTreeMap<String, Measured>,
     ) -> Result<()> {
         let tx = self.0.unchecked_transaction()?;
-        for (role, results) in results {
-            for (bench, e) in results {
+        for (role, m) in measured {
+            for (bench, e) in &m.results {
                 tx.execute(
-                    "INSERT OR REPLACE INTO results VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+                    "INSERT OR REPLACE INTO results VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
                     params![
                         id,
                         role,
                         bench,
-                        e.mean_ns,
-                        e.min_ns,
-                        e.max_ns,
-                        e.median_ns,
-                        e.stddev_ns,
-                        e.rounds
+                        e.instructions,
+                        e.estimated_cycles,
+                        e.l1_hits,
+                        e.ll_hits,
+                        e.ram_hits,
+                        e.heap_bytes,
+                        e.heap_blocks
                     ],
+                )?;
+            }
+            for (bench, w) in &m.wall {
+                tx.execute(
+                    "INSERT OR REPLACE INTO wallclock VALUES (?1,?2,?3,?4,?5,?6)",
+                    params![id, role, bench, w.mean_ns, w.lo_ns, w.hi_ns],
                 )?;
             }
         }
@@ -226,130 +300,156 @@ impl Db {
 
     pub fn results(&self, run: i64, role: &str) -> Result<Results> {
         let mut stmt = self.0.prepare(
-            "SELECT bench, mean_ns, min_ns, max_ns, median_ns, stddev_ns, rounds
+            "SELECT bench, instructions, estimated_cycles, l1_hits, ll_hits, ram_hits, heap_bytes, heap_blocks
              FROM results WHERE run_id=?1 AND role=?2",
         )?;
         let rows = stmt.query_map(params![run, role], |r| {
             Ok((
                 r.get::<_, String>(0)?,
-                Estimate {
-                    mean_ns: r.get(1)?,
-                    min_ns: r.get(2)?,
-                    max_ns: r.get(3)?,
-                    median_ns: r.get(4)?,
-                    stddev_ns: r.get(5)?,
-                    rounds: r.get(6)?,
+                Metrics {
+                    instructions: r.get(1)?,
+                    estimated_cycles: r.get(2)?,
+                    l1_hits: r.get(3)?,
+                    ll_hits: r.get(4)?,
+                    ram_hits: r.get(5)?,
+                    heap_bytes: r.get(6)?,
+                    heap_blocks: r.get(7)?,
                 },
             ))
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    pub fn dashboard(&self, threshold: f64, history: usize) -> Result<DashboardData> {
-        let mut benches: BTreeMap<String, Vec<Point>> = BTreeMap::new();
+    pub fn wall(&self, run: i64, role: &str) -> Result<WallResults> {
         let mut stmt = self.0.prepare(
-            "SELECT r.bench, runs.id, runs.head_sha, runs.finished_at, r.mean_ns, r.min_ns, r.max_ns
-             FROM results r JOIN runs ON runs.id = r.run_id
-             WHERE runs.kind='main' AND runs.status='done' AND r.role='head'
-             ORDER BY runs.finished_at, runs.id",
+            "SELECT bench, mean_ns, lo_ns, hi_ns FROM wallclock WHERE run_id=?1 AND role=?2",
         )?;
-        let rows = stmt.query_map([], |r| {
+        let rows = stmt.query_map(params![run, role], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                WallClock {
+                    mean_ns: r.get(1)?,
+                    lo_ns: r.get(2)?,
+                    hi_ns: r.get(3)?,
+                },
+            ))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The measurement of a commit of `main` that was already benchmarked, so that a pull
+    /// request does not measure its merge base again.
+    pub fn main_measurement(&self, sha: &str) -> Result<Option<Measured>> {
+        let id: Option<i64> = self
+            .0
+            .query_row(
+                "SELECT id FROM runs WHERE kind='main' AND head_sha=?1 AND status='done'
+                 ORDER BY id DESC LIMIT 1",
+                [sha],
+                |r| r.get(0),
+            )
+            .optional()?;
+        id.map(|id| {
+            Ok(Measured {
+                results: self.results(id, "head")?,
+                wall: self.wall(id, "head")?,
+            })
+        })
+        .transpose()
+    }
+
+    pub fn run(&self, id: i64) -> Result<Option<RunInfo>> {
+        Ok(self
+            .0
+            .query_row(
+                &format!("SELECT {RUN_COLUMNS} FROM runs WHERE id=?1"),
+                [id],
+                run_info,
+            )
+            .optional()?)
+    }
+
+    /// Queued and running runs, the running one first.
+    pub fn queue(&self) -> Result<Vec<RunInfo>> {
+        let mut stmt = self.0.prepare(&format!(
+            "SELECT {RUN_COLUMNS} FROM runs WHERE status IN ('queued','running')
+             ORDER BY (status='running') DESC, (kind='pr') DESC, id"
+        ))?;
+        Ok(stmt
+            .query_map([], run_info)?
+            .collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The most recent runs of `main`, newest first.
+    pub fn recent_main_runs(&self, limit: usize) -> Result<Vec<RunInfo>> {
+        let mut stmt = self.0.prepare(&format!(
+            "SELECT {RUN_COLUMNS} FROM runs WHERE kind='main' AND status != 'queued'
+             ORDER BY id DESC LIMIT ?1"
+        ))?;
+        Ok(stmt
+            .query_map([limit], run_info)?
+            .collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Value of `metric` of every benchmark at every finished commit of `main`, oldest first,
+    /// limited to the last `history` commits.
+    pub fn history(&self, metric: Metric, history: usize) -> Result<BTreeMap<String, Vec<Point>>> {
+        let column = match metric {
+            Metric::Instructions => "instructions",
+            Metric::EstimatedCycles => "estimated_cycles",
+            Metric::HeapBytes => "heap_bytes",
+            Metric::HeapBlocks => "heap_blocks",
+        };
+        let mut stmt = self.0.prepare(&format!(
+            "SELECT r.bench, runs.id, runs.head_sha, COALESCE(runs.finished_at, runs.created_at), r.{column}
+             FROM results r JOIN runs ON runs.id = r.run_id
+             WHERE runs.kind='main' AND runs.status='done' AND r.role='head' AND r.{column} IS NOT NULL
+               AND runs.id IN (SELECT id FROM runs WHERE kind='main' AND status='done' ORDER BY id DESC LIMIT ?1)
+             ORDER BY runs.id"
+        ))?;
+        let rows = stmt.query_map([history], |r| {
             Ok((
                 r.get::<_, String>(0)?,
                 Point {
                     run: r.get(1)?,
                     sha: r.get(2)?,
                     time: r.get(3)?,
-                    mean: r.get(4)?,
-                    min: r.get(5)?,
-                    max: r.get(6)?,
+                    value: r.get(4)?,
                 },
             ))
         })?;
+        let mut benches: BTreeMap<String, Vec<Point>> = BTreeMap::new();
         for row in rows {
             let (bench, point) = row?;
             benches.entry(bench).or_default().push(point);
         }
-        for points in benches.values_mut() {
-            let excess = points.len().saturating_sub(history);
-            points.drain(..excess);
-        }
+        Ok(benches)
+    }
 
-        let mut prs = Vec::new();
-        let mut stmt = self.0.prepare(
-            "SELECT id, pr, title, head_sha, base_sha, status, COALESCE(finished_at, created_at), error
-             FROM runs WHERE kind='pr' AND status != 'cancelled' ORDER BY id DESC LIMIT 30",
-        )?;
-        let rows = stmt.query_map([], |r| {
-            Ok((
-                r.get::<_, i64>(0)?,
-                r.get::<_, u64>(1)?,
-                r.get::<_, String>(2)?,
-                r.get::<_, String>(3)?,
-                r.get::<_, Option<String>>(4)?,
-                r.get::<_, String>(5)?,
-                r.get::<_, i64>(6)?,
-                r.get::<_, Option<String>>(7)?,
-            ))
-        })?;
-        for row in rows {
-            let (id, pr, title, head, base, status, time, error) = row?;
-            let rows = if status == "done" {
-                compare::compare(
-                    &self.results(id, "base")?,
-                    &self.results(id, "head")?,
-                    threshold,
-                )
-            } else {
-                Vec::new()
-            };
-            prs.push(PrRun {
-                id,
-                pr,
-                title,
-                head,
-                base,
-                status,
-                time,
-                error,
-                rows,
-            });
-        }
-
-        let mut stmt = self.0.prepare(
-            "SELECT kind, pr, head_sha, status FROM runs WHERE status IN ('queued','running') ORDER BY id",
-        )?;
-        let queue = stmt
-            .query_map([], |r| {
-                let pr: Option<u64> = r.get(1)?;
-                let sha: String = r.get(2)?;
-                let what = pr
-                    .map(|p| format!("PR #{p}"))
-                    .unwrap_or_else(|| "main".into());
-                Ok(format!(
-                    "{what} @ {} ({})",
-                    &sha[..sha.len().min(8)],
-                    r.get::<_, String>(3)?
-                ))
-            })?
-            .collect::<rusqlite::Result<_>>()?;
-
-        let env: Option<String> = self
-            .0
-            .query_row(
-                "SELECT env FROM runs WHERE status='done' ORDER BY finished_at DESC LIMIT 1",
-                [],
-                |r| r.get(0),
-            )
-            .optional()?
-            .flatten();
-        Ok(DashboardData {
-            generated: now(),
-            benches,
-            prs,
-            queue,
-            env: env.and_then(|e| serde_json::from_str(&e).ok()),
-        })
+    /// The latest pull request runs with their comparison, newest first.
+    pub fn pull_requests(&self, threshold: f64) -> Result<Vec<PrRun>> {
+        let mut stmt = self.0.prepare(&format!(
+            "SELECT {RUN_COLUMNS} FROM runs WHERE kind='pr' AND status NOT IN ('cancelled','queued')
+             ORDER BY id DESC LIMIT 30"
+        ))?;
+        let infos = stmt
+            .query_map([], run_info)?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        infos
+            .into_iter()
+            .map(|info| {
+                let rows = if info.status == "done" {
+                    compare::compare(
+                        &self.results(info.id, "base")?,
+                        &self.results(info.id, "head")?,
+                        threshold,
+                    )
+                } else {
+                    Vec::new()
+                };
+                Ok(PrRun { info, rows })
+            })
+            .collect()
     }
 }
 
@@ -370,6 +470,44 @@ mod tests {
         }
     }
 
+    fn main_run(sha: &str) -> NewRun {
+        NewRun {
+            kind: "main".into(),
+            pr: None,
+            title: "t".into(),
+            head_sha: sha.into(),
+        }
+    }
+
+    fn metrics(ir: u64) -> Metrics {
+        Metrics {
+            instructions: ir,
+            estimated_cycles: 2 * ir,
+            l1_hits: 1,
+            ll_hits: 2,
+            ram_hits: 3,
+            heap_bytes: Some(10),
+            heap_blocks: None,
+        }
+    }
+
+    fn measured(ir: u64) -> BTreeMap<String, Measured> {
+        BTreeMap::from([(
+            "head".to_string(),
+            Measured {
+                results: Results::from([("x".to_string(), metrics(ir))]),
+                wall: WallResults::from([(
+                    "w".to_string(),
+                    WallClock {
+                        mean_ns: 1.0,
+                        lo_ns: 0.5,
+                        hi_ns: 2.0,
+                    },
+                )]),
+            },
+        )])
+    }
+
     #[test]
     fn queue_coalesces_pull_requests() {
         let db = db();
@@ -388,17 +526,63 @@ mod tests {
         let db = db();
         let id = db.enqueue(&pr(2, "ccc")).unwrap().unwrap();
         db.claim().unwrap();
-        let e = Estimate {
-            mean_ns: 1.0,
-            min_ns: 0.5,
-            max_ns: 2.0,
-            median_ns: 1.0,
-            stddev_ns: 0.1,
-            rounds: 3,
-        };
-        let results = BTreeMap::from([("head".to_string(), Results::from([("x".to_string(), e)]))]);
-        db.finish(id, None, &EnvInfo::default(), &results).unwrap();
-        assert_eq!(db.results(id, "head").unwrap()["x"], e);
-        assert_eq!(db.dashboard(10.0, 100).unwrap().prs.len(), 1);
+        db.finish(id, None, &EnvInfo::default(), &measured(5))
+            .unwrap();
+        assert_eq!(db.results(id, "head").unwrap()["x"], metrics(5));
+        assert_eq!(db.wall(id, "head").unwrap()["w"].mean_ns, 1.0);
+        assert_eq!(db.pull_requests(1.0).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn discarding_only_affects_queued_runs() {
+        let db = db();
+        let a = db.enqueue(&main_run("a")).unwrap().unwrap();
+        let b = db.enqueue(&main_run("b")).unwrap().unwrap();
+        let running = db.claim().unwrap().unwrap().id;
+        assert_eq!(running, a);
+        assert!(
+            !db.discard(a).unwrap(),
+            "a running run is cancelled, not discarded"
+        );
+        assert!(db.discard(b).unwrap());
+        assert!(db.queue().unwrap().iter().all(|r| r.id == a));
+        // a discarded commit can be queued again
+        assert!(db.enqueue(&main_run("b")).unwrap().is_some());
+        db.mark_cancelled(a).unwrap();
+        assert_eq!(db.run(a).unwrap().unwrap().status, "cancelled");
+    }
+
+    #[test]
+    fn history_lists_commits_oldest_first() {
+        let db = db();
+        for (sha, ir) in [("a", 10), ("b", 20), ("c", 30)] {
+            let id = db.enqueue(&main_run(sha)).unwrap().unwrap();
+            db.claim().unwrap();
+            db.finish(id, None, &EnvInfo::default(), &measured(ir))
+                .unwrap();
+        }
+        let h = db.history(Metric::Instructions, 2).unwrap();
+        let values: Vec<u64> = h["x"].iter().map(|p| p.value).collect();
+        assert_eq!(values, vec![20, 30]);
+        // heap blocks were not measured
+        assert!(db.history(Metric::HeapBlocks, 10).unwrap().is_empty());
+        assert!(db.main_measurement("b").unwrap().is_some());
+        assert!(db.main_measurement("zzz").unwrap().is_none());
+    }
+
+    #[test]
+    fn criterion_results_are_set_aside() {
+        let dir = std::env::temp_dir().join(format!("ab-db-{}.sqlite", std::process::id()));
+        {
+            let conn = Connection::open(&dir).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE results (run_id INTEGER, role TEXT, bench TEXT, mean_ns REAL);",
+            )
+            .unwrap();
+        }
+        let db = Db::open(&dir).unwrap();
+        assert!(db.results(1, "head").unwrap().is_empty());
+        drop(db);
+        let _ = std::fs::remove_file(&dir);
     }
 }

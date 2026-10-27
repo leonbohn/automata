@@ -4,7 +4,7 @@ mod common;
 
 use automata::TransitionSystem;
 use common::Dts;
-use gungraun::prelude::*;
+use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
 
 fn ring(n: usize) -> Dts {
@@ -85,4 +85,7 @@ library_benchmark_group!(
     benchmarks = tarjan, tarjan_recursive, kosaraju, scc_queries
 );
 
-main!(library_benchmark_groups = scc);
+main!(
+    config = LibraryBenchmarkConfig::default().tool(Dhat::default()),
+    library_benchmark_groups = scc
+);

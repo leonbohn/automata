@@ -5,7 +5,7 @@ mod common;
 use automata::automaton::{DFA, DPA};
 use automata::{Deterministic, TransitionSystem, upw};
 use common::FixtureDpa;
-use gungraun::prelude::*;
+use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
 
 // ---- finite words ------------------------------------------------------------------------------
@@ -23,20 +23,20 @@ fn dfa_with_words(count: usize) -> (DFA, Vec<String>) {
 }
 
 // One long word: the cost per step, without the per-call overhead.
-#[library_benchmark]
+#[library_benchmark(config = LibraryBenchmarkConfig::default().tool(Dhat::default()))]
 #[benches::len(args = [100, 10_000, 100_000], setup = dfa_with_word)]
 fn dfa_accepts_one_word((dfa, word): (DFA, Vec<char>)) -> bool {
     black_box(dfa.accepts(word.as_slice()))
 }
 
 // Many short words: the per-call overhead.
-#[library_benchmark]
+#[library_benchmark(config = LibraryBenchmarkConfig::default().tool(Dhat::default()))]
 #[benches::count(args = [1_000], setup = dfa_with_words)]
 fn dfa_accepts_many_words((dfa, words): (DFA, Vec<String>)) -> usize {
     black_box(words.iter().filter(|w| dfa.accepts(w.as_str())).count())
 }
 
-#[library_benchmark]
+#[library_benchmark(config = LibraryBenchmarkConfig::default().tool(Dhat::default()))]
 #[benches::count(args = [1_000], setup = dfa_with_words)]
 fn dfa_reached_state((dfa, words): (DFA, Vec<String>)) -> u64 {
     black_box(
@@ -56,7 +56,7 @@ fn dpa_with_lassos(spoke: usize, cycle: usize) -> (DPA, Vec<(String, String)>) {
     )
 }
 
-#[library_benchmark]
+#[library_benchmark(config = LibraryBenchmarkConfig::default().tool(Dhat::default()))]
 #[bench::short(args = (5, 10), setup = dpa_with_lassos)]
 #[bench::long(args = (500, 1_000), setup = dpa_with_lassos)]
 fn dpa_accepts_lassos((dpa, lassos): (DPA, Vec<(String, String)>)) -> usize {
@@ -69,7 +69,7 @@ fn dpa_accepts_lassos((dpa, lassos): (DPA, Vec<(String, String)>)) -> usize {
 }
 
 // The infinity set of a run: the priorities seen infinitely often.
-#[library_benchmark]
+#[library_benchmark(config = LibraryBenchmarkConfig::default().tool(Dhat::default()))]
 #[bench::short(args = (5, 10), setup = dpa_with_lassos)]
 #[bench::long(args = (500, 1_000), setup = dpa_with_lassos)]
 fn dpa_recurrent_edge_colors((dpa, lassos): (DPA, Vec<(String, String)>)) -> usize {
@@ -82,7 +82,7 @@ fn dpa_recurrent_edge_colors((dpa, lassos): (DPA, Vec<(String, String)>)) -> usi
     )
 }
 
-#[library_benchmark]
+#[library_benchmark(config = LibraryBenchmarkConfig::default().tool(Dhat::default()))]
 #[bench::short(args = (5, 10), setup = dpa_with_lassos)]
 #[bench::long(args = (500, 1_000), setup = dpa_with_lassos)]
 fn dpa_recurrent_states((dpa, lassos): (DPA, Vec<(String, String)>)) -> usize {
@@ -96,7 +96,7 @@ fn dpa_recurrent_states((dpa, lassos): (DPA, Vec<(String, String)>)) -> usize {
 }
 
 // The whole sequence of visited states and of edge colors along the prefix `u v v v`.
-#[library_benchmark]
+#[library_benchmark(config = LibraryBenchmarkConfig::default().tool(Dhat::default()))]
 #[bench::short(args = (5, 10), setup = dpa_with_lassos)]
 #[bench::long(args = (500, 1_000), setup = dpa_with_lassos)]
 fn dpa_visited_sequences((dpa, lassos): (DPA, Vec<(String, String)>)) -> usize {
@@ -128,6 +128,7 @@ fn lassos_over(
         .collect()
 }
 
+// Every fixture is run on 100 lassos. No heap profile here: parsing the fixtures is slow under DHAT.
 // Every fixture is run on 100 lassos, the number of acceptances is the (checked) result.
 #[library_benchmark]
 #[bench::ltl(setup = common::ltl_dpas)]

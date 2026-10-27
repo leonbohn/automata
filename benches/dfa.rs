@@ -6,7 +6,7 @@ use automata::TransitionSystem;
 use automata::alphabet::CharAlphabet;
 use automata::automaton::{DFA, MooreMachine};
 use automata::representation::CollectTs;
-use gungraun::prelude::*;
+use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
 
 fn scrambled(n: usize) -> DFA {
@@ -150,4 +150,7 @@ library_benchmark_group!(
         accepts_many_words
 );
 
-main!(library_benchmark_groups = dfa);
+main!(
+    config = LibraryBenchmarkConfig::default().tool(Dhat::default()),
+    library_benchmark_groups = dfa
+);

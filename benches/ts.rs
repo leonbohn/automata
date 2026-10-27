@@ -10,7 +10,7 @@ use automata::ts::{
 };
 use automata::{DTS, Int, TransitionSystem, Void};
 use common::Dts;
-use gungraun::prelude::*;
+use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
 
 fn scrambled(n: usize) -> Dts {
@@ -239,4 +239,7 @@ library_benchmark_group!(
         remove_edges_from_matching, remove_state, subset_construction
 );
 
-main!(library_benchmark_groups = ts);
+main!(
+    config = LibraryBenchmarkConfig::default().tool(Dhat::default()),
+    library_benchmark_groups = ts
+);
