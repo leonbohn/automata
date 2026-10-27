@@ -96,10 +96,11 @@ in
 
     threshold = mkOption {
       type = types.numbers.positive;
-      default = 1;
+      default = 2;
       description = ''
         Relative change of the instruction count in percent above which a difference is reported.
-        Instruction counts are exact, repeated runs differ by far less than a percent.
+        Repeated runs differ by up to about one percent in benchmarks that are dominated by hash
+        maps (the library seeds them randomly), and by far less elsewhere.
       '';
     };
 

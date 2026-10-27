@@ -68,7 +68,7 @@ Without Nix, `cargo run --manifest-path tools/bench/Cargo.toml -- compare --base
 your own toolchain. Both revisions are checked out into worktrees (under `.git/automata-bench`) and built
 once; each is executed once. A revision uses *its own* `benches/`; benchmarks that exist only on one side
 show up as `new` or `removed`. A change is reported if the instruction count differs by more than the
-threshold (1 % by default) and by at least 1000 instructions.
+threshold (2 % by default) and by at least 1000 instructions.
 
 The whole suite takes about SUITE_MINUTES minutes on the development machine, most of it spent
 parsing fixtures under valgrind.
@@ -181,7 +181,10 @@ The package and the development shell contain `valgrind` and the `gungraun-runne
   the hit counts are in the detail view.
 - Numbers from different compilers, targets or valgrind versions are not comparable. The history records
   the toolchain; do not mix.
-- Counts vary by a few hundredths of a percent between runs because of address space layout and the
-  kernel. `check-determinism` checks that on your machine (default tolerance 0.5 %).
+- Counts are not bit-identical between runs. Most benchmarks differ by a few hundredths of a percent
+  (address space layout, kernel), but the library seeds its hash maps randomly (`std`'s `RandomState`,
+  also behind `math::Set` and `math::Map`), so benchmarks dominated by hashing differ by up to about
+  1 % depending on the seed. That is why the threshold is 2 %. Seeding the maps with a fixed hasher would
+  make the counts exact; `check-determinism` lists the benchmarks that vary most (default tolerance 2 %).
 - Regenerating the fixtures changes the inputs of the fixture benchmarks and therefore breaks the
   history for those; mention it in the changelog.

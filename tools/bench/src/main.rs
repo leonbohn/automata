@@ -60,7 +60,7 @@ enum Command {
         #[arg(long, default_value = ".")]
         repo: PathBuf,
         /// Changes of the instruction count above this many percent count.
-        #[arg(long, default_value_t = 1.0)]
+        #[arg(long, default_value_t = 2.0)]
         threshold: f64,
         #[command(flatten)]
         engine: EngineArgs,
@@ -84,7 +84,7 @@ enum Command {
         #[arg(long, default_value_t = 2)]
         runs: usize,
         /// Largest accepted deviation between runs in percent.
-        #[arg(long, default_value_t = 0.5)]
+        #[arg(long, default_value_t = 2.0)]
         tolerance: f64,
         #[command(flatten)]
         engine: EngineArgs,
@@ -123,7 +123,7 @@ enum Command {
         /// Where the dashboard is reachable, used in links.
         #[arg(long, default_value = "")]
         public_url: String,
-        #[arg(long, default_value_t = 1.0)]
+        #[arg(long, default_value_t = 2.0)]
         threshold: f64,
         #[command(flatten)]
         engine: EngineArgs,
@@ -263,33 +263,37 @@ fn main() -> Result<()> {
                 let m = engine.measure(&[("head", &rev)], &local_control(&engine))?;
                 all.push(m.results["head"].results.clone());
             }
-            let mut worst = (0.0f64, String::new());
-            for name in all[0].keys() {
-                let values: Vec<u64> = all
-                    .iter()
-                    .filter_map(|r| r.get(name))
-                    .map(|m| m.instructions)
-                    .collect();
-                let (lo, hi) = (
-                    values.iter().min().copied().unwrap_or(0),
-                    values.iter().max().copied().unwrap_or(0),
-                );
-                let spread = compare::relative_change(lo, hi);
-                if spread > worst.0 {
-                    worst = (spread, name.clone());
-                }
-            }
+            let mut spreads: Vec<(f64, String)> = all[0]
+                .keys()
+                .map(|name| {
+                    let values: Vec<u64> = all
+                        .iter()
+                        .filter_map(|r| r.get(name))
+                        .map(|m| m.instructions)
+                        .collect();
+                    let lo = values.iter().min().copied().unwrap_or(0);
+                    let hi = values.iter().max().copied().unwrap_or(0);
+                    (compare::relative_change(lo, hi), name.clone())
+                })
+                .collect();
+            spreads.sort_by(|a, b| b.0.total_cmp(&a.0));
+            let above = |limit: f64| spreads.iter().filter(|(s, _)| *s > limit).count();
             println!(
-                "{} benchmarks, {} runs, largest spread {:.3} % ({})",
-                all[0].len(),
+                "{} benchmarks, {} runs; spread above 0.1 %: {}, above 0.5 %: {}, above 1 %: {}",
+                spreads.len(),
                 all.len(),
-                worst.0,
-                worst.1
+                above(0.1),
+                above(0.5),
+                above(1.0)
             );
-            if worst.0 > tolerance {
+            for (spread, name) in spreads.iter().take(5) {
+                println!("  {spread:.3} %  {name}");
+            }
+            if let Some((spread, name)) = spreads.first()
+                && *spread > tolerance
+            {
                 bail!(
-                    "the spread of {} is above the tolerance of {tolerance} %",
-                    worst.1
+                    "the spread of {name} ({spread:.2} %) is above the tolerance of {tolerance} %"
                 );
             }
         }
