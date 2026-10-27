@@ -751,6 +751,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
     }
 }
 
+/// Two systems are equal if they have the same alphabet and the same number of states, and every
+/// state has the same color and the same set of edges in both. Note that this compares state
+/// indices, so it is not an isomorphism check: systems that differ only by a renaming of the
+/// states are not equal.
 impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const DET: bool> PartialEq
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
@@ -777,9 +781,13 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const 
                 .map(|e| (&e.expression, &e.color, e.target))
                 .collect::<math::Set<_>>();
 
-            y.edges_from_iter(&other.edges)
+            let other_edges = y
+                .edges_from_iter(&other.edges)
                 .expect("state exists")
-                .all(|e| edges.contains(&(&e.expression, &e.color, e.target)))
+                .map(|e| (&e.expression, &e.color, e.target))
+                .collect::<math::Set<_>>();
+
+            edges == other_edges
         })
     }
 }
@@ -855,6 +863,26 @@ mod tests {
             .into_nts();
         assert!(nts.is_deterministic());
         assert!(nts.try_into_deterministic().is_ok());
+    }
+
+    #[test]
+    fn equality_is_symmetric() {
+        let small = Builder::default()
+            .with_state_colors([0, 0])
+            .with_edges([(0, 'a', 0u32, 1), (1, 'a', 0, 0), (1, 'b', 0, 1)])
+            .into_dts();
+        let big = Builder::default()
+            .with_state_colors([0, 0])
+            .with_edges([
+                (0, 'a', 0u32, 1),
+                (1, 'a', 0, 0),
+                (1, 'b', 0, 1),
+                (0, 'b', 0, 0),
+            ])
+            .into_dts();
+        assert!(small != big);
+        assert!(big != small);
+        assert!(small == small.clone());
     }
 
     #[test]
