@@ -112,7 +112,9 @@ fn edges_from_all_states((ts, _k): (Dts, usize)) -> usize {
     )
 }
 
-fn product_queries(n: usize) -> (Dts, Dts, Vec<(ProductIndex<u32, u32>, char)>) {
+type ProductQueries = (Dts, Dts, Vec<(ProductIndex<u32, u32>, char)>);
+
+fn product_queries(n: usize) -> ProductQueries {
     let (l, r) = (common::scrambled(n, 2), common::counter(n, 2));
     let queries = (0..1_000)
         .map(|i| {
@@ -127,9 +129,7 @@ fn product_queries(n: usize) -> (Dts, Dts, Vec<(ProductIndex<u32, u32>, char)>) 
 
 #[library_benchmark]
 #[bench::n200(args = (200), setup = product_queries)]
-fn matching_product_successor_index(
-    (l, r, queries): (Dts, Dts, Vec<(ProductIndex<u32, u32>, char)>),
-) -> usize {
+fn matching_product_successor_index((l, r, queries): ProductQueries) -> usize {
     let product = MatchingProduct(&l, &r);
     black_box(
         queries

@@ -60,23 +60,29 @@ required-features = ["hoa"]
 [[bench]]
 name = "scc"
 harness = false
+required-features = ["hoa"]
 
 [[bench]]
 name = "ts"
 harness = false
+required-features = ["hoa"]
 
 [[bench]]
 name = "runs"
 harness = false
+required-features = ["hoa"]
 
 [[bench]]
 name = "dpa"
 harness = false
+required-features = ["hoa"]
 
 [[bench]]
 name = "dfa"
 harness = false
+required-features = ["hoa"]
 
 [[bench]]
 name = "wallclock"
 harness = false
+required-features = ["hoa"]

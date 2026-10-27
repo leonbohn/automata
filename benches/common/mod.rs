@@ -106,7 +106,7 @@ pub fn grid(n: usize, width: usize) -> Dts {
     build(
         n,
         2,
-        |q| (q % width + q / width) % 2 == 0,
+        |q| (q % width + q / width).is_multiple_of(2),
         |q, i| {
             let (x, y) = (q % width, q / width);
             if i == 0 {
@@ -438,7 +438,7 @@ pub fn fixture_lasso(
     let all: Vec<_> = alphabet.universe().collect();
     let pick = |len: usize, offset: usize| -> Vec<_> {
         (0..len)
-            .map(|i| all[(i * i + offset) % all.len()].clone())
+            .map(|i| all[(i * i + offset) % all.len()])
             .collect()
     };
     ReducedOmegaWord::ultimately_periodic(pick(spoke, 1), pick(cycle, 2))
