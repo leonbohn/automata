@@ -1,7 +1,8 @@
-use crate::alphabet::{Alphabet, CharAlphabet, Directional, InvertibleChar};
+use crate::alphabet::{Alphabet, CharAlphabet, Directional, InvertibleChar, Matcher};
+use crate::math::OrderedMap;
 use crate::ts::{
     Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, EdgeReference, StateColor,
-    StateIndex,
+    StateIndex, SymbolOf,
 };
 use crate::{Pointed, TransitionSystem};
 
@@ -29,6 +30,7 @@ where
     Ts::StateColor: Accumulates,
 {
     alphabet: Directional,
+    expressions: Vec<InvertibleChar>,
     m: TransitionMonoid<Ts>,
 }
 
@@ -36,6 +38,7 @@ where
 /// the transition profiles of the ts as nodes. See [`Cayley`] for more details.
 #[derive(Clone)]
 pub struct RightCayley<Ts: TransitionSystem + Pointed> {
+    expressions: OrderedMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
     m: TransitionMonoid<Ts>,
 }
 
@@ -103,6 +106,19 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
+    fn edge(
+        &self,
+        state: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Self::EdgeRef<'_>> {
+        let expression = self.expressions.iter().find(|e| matcher.matches(e))?;
+        let target = if expression.is_inverted() {
+            self.m.left_successor(state, expression.symbol())?
+        } else {
+            self.m.right_successor(state, expression.symbol())?
+        };
+        Some(EdgeReference::new(state, expression, &(), target))
+    }
 }
 
 impl<Ts> Cayley<Ts>
@@ -113,11 +129,8 @@ where
 {
     /// Build a new Cayley graph from the given transition system.
     pub fn new(ts: Ts) -> Self {
-        let alphabet = Directional::from_iter(ts.alphabet().universe());
-        Cayley {
-            m: TransitionMonoid::new(ts),
-            alphabet,
-        }
+        let m = TransitionMonoid::new(ts);
+        Self::from_monoid(m)
     }
 }
 
@@ -129,8 +142,18 @@ where
 {
     /// Builds a new Cayley graph from the given transition system and transition monoid.
     pub fn from(ts: Ts, m: TransitionMonoid<Ts>) -> Self {
-        let alphabet = Directional::from_iter(ts.alphabet().universe());
-        Self { alphabet, m }
+        let _ = ts;
+        Self::from_monoid(m)
+    }
+
+    fn from_monoid(m: TransitionMonoid<Ts>) -> Self {
+        let alphabet = Directional::from_iter(m.ts().alphabet().universe());
+        let expressions = alphabet.universe().collect();
+        Self {
+            alphabet,
+            expressions,
+            m,
+        }
     }
 }
 
@@ -202,6 +225,15 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
+    fn edge(
+        &self,
+        state: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Self::EdgeRef<'_>> {
+        let (symbol, expression) = self.expressions.iter().find(|(_, e)| matcher.matches(e))?;
+        let target = self.m.right_successor(state, *symbol)?;
+        Some(EdgeReference::new(state, expression, &(), target))
+    }
 }
 impl<Ts> RightCayley<Ts>
 where
@@ -211,6 +243,57 @@ where
 {
     /// Builds a new right Cayley graph from the given transition monoid.
     pub fn from(m: TransitionMonoid<Ts>) -> Self {
-        Self { m }
+        let expressions = m.ts().alphabet().expression_map();
+        Self { expressions, m }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ts::{Builder, IsEdge};
+
+    fn parity_dfa() -> crate::automaton::DFA {
+        Builder::without_edge_colors()
+            .with_state_colors([false, true])
+            .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (1, 'b', 1)])
+            .into_dfa(0)
+    }
+
+    #[test]
+    fn right_cayley_edges() {
+        let rc = RightCayley::from(TransitionMonoid::new(parity_dfa()));
+        assert_eq!(rc.state_indices().count(), 5);
+        assert_eq!(rc.edges_from(0).unwrap().count(), 2);
+        assert_eq!(rc.size(), 5);
+        for q in rc.state_indices() {
+            for sym in ['a', 'b'] {
+                let e = rc.edge(q, sym).unwrap();
+                assert_eq!(e.target(), rc.monoid().right_successor(q, sym).unwrap());
+            }
+        }
+        // the transition on 'a' from epsilon leads to the profile of "a"
+        let a = rc.monoid().profile_for("a").unwrap();
+        assert_eq!(rc.edge(0, 'a').unwrap().target(), a);
+        assert_eq!(rc.edge(0, 'x'), None);
+    }
+
+    #[test]
+    fn cayley_edges() {
+        let c = Cayley::new(parity_dfa());
+        assert_eq!(c.state_indices().count(), 5);
+        assert_eq!(c.edges_from(0).unwrap().count(), 4);
+        assert_eq!(c.size(), 5);
+        let a = c.monoid().profile_for("a").unwrap();
+        let right_a = c
+            .alphabet()
+            .universe()
+            .find(|s| !s.is_inverted() && s.symbol() == 'a');
+        let left_a = c
+            .alphabet()
+            .universe()
+            .find(|s| s.is_inverted() && s.symbol() == 'a');
+        assert_eq!(c.edge(0, right_a.unwrap()).unwrap().target(), a);
+        assert_eq!(c.edge(0, left_a.unwrap()).unwrap().target(), a);
     }
 }

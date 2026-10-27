@@ -271,6 +271,11 @@ impl InvertibleChar {
         }
     }
 
+    /// Returns the underlying character.
+    pub fn symbol(&self) -> char {
+        self.0
+    }
+
     /// Returns true if this symbol is inverted.
     pub fn is_inverted(&self) -> bool {
         self.1
