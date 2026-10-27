@@ -32,7 +32,6 @@ pub struct LinkedListTransitionSystem<
     alphabet: A,
     states: Vec<LinkedListTransitionSystemState<Q>>,
     edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
-    vacant: Option<usize>,
 }
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSystem<A, Q, C, DET> {
@@ -48,7 +47,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
                 .enumerate()
                 .map(|(i, s)| s.zip_prepend(ScalarIndexType::from_usize(i)))
                 .collect(),
-            vacant: self.vacant,
         }
     }
 
@@ -117,7 +115,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
                     })
                 })
                 .collect(),
-            vacant: self.vacant,
         }
     }
 
@@ -144,13 +141,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         assert_eq!(self.first_in_edge(state), None);
         assert_eq!(self.first_out_edge(state), None);
 
-        let out = self.states[state].vacate(self.vacant, None);
-        if let Some(prev) = self.vacant {
-            self.states[prev].set_next_vacancy(Some(state));
-        }
-        self.vacant = Some(state);
-
-        out
+        self.states[state].vacate()
     }
 
     fn swap_remove_edge(&mut self, id: usize) -> Option<EdgeTuple<Self>> {
@@ -317,7 +308,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
             alphabet,
             states: Vec::with_capacity(cap),
             edges: Vec::with_capacity(cap),
-            vacant: None,
         }
     }
 
@@ -357,7 +347,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
             alphabet,
             states,
             edges,
-            vacant: None,
         }
     }
 
@@ -415,7 +404,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color>
             alphabet: self.alphabet,
             edges: self.edges,
             states: self.states.into_iter().map(|q| q.unzip()).collect(),
-            vacant: self.vacant,
         }
     }
 
@@ -714,7 +702,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A>
             alphabet,
             states: vec![],
             edges: vec![],
-            vacant: None,
         }
     }
 
@@ -723,7 +710,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A>
             alphabet: from,
             states: Vec::with_capacity(size_hint),
             edges: vec![],
-            vacant: None,
         }
     }
 }
@@ -831,13 +817,11 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
         alphabet,
         states,
         edges,
-        vacant,
     } = ts;
     LinkedListTransitionSystem {
         alphabet,
         states,
         edges,
-        vacant,
     }
 }
 
