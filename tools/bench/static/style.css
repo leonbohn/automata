@@ -1,0 +1,23 @@
+:root { color-scheme: light dark; --fg: #222; --bg: #fff; --mut: #777; --line: #ccc; --acc: #2a6fdb; --bad: #c62828; --good: #2e7d32; }
+@media (prefers-color-scheme: dark) { :root { --fg: #ddd; --bg: #151515; --mut: #999; --line: #333; --acc: #6ea8ff; --bad: #ef5350; --good: #66bb6a; } }
+body { font: 15px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); max-width: 72rem; margin: 2rem auto; padding: 0 1rem; }
+h1, h2, h3 { font-weight: 600; } h1 { margin-bottom: 0; } h1 a { color: inherit; text-decoration: none; }
+h2 { margin-top: 2rem; } h3 { margin: 1.5rem 0 .3rem; font-size: 1rem; }
+a { color: var(--acc); }
+table { border-collapse: collapse; width: 100%; } td, th { padding: .2rem .6rem; border-bottom: 1px solid var(--line); text-align: right; }
+td:first-child, th:first-child { text-align: left; }
+td.name, td:first-child { font-family: ui-monospace, monospace; font-size: .85rem; word-break: break-all; }
+.mut { color: var(--mut); } .bad { color: var(--bad); } .good { color: var(--good); }
+form.filters { display: flex; gap: .5rem; flex-wrap: wrap; margin: .5rem 0; }
+input, select { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: .15rem .5rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: 1rem; }
+.card { border: 1px solid var(--line); border-radius: 6px; padding: .5rem .7rem; }
+.card b { font: .8rem ui-monospace, monospace; word-break: break-all; }
+svg { width: 100%; height: 7rem; display: block; }
+svg.stacked { height: 16rem; }
+svg .line { stroke: var(--acc); fill: none; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+svg circle { fill: var(--acc); } svg circle.bad { fill: var(--bad); r: 4; } svg circle.good { fill: var(--good); r: 4; }
+svg.stacked circle { fill: var(--fg); r: 2; }
+details { margin: .3rem 0; } summary { cursor: pointer; }
+pre { overflow-x: auto; background: color-mix(in srgb, var(--fg) 6%, var(--bg)); padding: .5rem; border-radius: 4px; max-height: 24rem; }
+code { font-size: .85em; }

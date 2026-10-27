@@ -82,8 +82,8 @@ in
       default = null;
       example = "bench.lnbhn.xyz";
       description = ''
-        If set, nginx serves the dashboard on this host and forwards `/webhook` to the service.
-        The webhook URL to configure on GitHub is then `https://<virtualHost>/webhook`.
+        If set, nginx forwards this host to the service, which serves the dashboard and the
+        webhook. The webhook URL to configure on GitHub is then `https://<virtualHost>/webhook`.
       '';
     };
 
@@ -94,27 +94,32 @@ in
       description = "CPU list to pin the benchmarks to (`taskset -c`). Ideally one that nothing else uses.";
     };
 
-    rounds = mkOption {
-      type = types.ints.positive;
-      default = 3;
-      description = "Alternating rounds per revision. More rounds are slower but filter out noise.";
-    };
-
     threshold = mkOption {
       type = types.numbers.positive;
-      default = 10;
-      description = "Relative change in percent above which a difference is reported.";
+      default = 2;
+      description = ''
+        Relative change of the instruction count in percent above which a difference is reported.
+        Repeated runs differ by up to about one percent in benchmarks that are dominated by hash
+        maps (the library seeds them randomly), and by far less elsewhere.
+      '';
     };
 
     benches = mkOption {
       type = types.listOf types.str;
       default = [
-        "baseline"
         "scc"
-        "operations"
+        "ts"
+        "runs"
+        "dfa"
         "dpa"
       ];
-      description = "Bench targets to run, those a revision does not define are skipped.";
+      description = "Gungraun bench targets to run, those a revision does not define are skipped.";
+    };
+
+    wallclockBench = mkOption {
+      type = types.nullOr types.str;
+      default = "wallclock";
+      description = "The criterion target with wall-clock times, shown in the detail view of a run only. `null` skips it.";
     };
 
     criterionArgs = mkOption {
@@ -159,13 +164,13 @@ in
             "--repo=${cfg.repo}"
             "--main-branch=${cfg.mainBranch}"
             "--label=${cfg.label}"
-            "--rounds=${toString cfg.rounds}"
             "--threshold=${toString cfg.threshold}"
             "--webhook-secret-file=%d/webhook-secret"
           ]
           ++ map (u: "--allowed-labeler=${u}") cfg.allowedLabelers
           ++ lib.optional cfg.allowForks "--allow-forks"
           ++ lib.optional (cfg.githubTokenFile != null) "--github-token-file=%d/github-token"
+          ++ (if cfg.wallclockBench == null then [ "--no-wallclock" ] else [ "--wallclock-bench=${cfg.wallclockBench}" ])
           ++ lib.optional (cfg.virtualHost != null) "--public-url=https://${cfg.virtualHost}/"
           ++ lib.optional (cfg.cpu != null) "--cpu=${cfg.cpu}"
           # the default bench list is replaced, not extended, so it is always passed
@@ -181,9 +186,7 @@ in
         User = "automata-bench";
         Group = "automata-bench";
         StateDirectory = "automata-bench";
-        # the web server reads the dashboard from here
-        StateDirectoryMode = "0755";
-        UMask = "0022";
+        StateDirectoryMode = "0750";
         WorkingDirectory = stateDir;
         Restart = "on-failure";
         RestartSec = 10;
@@ -217,10 +220,6 @@ in
         forceSSL = true;
         enableACME = true;
         locations."/" = {
-          root = "${stateDir}/www";
-          index = "index.html";
-        };
-        locations."= /webhook" = {
           proxyPass = "http://${cfg.listenAddress}:${toString cfg.port}";
           extraConfig = ''
             client_max_body_size 5m;

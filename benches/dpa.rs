@@ -1,86 +1,250 @@
-//! Operations on deterministic parity automata.
+//! Operations on deterministic parity automata: normalization, complementation, witnesses,
+//! language comparison, structure and HOA input/output.
 
 mod common;
 
-use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use automata::automaton::DPA;
+use automata::hoa::WriteHoa;
+use automata::representation::CollectTs;
+use automata::{Int, TransitionSystem};
+use common::FixtureDpa;
+use gungraun::prelude::*;
 use std::hint::black_box;
 
-use automata::TransitionSystem;
-
-fn normalization(c: &mut Criterion) {
-    let mut group = c.benchmark_group("dpa/normalized");
-    for n in [1_000, 4_000, 16_000] {
-        let dpa = common::dpa(n, 21);
-        group.bench_with_input(BenchmarkId::from_parameter(n), &dpa, |b, dpa| {
-            b.iter(|| black_box(dpa.normalized().size()))
-        });
-    }
-    group.finish();
+fn scrambled(n: usize) -> DPA {
+    common::scrambled_dpa(n, 2, 8)
+}
+fn scrambled_k4(n: usize) -> DPA {
+    common::scrambled_dpa(n, 4, 12)
+}
+fn chain(n: usize) -> DPA {
+    common::chain_dpa(n, 8)
 }
 
-fn complement(c: &mut Criterion) {
-    let mut group = c.benchmark_group("dpa/complement");
-    for n in [1_000, 4_000, 16_000] {
-        let dpa = common::dpa(n, 22);
-        group.bench_with_input(BenchmarkId::new("normalizing", n), &dpa, |b, dpa| {
-            b.iter(|| black_box(dpa.clone().complement().size()))
-        });
-        group.bench_with_input(
-            BenchmarkId::new("without_normalizing", n),
-            &dpa,
-            |b, dpa| {
-                b.iter(|| {
-                    black_box(
-                        dpa.clone()
-                            .complement_without_normalizing()
-                            .map(|d| d.size()),
-                    )
-                })
-            },
-        );
-    }
-    group.finish();
+// ---- normalization -----------------------------------------------------------------------------
+
+#[library_benchmark]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
+#[bench::scrambled_k4_1000(args = (1_000), setup = scrambled_k4)]
+#[bench::chain_1000(args = (1_000), setup = chain)]
+#[bench::chain_4000(args = (4_000), setup = chain)]
+fn normalized(dpa: DPA) -> usize {
+    black_box(dpa.normalized().size())
 }
 
-fn witnesses(c: &mut Criterion) {
-    let mut group = c.benchmark_group("dpa/witness");
-    for n in [100, 400, 1_600] {
-        let dpa = common::dpa(n, 23);
-        group.bench_with_input(BenchmarkId::new("accepted_word", n), &dpa, |b, dpa| {
-            b.iter(|| black_box(dpa.give_accepted_word()))
-        });
-        group.bench_with_input(BenchmarkId::new("rejected_word", n), &dpa, |b, dpa| {
-            b.iter(|| black_box(dpa.give_rejected_word()))
-        });
-    }
-    group.finish();
+#[library_benchmark]
+#[bench::ltl(setup = common::ltl_dpas)]
+#[bench::synthetic(setup = common::synthetic_dpas)]
+fn normalized_fixtures(dpas: Vec<FixtureDpa>) -> usize {
+    black_box(dpas.iter().map(|dpa| dpa.normalized().size()).sum())
 }
 
-fn comparison(c: &mut Criterion) {
-    let mut group = c.benchmark_group("dpa/compare");
-    group.sample_size(20);
-    for n in [10, 25, 50] {
-        let (a, b) = (common::dpa(n, 24), common::dpa(n, 25));
-        group.bench_with_input(
-            BenchmarkId::new("language_equivalent_random", n),
-            &(a.clone(), b.clone()),
-            |bench, (a, b)| bench.iter(|| black_box(a.language_equivalent(b))),
-        );
-        group.bench_with_input(
-            BenchmarkId::new("included_in_random", n),
-            &(a.clone(), b.clone()),
-            |bench, (a, b)| bench.iter(|| black_box(a.included_in(b))),
-        );
-        // equal languages cannot be refuted early, so every pair of colors is searched
-        let normalized = a.normalized();
-        group.bench_with_input(
-            BenchmarkId::new("language_equivalent_normalized", n),
-            &(a.clone(), normalized),
-            |bench, (a, norm)| bench.iter(|| black_box(a.language_equivalent(norm))),
-        );
-    }
-    group.finish();
+// ---- complement --------------------------------------------------------------------------------
+
+#[library_benchmark]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
+#[bench::chain_1000(args = (1_000), setup = chain)]
+#[bench::chain_4000(args = (4_000), setup = chain)]
+fn complement(dpa: DPA) -> usize {
+    black_box(dpa.complement().size())
 }
 
-criterion_group!(benches, normalization, complement, witnesses, comparison);
-criterion_main!(benches);
+#[library_benchmark]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
+fn complement_without_normalizing(dpa: DPA) -> Option<usize> {
+    black_box(dpa.complement_without_normalizing().map(|d| d.size()))
+}
+
+#[library_benchmark]
+#[bench::ltl(setup = common::ltl_dpas)]
+#[bench::synthetic(setup = common::synthetic_dpas)]
+fn complement_fixtures(dpas: Vec<FixtureDpa>) -> usize {
+    let mut size = 0;
+    for dpa in dpas {
+        size += dpa.complement().size();
+    }
+    black_box(size)
+}
+
+// ---- emptiness and witnesses -------------------------------------------------------------------
+
+#[library_benchmark]
+#[bench::scrambled_100(args = (100), setup = scrambled)]
+#[bench::scrambled_400(args = (400), setup = scrambled)]
+#[bench::chain_100(args = (100), setup = chain)]
+#[bench::chain_400(args = (400), setup = chain)]
+fn accepted_word(dpa: DPA) -> bool {
+    black_box(dpa.give_accepted_word().is_some())
+}
+
+#[library_benchmark]
+#[bench::scrambled_100(args = (100), setup = scrambled)]
+#[bench::scrambled_400(args = (400), setup = scrambled)]
+#[bench::chain_100(args = (100), setup = chain)]
+#[bench::chain_400(args = (400), setup = chain)]
+fn rejected_word(dpa: DPA) -> bool {
+    black_box(dpa.give_rejected_word().is_some())
+}
+
+#[library_benchmark]
+#[bench::ltl(setup = common::ltl_dpas)]
+#[bench::synthetic(setup = common::synthetic_dpas)]
+fn witnesses_fixtures(dpas: Vec<FixtureDpa>) -> usize {
+    black_box(
+        dpas.iter()
+            .filter(|dpa| dpa.give_accepted_word().is_some())
+            .count()
+            + dpas
+                .iter()
+                .filter(|dpa| dpa.give_rejected_word().is_some())
+                .count(),
+    )
+}
+
+// For every priority, a word whose run sees it infinitely often as the smallest one.
+#[library_benchmark]
+#[bench::scrambled_100(args = (100), setup = scrambled)]
+#[bench::scrambled_400(args = (400), setup = scrambled)]
+#[bench::chain_100(args = (100), setup = chain)]
+#[bench::chain_400(args = (400), setup = chain)]
+fn witness_colors(dpa: DPA) -> usize {
+    black_box(
+        dpa.colors()
+            .filter(|&c| dpa.witness_color(c).is_some())
+            .count(),
+    )
+}
+
+// ---- comparing languages -----------------------------------------------------------------------
+
+// A pair of an automaton and its normalization: equal languages, so nothing can be refuted
+// early and the whole product is searched.
+fn with_normalization(n: usize) -> (DPA, DPA) {
+    let dpa = common::scrambled_dpa(n, 2, 8);
+    let normalized = dpa.normalized().collect_dpa();
+    (dpa, normalized)
+}
+
+// An automaton and its complement: the languages are disjoint, a counterexample is found quickly.
+fn with_complement(n: usize) -> (DPA, DPA) {
+    let dpa = common::scrambled_dpa(n, 2, 8);
+    let complement = dpa.clone().complement();
+    (dpa, complement)
+}
+
+#[library_benchmark]
+#[bench::normalized_25(args = (25), setup = with_normalization)]
+#[bench::normalized_50(args = (50), setup = with_normalization)]
+#[bench::normalized_100(args = (100), setup = with_normalization)]
+#[bench::complement_25(args = (25), setup = with_complement)]
+#[bench::complement_50(args = (50), setup = with_complement)]
+#[bench::complement_100(args = (100), setup = with_complement)]
+fn language_equivalent((a, b): (DPA, DPA)) -> bool {
+    black_box(a.language_equivalent(&b))
+}
+
+#[library_benchmark]
+#[bench::normalized_25(args = (25), setup = with_normalization)]
+#[bench::normalized_50(args = (50), setup = with_normalization)]
+#[bench::normalized_100(args = (100), setup = with_normalization)]
+#[bench::complement_25(args = (25), setup = with_complement)]
+#[bench::complement_50(args = (50), setup = with_complement)]
+#[bench::complement_100(args = (100), setup = with_complement)]
+fn included_in((a, b): (DPA, DPA)) -> bool {
+    black_box(a.included_in(&b))
+}
+
+#[library_benchmark]
+#[bench::normalized_25(args = (25), setup = with_normalization)]
+#[bench::normalized_50(args = (50), setup = with_normalization)]
+#[bench::normalized_100(args = (100), setup = with_normalization)]
+#[bench::complement_25(args = (25), setup = with_complement)]
+#[bench::complement_50(args = (50), setup = with_complement)]
+#[bench::complement_100(args = (100), setup = with_complement)]
+fn witness_not_subset_of((a, b): (DPA, DPA)) -> bool {
+    black_box(a.witness_not_subset_of(&b).is_some())
+}
+
+#[library_benchmark]
+#[bench::complement_25(args = (25), setup = with_complement)]
+#[bench::complement_50(args = (50), setup = with_complement)]
+#[bench::complement_100(args = (100), setup = with_complement)]
+fn witness_inequivalence((a, b): (DPA, DPA)) -> bool {
+    black_box(a.witness_inequivalence(&b).is_some())
+}
+
+// ---- structure ---------------------------------------------------------------------------------
+
+#[library_benchmark]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
+#[bench::chain_1000(args = (1_000), setup = chain)]
+#[bench::chain_4000(args = (4_000), setup = chain)]
+fn sccs(dpa: DPA) -> usize {
+    black_box(dpa.sccs().size())
+}
+
+// The congruence that the learning algorithms ask for.
+#[library_benchmark]
+#[bench::scrambled_8(args = (8), setup = scrambled)]
+#[bench::scrambled_16(args = (16), setup = scrambled)]
+#[bench::chain_8(args = (8), setup = chain)]
+#[bench::chain_16(args = (16), setup = chain)]
+fn prefix_partition(dpa: DPA) -> usize {
+    black_box(dpa.prefix_partition().len())
+}
+
+#[library_benchmark]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
+fn collect_dpa(dpa: DPA) -> DPA {
+    black_box(dpa.collect_dpa())
+}
+
+#[library_benchmark]
+#[bench::scrambled_1000(args = (1_000), setup = scrambled)]
+#[bench::scrambled_4000(args = (4_000), setup = scrambled)]
+fn map_edge_colors_collect(dpa: DPA) -> usize {
+    black_box(dpa.map_edge_colors(|c| c / 2 as Int).collect_dts().size())
+}
+
+// ---- HOA ---------------------------------------------------------------------------------------
+
+fn ltl_texts() -> Vec<String> {
+    common::fixture_texts(common::LTL)
+}
+fn synthetic_texts() -> Vec<String> {
+    common::fixture_texts(common::SYNTHETIC)
+}
+
+#[library_benchmark]
+#[bench::ltl(setup = ltl_texts)]
+#[bench::synthetic(setup = synthetic_texts)]
+fn hoa_parse(texts: Vec<String>) -> usize {
+    black_box(
+        texts
+            .iter()
+            .map(|text| common::parse_dpa(text).size())
+            .sum(),
+    )
+}
+
+#[library_benchmark]
+#[bench::ltl(setup = common::ltl_dpas)]
+#[bench::synthetic(setup = common::synthetic_dpas)]
+fn hoa_print(dpas: Vec<FixtureDpa>) -> usize {
+    black_box(dpas.iter().map(|dpa| dpa.to_hoa().len()).sum())
+}
+
+library_benchmark_group!(
+    name = dpa;
+    benchmarks = normalized, normalized_fixtures, complement, complement_without_normalizing,
+        complement_fixtures, accepted_word, rejected_word, witnesses_fixtures, witness_colors,
+        language_equivalent, included_in, witness_not_subset_of, witness_inequivalence, sccs,
+        prefix_partition, collect_dpa, map_edge_colors_collect, hoa_parse, hoa_print
+);
+
+main!(library_benchmark_groups = dpa);

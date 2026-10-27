@@ -8,6 +8,8 @@
   git,
   util-linux,
   coreutils,
+  valgrind,
+  gungraun-runner,
 }:
 
 rustPlatform.buildRustPackage {
@@ -20,6 +22,7 @@ rustPlatform.buildRustPackage {
       ../tools/bench/Cargo.toml
       ../tools/bench/Cargo.lock
       ../tools/bench/src
+      ../tools/bench/static
     ];
   };
   cargoLock.lockFile = ../tools/bench/Cargo.lock;
@@ -35,12 +38,14 @@ rustPlatform.buildRustPackage {
         git
         util-linux # taskset
         coreutils
+        valgrind # the benchmarks run under callgrind and DHAT
+        gungraun-runner # must match the version of the gungraun dependency
       ]
     }
   '';
 
   meta = {
-    description = "Benchmark runner, history database, dashboard and webhook service for the automata crate";
+    description = "Benchmark runner (instruction counts), history database, dashboard and webhook service for the automata crate";
     mainProgram = "automata-bench";
     license = lib.licenses.mit;
   };

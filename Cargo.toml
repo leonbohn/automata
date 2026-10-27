@@ -11,7 +11,7 @@ license = "MIT"
 authors = ["León Bohn <bohn@lics.rwth-aachen.de>"]
 keywords = ["transition-system", "language", "hoa", "automata", "omega-automata"]
 categories = ["mathematics", "science"]
-exclude = [".github", "scripts", "tools", "nix", "docs", "flake.nix", "flake.lock", "CHANGELOG.md", "CLAUDE.md", "PANIC-AUDIT.md", "PLAN.md", "TODO-TRIAGE.md"]
+exclude = ["benches/fixtures", "tests/benchmark_fixtures.rs", ".github", "scripts", "tools", "nix", "docs", "flake.nix", "flake.lock", "CHANGELOG.md", "CLAUDE.md", "PANIC-AUDIT.md", "PLAN.md", "TODO-TRIAGE.md"]
 
 [dependencies]
 tracing = "0.1"
@@ -39,6 +39,8 @@ rand_distr = { version = "0.6", optional = true }
 [dev-dependencies]
 test-log = { version = "0.2", features = ["trace"] }
 criterion = "0.8"
+# the runner (gungraun-runner) must have exactly this version
+gungraun = "=0.20.0"
 
 [features]
 default = ["hoa"]
@@ -58,15 +60,29 @@ required-features = ["hoa"]
 [[bench]]
 name = "scc"
 harness = false
+required-features = ["hoa"]
 
 [[bench]]
-name = "operations"
+name = "ts"
 harness = false
+required-features = ["hoa"]
+
+[[bench]]
+name = "runs"
+harness = false
+required-features = ["hoa"]
 
 [[bench]]
 name = "dpa"
 harness = false
+required-features = ["hoa"]
 
 [[bench]]
-name = "baseline"
+name = "dfa"
 harness = false
+required-features = ["hoa"]
+
+[[bench]]
+name = "wallclock"
+harness = false
+required-features = ["hoa"]

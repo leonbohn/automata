@@ -1,18 +1,20 @@
 //! Benchmark runner, history database, dashboard and webhook service for `automata`.
 
+mod charts;
 mod compare;
 mod criterion;
 mod db;
 mod engine;
 mod github;
+mod gungraun;
 mod model;
-mod render;
 mod report;
 mod server;
+mod web;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::{Args, Parser, Subcommand};
-use engine::Engine;
+use engine::{Control, Engine};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -24,15 +26,18 @@ struct Cli {
 
 #[derive(Args, Clone)]
 struct EngineArgs {
-    /// Bench targets to run (those a revision does not define are skipped).
-    #[arg(long = "bench", default_values_t = ["baseline".to_string(), "scc".into(), "operations".into(), "dpa".into()])]
+    /// Gungraun bench targets to run (those a revision does not define are skipped).
+    #[arg(long = "bench", default_values_t = ["scc".to_string(), "ts".into(), "runs".into(), "dfa".into(), "dpa".into()])]
     benches: Vec<String>,
+    /// The criterion target with the wall-clock times, shown in the detail view only.
+    #[arg(long, default_value = "wallclock")]
+    wallclock_bench: String,
+    /// Do not run the wall-clock target.
+    #[arg(long)]
+    no_wallclock: bool,
     /// Arguments passed to criterion.
     #[arg(long = "criterion-arg", default_values_t = ["--quick".to_string()], allow_hyphen_values = true)]
     criterion_args: Vec<String>,
-    /// Number of alternating rounds per revision.
-    #[arg(long, default_value_t = 3)]
-    rounds: u32,
     /// Pin the benchmarks to this CPU list with `taskset -c`.
     #[arg(long)]
     cpu: Option<String>,
@@ -54,8 +59,8 @@ enum Command {
         /// Path inside the repository.
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Changes above this many percent count (if outside the spread of the rounds).
-        #[arg(long, default_value_t = 10.0)]
+        /// Changes of the instruction count above this many percent count.
+        #[arg(long, default_value_t = 2.0)]
         threshold: f64,
         #[command(flatten)]
         engine: EngineArgs,
@@ -69,8 +74,23 @@ enum Command {
         #[command(flatten)]
         engine: EngineArgs,
     },
-    /// Receive GitHub webhooks, run benchmarks for labelled pull requests and `main`, keep the
-    /// history, serve nothing itself: the dashboard is written to `<state-dir>/www`.
+    /// Run the suite several times on one revision and fail if the instruction counts differ.
+    CheckDeterminism {
+        #[arg(long, default_value = "HEAD")]
+        rev: String,
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// How often the suite is run.
+        #[arg(long, default_value_t = 2)]
+        runs: usize,
+        /// Largest accepted deviation between runs in percent.
+        #[arg(long, default_value_t = 2.0)]
+        tolerance: f64,
+        #[command(flatten)]
+        engine: EngineArgs,
+    },
+    /// Serve the dashboard, receive GitHub webhooks and run benchmarks for labelled pull requests
+    /// and for every commit of `main`.
     Serve {
         #[arg(long, env = "AUTOMATA_BENCH_LISTEN", default_value = "127.0.0.1:8742")]
         listen: String,
@@ -103,7 +123,7 @@ enum Command {
         /// Where the dashboard is reachable, used in links.
         #[arg(long, default_value = "")]
         public_url: String,
-        #[arg(long, default_value_t = 10.0)]
+        #[arg(long, default_value_t = 2.0)]
         threshold: f64,
         #[command(flatten)]
         engine: EngineArgs,
@@ -142,9 +162,27 @@ fn engine_from(git_dir: PathBuf, args: &EngineArgs) -> Engine {
             .unwrap_or_else(|| git_dir.join("automata-bench")),
         git_dir,
         benches: args.benches.clone(),
+        wallclock_bench: (!args.no_wallclock).then(|| args.wallclock_bench.clone()),
         criterion_args: args.criterion_args.clone(),
-        rounds: args.rounds,
         cpu: args.cpu.clone(),
+    }
+}
+
+/// A control that writes the output of the commands to stderr's log, for local use.
+fn local_control(engine: &Engine) -> Control {
+    let log = engine.work_dir.join("last-run.log");
+    let _ = std::fs::create_dir_all(&engine.work_dir);
+    let _ = std::fs::remove_file(&log);
+    eprintln!("output of the builds and benchmarks: {}", log.display());
+    Control { log: Some(log) }
+}
+
+/// Benchmarks that executed (almost) no instructions did not measure what they claim to.
+fn warn_about_empty(results: &model::Results) {
+    for (name, m) in results {
+        if m.instructions < 1_000 {
+            tracing::warn!("{name} executed only {} instructions", m.instructions);
+        }
     }
 }
 
@@ -166,30 +204,98 @@ fn main() -> Result<()> {
         } => {
             let engine = local_engine(&repo, &engine)?;
             let (base, head) = (engine.resolve(&base)?, engine.resolve(&head)?);
-            let m = engine.measure(&[("head", &head), ("base", &base)])?;
-            let rows = compare::compare(&m.results["base"], &m.results["head"], threshold);
+            let m = engine.measure(&[("head", &head), ("base", &base)], &local_control(&engine))?;
+            warn_about_empty(&m.results["head"].results);
+            let rows = compare::compare(
+                &m.results["base"].results,
+                &m.results["head"].results,
+                threshold,
+            );
             println!(
                 "{}",
-                report::comment(&rows, &head, &base, &m.env, threshold, engine.rounds, "")
+                report::comment(&rows, &head, &base, &m.env, threshold, "")
             );
         }
         Command::Run { rev, repo, engine } => {
             let engine = local_engine(&repo, &engine)?;
             let rev = engine.resolve(&rev)?;
-            let m = engine.measure(&[("head", &rev)])?;
-            println!("| benchmark | mean | range |\n|---|--:|--:|");
-            for (name, e) in &m.results["head"] {
+            let m = engine.measure(&[("head", &rev)], &local_control(&engine))?;
+            let measured = &m.results["head"];
+            warn_about_empty(&measured.results);
+            println!(
+                "| benchmark | instructions | est. cycles | heap bytes | allocations |\n|---|--:|--:|--:|--:|"
+            );
+            for (name, e) in &measured.results {
+                let opt = |v: Option<u64>| v.map(model::fmt_count).unwrap_or_default();
                 println!(
-                    "| `{name}` | {} | {} … {} |",
-                    model::fmt_ns(e.mean_ns),
-                    model::fmt_ns(e.min_ns),
-                    model::fmt_ns(e.max_ns)
+                    "| `{name}` | {} | {} | {} | {} |",
+                    model::fmt_count(e.instructions),
+                    model::fmt_count(e.estimated_cycles),
+                    opt(e.heap_bytes),
+                    opt(e.heap_blocks)
                 );
             }
             println!(
-                "\n{} · {} · {} · {} rounds",
-                m.env.host, m.env.cpu, m.env.rustc, engine.rounds
+                "\n{} · {} · {} · {}",
+                m.env.host, m.env.cpu, m.env.rustc, m.env.valgrind
             );
+            if !measured.wall.is_empty() {
+                println!("\n| wall clock | mean |\n|---|--:|");
+                for (name, w) in &measured.wall {
+                    println!("| `{name}` | {} |", model::fmt_ns(w.mean_ns));
+                }
+            }
+        }
+        Command::CheckDeterminism {
+            rev,
+            repo,
+            runs,
+            tolerance,
+            mut engine,
+        } => {
+            // wall-clock times are not part of this check
+            engine.no_wallclock = true;
+            let engine = local_engine(&repo, &engine)?;
+            let rev = engine.resolve(&rev)?;
+            let mut all = Vec::new();
+            for run in 1..=runs.max(2) {
+                tracing::info!(run, "running the suite");
+                let m = engine.measure(&[("head", &rev)], &local_control(&engine))?;
+                all.push(m.results["head"].results.clone());
+            }
+            let mut spreads: Vec<(f64, String)> = all[0]
+                .keys()
+                .map(|name| {
+                    let values: Vec<u64> = all
+                        .iter()
+                        .filter_map(|r| r.get(name))
+                        .map(|m| m.instructions)
+                        .collect();
+                    let lo = values.iter().min().copied().unwrap_or(0);
+                    let hi = values.iter().max().copied().unwrap_or(0);
+                    (compare::relative_change(lo, hi), name.clone())
+                })
+                .collect();
+            spreads.sort_by(|a, b| b.0.total_cmp(&a.0));
+            let above = |limit: f64| spreads.iter().filter(|(s, _)| *s > limit).count();
+            println!(
+                "{} benchmarks, {} runs; spread above 0.1 %: {}, above 0.5 %: {}, above 1 %: {}",
+                spreads.len(),
+                all.len(),
+                above(0.1),
+                above(0.5),
+                above(1.0)
+            );
+            for (spread, name) in spreads.iter().take(5) {
+                println!("  {spread:.3} %  {name}");
+            }
+            if let Some((spread, name)) = spreads.first()
+                && *spread > tolerance
+            {
+                bail!(
+                    "the spread of {name} ({spread:.2} %) is above the tolerance of {tolerance} %"
+                );
+            }
         }
         Command::Serve {
             listen,
