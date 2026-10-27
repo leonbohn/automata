@@ -32,3 +32,12 @@ needs more than 10 seconds or 1 GB to produce, are left out on purpose: the benc
 under valgrind, which is slow.
 
 References for the formula families are in `genltl --help` and the Spot documentation.
+
+## Which files the benchmarks use
+
+Parsing HOA is slow (about 45 µs per edge, and a benchmark runs under valgrind, which is roughly
+100 times slower), and every benchmark runs in its own process and parses its inputs again. The
+benchmarks therefore use two selections, `LTL` and `SYNTHETIC` in `benches/common/mod.rs`, of
+15 and 7 files. The other files are exercised by `tests/benchmark_fixtures.rs`, which checks that all
+of them can be read, and are there for benchmarks that want other shapes (larger, or with more
+priorities, such as `hard/ks-nca-3` and `ltl/pps-arbiter-3`).
