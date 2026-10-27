@@ -133,13 +133,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
             return None;
         }
 
-        // TODO: can we do this more efficiently?
-        while let Some(out_edge) = self.first_out_edge(state) {
-            self.swap_remove_edge(out_edge);
-        }
-        while let Some(in_edge) = self.first_in_edge(state) {
-            self.swap_remove_edge(in_edge);
-        }
+        let mut ids = self.out_edge_ids(state, |_| true);
+        ids.extend(self.in_edge_ids(state, |_| true));
+        self.remove_edge_ids(ids);
 
         self.vacate_state_index(state)
     }
@@ -259,6 +255,48 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
         removed
     }
 
+    /// The ids of the edges in the out-list of `state` for which `keep` holds, in list order.
+    fn out_edge_ids(&self, state: usize, mut keep: impl FnMut(usize) -> bool) -> Vec<usize> {
+        let mut ids = Vec::new();
+        let mut next = self.states.get(state).and_then(|s| s.first_out_edge());
+        while let Some(id) = next {
+            if keep(id) {
+                ids.push(id);
+            }
+            next = self.edges[id].out_next;
+        }
+        ids
+    }
+
+    /// The ids of the edges in the in-list of `state` for which `keep` holds, in list order.
+    fn in_edge_ids(&self, state: usize, mut keep: impl FnMut(usize) -> bool) -> Vec<usize> {
+        let mut ids = Vec::new();
+        let mut next = self.states.get(state).and_then(|s| s.first_in_edge());
+        while let Some(id) = next {
+            if keep(id) {
+                ids.push(id);
+            }
+            next = self.edges[id].in_next;
+        }
+        ids
+    }
+
+    /// Removes the edges with the given ids (duplicates are ignored) and returns them.
+    ///
+    /// [`Self::swap_remove_edge`] moves the last edge into the freed slot. Removing in descending
+    /// order keeps the remaining ids valid: the edge that is moved is either itself removed
+    /// already (it has the largest id) or ends up in a slot that is not in the list anymore.
+    fn remove_edge_ids(&mut self, mut ids: Vec<usize>) -> Vec<EdgeTuple<Self>> {
+        ids.sort_unstable_by(|a, b| b.cmp(a));
+        ids.dedup();
+        ids.into_iter()
+            .map(|id| {
+                self.swap_remove_edge(id)
+                    .expect("should be able to remove edge that exists")
+            })
+            .collect()
+    }
+
     fn out_edge_position(
         &self,
         from: usize,
@@ -266,7 +304,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
     ) -> Option<usize> {
         let mut idx = self.states.get(from)?.first_out_edge()?;
         loop {
-            // FIXME: Make this be a match
             if matcher.matches((&self.edges[idx]).expression()) {
                 return Some(idx);
             }
@@ -498,7 +535,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
             trace!("cannot remove edges from state that does not exist");
             return None;
         }
-        Some(self.filter_swap_remove_edges(|q, e, _, _| q == source && matcher.matches(e)))
+        let ids = self.out_edge_ids(id, |e| matcher.matches((&self.edges[e]).expression()));
+        Some(self.remove_edge_ids(ids))
     }
     fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         self.linked_remove_state(state.into_usize())
@@ -520,9 +558,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
             trace!("cannot remove edges to state that does not exist");
             return None;
         }
-        Some(self.filter_swap_remove_edges(|q, e, _, p| {
-            q == source && p == target && matcher.matches(e)
-        }))
+        let ids = self.out_edge_ids(source.into_usize(), |e| {
+            self.edges[e].target == id && matcher.matches((&self.edges[e]).expression())
+        });
+        Some(self.remove_edge_ids(ids))
     }
 
     fn remove_edges_between(
@@ -540,7 +579,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
             trace!("cannot remove edges to state that does not exist");
             return None;
         }
-        Some(self.filter_swap_remove_edges(|q, _, _, p| q == source && p == target))
+        let ids = self.out_edge_ids(source.into_usize(), |e| self.edges[e].target == id);
+        Some(self.remove_edge_ids(ids))
     }
 
     fn remove_edges_from(
@@ -552,7 +592,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
             trace!("cannot remove edges from state that does not exist");
             return None;
         }
-        Some(self.filter_swap_remove_edges(|q, _, _, _| q == source))
+        let ids = self.out_edge_ids(id, |_| true);
+        Some(self.remove_edge_ids(ids))
     }
 
     fn remove_edges_to(
@@ -564,7 +605,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
             trace!("cannot remove edges to state that does not exist");
             return None;
         }
-        Some(self.filter_swap_remove_edges(|_, _, _, p| p == target))
+        let ids = self.in_edge_ids(id, |_| true);
+        Some(self.remove_edge_ids(ids))
     }
 }
 
@@ -795,7 +837,7 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
 mod tests {
     use crate::TransitionSystem;
     use crate::alphabet::CharAlphabet;
-    use crate::ts::{Builder, Deterministic, ForAlphabet, Sproutable};
+    use crate::ts::{Builder, Deterministic, ForAlphabet, Shrinkable, Sproutable};
 
     #[test]
     fn dts_equality() {
@@ -818,6 +860,76 @@ mod tests {
             ])
             .into_dts();
         assert!(first == second, "equality should disregard order of edges");
+    }
+
+    /// Builds a nondeterministic TS with parallel edges and loops from a fixed pseudo random sequence.
+    fn tangle(n: u32) -> crate::NTS<CharAlphabet, u32, u32> {
+        let mut ts = crate::NTS::for_alphabet(CharAlphabet::of_size(2));
+        for q in 0..n {
+            ts.add_state(q);
+        }
+        let mut x = 12345u64;
+        let mut next = |bound: u32| {
+            x = x
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            ((x >> 33) % bound as u64) as u32
+        };
+        for c in 0..(6 * n) {
+            let sym = ['a', 'b'][next(2) as usize];
+            ts.add_edge((next(n), sym, c, next(n)));
+        }
+        ts
+    }
+
+    fn sorted(
+        mut edges: Vec<crate::ts::EdgeTuple<crate::NTS<CharAlphabet, u32, u32>>>,
+    ) -> Vec<(u32, char, u32, u32)> {
+        edges.sort();
+        edges
+    }
+
+    #[test]
+    fn list_walking_removal_agrees_with_full_scan() {
+        let n = 8;
+        for q in 0..n {
+            for p in 0..n {
+                let (mut fast, mut slow) = (tangle(n), tangle(n));
+                let a = fast.remove_edges_between(q, p).unwrap();
+                let b = slow.filter_swap_remove_edges(|s, _, _, t| s == q && t == p);
+                assert_eq!(sorted(a), sorted(b));
+                fast.verify_state();
+                assert_eq!(fast.size(), slow.size());
+
+                let a = fast.remove_edges_between_matching(q, p, 'a');
+                let b = slow.filter_swap_remove_edges(|s, e, _, t| s == q && t == p && *e == 'a');
+                assert_eq!(sorted(a.unwrap()), sorted(b));
+                fast.verify_state();
+            }
+            let (mut fast, mut slow) = (tangle(n), tangle(n));
+            let a = fast.remove_edges_from_matching(q, 'b').unwrap();
+            let b = slow.filter_swap_remove_edges(|s, e, _, _| s == q && *e == 'b');
+            assert_eq!(sorted(a), sorted(b));
+            fast.verify_state();
+            let a = fast.remove_edges_from(q).unwrap();
+            let b = slow.filter_swap_remove_edges(|s, _, _, _| s == q);
+            assert_eq!(sorted(a), sorted(b));
+            fast.verify_state();
+            let a = fast.remove_edges_to(q).unwrap();
+            let b = slow.filter_swap_remove_edges(|_, _, _, t| t == q);
+            assert_eq!(sorted(a), sorted(b));
+            fast.verify_state();
+
+            // removing a state removes all edges around it, loops included
+            let mut ts = tangle(n);
+            let before = ts.edges.len();
+            let touching = tangle(n)
+                .filter_swap_remove_edges(|s, _, _, t| s == q || t == q)
+                .len();
+            assert!(ts.remove_state(q).is_some());
+            ts.verify_state();
+            assert_eq!(ts.edges.len(), before - touching);
+        }
     }
 
     #[test]
