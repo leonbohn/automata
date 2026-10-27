@@ -798,6 +798,24 @@ mod tests {
     use crate::ts::{Builder, Deterministic, ForAlphabet, Sproutable};
 
     #[test]
+    fn is_deterministic_compares_all_edge_pairs() {
+        // the two edges on 'a' are not adjacent in this edge list
+        let nts = Builder::<_, _, false>::default()
+            .with_state_colors([0, 0, 0])
+            .with_edges([(0, 'a', 0u32, 1), (0, 'b', 0, 1), (0, 'a', 0, 2)])
+            .into_nts();
+        assert!(!nts.is_deterministic());
+        assert!(nts.try_into_deterministic().is_err());
+
+        let nts = Builder::<_, _, false>::default()
+            .with_state_colors([0, 0, 0])
+            .with_edges([(0, 'a', 0u32, 1), (0, 'b', 0, 1), (1, 'a', 0, 2)])
+            .into_nts();
+        assert!(nts.is_deterministic());
+        assert!(nts.try_into_deterministic().is_ok());
+    }
+
+    #[test]
     fn dts_equality() {
         let first = Builder::default()
             .with_state_colors([0, 1])
