@@ -74,51 +74,24 @@ pub fn handle_event(cfg: &Config, db: &Db, event: &str, payload: &Value) -> Resu
             {
                 return Ok("ignored push".into());
             }
-            // every commit of the push gets a point in the history, oldest first
-            let mut commits: Vec<(String, String)> = payload["commits"]
-                .as_array()
-                .map(|cs| {
-                    cs.iter()
-                        .filter_map(|c| {
-                            Some((
-                                c["id"].as_str()?.to_string(),
-                                c["message"]
-                                    .as_str()
-                                    .unwrap_or_default()
-                                    .lines()
-                                    .next()
-                                    .unwrap_or_default()
-                                    .to_string(),
-                            ))
-                        })
-                        .collect()
-                })
+            // only the head of a push is measured: for a merge that is the merge commit, and the
+            // commits it brought in get no point of their own in the history
+            let title = payload["head_commit"]["message"]
+                .as_str()
+                .unwrap_or_default()
+                .lines()
+                .next()
                 .unwrap_or_default();
-            if !commits.iter().any(|(id, _)| id == sha) {
-                commits.push((
-                    sha.to_string(),
-                    payload["head_commit"]["message"]
-                        .as_str()
-                        .unwrap_or_default()
-                        .lines()
-                        .next()
-                        .unwrap_or_default()
-                        .to_string(),
-                ));
-            }
-            let mut queued = 0;
-            for (id, title) in &commits {
-                let run = NewRun {
-                    kind: "main".into(),
-                    pr: None,
-                    title: title.clone(),
-                    head_sha: id.clone(),
-                };
-                queued += usize::from(db.enqueue(&run)?.is_some());
-            }
+            let run = NewRun {
+                kind: "main".into(),
+                pr: None,
+                title: title.into(),
+                head_sha: sha.into(),
+            };
+            let queued = db.enqueue(&run)?.is_some();
             Ok(format!(
-                "main {sha}: {queued} of {} commits queued",
-                commits.len()
+                "main {sha}: {}",
+                if queued { "queued" } else { "already known" }
             ))
         }
         "pull_request" => {
@@ -464,7 +437,7 @@ fn process(cfg: &Config, db: &Db, run: &Run, control: &Control) -> Result<()> {
     match run.pr {
         Some(pr) => {
             let base = engine.merge_base(&format!("refs/heads/{}", cfg.main_branch), &head)?;
-            // `main` is benchmarked at every commit, so the merge base usually is known already
+            // every push to `main` is measured, so the merge base usually is known already
             let known = db.main_measurement(&base)?;
             let mut m = engine.measure(&[("head", &head)], control)?;
             let base_measured: Measured = match known {
@@ -620,17 +593,17 @@ mod tests {
     }
 
     #[test]
-    fn every_commit_of_a_push_is_queued_oldest_first() {
+    fn only_the_head_of_a_push_is_queued() {
         let db = memory_db();
         let event = json!({
             "ref": "refs/heads/main", "after": "c3", "repository": {"full_name": "o/r"},
-            "commits": [{"id": "c1", "message": "one\n\nbody"}, {"id": "c2", "message": "two"}, {"id": "c3", "message": "three"}],
+            "head_commit": {"id": "c3", "message": "Merge pull request #1\n\nbody"},
+            "commits": [{"id": "c1", "message": "one"}, {"id": "c2", "message": "two"}, {"id": "c3", "message": "three"}],
         });
         handle_event(&cfg(), &db, "push", &event).unwrap();
-        let order: Vec<String> = std::iter::from_fn(|| db.claim().unwrap())
-            .map(|r| r.head_sha)
-            .collect();
-        assert_eq!(order, ["c1", "c2", "c3"]);
+        let run = db.claim().unwrap().unwrap();
+        assert_eq!(run.head_sha, "c3");
+        assert!(db.claim().unwrap().is_none());
     }
 
     #[test]
