@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Removing edges and states of a `LinkedListTransitionSystem` (`remove_edges_from`, `remove_edges_to`, `remove_edges_between`, `remove_edges_from_matching`, `remove_edges_between_matching`, `remove_state`) walks the edge lists of the states involved instead of scanning all edges, so the cost is proportional to the degree. The order of the returned edges may differ.
 - `IntoTs::into_dfa_with_initial` only requires `Deterministic<StateColor = bool>` instead of `Congruence`, since the initial state is given explicitly.
 - **Breaking:** `display_rendered` and `display_rendered_graphviz` now write an SVG to a temporary file and open it with the default program of the system (`xdg-open` on Linux, `open` on macOS, `start` on Windows) instead of piping a PNG to ImageMagick's `display`. This works on Wayland. The `IMAGE_VIEWER` environment variable is still honored, the program is now called with the path of the file instead of reading from stdin. The temporary file is not deleted.
 - **Breaking:** the `graphviz` feature no longer implies `render`; it does not pull in `layout-rs`, `resvg` and `usvg` anymore.
