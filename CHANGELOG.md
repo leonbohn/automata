@@ -18,6 +18,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Breaking:** removed the type aliases `math::OrderedSet`, `math::OrderedMap` and `math::Bijection` and the reexports `math::ordered_set` and `math::ordered_map`; use `BTreeSet`, `BTreeMap`, `bimap::BiBTreeMap` and `std::collections::{btree_set, btree_map}` directly (#64).
+- **Breaking:** `math::Set` and `math::Map` are renamed to `math::FxIndexSet` and `math::FxIndexMap` and use the deterministic `rustc_hash::FxBuildHasher` instead of a randomly seeded one, so iteration order and benchmark instruction counts are reproducible. They are created with `default()` instead of `new()`. The hash maps in the SCC and normalization code use the same hasher.
+- **Breaking:** `math::Partition` moved to `partition::Partition`.
 - `DPA::normalized` stores the recoloring in a `HashMap` instead of a linearly searched `Vec` and collects the transition system only once (#39).
 - Removing edges and states of a `LinkedListTransitionSystem` (`remove_edges_from`, `remove_edges_to`, `remove_edges_between`, `remove_edges_from_matching`, `remove_edges_between_matching`, `remove_state`) walks the edge lists of the states involved instead of scanning all edges, so the cost is proportional to the degree. The order of the returned edges may differ.
 - `IntoTs::into_dfa_with_initial` only requires `Deterministic<StateColor = bool>` instead of `Congruence`, since the initial state is given explicitly.

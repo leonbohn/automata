@@ -1,7 +1,7 @@
 use crate::{
     Int, Void,
     alphabet::{Alphabet, CharAlphabet},
-    math::Map,
+    math::FxIndexMap,
     word::FiniteWord,
 };
 
@@ -25,7 +25,7 @@ use crate::{Congruence, RightCongruence};
 #[derive(Debug, Clone)]
 pub struct Family<T: Congruence, X> {
     leading: T,
-    progress: Map<StateIndex<T>, X>,
+    progress: FxIndexMap<StateIndex<T>, X>,
 }
 
 impl<T: Congruence, X> Family<T, X> {
@@ -55,10 +55,10 @@ impl<T: Congruence, X> Family<T, X> {
         self.progress
             .get_mut(&self.leading.reached_state_index(word)?)
     }
-    pub(crate) fn into_parts(self) -> (T, Map<StateIndex<T>, X>) {
+    pub(crate) fn into_parts(self) -> (T, FxIndexMap<StateIndex<T>, X>) {
         (self.leading, self.progress)
     }
-    pub(crate) fn from_parts(leading: T, progress: Map<StateIndex<T>, X>) -> Self {
+    pub(crate) fn from_parts(leading: T, progress: FxIndexMap<StateIndex<T>, X>) -> Self {
         assert_eq!(leading.size(), progress.len());
         Self { leading, progress }
     }

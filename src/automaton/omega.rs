@@ -16,11 +16,11 @@ use super::InfiniteWordAutomaton;
 use crate::Error;
 use crate::Int;
 use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
-use crate::math::OrderedSet;
 use crate::representation::IntoTs;
 use crate::ts::{Builder, DefaultIdType, ForAlphabet, IsEdge, ScalarIndexType, Sproutable};
 use crate::{DTS, Pointed, TS, TransitionSystem};
 pub use acceptance_mask::{AcceptanceError, AcceptanceMask};
+use std::collections::BTreeSet;
 
 /// Type alias for an omega automaton (i.e. an [`InfiniteWordAutomaton`]) that is guaranteed to be
 /// [`crate::Deterministic`].
@@ -80,7 +80,7 @@ impl OmegaAcceptanceCondition {
     /// of the condition, otherwise an [`Error::Acceptance`] is returned.
     /// [`OmegaAcceptanceCondition::Rabin`] and [`OmegaAcceptanceCondition::Streett`] yield
     /// [`Error::NotYetImplemented`].
-    pub fn satisfied(&self, infset: &OrderedSet<AcceptanceMask>) -> Result<bool, Error> {
+    pub fn satisfied(&self, infset: &BTreeSet<AcceptanceMask>) -> Result<bool, Error> {
         match self {
             OmegaAcceptanceCondition::Parity(low, high) => {
                 let min = Self::priorities(infset, *low, *high)?.into_iter().min();
@@ -103,7 +103,7 @@ impl OmegaAcceptanceCondition {
     }
 
     fn priorities(
-        infset: &OrderedSet<AcceptanceMask>,
+        infset: &BTreeSet<AcceptanceMask>,
         low: Int,
         high: Int,
     ) -> Result<Vec<Int>, AcceptanceError> {
@@ -308,7 +308,7 @@ mod tests {
         DeterministicOmegaAutomaton::new(ts, q, acceptance)
     }
 
-    fn infset(masks: &[&[Int]]) -> OrderedSet<AcceptanceMask> {
+    fn infset(masks: &[&[Int]]) -> BTreeSet<AcceptanceMask> {
         masks
             .iter()
             .map(|m| AcceptanceMask::from_iter(m.iter().copied()))
@@ -386,7 +386,7 @@ mod tests {
         ];
         for (acc, mask, expected) in cases {
             let mask = AcceptanceMask::from_iter(mask);
-            let set: OrderedSet<_> = [mask.clone()].into_iter().collect();
+            let set: BTreeSet<_> = [mask.clone()].into_iter().collect();
             assert_eq!(acc.satisfied(&set), Ok(expected), "{acc:?} {mask:?}");
 
             let dpa = two_state_automaton(acc, mask).into_dpa().unwrap();

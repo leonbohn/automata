@@ -5,6 +5,8 @@ use crate::{
     word::Infix,
     word::{FiniteWord, OmegaWord, ReducedOmegaWord, Word},
 };
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::{fmt::Debug, marker::PhantomData};
 
 use crate::TransitionSystem;
@@ -73,9 +75,9 @@ pub struct EdgeColorLimit<T: TransitionSystem, const MAX: bool = false>(pub Edge
 /// Observes the set of states that were visited. For infinite runs these are the states that
 /// are visited infinitely often.
 #[derive(Clone, Debug)]
-pub struct StateSet<T: TransitionSystem>(pub(crate) math::OrderedSet<StateIndex<T>>);
+pub struct StateSet<T: TransitionSystem>(pub(crate) BTreeSet<StateIndex<T>>);
 impl<T: TransitionSystem> std::ops::Deref for StateSet<T> {
-    type Target = math::OrderedSet<StateIndex<T>>;
+    type Target = BTreeSet<StateIndex<T>>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -103,9 +105,9 @@ impl<T: TransitionSystem> std::ops::Deref for StateColorSequence<T> {
 
 /// Observes the set of colors of visited states. For infinite runs these are the colors
 /// that are seen infinitely often.
-pub struct StateColorSet<T: TransitionSystem>(math::Set<StateColor<T>>);
+pub struct StateColorSet<T: TransitionSystem>(math::FxIndexSet<StateColor<T>>);
 impl<T: TransitionSystem> std::ops::Deref for StateColorSet<T> {
-    type Target = math::Set<StateColor<T>>;
+    type Target = math::FxIndexSet<StateColor<T>>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -114,9 +116,9 @@ impl<T: TransitionSystem> std::ops::Deref for StateColorSet<T> {
 /// Observes the set of colors of the taken edges. For infinite runs these are the colors
 /// that are seen infinitely often.
 #[derive(Debug)]
-pub struct EdgeColorSet<T: TransitionSystem>(pub(crate) math::Set<EdgeColor<T>>);
+pub struct EdgeColorSet<T: TransitionSystem>(pub(crate) math::FxIndexSet<EdgeColor<T>>);
 impl<T: TransitionSystem> std::ops::Deref for EdgeColorSet<T> {
-    type Target = math::Set<EdgeColor<T>>;
+    type Target = math::FxIndexSet<EdgeColor<T>>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -136,9 +138,9 @@ impl<T: TransitionSystem> std::ops::Deref for EdgeColorSequence<T> {
 /// Observes the set of pairs `(state, symbol)` of transitions that were taken. For infinite
 /// runs these are the transitions that are taken infinitely often.
 #[derive(Debug, Clone)]
-pub struct Triggers<T: TransitionSystem>(math::OrderedSet<(StateIndex<T>, SymbolOf<T>)>);
+pub struct Triggers<T: TransitionSystem>(BTreeSet<(StateIndex<T>, SymbolOf<T>)>);
 impl<T: TransitionSystem> std::ops::Deref for Triggers<T> {
-    type Target = math::OrderedSet<(StateIndex<T>, SymbolOf<T>)>;
+    type Target = BTreeSet<(StateIndex<T>, SymbolOf<T>)>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -228,7 +230,7 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
             }
         };
 
-        let mut seen = math::OrderedMap::default();
+        let mut seen = BTreeMap::default();
         let mut iteration = 0;
         seen.insert(current, iteration);
         let mut seq = vec![];
@@ -726,7 +728,7 @@ mod impls {
         type Current = Self;
         #[inline(always)]
         fn begin(_ts: &T, state: StateIndex<T>) -> Self {
-            Self(math::OrderedSet::from_iter([state]))
+            Self(BTreeSet::from_iter([state]))
         }
         #[inline(always)]
         fn into_current(self) -> Self::Current {
@@ -840,7 +842,7 @@ mod impls {
         #[inline(always)]
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
             let start = ts.state_color(state).unwrap();
-            Self(math::Set::from_iter([start]))
+            Self(math::FxIndexSet::from_iter([start]))
         }
         #[inline(always)]
         fn current(&self) -> &Self::Current {
@@ -876,7 +878,7 @@ mod impls {
         type Current = Self;
         #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
-            Self(math::Set::default())
+            Self(math::FxIndexSet::default())
         }
         #[inline(always)]
         fn current(&self) -> &Self::Current {
@@ -901,10 +903,14 @@ mod impls {
     impl<T: Deterministic> InfiniteObserver<T> for EdgeColorSet<T> {
         #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            Self(seq[time..].iter().fold(math::Set::default(), |mut acc, x| {
-                acc.extend(x.0.iter().cloned());
-                acc
-            }))
+            Self(
+                seq[time..]
+                    .iter()
+                    .fold(math::FxIndexSet::default(), |mut acc, x| {
+                        acc.extend(x.0.iter().cloned());
+                        acc
+                    }),
+            )
         }
     }
     impl<T: Deterministic> Clone for EdgeColorSet<T> {
@@ -958,7 +964,7 @@ mod impls {
     }
 
     impl<T: Deterministic> Observer<T> for Triggers<T> {
-        type Current = math::OrderedSet<(StateIndex<T>, SymbolOf<T>)>;
+        type Current = BTreeSet<(StateIndex<T>, SymbolOf<T>)>;
 
         #[inline(always)]
         fn current(&self) -> &Self::Current {
@@ -972,7 +978,7 @@ mod impls {
 
         #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
-            Self(math::OrderedSet::default())
+            Self(BTreeSet::default())
         }
 
         #[inline(always)]
@@ -993,12 +999,10 @@ mod impls {
             assert!(!seq.is_empty());
             assert!(time < seq.len());
 
-            seq[time..]
-                .iter()
-                .fold(math::OrderedSet::default(), |mut acc, x| {
-                    acc.extend(x.iter().cloned());
-                    acc
-                })
+            seq[time..].iter().fold(BTreeSet::default(), |mut acc, x| {
+                acc.extend(x.iter().cloned());
+                acc
+            })
         }
     }
 }

@@ -3,7 +3,7 @@ use std::{cell::OnceCell, hash::Hash};
 use crate::ts::{StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
 use crate::{
-    Show, math,
+    Show,
     word::{FiniteWord, Word},
 };
 use bimap::BiBTreeMap;
@@ -11,7 +11,7 @@ use itertools::Itertools;
 
 /// Represents a bijection between state indices of a transition
 /// system and the minimal representative word.
-pub struct StateNaming<T: TransitionSystem>(math::Bijection<StateIndex<T>, Vec<SymbolOf<T>>>);
+pub struct StateNaming<T: TransitionSystem>(BiBTreeMap<StateIndex<T>, Vec<SymbolOf<T>>>);
 
 impl<T: TransitionSystem> FromIterator<(StateIndex<T>, Vec<SymbolOf<T>>)> for StateNaming<T> {
     fn from_iter<I: IntoIterator<Item = (StateIndex<T>, Vec<SymbolOf<T>>)>>(iter: I) -> Self {
@@ -29,7 +29,7 @@ impl<T: TransitionSystem> FromIterator<MinimalRepresentative<T>> for StateNaming
 }
 
 impl<T: TransitionSystem> std::ops::Deref for StateNaming<T> {
-    type Target = math::Bijection<StateIndex<T>, Vec<SymbolOf<T>>>;
+    type Target = BiBTreeMap<StateIndex<T>, Vec<SymbolOf<T>>>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }

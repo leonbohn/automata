@@ -59,7 +59,7 @@ where
     where
         D: Pointed,
     {
-        let accepting: math::Map<_, bool> = accepting_states
+        let accepting: math::FxIndexMap<_, bool> = accepting_states
             .into_iter()
             .map(|idx| (idx, true))
             .collect();

@@ -1,6 +1,6 @@
 use crate::alphabet::{Alphabet, CharAlphabet};
-use crate::math::Bijection;
 use crate::{Pointed, TransitionSystem};
+use bimap::BiBTreeMap;
 use bit_set::BitSet;
 use itertools::Itertools;
 
@@ -121,7 +121,7 @@ pub trait Sproutable: TransitionSystem {
         E: IntoEdgeTuple<Self>;
 
     /// Builds a new transition system by collecting all states and transitions present in another.
-    /// The method returns the new transition system and a [bijective mapping](`Bijection`) between the old and new
+    /// The method returns the new transition system and a [bijective mapping](`BiBTreeMap`) between the old and new
     /// state indices.
     ///
     /// Creates a new transition system, by collecting all states and transitions present in `ts`.
@@ -149,7 +149,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     fn sprout_from_ts_with_bijection<Ts>(
         ts: Ts,
-    ) -> (Self, Bijection<Ts::StateIndex, StateIndex<Self>>)
+    ) -> (Self, BiBTreeMap<Ts::StateIndex, StateIndex<Self>>)
     where
         Self: ForAlphabet<Ts::Alphabet>,
         Ts: TransitionSystem<
@@ -159,7 +159,7 @@ pub trait Sproutable: TransitionSystem {
             >,
     {
         let mut out: Self = Self::for_alphabet(ts.alphabet().clone());
-        let mut map = Bijection::new();
+        let mut map = BiBTreeMap::new();
         for index in ts.state_indices() {
             map.insert(
                 index,

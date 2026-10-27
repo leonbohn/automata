@@ -1,11 +1,12 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use super::SccDecomposition;
 use crate::TransitionSystem;
+use crate::alphabet::Expression;
 use crate::ts::connected_components::Scc;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{IndexType, IsEdge, StateIndex};
-use crate::{alphabet::Expression, math::OrderedMap};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 struct TarjanData {
@@ -19,7 +20,7 @@ pub struct Tarjan<Idx> {
     index: usize,
     component_count: usize,
     stack: Vec<Idx>,
-    data: OrderedMap<Idx, TarjanData>,
+    data: BTreeMap<Idx, TarjanData>,
 }
 
 impl<Idx: IndexType> Default for Tarjan<Idx> {
@@ -35,7 +36,7 @@ impl<Idx: IndexType> Tarjan<Idx> {
             index: 0,
             component_count: usize::MAX,
             stack: Vec::new(),
-            data: OrderedMap::default(),
+            data: BTreeMap::default(),
         }
     }
 
@@ -143,7 +144,7 @@ where
     Ts: TransitionSystem + PredecessorIterable,
 {
     // first pass: dfs on the forward graph, recording states in order of finishing
-    let mut ids: HashMap<Ts::StateIndex, usize> = HashMap::new();
+    let mut ids: FxHashMap<Ts::StateIndex, usize> = FxHashMap::default();
     let mut states = vec![start];
     ids.insert(start, 0);
     let mut finished = Vec::new();
@@ -216,7 +217,8 @@ where
     let roots: Vec<_> = iter.into_iter().collect();
 
     // dense numbering of the considered states, so that all bookkeeping can use plain vectors
-    let mut ids: HashMap<StateIndex<Ts>, usize> = HashMap::with_capacity(roots.len());
+    let mut ids: FxHashMap<StateIndex<Ts>, usize> =
+        FxHashMap::with_capacity_and_hasher(roots.len(), Default::default());
     let mut states = Vec::with_capacity(roots.len());
     for &q in &roots {
         ids.entry(q).or_insert_with(|| {

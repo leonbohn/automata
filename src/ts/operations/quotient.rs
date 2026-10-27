@@ -1,6 +1,6 @@
 use crate::{
     RightCongruence,
-    math::Partition,
+    partition::Partition,
     representation::CollectTs,
     ts::{Deterministic, EdgeExpression, IsEdge, Pointed, StateIndex, SymbolOf, TransitionSystem},
 };
@@ -9,6 +9,8 @@ use crate::{
     math,
 };
 use itertools::Itertools;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 /// A quotient takes a transition system and merges states which are in the same
 /// congruence class of some [`Partition`]. We assume that the [`Partition`] is
@@ -24,9 +26,9 @@ use itertools::Itertools;
 #[derive(Debug, Clone)]
 pub struct Quotient<Ts: TransitionSystem> {
     ts: Ts,
-    expressions: math::OrderedMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
+    expressions: BTreeMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
     partition: Partition<Ts::StateIndex>,
-    class_of: math::Map<Ts::StateIndex, usize>,
+    class_of: math::FxIndexMap<Ts::StateIndex, usize>,
 }
 
 impl<Ts: Deterministic + Pointed> Pointed for Quotient<Ts> {
@@ -230,7 +232,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
         origin: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Self::EdgeRef<'_>> {
-        let (states, colors): (math::OrderedSet<_>, Vec<_>) = self
+        let (states, colors): (BTreeSet<_>, Vec<_>) = self
             .class_iter_by_id(origin)?
             .filter_map(|q| {
                 self.ts.edge(q, &matcher).map(|tt| {
@@ -284,7 +286,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
 
 #[cfg(test)]
 mod tests {
-    use crate::math::Partition;
+    use crate::partition::Partition;
     use crate::ts::Deterministic;
     use crate::{TransitionSystem, tests::wiki_dfa};
 

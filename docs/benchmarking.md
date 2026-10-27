@@ -181,10 +181,10 @@ The package and the development shell contain `valgrind` and the `gungraun-runne
   the hit counts are in the detail view.
 - Numbers from different compilers, targets or valgrind versions are not comparable. The history records
   the toolchain; do not mix.
-- Counts are not bit-identical between runs. Most benchmarks differ by a few hundredths of a percent
-  (address space layout, kernel), but the library seeds its hash maps randomly (`std`'s `RandomState`,
-  also behind `math::Set` and `math::Map`), so benchmarks dominated by hashing differ by up to about
-  1 % depending on the seed. That is why the threshold is 2 %. Seeding the maps with a fixed hasher would
-  make the counts exact; `check-determinism` lists the benchmarks that vary most (default tolerance 2 %).
+- Counts are not bit-identical between runs, but nearly: most benchmarks differ by a few hundredths of a
+  percent (address space layout, kernel). The library uses a fixed hasher (`rustc_hash::FxBuildHasher`,
+  see `math::FxIndexMap`) instead of the randomly seeded `RandomState`, so hashing no longer contributes;
+  the 2 % threshold predates this and is kept. `check-determinism` lists the benchmarks that vary most
+  (default tolerance 2 %).
 - Regenerating the fixtures changes the inputs of the fixture benchmarks and therefore breaks the
   history for those; mention it in the changelog.
