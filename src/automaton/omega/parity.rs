@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeSet, VecDeque},
+    collections::{BTreeSet, HashMap, VecDeque},
     fmt::Debug,
     hash::Hash,
 };
@@ -357,10 +357,10 @@ where
                 continue;
             }
             if scc.interior_edge_colors().contains(&color) {
-                let rep = scc
-                    .minimal_representative()
-                    .as_ref()
-                    .expect("We know this is reachable");
+                // components that cannot be reached from the initial state have no representative
+                let Some(rep) = scc.minimal_representative().as_ref() else {
+                    continue;
+                };
                 let cycle = scc
                     .maximal_loop_from(rep.state_index())
                     .expect("This thing is non-transient");
@@ -490,14 +490,14 @@ where
     {
         let start = std::time::Instant::now();
 
-        let mut ts = self.ts.clone().into_dts();
         let (out, out_initial) = self
             .ts
             .clone()
             .with_initial(self.initial)
             .into_dts_and_initial();
+        let mut ts = out.clone();
 
-        let mut recoloring = Vec::new();
+        let mut recoloring: HashMap<_, Int> = HashMap::new();
         let mut remove_states = Vec::new();
         let mut remove_edges = Vec::new();
 
@@ -511,25 +511,12 @@ where
             }
             for state in remove_states.drain(..) {
                 trace!("removing state {state}");
-                for edge in ts.edges_from(state).unwrap() {
-                    trace!("inside loop");
-                    let Some(idx) = recoloring
-                        .iter()
-                        .position(|((p, e), _)| edge.source().eq(p) && edge.expression().eq(e))
-                    else {
-                        panic!(
-                            "no recoloring stored for {} --{}-->",
-                            edge.source(),
-                            edge.expression().show()
-                        );
-                    };
-                    trace!(
-                        "recoloring edge {} --{}--> with {:?}",
-                        recoloring[idx].0.0,
-                        recoloring[idx].0.1.show(),
-                        recoloring[idx].1
-                    );
-                }
+                debug_assert!(
+                    ts.edges_from(state)
+                        .unwrap()
+                        .all(|e| recoloring.contains_key(&(e.source(), e.expression().clone()))),
+                    "every edge of a removed state must have been recolored"
+                );
                 assert!(
                     ts.remove_state(state).is_some(),
                     "We must be able to actually remove these edges"
@@ -556,7 +543,7 @@ where
                                 edge.target(),
                                 priority
                             );
-                            recoloring.push(((*state, edge.expression().clone()), priority));
+                            recoloring.insert((*state, edge.expression().clone()), priority);
                             remove_edges.push((edge.source(), edge.expression().clone()));
                         }
                         remove_states.push(*state);
@@ -574,7 +561,7 @@ where
                         "recoloring border edge {q} --{}--> {p} with prio {priority}",
                         e.show()
                     );
-                    recoloring.push(((*q, e.clone()), priority));
+                    recoloring.insert((*q, e.clone()), priority);
                 }
 
                 if priority % 2 != minimal_interior_edge_color % 2 {
@@ -596,7 +583,7 @@ where
                         c.show(),
                         priority
                     );
-                    recoloring.push(((*q, a.clone()), priority));
+                    recoloring.insert((*q, a.clone()), priority);
                     remove_edges.push((*q, a.clone()));
                 }
             }
@@ -609,11 +596,7 @@ where
         trace!("computation done, building output automaton");
         let ret = out
             .map_edge_colors_full(|q, e, _, _| {
-                let Some(c) = recoloring
-                    .iter()
-                    .find(|((p, f), _)| *p == q && f == e)
-                    .map(|(_, c)| *c)
-                else {
+                let Some(c) = recoloring.get(&(q, e.clone())).copied() else {
                     panic!("Could not find recoloring for edge ({}, {:?})", q, e);
                 };
                 c

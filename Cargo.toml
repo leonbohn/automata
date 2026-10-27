@@ -64,5 +64,9 @@ name = "operations"
 harness = false
 
 [[bench]]
+name = "dpa"
+harness = false
+
+[[bench]]
 name = "baseline"
 harness = false

@@ -39,7 +39,7 @@ Edges are labeled with alphabet *expressions*; a *transition* is the concrete (s
 
 Features: `default = ["hoa"]`; opt-in: `random`, `render` (SVG/PNG via `resvg`/`layout-rs`, experimental), `graphviz` (calls the `dot` executable, implies `render`). Text `dot` output is always available.
 
-- `benches/`: criterion benchmarks with deterministic generators in `benches/common`. `baseline.rs` is the set from #32 (problems P1 to P5 of #30); `scc.rs` and `operations.rs` are the broader suites. Benchmarks must only use public API.
+- `benches/`: criterion benchmarks with deterministic generators in `benches/common`. `baseline.rs` is the set from #32 (problems P1 to P5 of #30); `scc.rs`, `operations.rs` and `dpa.rs` are the broader suites. Benchmarks must only use public API.
 - `tools/bench/`: separate crate (own `Cargo.lock`, not part of the library) `automata-bench`: runs benches for two revisions in alternating rounds (`compare`, `run`), keeps history in SQLite and renders a static dashboard, and as `serve` receives GitHub webhooks. `flake.nix` and `nix/` package it and provide the NixOS module. See `docs/benchmarking.md`.
 
 ## Conventions

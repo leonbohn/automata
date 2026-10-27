@@ -112,6 +112,7 @@ in
         "baseline"
         "scc"
         "operations"
+        "dpa"
       ];
       description = "Bench targets to run, those a revision does not define are skipped.";
     };
