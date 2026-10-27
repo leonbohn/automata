@@ -34,6 +34,8 @@ pub struct TransitionMonoid<Ts: TransitionSystem> {
         RunProfile<Ts::StateIndex, Ts::StateColor, Ts::EdgeColor>,
         usize,
     )>,
+    /// For each profile, the index of the profile obtained by appending a symbol.
+    right: Vec<Vec<(SymbolOf<Ts>, usize)>>,
 }
 
 /// Encapsulates the behavour of colors along run segments. This is what we are mainly
@@ -413,6 +415,30 @@ where
         0..self.tps.len()
     }
 
+    /// Returns the index of the profile of `w·a`, where `w` is a word with the profile of index
+    /// `idx` and `a` is the given `symbol`. Returns `None` if `idx` is not a profile index or
+    /// `symbol` is not a symbol of the alphabet.
+    pub fn right_successor(&self, idx: usize, symbol: SymbolOf<Ts>) -> Option<usize> {
+        self.right
+            .get(idx)?
+            .iter()
+            .find(|(sym, _)| *sym == symbol)
+            .map(|(_, target)| *target)
+    }
+
+    /// Returns the index of the profile of `a·w`, where `w` is a word with the profile of index
+    /// `idx` and `a` is the given `symbol`. Returns `None` if `idx` is not a profile index.
+    pub fn left_successor(&self, idx: usize, symbol: SymbolOf<Ts>) -> Option<usize> {
+        let (_, word) = self.get_profile(idx)?;
+        let states = self.tps[0].0.iter().map(|s| s.state()).collect();
+        let profile = std::iter::once(&symbol)
+            .chain(word)
+            .fold(RunProfile::empty_for_states(states), |p, sym| {
+                p.extend_in(&self.ts, *sym)
+            });
+        self.tps.iter().position(|(tp, _)| *tp == profile)
+    }
+
     fn build(ts: Ts) -> TransitionMonoid<Ts> {
         let indices = ts.state_indices().collect();
         Self::build_for_states(ts, indices)
@@ -422,9 +448,10 @@ where
         let eps_profile = RunProfile::empty_for_states(states);
         let mut tps = vec![(eps_profile.clone(), 0)];
         let mut strings = vec![(vec![], ProfileEntry::Profile(0))];
-        let mut queue = VecDeque::from_iter([(vec![], eps_profile)]);
+        let mut right: Vec<Vec<(SymbolOf<Ts>, usize)>> = vec![vec![]];
+        let mut queue = VecDeque::from_iter([(vec![], eps_profile, 0)]);
 
-        while let Some((word, profile)) = queue.pop_front() {
+        while let Some((word, profile, profile_idx)) = queue.pop_front() {
             for (profile_extension, sym) in profile.all_extensions(&ts) {
                 assert!(
                     word.len() < ts.size() * 2,
@@ -440,19 +467,27 @@ where
                 if let Some(existing_idx) = tps.iter().position(|(tp, _)| *tp == profile_extension)
                 {
                     strings.push((word_extension, ProfileEntry::Redirect(existing_idx)));
+                    right[profile_idx].push((sym, existing_idx));
                 } else {
                     let string_id = strings.len();
                     let profile_id = tps.len();
                     strings.push((word_extension.clone(), ProfileEntry::Profile(profile_id)));
                     tps.push((profile_extension.clone(), string_id));
-                    queue.push_back((word_extension, profile_extension));
+                    right[profile_idx].push((sym, profile_id));
+                    right.push(vec![]);
+                    queue.push_back((word_extension, profile_extension, profile_id));
                     assert!(profile_id < tps.len());
                     assert!(string_id < strings.len());
                 }
             }
         }
 
-        TransitionMonoid { ts, tps, strings }
+        TransitionMonoid {
+            ts,
+            tps,
+            strings,
+            right,
+        }
     }
 }
 
