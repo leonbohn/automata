@@ -228,21 +228,20 @@ pub trait TransitionSystem: Sized {
     /// the same state with the same symbol.
     fn is_deterministic(&self) -> bool {
         for state in self.state_indices() {
-            for (l, r) in self
-                .edges_from(state)
-                .unwrap()
-                .zip(self.edges_from(state).unwrap().skip(1))
-            {
-                if self.alphabet().overlapping(l.expression(), r.expression()) {
-                    trace!(
-                        "found overlapping edges from {:?}: on {} to {:?} and on {} to {:?}",
-                        l.source(),
-                        l.expression().show(),
-                        l.target(),
-                        r.expression().show(),
-                        r.target(),
-                    );
-                    return false;
+            let edges: Vec<_> = self.edges_from(state).unwrap().collect();
+            for (i, l) in edges.iter().enumerate() {
+                for r in &edges[i + 1..] {
+                    if self.alphabet().overlapping(l.expression(), r.expression()) {
+                        trace!(
+                            "found overlapping edges from {:?}: on {} to {:?} and on {} to {:?}",
+                            l.source(),
+                            l.expression().show(),
+                            l.target(),
+                            r.expression().show(),
+                            r.target(),
+                        );
+                        return false;
+                    }
                 }
             }
         }
