@@ -17,7 +17,7 @@ use crate::Error;
 use crate::Int;
 use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
 use crate::representation::IntoTs;
-use crate::ts::{Builder, DefaultIdType, ForAlphabet, IsEdge, DenseId, Sproutable};
+use crate::ts::{Builder, DefaultIdType, DenseId, ForAlphabet, IsEdge, Sproutable};
 use crate::{DTS, Pointed, TS, TransitionSystem};
 pub use acceptance_mask::{AcceptanceError, AcceptanceMask};
 use std::collections::BTreeSet;

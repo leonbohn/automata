@@ -1,8 +1,8 @@
 use std::{fmt::Debug, hash::Hash};
 
 use crate::ts::{
-    Builder, DefaultIdType, Deterministic, EdgeColor, EdgeExpression, EdgeTuple, ForAlphabet,
-    IntoEdgeTuple, IsEdge, DenseId, Shrinkable, Sproutable, StateColor, StateIndex,
+    Builder, DefaultIdType, DenseId, Deterministic, EdgeColor, EdgeExpression, EdgeTuple,
+    ForAlphabet, IntoEdgeTuple, IsEdge, Shrinkable, Sproutable, StateColor, StateIndex,
 };
 
 mod linked_state;
@@ -105,14 +105,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
                 .edges
                 .into_iter()
                 .map(|e| {
-                    e.map(|q, e, c, p| {
-                        edge_f(
-                            DenseId::from_usize(q),
-                            e,
-                            c,
-                            DenseId::from_usize(p),
-                        )
-                    })
+                    e.map(|q, e, c, p| edge_f(DenseId::from_usize(q), e, c, DenseId::from_usize(p)))
                 })
                 .collect(),
         }

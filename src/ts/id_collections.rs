@@ -117,10 +117,7 @@ impl<I: IdType> StateSet<I> {
 /// Iterator over a [`StateSet`].
 pub enum StateSetIter<'a, I> {
     #[doc(hidden)]
-    Dense(
-        fixedbitset::Ones<'a>,
-        std::marker::PhantomData<fn() -> I>,
-    ),
+    Dense(fixedbitset::Ones<'a>, std::marker::PhantomData<fn() -> I>),
     #[doc(hidden)]
     Sparse(std::collections::hash_set::Iter<'a, I>),
 }
@@ -130,9 +127,9 @@ impl<I: IdType> Iterator for StateSetIter<'_, I> {
     #[inline]
     fn next(&mut self) -> Option<I> {
         match self {
-            Self::Dense(ones, _) => ones.next().map(|n| {
-                I::from_dense(n).expect("bit index was produced from a valid id")
-            }),
+            Self::Dense(ones, _) => ones
+                .next()
+                .map(|n| I::from_dense(n).expect("bit index was produced from a valid id")),
             Self::Sparse(it) => it.next().copied(),
         }
     }
