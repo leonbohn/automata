@@ -1,6 +1,6 @@
 use crate::{Int, Show};
 
-use bit_set::BitSet;
+use fixedbitset::FixedBitSet;
 use itertools::Itertools;
 use thiserror::Error;
 
@@ -30,7 +30,7 @@ pub enum AcceptanceError {
 /// by the HOA format. Büchi conditions only use the set `0`, parity conditions require every
 /// edge to belong to exactly one set, which is then interpreted as its priority.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct AcceptanceMask(BitSet);
+pub struct AcceptanceMask(FixedBitSet);
 
 impl AcceptanceMask {
     /// Returns the largest acceptance set of the mask, or `None` if it is empty.
@@ -40,7 +40,7 @@ impl AcceptanceMask {
 
     /// Iterates over the acceptance sets of the mask in increasing order.
     pub fn iter(&self) -> impl Iterator<Item = Int> + '_ {
-        self.0.iter().map(|x| x as Int)
+        self.0.ones().map(|x| x as Int)
     }
 
     /// Returns the smallest acceptance set of the mask, or `None` if it is empty.
@@ -103,7 +103,7 @@ impl Show for AcceptanceMask {
 #[cfg(feature = "hoa")]
 impl From<&hoars::AcceptanceSignature> for AcceptanceMask {
     fn from(value: &hoars::AcceptanceSignature) -> Self {
-        Self(BitSet::from_iter(value.iter().map(|&i| {
+        Self(FixedBitSet::from_iter(value.iter().map(|&i| {
             i.try_into().expect("Could not cast {i} to usize")
         })))
     }
@@ -111,7 +111,7 @@ impl From<&hoars::AcceptanceSignature> for AcceptanceMask {
 
 impl std::fmt::Debug for AcceptanceMask {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.0)
+        f.debug_set().entries(self.0.ones()).finish()
     }
 }
 

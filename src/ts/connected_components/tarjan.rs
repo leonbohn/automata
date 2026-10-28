@@ -1,12 +1,9 @@
-use rustc_hash::FxHashMap;
-
 use super::SccDecomposition;
 use crate::TransitionSystem;
 use crate::alphabet::Expression;
 use crate::ts::connected_components::Scc;
 use crate::ts::predecessors::PredecessorIterable;
-use crate::ts::{IndexType, IsEdge, StateIndex};
-use std::collections::BTreeMap;
+use crate::ts::{CompactIdMap, IdType, IsEdge, StateIndex, StateMap};
 
 #[derive(Debug, Clone)]
 struct TarjanData {
@@ -20,23 +17,23 @@ pub struct Tarjan<Idx> {
     index: usize,
     component_count: usize,
     stack: Vec<Idx>,
-    data: BTreeMap<Idx, TarjanData>,
+    data: StateMap<Idx, TarjanData>,
 }
 
-impl<Idx: IndexType> Default for Tarjan<Idx> {
+impl<Idx: IdType> Default for Tarjan<Idx> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<Idx: IndexType> Tarjan<Idx> {
+impl<Idx: IdType> Tarjan<Idx> {
     /// Creates a new Tarjan SCC decomposition instance.
     pub fn new() -> Self {
         Self {
             index: 0,
             component_count: usize::MAX,
             stack: Vec::new(),
-            data: BTreeMap::default(),
+            data: StateMap::default(),
         }
     }
 
@@ -108,7 +105,7 @@ impl<Idx: IndexType> Tarjan<Idx> {
         Ts: TransitionSystem<StateIndex = Idx>,
         F: FnMut(&[Idx]),
     {
-        self.data.clear();
+        self.data = StateMap::new(ts.state_bound());
 
         for q in ts.state_indices() {
             if let Some(TarjanData { rootindex: None }) | None = self.data.get(&q) {
@@ -144,9 +141,8 @@ where
     Ts: TransitionSystem + PredecessorIterable,
 {
     // first pass: dfs on the forward graph, recording states in order of finishing
-    let mut ids: FxHashMap<Ts::StateIndex, usize> = FxHashMap::default();
-    let mut states = vec![start];
-    ids.insert(start, 0);
+    let mut ids = CompactIdMap::new(ts.state_bound(), ts.hint_size().0);
+    ids.get_or_insert(start);
     let mut finished = Vec::new();
     let mut queue = vec![(start, ts.edges_from(start).unwrap())];
 
@@ -154,20 +150,19 @@ where
         let q = *q;
         if let Some(edge) = edges.next() {
             let target = edge.target();
-            if let std::collections::hash_map::Entry::Vacant(e) = ids.entry(target) {
-                e.insert(states.len());
-                states.push(target);
+            if ids.id(&target).is_none() {
+                ids.get_or_insert(target);
                 queue.push((target, ts.edges_from(target).unwrap()));
             }
         } else {
             queue.pop();
-            finished.push(ids[&q]);
+            finished.push(ids.id(&q).expect("state was numbered when discovered"));
         }
     }
 
     // second pass: backward dfs in decreasing order of finishing time, restricted to
     // states that have not been assigned to an scc yet
-    let mut assigned = vec![false; states.len()];
+    let mut assigned = vec![false; ids.len()];
     let mut sccs = vec![];
     let mut work = vec![];
 
@@ -179,10 +174,10 @@ where
         work.push(root);
         let mut scc = vec![];
         while let Some(v) = work.pop() {
-            let q = states[v];
+            let q = ids.state(v);
             scc.push(q);
             for edge in ts.predecessors(q).into_iter().flatten() {
-                if let Some(&u) = ids.get(&edge.source())
+                if let Some(u) = ids.id(&edge.source())
                     && !assigned[u]
                 {
                     assigned[u] = true;
@@ -217,15 +212,14 @@ where
     let roots: Vec<_> = iter.into_iter().collect();
 
     // dense numbering of the considered states, so that all bookkeeping can use plain vectors
-    let mut ids: FxHashMap<StateIndex<Ts>, usize> =
-        FxHashMap::with_capacity_and_hasher(roots.len(), Default::default());
-    let mut states = Vec::with_capacity(roots.len());
+    // a dense numbering costs time proportional to the bound, which is not worth it if only few
+    // of the states are considered (e.g. after removing states from a linked list system)
+    let bound = ts.state_bound().filter(|&b| b <= 4 * roots.len());
+    let mut ids = CompactIdMap::new(bound, roots.len());
     for &q in &roots {
-        ids.entry(q).or_insert_with(|| {
-            states.push(q);
-            states.len() - 1
-        });
+        ids.get_or_insert(q);
     }
+    let states = ids.states().to_vec();
     let n = states.len();
 
     let mut index = vec![UNVISITED; n];
@@ -254,7 +248,7 @@ where
         while let Some((v, edges)) = call_stack.last_mut() {
             let v = *v;
             if let Some(edge) = edges.next() {
-                let Some(&w) = ids.get(&edge.target()) else {
+                let Some(w) = ids.id(&edge.target()) else {
                     continue;
                 };
                 if index[w] == UNVISITED {

@@ -133,7 +133,7 @@ fn refine(n: usize, labels: usize, pre: Vec<Predecessors>, initial: Vec<usize>) 
     block_of
 }
 
-fn collect_partition<I: crate::ts::IndexType>(states: &[I], block_of: &[usize]) -> Partition<I> {
+fn collect_partition<I: crate::ts::IdType>(states: &[I], block_of: &[usize]) -> Partition<I> {
     let mut blocks: math::FxIndexMap<usize, BTreeSet<I>> = math::FxIndexMap::default();
     for (q, b) in states.iter().zip(block_of) {
         blocks.entry(*b).or_default().insert(*q);
@@ -153,8 +153,11 @@ where
     EdgeColor<D>: Color,
 {
     let start = Instant::now();
-    let states: Vec<_> = mm.state_indices().collect();
-    let ids: math::FxIndexMap<_, usize> = states.iter().enumerate().map(|(i, q)| (*q, i)).collect();
+    let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), mm.hint_size().0);
+    for q in mm.state_indices() {
+        ids.get_or_insert(q);
+    }
+    let states = ids.states().to_vec();
     let symbols: Vec<_> = mm.symbols().collect();
 
     let mut labels: math::FxIndexMap<EdgeColor<D>, usize> = math::FxIndexMap::default();
@@ -162,7 +165,7 @@ where
     for (s, sym) in symbols.iter().enumerate() {
         for (q, state) in states.iter().enumerate() {
             if let Some(t) = mm.edge(*state, *sym)
-                && let Some(&target) = ids.get(&t.target())
+                && let Some(target) = ids.id(&t.target())
             {
                 let next = labels.len();
                 let label = *labels.entry(t.color()).or_insert(next);
@@ -230,8 +233,11 @@ where
     StateColor<D>: Color,
 {
     let start = Instant::now();
-    let states: Vec<_> = mm.state_indices().collect();
-    let ids: math::FxIndexMap<_, usize> = states.iter().enumerate().map(|(i, q)| (*q, i)).collect();
+    let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), mm.hint_size().0);
+    for q in mm.state_indices() {
+        ids.get_or_insert(q);
+    }
+    let states = ids.states().to_vec();
     let symbols: Vec<_> = mm.symbols().collect();
 
     let mut classes: math::FxIndexMap<StateColor<D>, usize> = math::FxIndexMap::default();
@@ -247,7 +253,7 @@ where
     for (s, sym) in symbols.iter().enumerate() {
         for (q, state) in states.iter().enumerate() {
             if let Some(t) = mm.edge(*state, *sym)
-                && let Some(&target) = ids.get(&t.target())
+                && let Some(target) = ids.id(&t.target())
             {
                 raw[s].push((target, q, 0));
             }

@@ -1,8 +1,8 @@
 use std::{fmt::Debug, hash::Hash};
 
 use crate::ts::{
-    Builder, DefaultIdType, Deterministic, EdgeColor, EdgeExpression, EdgeTuple, ForAlphabet,
-    IntoEdgeTuple, IsEdge, ScalarIndexType, Shrinkable, Sproutable, StateColor, StateIndex,
+    Builder, DefaultIdType, DenseId, Deterministic, EdgeColor, EdgeExpression, EdgeTuple,
+    ForAlphabet, IntoEdgeTuple, IsEdge, Shrinkable, Sproutable, StateColor, StateIndex,
 };
 
 mod linked_state;
@@ -45,7 +45,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
                 .states
                 .into_iter()
                 .enumerate()
-                .map(|(i, s)| s.zip_prepend(ScalarIndexType::from_usize(i)))
+                .map(|(i, s)| s.zip_prepend(DenseId::from_usize(i)))
                 .collect(),
         }
     }
@@ -99,20 +99,13 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
                 .states
                 .into_iter()
                 .enumerate()
-                .map(|(i, s)| s.map_occupied(|c| state_f(ScalarIndexType::from_usize(i), c)))
+                .map(|(i, s)| s.map_occupied(|c| state_f(DenseId::from_usize(i), c)))
                 .collect(),
             edges: self
                 .edges
                 .into_iter()
                 .map(|e| {
-                    e.map(|q, e, c, p| {
-                        edge_f(
-                            ScalarIndexType::from_usize(q),
-                            e,
-                            c,
-                            ScalarIndexType::from_usize(p),
-                        )
-                    })
+                    e.map(|q, e, c, p| edge_f(DenseId::from_usize(q), e, c, DenseId::from_usize(p)))
                 })
                 .collect(),
         }
@@ -654,6 +647,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
         &self.alphabet
     }
 
+    fn state_bound(&self) -> Option<usize> {
+        Some(self.states.len())
+    }
+
     fn state_indices(&self) -> Self::StateIndices<'_> {
         LinkedStateIndices(&self.states, 0)
     }
@@ -687,7 +684,7 @@ impl<Q: Color> Iterator for LinkedStateIndices<'_, Q> {
         while let Some(state) = self.0.get(self.1) {
             self.1 += 1;
             if state.is_occupied() {
-                return Some(ScalarIndexType::from_usize(self.1 - 1));
+                return Some(DenseId::from_usize(self.1 - 1));
             }
         }
         None

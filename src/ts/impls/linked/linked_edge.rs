@@ -1,5 +1,5 @@
 use super::LinkedListTransitionSystem;
-use crate::ts::{DefaultIdType, IntoEdgeTuple, IsEdge, ScalarIndexType};
+use crate::ts::{DefaultIdType, DenseId, IntoEdgeTuple, IsEdge};
 use crate::{Color, Void, alphabet::Alphabet};
 use std::fmt::Debug;
 
@@ -36,7 +36,7 @@ impl<E, C> LinkedListTransitionSystemEdge<E, C> {
         }
     }
 
-    pub fn borrowed_tuple<Idx: ScalarIndexType>(&self) -> (Idx, &E, &C, Idx) {
+    pub fn borrowed_tuple<Idx: DenseId>(&self) -> (Idx, &E, &C, Idx) {
         (
             Idx::from_usize(self.source),
             &self.expression,
@@ -45,7 +45,7 @@ impl<E, C> LinkedListTransitionSystemEdge<E, C> {
         )
     }
 
-    pub fn into_tuple<Idx: ScalarIndexType>(self) -> (Idx, E, C, Idx) {
+    pub fn into_tuple<Idx: DenseId>(self) -> (Idx, E, C, Idx) {
         (
             Idx::from_usize(self.source),
             self.expression,
@@ -87,7 +87,7 @@ impl<E, C> LinkedListTransitionSystemEdge<E, C> {
 
 impl<E, C, I> PartialEq<(I, E, C, I)> for LinkedListTransitionSystemEdge<E, C>
 where
-    I: ScalarIndexType,
+    I: DenseId,
     E: PartialEq,
     C: PartialEq,
 {
@@ -100,7 +100,7 @@ where
 }
 impl<E, C, I> PartialEq<(I, E, C, I)> for &LinkedListTransitionSystemEdge<E, C>
 where
-    I: ScalarIndexType,
+    I: DenseId,
     E: PartialEq,
     C: PartialEq,
 {
@@ -113,7 +113,7 @@ where
 }
 impl<E, I, C> PartialEq<(I, E, I)> for LinkedListTransitionSystemEdge<E, C>
 where
-    I: ScalarIndexType,
+    I: DenseId,
     E: PartialEq,
 {
     fn eq(&self, other: &(I, E, I)) -> bool {
@@ -124,7 +124,7 @@ where
 }
 impl<E, I> PartialEq<(I, E, I)> for &LinkedListTransitionSystemEdge<E, Void>
 where
-    I: ScalarIndexType,
+    I: DenseId,
     E: PartialEq,
 {
     fn eq(&self, other: &(I, E, I)) -> bool {

@@ -5,12 +5,11 @@ use crate::{
     word::Infix,
     word::{FiniteWord, OmegaWord, ReducedOmegaWord, Word},
 };
-use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::{fmt::Debug, marker::PhantomData};
 
 use crate::TransitionSystem;
-use crate::ts::{Deterministic, EdgeColor, IndexType, StateColor, StateIndex, SymbolOf};
+use crate::ts::{Deterministic, EdgeColor, IdType, StateColor, StateIndex, SymbolOf};
 
 /// Observes a run on a [`TransitionSystem`] and collects information about it, for example the
 /// state that is reached or the colors that are seen. A run feeds the symbols of a word one by
@@ -75,9 +74,9 @@ pub struct EdgeColorLimit<T: TransitionSystem, const MAX: bool = false>(pub Edge
 /// Observes the set of states that were visited. For infinite runs these are the states that
 /// are visited infinitely often.
 #[derive(Clone, Debug)]
-pub struct StateSet<T: TransitionSystem>(pub(crate) BTreeSet<StateIndex<T>>);
+pub struct StateSet<T: TransitionSystem>(pub(crate) crate::ts::StateSet<StateIndex<T>>);
 impl<T: TransitionSystem> std::ops::Deref for StateSet<T> {
-    type Target = BTreeSet<StateIndex<T>>;
+    type Target = crate::ts::StateSet<StateIndex<T>>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -230,7 +229,9 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
             }
         };
 
-        let mut seen = BTreeMap::default();
+        // only the states at the end of each loop iteration are stored, usually far fewer than
+        // there are states, so a dense vector sized by the bound would not pay off
+        let mut seen = crate::ts::StateMap::new(None);
         let mut iteration = 0;
         seen.insert(current, iteration);
         let mut seq = vec![];
@@ -415,7 +416,7 @@ pub trait RunResult: Sized {
     /// The type of the edge colors.
     type EdgeColor: Color;
     /// The type of the state indices.
-    type StateIndex: IndexType;
+    type StateIndex: IdType;
     /// The type of symbol over which the input word operates.
     type Symbol: Symbol;
 }
@@ -727,8 +728,10 @@ mod impls {
     impl<T: Deterministic> Observer<T> for StateSet<T> {
         type Current = Self;
         #[inline(always)]
-        fn begin(_ts: &T, state: StateIndex<T>) -> Self {
-            Self(BTreeSet::from_iter([state]))
+        fn begin(ts: &T, state: StateIndex<T>) -> Self {
+            let mut set = crate::ts::StateSet::new(ts.state_bound());
+            set.insert(state);
+            Self(set)
         }
         #[inline(always)]
         fn into_current(self) -> Self::Current {
@@ -752,11 +755,12 @@ mod impls {
     }
     impl<T: Deterministic> InfiniteObserver<T> for StateSet<T> {
         #[inline(always)]
-        fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            seq[time..].iter().fold(Default::default(), |mut acc, x| {
-                acc.0.extend(x.0.iter().cloned());
-                acc
-            })
+        fn loop_back(seq: &[Self::Current], ts: &T, time: usize) -> Self::Current {
+            let mut acc = Self(crate::ts::StateSet::new(ts.state_bound()));
+            for x in &seq[time..] {
+                acc.0.extend(x.0.iter());
+            }
+            acc
         }
     }
 

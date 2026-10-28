@@ -1,6 +1,6 @@
 use crate::alphabet::Matcher;
 use crate::ts::predecessors::PredecessorIterable;
-use crate::ts::{Deterministic, EdgeColor, EdgeExpression, IndexType, IsEdge, StateIndex};
+use crate::ts::{Deterministic, EdgeColor, EdgeExpression, IdType, IsEdge, StateIndex};
 use crate::{Congruence, Pointed, TransitionSystem};
 use std::collections::BTreeSet;
 use std::marker::PhantomData;
@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 /// functions which take a state index and return a boolean value indicating whether the state index
 /// should be filtered out or not. It is also implemented by [`Vec`] and [`crate::math::FxIndexSet`] which are used to
 /// filter out state indices that are not contained in the vector or set.
-pub trait StateIndexFilter<Idx: IndexType> {
+pub trait StateIndexFilter<Idx: IdType> {
     /// This method is called to check whether an index should be present in a filtered transition
     /// system or not. Any index for which the function returns `true`, will be present, while all those
     /// for which the function returns `false` are masked out.
@@ -25,7 +25,7 @@ pub trait StateIndexFilter<Idx: IndexType> {
 
 impl<Idx, F> StateIndexFilter<Idx> for F
 where
-    Idx: IndexType,
+    Idx: IdType,
     F: Fn(Idx) -> bool,
 {
     #[inline(always)]
@@ -36,7 +36,7 @@ where
 
 impl<Idx> StateIndexFilter<Idx> for Vec<Idx>
 where
-    Idx: IndexType,
+    Idx: IdType,
 {
     #[inline(always)]
     fn is_unmasked(&self, idx: Idx) -> bool {
@@ -46,7 +46,7 @@ where
 
 impl<Idx> StateIndexFilter<Idx> for BTreeSet<Idx>
 where
-    Idx: IndexType,
+    Idx: IdType,
 {
     #[inline(always)]
     fn is_unmasked(&self, idx: Idx) -> bool {
@@ -87,6 +87,10 @@ where
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts().alphabet()
     }
+    fn state_bound(&self) -> Option<usize> {
+        self.ts().state_bound()
+    }
+
     fn state_indices(&self) -> Self::StateIndices<'_> {
         RestrictedStateIndices {
             it: self.ts().state_indices(),
@@ -298,6 +302,10 @@ where
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts().alphabet()
     }
+    fn state_bound(&self) -> Option<usize> {
+        self.ts().state_bound()
+    }
+
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.ts().state_indices()
     }

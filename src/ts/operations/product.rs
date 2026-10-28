@@ -1,5 +1,5 @@
 use crate::ts::predecessors::PredecessorIterable;
-use crate::ts::{EdgeExpression, IndexType, IsEdge, StateIndex, SymbolOf};
+use crate::ts::{EdgeExpression, IdType, IsEdge, StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
 use crate::{Show, alphabet::Alphabet};
 use itertools::Itertools;
@@ -29,6 +29,8 @@ impl<Lts: TransitionSystem + Sized> Product for Lts {
 /// Index type for product transition systems.
 #[derive(Copy, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ProductIndex<L, R>(pub L, pub R);
+
+impl<L: IdType, R: IdType> IdType for ProductIndex<L, R> {}
 
 impl<L, R> From<ProductIndex<L, R>> for (L, R) {
     fn from(value: ProductIndex<L, R>) -> Self {
@@ -203,8 +205,8 @@ impl<'a, Idx, Jdx, E, C, D> IsEdge<'a, E, ProductIndex<Idx, Jdx>, (C, D)>
 where
     C: Clone,
     D: Clone,
-    Idx: IndexType,
-    Jdx: IndexType,
+    Idx: IdType,
+    Jdx: IdType,
 {
     fn source(&self) -> ProductIndex<Idx, Jdx> {
         ProductIndex(self.source.0, self.source.1)
@@ -308,8 +310,8 @@ impl<'a, LI, RI, E, LC, RC> IsEdge<'a, E, ProductIndex<LI, RI>, (LC, RC)>
 where
     LC: Clone,
     RC: Clone,
-    LI: IndexType,
-    RI: IndexType,
+    LI: IdType,
+    RI: IdType,
 {
     fn color(&self) -> (LC, RC) {
         self.color.clone()

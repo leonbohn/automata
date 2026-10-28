@@ -10,7 +10,10 @@ use crate::{DTS, congruence::StateNaming};
 use std::{collections::BTreeSet, hash::Hash};
 
 mod state_index;
-pub use state_index::{IndexType, ScalarIndexType};
+pub use state_index::{DenseId, EdgeId, IdType};
+
+mod id_collections;
+pub use id_collections::{CompactIdMap, StateMap, StateSet, StateSetIter};
 
 mod edge;
 pub use edge::{Edge, EdgeReference, IsEdge};
@@ -76,7 +79,7 @@ pub trait TransitionSystem: Sized {
     /// The type of the underlying [`Alphabet`].
     type Alphabet: Alphabet;
     /// The type of the indices of the states of the transition system.
-    type StateIndex: IndexType;
+    type StateIndex: IdType;
     /// The type of the colors of the states of the transition system.
     type StateColor: Color;
     /// The type of the colors of the edges of the transition system.
@@ -128,6 +131,14 @@ pub trait TransitionSystem: Sized {
     #[inline(always)]
     fn state_indices_vec(&self) -> Vec<Self::StateIndex> {
         self.state_indices().collect()
+    }
+
+    /// Returns an exclusive upper bound on the dense ids of the states, i.e. every state id `q`
+    /// with `q.to_dense() == Some(n)` satisfies `n < bound`. Returns `None` if there is no such
+    /// bound, e.g. for lazily explored systems. Algorithms use it to choose between dense
+    /// (bitsets, vectors) and sparse (hash based) containers, see [`StateSet`] and [`StateMap`].
+    fn state_bound(&self) -> Option<usize> {
+        None
     }
 
     /// Returns true if the transition system has no states.
@@ -690,6 +701,10 @@ impl<Ts: TransitionSystem> TransitionSystem for &Ts {
         Ts::alphabet(self)
     }
 
+    fn state_bound(&self) -> Option<usize> {
+        Ts::state_bound(self)
+    }
+
     fn state_indices(&self) -> Self::StateIndices<'_> {
         Ts::state_indices(self)
     }
@@ -729,6 +744,10 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 
     fn alphabet(&self) -> &Self::Alphabet {
         Ts::alphabet(self)
+    }
+
+    fn state_bound(&self) -> Option<usize> {
+        Ts::state_bound(self)
     }
 
     fn state_indices(&self) -> Self::StateIndices<'_> {
