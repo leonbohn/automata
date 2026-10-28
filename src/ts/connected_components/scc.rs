@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::rc::Rc;
 use std::{cell::OnceCell, collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use crate::congruence::MinimalRepresentative;
-use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateIndex, SymbolOf};
+use crate::ts::{AccessWords, EdgeColor, EdgeExpression, IsEdge, StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
 use crate::{alphabet::Expression, math::FxIndexSet};
 use itertools::Itertools;
@@ -42,6 +43,7 @@ pub struct Scc<'a, Ts: TransitionSystem> {
     interior_edges: OnceCell<InteriorEdgeSet<Ts>>,
     edge_colors: OnceCell<FxIndexSet<Ts::EdgeColor>>,
     minimal_representative: OnceCell<Option<MinimalRepresentative<Ts>>>,
+    access_words: Rc<OnceCell<AccessWords<'a, Ts>>>,
     border_edges: OnceCell<BorderEdgeSet<Ts>>,
     border_transitions: OnceCell<BorderTransitionSet<Ts>>,
 }
@@ -107,8 +109,15 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
             border_edges: OnceCell::new(),
             border_transitions: OnceCell::new(),
             minimal_representative,
+            access_words: Rc::new(OnceCell::new()),
             edge_colors,
         }
+    }
+
+    /// Makes `self` use the given cache of access words. [`SccDecomposition`](super::SccDecomposition)
+    /// shares one cache between all of its SCCs so that a single search suffices for all of them.
+    pub(super) fn share_access_words(&mut self, access_words: Rc<OnceCell<AccessWords<'a, Ts>>>) {
+        self.access_words = access_words;
     }
 
     /// Returns the `first` state of `self`. As we know that SCCs are always non-empty,
@@ -245,13 +254,18 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         Ts: Pointed,
     {
         self.minimal_representative.get_or_init(|| {
-            self.ts.minimal_representatives_iter().find_map(|rep| {
-                if self.states.contains(&rep.state_index()) {
-                    Some(rep)
-                } else {
-                    None
-                }
-            })
+            let access = self.access_words.get_or_init(|| {
+                let mut access = AccessWords::new(self.ts, self.ts.initial());
+                access.complete();
+                access
+            });
+            let state = self
+                .states
+                .iter()
+                .filter_map(|&q| access.rank(q).map(|rank| (rank, q)))
+                .min()?
+                .1;
+            Some(MinimalRepresentative::new(access.word(state)?, state))
         })
     }
 
