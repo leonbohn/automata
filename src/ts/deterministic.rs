@@ -1,3 +1,4 @@
+use super::AccessWords;
 use super::operations::MapEdges;
 use super::operations::MapStateColor;
 use super::operations::MatchingProduct;
@@ -165,13 +166,9 @@ pub trait Deterministic: TransitionSystem {
     where
         Self: Pointed,
     {
-        self.minimal_representatives_iter().find_map(|rep| {
-            if rep.state_index() == q {
-                Some(rep)
-            } else {
-                None
-            }
-        })
+        AccessWords::new(self, self.initial())
+            .word_to(q)
+            .map(|word| MinimalRepresentative::new(word, q))
     }
 
     /// Gives an iterator over the minimal transition representatives, which are the length-lexicographically
@@ -550,7 +547,7 @@ pub trait Deterministic: TransitionSystem {
     where
         Self: Pointed,
     {
-        self.size() == self.minimal_representatives_iter().count()
+        self.size() == self.reachable_state_indices().count()
     }
 
     /// Attempts to extract the escape prefix of running the given omega word.

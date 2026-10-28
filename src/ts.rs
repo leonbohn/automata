@@ -46,8 +46,8 @@ mod builder;
 pub use builder::{Builder, BuilderError};
 
 /// Deals with analysing reachability in transition systems.
-pub mod reachable;
-pub use reachable::{LengthLexicographicMinimalRepresentatives, Reachable};
+pub mod visit;
+pub use visit::{AccessWords, Bfs, BfsEdges, Dfs, LengthLexicographicMinimalRepresentatives};
 
 /// Contains implementations for SCC decompositions and the corresponding/associated types.
 pub mod connected_components;
@@ -345,14 +345,7 @@ pub trait TransitionSystem: Sized {
     where
         Self: Sized,
     {
-        self.minimal_representatives_iter_from(from)
-            .find_map(|rep| {
-                if rep.state_index() == to {
-                    Some(rep.decompose().0)
-                } else {
-                    None
-                }
-            })
+        AccessWords::new(self, from).word_to(to)
     }
 
     /// Gives the size of `self`, which is obtained simply by counting the number of elements yielded by [`Self::state_indices()`].
@@ -628,11 +621,11 @@ pub trait TransitionSystem: Sized {
 
     /// Returns an iterator over the indices of the states that are reachable from the initial state. The iterator yields tuples
     /// (State Index, State Color)
-    fn reachable_states(&self) -> Reachable<'_, Self, false>
+    fn reachable_states(&self) -> Bfs<'_, Self>
     where
         Self: Sized + Pointed,
     {
-        Reachable::new(self, self.initial())
+        Bfs::new(self, self.initial())
     }
 
     /// Returns an iterator over all state colors that are reachable from the initial state. May yield the same color multiple times.
@@ -645,7 +638,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the initial state.
-    fn reachable_state_indices(&self) -> Reachable<'_, Self, false>
+    fn reachable_state_indices(&self) -> Bfs<'_, Self>
     where
         Self: Sized + Pointed,
     {
@@ -653,19 +646,27 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the given `state`.
-    fn reachable_state_indices_from(&self, state: Self::StateIndex) -> Reachable<'_, Self, false>
+    fn reachable_state_indices_from(&self, state: Self::StateIndex) -> Bfs<'_, Self>
     where
         Self: Sized,
     {
-        Reachable::state_indices(self, state)
+        Bfs::new(self, state)
     }
 
     /// Returns an iterator over the states that are reachable from the given `state`.
-    fn reachable_states_from(&self, state: StateIndex<Self>) -> Reachable<'_, Self>
+    fn reachable_states_from(&self, state: StateIndex<Self>) -> Bfs<'_, Self>
     where
         Self: Sized,
     {
-        Reachable::new(self, state)
+        Bfs::new(self, state)
+    }
+
+    /// Returns an iterator over the edges that are reachable from the given `state`.
+    fn reachable_edges_from(&self, state: StateIndex<Self>) -> BfsEdges<'_, Self>
+    where
+        Self: Sized,
+    {
+        BfsEdges::new(self, state)
     }
 
     /// Returns an option containing the index of the initial state, if it exists.

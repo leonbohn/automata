@@ -54,7 +54,11 @@ impl<'a, Ts: TransitionSystem> std::ops::Deref for SccDecomposition<'a, Ts> {
 
 impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     /// Creates a new SCC decomposition from a transition system and a vector of SCCs.
-    pub fn from_sccs(ts: &'a Ts, sccs: Vec<Scc<'a, Ts>>) -> Self {
+    pub fn from_sccs(ts: &'a Ts, mut sccs: Vec<Scc<'a, Ts>>) -> Self {
+        let access_words = std::rc::Rc::new(std::cell::OnceCell::new());
+        for scc in &mut sccs {
+            scc.share_access_words(access_words.clone());
+        }
         let mut index_of = FxHashMap::default();
         for (i, scc) in sccs.iter().enumerate() {
             index_of.extend(scc.iter().map(|q| (*q, i)));
