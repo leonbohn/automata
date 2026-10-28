@@ -502,6 +502,43 @@ mod tests {
         }
     }
 
+    /// Regression test for #80: an edge matching several symbols must not yield its target
+    /// several times.
+    #[test]
+    fn multi_symbol_edge_yields_each_state_once() {
+        use crate::Void;
+        use crate::alphabet::{Alphabet, PropAlphabet, PropExpression};
+        use crate::ts::{ForAlphabet, Sproutable};
+
+        let alphabet = PropAlphabet::<u32>::new(vec!["p".into(), "q".into()]);
+        let mut ts = crate::DTS::for_alphabet(alphabet);
+        let q0 = ts.add_state(Void);
+        let q1 = ts.add_state(Void);
+        ts.add_edge((q0, PropExpression::<u32>::universal(2), Void, q1));
+        let reps = ts.minimal_representatives_iter_from(q0).collect_vec();
+        assert_eq!(reps.len(), 2);
+        assert_eq!(reps[1].state_index(), q1);
+        assert_eq!(reps[1].len(), 1);
+        let first_symbol = ts.alphabet().universe().min().unwrap();
+        assert_eq!(reps[1].clone().into_inner(), vec![first_symbol]);
+    }
+
+    /// Regression test for #81: among parallel edges the smallest symbol wins, regardless of the
+    /// order in which the edges are listed.
+    #[test]
+    fn parallel_edges_use_smallest_symbol() {
+        for edges in [[(0, 'a', 1), (0, 'b', 1)], [(0, 'b', 1), (0, 'a', 1)]] {
+            let dts = Builder::without_colors()
+                .with_transitions(edges)
+                .into_dts_with_initial(0);
+            assert_eq!(dts.word_from_to(0, 1), Some(vec!['a']));
+            assert_eq!(
+                dts.minimal_representative(1).unwrap().into_inner(),
+                vec!['a']
+            );
+        }
+    }
+
     #[test]
     fn propositional_alphabet() {
         use crate::Void;
