@@ -1,7 +1,7 @@
 use crate::alphabet::{Alphabet, CharAlphabet};
 use crate::{Pointed, TransitionSystem};
 use bimap::BiBTreeMap;
-use bit_set::BitSet;
+use fixedbitset::FixedBitSet;
 use itertools::Itertools;
 
 use super::{EdgeColor, EdgeTuple, IntoEdgeTuple, IsEdge, StateColor, StateIndex};
@@ -282,9 +282,9 @@ pub trait Sproutable: TransitionSystem {
                 sink,
             ));
         }
-        let mut seen = BitSet::with_capacity(self.alphabet().size());
+        let mut seen = FixedBitSet::with_capacity(self.alphabet().size());
         for state in self.state_indices().collect_vec() {
-            seen.make_empty();
+            seen.clear();
             for edge in self.edges_from(state).unwrap() {
                 seen.insert(self.alphabet().expression_to_index(edge.expression()));
             }

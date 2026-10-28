@@ -17,7 +17,7 @@ use crate::Error;
 use crate::Int;
 use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
 use crate::representation::IntoTs;
-use crate::ts::{Builder, DefaultIdType, ForAlphabet, IsEdge, ScalarIndexType, Sproutable};
+use crate::ts::{Builder, DefaultIdType, ForAlphabet, IsEdge, DenseId, Sproutable};
 use crate::{DTS, Pointed, TS, TransitionSystem};
 pub use acceptance_mask::{AcceptanceError, AcceptanceMask};
 use std::collections::BTreeSet;
@@ -239,7 +239,7 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
 
 impl From<DeterministicOmegaAutomaton<PropAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
     fn from(value: DeterministicOmegaAutomaton<PropAlphabet>) -> Self {
-        let size = value.size().into_index();
+        let size = value.size().into_id();
         let ts = Builder::default()
             .with_state_colors((0..size).map(|i| value.state_color(i).unwrap()))
             .with_transitions(value.state_indices().flat_map(|q| {

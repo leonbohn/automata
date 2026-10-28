@@ -439,6 +439,10 @@ where
         self.ts.alphabet()
     }
 
+    fn state_bound(&self) -> Option<usize> {
+        self.ts.state_bound()
+    }
+
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.ts.state_indices()
     }

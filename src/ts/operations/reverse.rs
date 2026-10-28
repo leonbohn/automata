@@ -58,6 +58,10 @@ where
         self.0.alphabet()
     }
 
+    fn state_bound(&self) -> Option<usize> {
+        self.0.state_bound()
+    }
+
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.0.state_indices()
     }

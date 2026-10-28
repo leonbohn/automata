@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 use std::{fmt::Debug, marker::PhantomData};
 
 use crate::TransitionSystem;
-use crate::ts::{Deterministic, EdgeColor, IndexType, StateColor, StateIndex, SymbolOf};
+use crate::ts::{Deterministic, EdgeColor, IdType, StateColor, StateIndex, SymbolOf};
 
 /// Observes a run on a [`TransitionSystem`] and collects information about it, for example the
 /// state that is reached or the colors that are seen. A run feeds the symbols of a word one by
@@ -415,7 +415,7 @@ pub trait RunResult: Sized {
     /// The type of the edge colors.
     type EdgeColor: Color;
     /// The type of the state indices.
-    type StateIndex: IndexType;
+    type StateIndex: IdType;
     /// The type of symbol over which the input word operates.
     type Symbol: Symbol;
 }

@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
-use crate::ts::{Deterministic, EdgeColor, IndexType, IsEdge, StateColor, SymbolOf};
+use crate::ts::{Deterministic, EdgeColor, IdType, IsEdge, StateColor, SymbolOf};
 use crate::{Pointed, TransitionSystem};
 use crate::{Show, Void, alphabet::Alphabet, word::FiniteWord};
 use itertools::Itertools;
@@ -143,7 +143,7 @@ impl Accumulates for usize {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct RunSignature<Idx, Q, C>(Idx, Q, C);
 
-impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
+impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
     /// The state that is reached at the end of the run piece.
     pub fn state(&self) -> Idx {
         self.0
@@ -160,7 +160,7 @@ impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
     }
 }
 
-impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
+impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
     /// The signature of the empty run piece that starts and ends in `q`.
     pub fn empty_from(q: Idx) -> Self {
         Self(q, Q::neutral(), C::neutral())
@@ -212,7 +212,7 @@ impl<Idx, Q, C> RunProfile<Idx, Q, C> {
     }
 }
 
-impl<Idx: IndexType, Q: Accumulates, C: Accumulates> Show for RunProfile<Idx, Q, C>
+impl<Idx: IdType, Q: Accumulates, C: Accumulates> Show for RunProfile<Idx, Q, C>
 where
     Q: Show,
     C: Show,
@@ -231,7 +231,7 @@ where
     }
 }
 
-impl<Idx: IndexType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
+impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
     /// Creates a profile from tuples `(state, state color, edge color)`, one for each start state.
     pub fn new<I: IntoIterator<Item = (Idx, Q, C)>>(iter: I) -> Self {
         Self(

@@ -137,6 +137,10 @@ impl<Ts: TransitionSystem, P: ProvidesStateColor<Ts::StateIndex>> TransitionSyst
         self.ts.alphabet()
     }
 
+    fn state_bound(&self) -> Option<usize> {
+        self.ts.state_bound()
+    }
+
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.ts.state_indices()
     }

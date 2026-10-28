@@ -1,5 +1,5 @@
 use crate::TransitionSystem;
-use crate::ts::{Deterministic, Edge, IndexType, IsEdge, SymbolOf};
+use crate::ts::{Deterministic, Edge, IdType, IsEdge, SymbolOf};
 use crate::{Show, alphabet::Alphabet};
 use itertools::{Either, Itertools};
 
@@ -27,7 +27,7 @@ pub type PathIn<D> = Path<
     <D as TransitionSystem>::EdgeColor,
 >;
 
-impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
+impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
     /// Builds a new path from its parts, which are the index of the state it ends in, the sequence of
     /// state colors and the setquence of transitions.
     pub fn from_parts(
@@ -230,7 +230,7 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
     }
 }
 
-impl<A: Alphabet, Idx: IndexType, Q: std::fmt::Debug, C: std::fmt::Debug> std::fmt::Debug
+impl<A: Alphabet, Idx: IdType, Q: std::fmt::Debug, C: std::fmt::Debug> std::fmt::Debug
     for Path<A, Idx, Q, C>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -256,7 +256,7 @@ impl<A: Alphabet, Idx: IndexType, Q: std::fmt::Debug, C: std::fmt::Debug> std::f
     }
 }
 
-impl<A: Alphabet, Idx: IndexType, Q: Show, C: Show> Show for Path<A, Idx, Q, C> {
+impl<A: Alphabet, Idx: IdType, Q: Show, C: Show> Show for Path<A, Idx, Q, C> {
     fn show(&self) -> String {
         format!(
             "{}{:?}",
@@ -284,7 +284,7 @@ pub type LassoIn<D> = Lasso<
     <D as TransitionSystem>::EdgeColor,
 >;
 
-impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Lasso<A, Idx, Q, C> {
+impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Lasso<A, Idx, Q, C> {
     /// Creates a new [`Lasso`] from the given base/spoke and cycle/recurring [`Path`].
     pub fn new(base: Path<A, Idx, Q, C>, cycle: Path<A, Idx, Q, C>) -> Self {
         Self { base, cycle }
@@ -341,7 +341,7 @@ impl<A: Alphabet, Idx: IndexType, Q: Clone, C: Clone> Lasso<A, Idx, Q, C> {
     }
 }
 
-impl<A: Alphabet, Idx: IndexType, Q: Show, C: Show> Show for Lasso<A, Idx, Q, C> {
+impl<A: Alphabet, Idx: IdType, Q: Show, C: Show> Show for Lasso<A, Idx, Q, C> {
     fn show(&self) -> String {
         format!("{}({})", self.base.show(), self.cycle.show())
     }
