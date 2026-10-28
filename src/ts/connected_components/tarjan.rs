@@ -212,7 +212,10 @@ where
     let roots: Vec<_> = iter.into_iter().collect();
 
     // dense numbering of the considered states, so that all bookkeeping can use plain vectors
-    let mut ids = CompactIdMap::new(ts.state_bound(), roots.len());
+    // a dense numbering costs time proportional to the bound, which is not worth it if only few
+    // of the states are considered (e.g. after removing states from a linked list system)
+    let bound = ts.state_bound().filter(|&b| b <= 4 * roots.len());
+    let mut ids = CompactIdMap::new(bound, roots.len());
     for &q in &roots {
         ids.get_or_insert(q);
     }
