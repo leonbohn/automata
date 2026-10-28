@@ -7,6 +7,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use rustc_hash::FxBuildHasher;
+
 use fixedbitset::FixedBitSet;
 
 use super::IdType;
@@ -30,7 +32,7 @@ pub enum StateSet<I> {
     /// Bitset indexed by [`IdType::to_dense`].
     Dense(FixedBitSet),
     /// Hash set for ids without a (known) dense bound.
-    Sparse(HashSet<I>),
+    Sparse(HashSet<I, FxBuildHasher>),
 }
 
 impl<I: IdType> Default for StateSet<I> {
@@ -165,7 +167,7 @@ pub enum StateMap<I, V> {
     /// Vector indexed by [`IdType::to_dense`].
     Dense(Vec<Option<V>>),
     /// Hash map for ids without a (known) dense bound.
-    Sparse(HashMap<I, V>),
+    Sparse(HashMap<I, V, FxBuildHasher>),
 }
 
 impl<I: IdType, V> Default for StateMap<I, V> {

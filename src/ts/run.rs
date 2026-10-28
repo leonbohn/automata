@@ -229,7 +229,9 @@ impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObser
             }
         };
 
-        let mut seen = crate::ts::StateMap::new(self.ts.state_bound());
+        // only the states at the end of each loop iteration are stored, usually far fewer than
+        // there are states, so a dense vector sized by the bound would not pay off
+        let mut seen = crate::ts::StateMap::new(None);
         let mut iteration = 0;
         seen.insert(current, iteration);
         let mut seq = vec![];
