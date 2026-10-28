@@ -155,6 +155,44 @@ fn minimal_representatives(ts: automata::automaton::DFA) -> usize {
     black_box(ts.minimal_representatives_iter().count())
 }
 
+fn small_cycles_dfa(n: usize) -> automata::automaton::DFA {
+    use automata::representation::IntoTs;
+    common::small_cycles(n).into_dfa_with_initial(0)
+}
+
+// The representative of every SCC (used for witnesses, e.g. of a DPA). Chains of 4-cycles give
+// n / 4 components, each of which is farther from the initial state than the previous one.
+#[library_benchmark]
+#[bench::small_cycles_100(args = (100), setup = small_cycles_dfa)]
+#[bench::small_cycles_400(args = (400), setup = small_cycles_dfa)]
+fn scc_minimal_representatives(ts: automata::automaton::DFA) -> usize {
+    let sccs = ts.sccs();
+    black_box(
+        sccs.iter()
+            .filter(|(_, scc)| scc.minimal_representative().is_some())
+            .count(),
+    )
+}
+
+// The representative of each state looked up on its own.
+#[library_benchmark]
+#[bench::scrambled_100(args = (100), setup = dfa)]
+#[bench::scrambled_300(args = (300), setup = dfa)]
+fn minimal_representative_of_all_states(ts: automata::automaton::DFA) -> usize {
+    black_box(
+        ts.state_indices()
+            .filter(|&q| ts.minimal_representative(q).is_some())
+            .count(),
+    )
+}
+
+#[library_benchmark]
+#[bench::scrambled_500(args = (500), setup = dfa)]
+#[bench::scrambled_1500(args = (1_500), setup = dfa)]
+fn canonical_naming(ts: automata::automaton::DFA) -> usize {
+    black_box(ts.canonical_naming().len())
+}
+
 #[library_benchmark]
 #[bench::scrambled_2000(args = (2_000), setup = scrambled)]
 #[bench::scrambled_8000(args = (8_000), setup = scrambled)]
@@ -244,7 +282,8 @@ library_benchmark_group!(
     name = ts;
     benchmarks = add_edges_in_order, add_edges_in_reverse, builder_with_edges,
         successor_index_all_pairs, edges_from_all_states, matching_product_successor_index,
-        reachable_states, minimal_representatives, predecessors_of_all_states,
+        reachable_states, minimal_representatives, scc_minimal_representatives,
+        minimal_representative_of_all_states, canonical_naming, predecessors_of_all_states,
         clone, collect_dts, map_edge_colors_collect, erase_state_colors_collect, into_dfa,
         remove_edges_from_matching, remove_state, subset_construction
 );
