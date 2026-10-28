@@ -9,6 +9,7 @@ use crate::{
     math,
 };
 use itertools::Itertools;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
@@ -120,8 +121,8 @@ impl<'a, Idx: Copy, E, C: Clone> IsEdge<'a, E, Idx, Vec<C>> for QuotientTransiti
         self.target
     }
 
-    fn color(&self) -> Vec<C> {
-        self.colors.clone()
+    fn color(&self) -> Cow<'_, Vec<C>> {
+        Cow::Borrowed(&self.colors)
     }
 
     fn expression(&self) -> &'a E {
@@ -209,9 +210,11 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
         0..self.partition.len()
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         let it = self.class_iter_by_id(state)?;
-        it.map(|o| self.ts.state_color(o)).collect()
+        it.map(|o| self.ts.state_color(o).map(Cow::into_owned))
+            .collect::<Option<Vec<_>>>()
+            .map(Cow::Owned)
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -238,7 +241,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
                 self.ts.edge(q, &matcher).map(|tt| {
                     (
                         self.find_id_by_state(tt.target()).expect("Unknown state"),
-                        tt.color().clone(),
+                        tt.color().into_owned(),
                     )
                 })
             })

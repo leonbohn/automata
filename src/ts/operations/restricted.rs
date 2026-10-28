@@ -2,6 +2,7 @@ use crate::alphabet::Matcher;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{Deterministic, EdgeColor, EdgeExpression, IdType, IsEdge, StateIndex};
 use crate::{Congruence, Pointed, TransitionSystem};
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::marker::PhantomData;
 
@@ -98,7 +99,7 @@ where
         }
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         if (self.filter()).is_masked(state) {
             return None;
         }
@@ -321,7 +322,7 @@ where
         })
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.ts().state_color(state)
     }
 }
@@ -358,7 +359,7 @@ where
     ) -> Option<Self::EdgeRef<'_>> {
         self.ts()
             .edge(state, matcher)
-            .filter(|t| t.color() <= self.max && self.min <= t.color())
+            .filter(|t| *t.color() <= self.max && self.min <= *t.color())
     }
 }
 
@@ -379,7 +380,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.it
-            .find(|t| t.color() <= self.max && self.min <= t.color())
+            .find(|t| *t.color() <= self.max && self.min <= *t.color())
     }
 }
 
@@ -412,7 +413,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.it
-            .find(|t| t.color() <= self.max && self.min <= t.color())
+            .find(|t| *t.color() <= self.max && self.min <= *t.color())
     }
 }
 

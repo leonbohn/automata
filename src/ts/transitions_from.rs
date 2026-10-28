@@ -55,7 +55,7 @@ impl<'a, D: TransitionSystem + 'a> Iterator for TransitionsFrom<'a, D> {
                 let mut it = t.expression().symbols();
                 if let Some(sym) = it.next() {
                     let target = t.target();
-                    let color = t.color();
+                    let color = t.color().into_owned();
                     self.symbols = Some(it);
                     self.color = Some(color.clone());
                     self.target = Some(target);

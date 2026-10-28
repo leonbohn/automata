@@ -1,5 +1,3 @@
-use std::hash::Hash;
-
 use super::{DefaultIdType, ForAlphabet, IntoEdgeTuple, Sproutable};
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine, WithInitial};
 use crate::representation::IntoTs;
@@ -337,10 +335,7 @@ impl<Q: Color, C: Color> Builder<Q, C, true> {
     pub fn into_dts_with_initial(
         self,
         initial: DefaultIdType,
-    ) -> WithInitial<DTS<CharAlphabet, Q, C>>
-    where
-        C: Hash + Eq,
-    {
+    ) -> WithInitial<DTS<CharAlphabet, Q, C>> {
         or_panic(self.try_into_dts_with_initial(initial))
     }
 
@@ -348,10 +343,7 @@ impl<Q: Color, C: Color> Builder<Q, C, true> {
     pub fn try_into_dts_with_initial(
         self,
         initial: DefaultIdType,
-    ) -> Result<WithInitial<DTS<CharAlphabet, Q, C>>, BuilderError>
-    where
-        C: Hash + Eq,
-    {
+    ) -> Result<WithInitial<DTS<CharAlphabet, Q, C>>, BuilderError> {
         Ok(self.try_into_dts()?.with_initial(initial))
     }
 
@@ -515,8 +507,8 @@ mod tests {
             .try_into_nts()
             .unwrap();
         assert_eq!(ts.state_indices().count(), 6);
-        assert_eq!(ts.state_color(5), Some(true));
-        assert_eq!(ts.state_color(3), Some(false));
+        assert_eq!(ts.state_color(5).as_deref(), Some(&true));
+        assert_eq!(ts.state_color(3).as_deref(), Some(&false));
     }
 
     #[test]

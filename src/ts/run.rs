@@ -583,7 +583,7 @@ mod impls {
         }
         #[inline(always)]
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
-            Self(ts.state_color(state).unwrap())
+            Self(ts.state_color(state).unwrap().into_owned())
         }
         #[inline(always)]
         fn observe_one(
@@ -593,7 +593,7 @@ mod impls {
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
             let succ = ts.successor_index(state, sym)?;
-            self.0 = ts.state_color(succ).unwrap();
+            self.0.clone_from(&ts.state_color(succ).unwrap());
             Some(succ)
         }
     }
@@ -619,7 +619,10 @@ mod impls {
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
             let e = ts.edge(state, sym)?;
-            self.0 = Some(e.color());
+            match &mut self.0 {
+                Some(c) => c.clone_from(&e.color()),
+                none => *none = Some(e.color().into_owned()),
+            }
             Some(e.target())
         }
     }
@@ -637,7 +640,7 @@ mod impls {
         }
         #[inline(always)]
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
-            Self(ts.state_color(state).unwrap())
+            Self(ts.state_color(state).unwrap().into_owned())
         }
         #[inline(always)]
         fn observe_one(
@@ -804,7 +807,7 @@ mod impls {
         type Current = Vec<StateColor<T>>;
         #[inline(always)]
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
-            Self(vec![ts.state_color(state).unwrap()])
+            Self(vec![ts.state_color(state).unwrap().into_owned()])
         }
         #[inline(always)]
         fn current(&self) -> &Self::Current {
@@ -822,7 +825,8 @@ mod impls {
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
             let successor_index = ts.successor_index(state, sym)?;
-            self.0.push(ts.state_color(successor_index).unwrap());
+            self.0
+                .push(ts.state_color(successor_index).unwrap().into_owned());
             Some(successor_index)
         }
     }
@@ -841,11 +845,11 @@ mod impls {
             Self(Default::default())
         }
     }
-    impl<T: Deterministic> Observer<T> for StateColorSet<T> {
+    impl<T: Deterministic<StateColor: Eq + std::hash::Hash>> Observer<T> for StateColorSet<T> {
         type Current = Self;
         #[inline(always)]
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
-            let start = ts.state_color(state).unwrap();
+            let start = ts.state_color(state).unwrap().into_owned();
             Self(math::FxIndexSet::from_iter([start]))
         }
         #[inline(always)]
@@ -864,11 +868,14 @@ mod impls {
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
             let t = ts.edge(state, sym)?;
-            self.0.insert(ts.state_color(t.target()).unwrap());
+            let c = ts.state_color(t.target()).unwrap();
+            if !self.0.contains(&*c) {
+                self.0.insert(c.into_owned());
+            }
             Some(t.target())
         }
     }
-    impl<T: Deterministic> InfiniteObserver<T> for StateColorSet<T> {
+    impl<T: Deterministic<StateColor: Eq + std::hash::Hash>> InfiniteObserver<T> for StateColorSet<T> {
         #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
             seq[time..].iter().fold(Default::default(), |mut acc, x| {
@@ -878,7 +885,7 @@ mod impls {
         }
     }
 
-    impl<T: Deterministic> Observer<T> for EdgeColorSet<T> {
+    impl<T: Deterministic<EdgeColor: Eq + std::hash::Hash>> Observer<T> for EdgeColorSet<T> {
         type Current = Self;
         #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
@@ -900,11 +907,14 @@ mod impls {
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
             let t = ts.edge(state, sym)?;
-            self.0.insert(t.color());
+            let c = t.color();
+            if !self.0.contains(&*c) {
+                self.0.insert(c.into_owned());
+            }
             Some(t.target())
         }
     }
-    impl<T: Deterministic> InfiniteObserver<T> for EdgeColorSet<T> {
+    impl<T: Deterministic<EdgeColor: Eq + std::hash::Hash>> InfiniteObserver<T> for EdgeColorSet<T> {
         #[inline(always)]
         fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
             Self(
@@ -945,7 +955,7 @@ mod impls {
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
             let t = ts.edge(state, sym)?;
-            self.0.push(t.color());
+            self.0.push(t.color().into_owned());
             Some(t.target())
         }
     }
@@ -1014,7 +1024,7 @@ mod impls {
 #[cfg(test)]
 mod tests {
     use crate::ts::run::EscapePrefix;
-    use crate::ts::{Builder, Deterministic};
+    use crate::ts::{Builder, Deterministic, IsEdge, TransitionSystem};
 
     #[test]
     fn run_escaping() {
@@ -1066,5 +1076,25 @@ mod tests {
             .unwrap();
         assert_eq!(greatest, 7);
         assert_eq!(least, 2);
+    }
+
+    #[test]
+    fn float_edge_colors_can_be_built_and_run() {
+        // `f64` is neither `Eq` nor `Hash`, which must not matter for building and running
+        let dts = Builder::without_state_colors()
+            .with_transitions([(0, 'a', 0.5f64, 1), (1, 'a', 1.5, 0)])
+            .into_dts_with_initial(0);
+
+        assert_eq!(dts.last_edge_color("aa"), Some(1.5));
+        assert_eq!(dts.visited_edge_colors("aaa"), Some(vec![0.5, 1.5, 0.5]));
+        assert_eq!(
+            TransitionSystem::edges_from(dts.ts(), 0)
+                .unwrap()
+                .next()
+                .unwrap()
+                .color()
+                .into_owned(),
+            0.5
+        );
     }
 }

@@ -33,7 +33,7 @@ where
     where
         (String, StateColor<Self>): Show,
     {
-        let shape = if self.state_color(idx).unwrap() {
+        let shape = if *self.state_color(idx).unwrap() {
             "doublecircle"
         } else {
             "circle"

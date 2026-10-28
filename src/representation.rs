@@ -71,7 +71,7 @@ pub trait CollectTs: TransitionSystem {
                 out.add_edge((
                     *map.get(&e.source()).unwrap(),
                     e.expression().clone(),
-                    e.color(),
+                    e.color().into_owned(),
                     *map.get(&e.target()).unwrap(),
                 ));
             }

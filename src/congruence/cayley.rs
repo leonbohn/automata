@@ -4,6 +4,7 @@ use crate::ts::{
     StateIndex, SymbolOf,
 };
 use crate::{Pointed, TransitionSystem};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use super::{Accumulates, RunProfile, TransitionMonoid};
@@ -95,8 +96,8 @@ where
         Some(DeterministicEdgesFrom::new(self, state))
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        self.monoid().get_profile(state).map(|p| p.0.clone())
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
+        self.monoid().get_profile(state).map(|p| Cow::Borrowed(p.0))
     }
 }
 
@@ -214,8 +215,8 @@ where
         Some(DeterministicEdgesFrom::new(self, state))
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        self.monoid().get_profile(state).map(|p| p.0.clone())
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
+        self.monoid().get_profile(state).map(|p| Cow::Borrowed(p.0))
     }
 }
 

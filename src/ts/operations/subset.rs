@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::{cell::RefCell, fmt::Debug};
 
 use crate::ts::{
@@ -121,7 +122,7 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
             .flat_map(|q| {
                 self.ts.edges_from(*q).unwrap().filter_map(|tt| {
                     if matcher.matches(tt.expression()) {
-                        Some((tt.color(), tt.target()))
+                        Some((tt.color().into_owned(), tt.target()))
                     } else {
                         None
                     }
@@ -188,13 +189,14 @@ impl<Ts: TransitionSystem> TransitionSystem for SubsetConstruction<Ts> {
         Some(DeterministicEdgesFrom::new(self, state))
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.states
             .borrow()
             .get(state)?
             .iter()
-            .map(|idx| self.ts.state_color(*idx))
-            .collect()
+            .map(|idx| self.ts.state_color(*idx).map(Cow::into_owned))
+            .collect::<Option<Vec<_>>>()
+            .map(Cow::Owned)
     }
 }
 

@@ -10,7 +10,7 @@ use crate::ts::{Deterministic, EdgeColor, StateColor};
 impl<D> IntoMooreMachine<D>
 where
     D: Deterministic,
-    StateColor<D>: Color,
+    StateColor<D>: Color + Eq + std::hash::Hash,
 {
     /// Returns the unique minimal moore machine that is bisimilar to `self`. This means
     /// for every finite word, the output of `self` and the output of the returned moore
@@ -24,7 +24,7 @@ where
 impl<D> IntoMealyMachine<D>
 where
     D: Deterministic,
-    EdgeColor<D>: Color,
+    EdgeColor<D>: Color + Eq + std::hash::Hash,
 {
     /// Minimizes `self` using Hopcroft's partition refinement algorithm.
     pub fn minimize(&self) -> MealyMachine<D::Alphabet, Vec<StateColor<D>>, D::EdgeColor> {

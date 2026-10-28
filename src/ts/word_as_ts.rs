@@ -2,6 +2,7 @@ use crate::{
     alphabet::SimpleAlphabet,
     word::{FiniteWord, OmegaWord, Word},
 };
+use std::borrow::Cow;
 
 use crate::TransitionSystem;
 use crate::ts::{StateIndex, predecessors::PredecessorIterable};
@@ -146,11 +147,11 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
         0..(self.word.len().try_into().unwrap())
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         if state as usize >= self.word.len() {
             None
         } else {
-            Some(state)
+            Some(Cow::Owned(state))
         }
     }
 }
@@ -207,11 +208,11 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for W
         0..(self.word.combined_len().try_into().unwrap())
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         if state as usize >= self.word.combined_len() {
             None
         } else {
-            Some(state)
+            Some(Cow::Owned(state))
         }
     }
 }

@@ -1,6 +1,7 @@
 use super::LinkedListTransitionSystem;
 use crate::ts::{DefaultIdType, DenseId, IntoEdgeTuple, IsEdge};
 use crate::{Color, Void, alphabet::Alphabet};
+use std::borrow::Cow;
 use std::fmt::Debug;
 
 /// Represents an edge in a non-deterministic transition system, see [`crate::NTS`]. It stores a color, an
@@ -153,8 +154,8 @@ impl<'a, E, C: Clone> IsEdge<'a, E, DefaultIdType, C> for &'a LinkedListTransiti
         self.target.try_into().unwrap()
     }
 
-    fn color(&self) -> C {
-        self.color.clone()
+    fn color(&self) -> Cow<'_, C> {
+        Cow::Borrowed(&self.color)
     }
 
     fn expression(&self) -> &'a E {

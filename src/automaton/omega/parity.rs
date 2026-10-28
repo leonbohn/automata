@@ -414,7 +414,7 @@ where
     /// Returns an iterator over all colors that appear on edges of `self`.
     pub fn colors(&self) -> impl Iterator<Item = Int> + '_ {
         self.state_indices()
-            .flat_map(|q| self.edges_from(q).unwrap().map(|e| e.color()))
+            .flat_map(|q| self.edges_from(q).unwrap().map(|e| *e.color()))
             .unique()
     }
 

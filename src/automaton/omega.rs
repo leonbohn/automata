@@ -241,13 +241,18 @@ impl From<DeterministicOmegaAutomaton<PropAlphabet>> for DeterministicOmegaAutom
     fn from(value: DeterministicOmegaAutomaton<PropAlphabet>) -> Self {
         let size = value.size().into_id();
         let ts = Builder::default()
-            .with_state_colors((0..size).map(|i| value.state_color(i).unwrap()))
+            .with_state_colors((0..size).map(|i| value.state_color(i).unwrap().into_owned()))
             .with_transitions(value.state_indices().flat_map(|q| {
                 assert!(q < size);
                 value.edges_from(q).unwrap().flat_map(|edge| {
-                    edge.expression()
-                        .chars_iter()
-                        .map(move |sym| (edge.source(), sym, IsEdge::color(&edge), edge.target()))
+                    edge.expression().chars_iter().map(move |sym| {
+                        (
+                            edge.source(),
+                            sym,
+                            IsEdge::color(&edge).into_owned(),
+                            edge.target(),
+                        )
+                    })
                 })
             }))
             .into_dts();
@@ -270,7 +275,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
                 q.into_usize() < size,
                 "The state indices must be contiguous for this!"
             );
-            ts.add_state(value.state_color(q).unwrap());
+            ts.add_state(value.state_color(q).unwrap().into_owned());
         }
 
         for q in value.state_indices() {
@@ -279,7 +284,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
                     edge.source(),
                     ts.alphabet()
                         .make_expression(ts.alphabet().char_to_symbol(*edge.expression())),
-                    edge.color(),
+                    edge.color().into_owned(),
                     edge.target(),
                 ));
             }

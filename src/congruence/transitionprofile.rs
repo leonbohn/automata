@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
 use crate::ts::{Deterministic, EdgeColor, IdType, IsEdge, StateColor, SymbolOf};
@@ -175,9 +176,9 @@ impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
         match ts.edge(self.0, symbol) {
             Some(tt) => {
                 let target = tt.target();
-                let mut sc = Q::from_or_neutral(ts.state_color(target));
+                let mut sc = Q::from_or_neutral(ts.state_color(target).map(Cow::into_owned));
                 sc.update(self.sc());
-                let mut ec = C::from(tt.color().clone());
+                let mut ec = C::from(tt.color().into_owned());
                 ec.update(self.ec());
 
                 Some(Self(target, sc, ec))

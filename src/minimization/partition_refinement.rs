@@ -150,7 +150,7 @@ fn collect_partition<I: crate::ts::IdType>(states: &[I], block_of: &[usize]) -> 
 pub fn mealy_greatest_bisimulation<D>(mm: D) -> Partition<D::StateIndex>
 where
     D: Deterministic,
-    EdgeColor<D>: Color,
+    EdgeColor<D>: Color + Eq + std::hash::Hash,
 {
     let start = Instant::now();
     let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), mm.hint_size().0);
@@ -168,7 +168,7 @@ where
                 && let Some(target) = ids.id(&t.target())
             {
                 let next = labels.len();
-                let label = *labels.entry(t.color()).or_insert(next);
+                let label = *labels.entry(t.color().into_owned()).or_insert(next);
                 raw[s].push((target, q, label));
             }
         }
@@ -194,7 +194,7 @@ pub fn mealy_partition_refinement<D>(
 ) -> MealyMachine<D::Alphabet, Vec<StateColor<D>>, EdgeColor<D>>
 where
     D: Congruence,
-    EdgeColor<D>: Color,
+    EdgeColor<D>: Color + Eq + std::hash::Hash,
 {
     let partition = mealy_greatest_bisimulation(&mm);
     trace!(
@@ -230,7 +230,7 @@ where
 pub fn moore_greatest_bisimulation<D>(mm: D) -> Partition<D::StateIndex>
 where
     D: Deterministic,
-    StateColor<D>: Color,
+    StateColor<D>: Color + Eq + std::hash::Hash,
 {
     let start = Instant::now();
     let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), mm.hint_size().0);
@@ -280,7 +280,7 @@ where
 pub fn moore_partition_refinement<D>(mm: D) -> MooreMachine<D::Alphabet, D::StateColor>
 where
     D: Congruence,
-    StateColor<D>: Color,
+    StateColor<D>: Color + Eq + std::hash::Hash,
 {
     let partition = moore_greatest_bisimulation(&mm);
     trace!(
@@ -379,7 +379,7 @@ mod tests {
                 if use_edge_colors {
                     0
                 } else {
-                    ts.state_color(q as u32).unwrap() as usize
+                    *ts.state_color(q as u32).unwrap() as usize
                 }
             })
             .collect();
@@ -391,7 +391,7 @@ mod tests {
                         ts.edge(q as u32, sym).map(|e| {
                             (
                                 class[e.target() as usize],
-                                use_edge_colors.then(|| e.color()),
+                                use_edge_colors.then(|| e.color().into_owned()),
                             )
                         })
                     })

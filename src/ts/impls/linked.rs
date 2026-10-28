@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::{fmt::Debug, hash::Hash};
 
 use crate::ts::{
@@ -387,7 +388,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
     pub(crate) fn verify_state(&self) {}
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color>
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color + PartialEq>
     LinkedListTransitionSystem<A, (X, Q), C, DET>
 {
     /// Drops the first component of the state colors, the inverse of pairing them (see
@@ -415,7 +416,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color>
 
     /// Returns the first component of the color of the state with the given index.
     pub fn new_to_old(&self, right: StateIndex<Self>) -> Option<X> {
-        self.state_color(right).map(|c| c.0)
+        self.state_color(right).map(|c| c.0.clone())
     }
 }
 
@@ -665,8 +666,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
         ))
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        self.states.get(state.into_usize())?.color().cloned()
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
+        self.states
+            .get(state.into_usize())?
+            .color()
+            .map(Cow::Borrowed)
     }
 
     fn contains_state_index(&self, index: StateIndex<Self>) -> bool {

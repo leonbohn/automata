@@ -99,7 +99,11 @@ impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
         state: Idx,
     ) -> Self {
         Self {
-            state_colors: vec![ts.state_color(state).expect("Origin state must be colored")],
+            state_colors: vec![
+                ts.state_color(state)
+                    .expect("Origin state must be colored")
+                    .into_owned(),
+            ],
             end: state,
             transitions: Vec::new(),
         }
@@ -111,7 +115,11 @@ impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
         D: Deterministic<StateColor = Q, EdgeColor = C, StateIndex = Idx, Alphabet = A>,
     {
         Self {
-            state_colors: vec![ts.state_color(state).expect("Origin state must be colored")],
+            state_colors: vec![
+                ts.state_color(state)
+                    .expect("Origin state must be colored")
+                    .into_owned(),
+            ],
             end: state,
             transitions: Vec::with_capacity(capacity),
         }
@@ -125,10 +133,13 @@ impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
     {
         let transition = ts.edge(self.end, symbol)?;
         self.transitions
-            .push((self.end, symbol, transition.color().clone()));
+            .push((self.end, symbol, transition.color().into_owned()));
         self.end = transition.target();
-        self.state_colors
-            .push(ts.state_color(self.end).expect("The state must be colored"));
+        self.state_colors.push(
+            ts.state_color(self.end)
+                .expect("The state must be colored")
+                .into_owned(),
+        );
         Some(transition)
     }
 

@@ -1,12 +1,13 @@
 use crate::TransitionSystem;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{IsEdge, StateIndex};
+use std::borrow::Cow;
 
 /// Reverses the direction of all transitions in a given [`TransitionSystem`].
 #[derive(Clone, Debug)]
 pub struct Reversed<Ts>(pub Ts);
 
-impl<'ts, E, Idx, C, T: IsEdge<'ts, E, Idx, C>> IsEdge<'ts, E, Idx, C> for Reversed<T> {
+impl<'ts, E, Idx, C: Clone, T: IsEdge<'ts, E, Idx, C>> IsEdge<'ts, E, Idx, C> for Reversed<T> {
     fn source(&self) -> Idx {
         self.0.target()
     }
@@ -15,7 +16,7 @@ impl<'ts, E, Idx, C, T: IsEdge<'ts, E, Idx, C>> IsEdge<'ts, E, Idx, C> for Rever
         self.0.source()
     }
 
-    fn color(&self) -> C {
+    fn color(&self) -> Cow<'_, C> {
         self.0.color()
     }
 
@@ -70,7 +71,7 @@ where
         Some(self.0.predecessors(state)?.map(Reversed))
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.0.state_color(state)
     }
 }

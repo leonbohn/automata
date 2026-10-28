@@ -5,6 +5,7 @@ use crate::{
     word::{FiniteWord, OmegaWord},
 };
 pub use acceptance_type::OmegaAcceptanceType;
+use std::borrow::Cow;
 
 #[macro_use]
 mod moore;
@@ -451,7 +452,7 @@ where
         self.ts.edges_from(state)
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.ts.state_color(state)
     }
 
@@ -507,7 +508,7 @@ impl<Ts: TransitionSystem<StateColor = bool>> Iterator for StatesWithColor<'_, T
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
-            .find(|&index| self.ts.state_color(index).unwrap() == self.color)
+            .find(|&index| *self.ts.state_color(index).unwrap() == self.color)
     }
 }
 
@@ -548,9 +549,9 @@ mod tests {
 
         let mut dfa: DFA =
             super::Automaton::new_with_initial_color(CharAlphabet::of_size(2), false);
-        assert_eq!(dfa.state_color(dfa.initial()), Some(false));
+        assert_eq!(dfa.state_color(dfa.initial()).as_deref(), Some(&false));
         dfa.set_initial_color(true);
-        assert_eq!(dfa.state_color(dfa.initial()), Some(true));
+        assert_eq!(dfa.state_color(dfa.initial()).as_deref(), Some(&true));
     }
 
     use crate::automaton::{DBA, DFA, MooreMachine};

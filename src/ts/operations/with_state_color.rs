@@ -1,6 +1,7 @@
 use crate::ts::{Deterministic, StateIndex};
 use crate::{Color, math};
 use crate::{Pointed, TransitionSystem};
+use std::borrow::Cow;
 use std::hash::Hash;
 
 /// Implementors of this trait provide a color for states of a
@@ -149,9 +150,9 @@ impl<Ts: TransitionSystem, P: ProvidesStateColor<Ts::StateIndex>> TransitionSyst
         self.ts.edges_from(state)
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         let idx = state;
-        Some(self.provider.state_color(idx))
+        Some(Cow::Owned(self.provider.state_color(idx)))
     }
 }
 

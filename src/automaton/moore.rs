@@ -50,7 +50,7 @@ where
     /// produce a color less than or equal to i.
     pub fn decompose_dfa(&self) -> Vec<DFA<M::Alphabet>>
     where
-        StateColor<Self>: Ord,
+        StateColor<Self>: Ord + Eq + std::hash::Hash,
     {
         self.color_range()
             .into_iter()
@@ -82,7 +82,7 @@ where
         self.map_edge_colors_full(|p, _a, _c, _q| {
             self.state_color(p)
                 .expect("We know it is reachable and it must be colored")
-                .clone()
+                .into_owned()
         })
         .with_initial(self.initial)
         .collect_mealy()
@@ -97,12 +97,13 @@ where
     /// Obtains a vec containing the possible colors emitted by `self` (without duplicates).
     pub fn color_range(&self) -> Vec<M::StateColor>
     where
-        StateColor<Self>: Color,
+        StateColor<Self>: Color + Eq + std::hash::Hash,
     {
         self.reachable_state_indices_from(self.initial)
             .map(|o| {
                 self.state_color(o)
                     .expect("We know it is reachable and it must be colored")
+                    .into_owned()
             })
             .unique()
             .collect()
@@ -114,7 +115,7 @@ where
     pub fn bisimilar<N>(&self, other: N) -> bool
     where
         N: Congruence<Alphabet = M::Alphabet, StateColor = M::StateColor>,
-        StateColor<Self>: Color,
+        StateColor<Self>: Color + PartialEq,
     {
         self.witness_non_bisimilarity(other).is_none()
     }
@@ -125,13 +126,14 @@ where
     pub fn witness_non_bisimilarity<N>(&self, other: N) -> Option<Vec<SymbolOf<Self>>>
     where
         N: Congruence<Alphabet = M::Alphabet, StateColor = M::StateColor>,
-        StateColor<Self>: Color,
+        StateColor<Self>: Color + PartialEq,
     {
         let other_initial = other.initial();
         let prod = self.ts_product(other);
         for mr in prod.minimal_representatives_iter_from(ProductIndex(self.initial, other_initial))
         {
-            let (c, d) = prod.state_color(mr.state_index()).unwrap();
+            let colors = prod.state_color(mr.state_index()).unwrap();
+            let (c, d) = &*colors;
             if c != d {
                 return Some(mr.decompose().0);
             }

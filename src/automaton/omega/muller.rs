@@ -21,9 +21,9 @@ pub type IntoDMA<T> = DMA<<T as TransitionSystem>::Alphabet, StateColor<T>, Edge
 /// is satisfied by a set (usually the set of colors that appear infinitely often in a run),
 /// if it contains the set.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct MullerCondition<C: Color>(Vec<math::FxIndexSet<C>>);
+pub struct MullerCondition<C: Color + Eq + std::hash::Hash>(Vec<math::FxIndexSet<C>>);
 
-impl<C: Color + Ord> MullerCondition<C> {
+impl<C: Color + Ord + Eq + std::hash::Hash> MullerCondition<C> {
     /// Builds a new instance from an iterator that yields iterators that yield colors
     /// (or elements of type `C`).
     ///
@@ -62,7 +62,9 @@ impl<C: Color + Ord> MullerCondition<C> {
     }
 }
 
-impl<T: Deterministic> Semantics<T, true> for MullerCondition<EdgeColor<T>> {
+impl<T: Deterministic<EdgeColor: Eq + std::hash::Hash>> Semantics<T, true>
+    for MullerCondition<EdgeColor<T>>
+{
     type Observer = run::EdgeColorSet<T>;
     type Output = bool;
     fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
