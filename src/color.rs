@@ -16,7 +16,7 @@ impl std::fmt::Debug for Void {
 }
 
 /// A color is simply a type that can be used to color states or transitions.
-pub trait Color: Clone + Eq + std::hash::Hash + std::fmt::Debug {
+pub trait Color: Clone + std::fmt::Debug {
     /// Reduces a sequence of colors (of type `Self`) to a single color of type `Self`.
     fn reduce<I: IntoIterator<Item = Self>>(iter: I) -> Self
     where
@@ -26,7 +26,7 @@ pub trait Color: Clone + Eq + std::hash::Hash + std::fmt::Debug {
     }
 }
 
-impl<T: Eq + Clone + std::hash::Hash + std::fmt::Debug> Color for T {}
+impl<T: Clone + std::fmt::Debug> Color for T {}
 
 /// Represents an ordered, finite set of colors.
 pub trait Lattice {

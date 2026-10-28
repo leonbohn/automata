@@ -137,7 +137,10 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
 
     /// Returns the number of SCCs which are not transient, meaning an SCC counts towards
     /// the total if there is at least one transition that starts and ends in it.
-    pub fn proper_size(&self) -> usize {
+    pub fn proper_size(&self) -> usize
+    where
+        EdgeColor<Ts>: Hash + Eq,
+    {
         self.dag
             .iter()
             .filter(|(_, scc)| scc.is_nontransient())
@@ -187,7 +190,10 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
 
     /// Returns an iterator over all SCCs which are terminal, meaning they have no outgoing
     /// edges to another SCC.
-    pub fn terminal_sccs(&self) -> impl Iterator<Item = &Scc<'a, Ts>> {
+    pub fn terminal_sccs(&self) -> impl Iterator<Item = &Scc<'a, Ts>>
+    where
+        EdgeColor<Ts>: Hash + Eq,
+    {
         self.dag.iter().filter_map(|(_, scc)| {
             if scc.border_edges().is_empty() {
                 Some(scc)
@@ -205,7 +211,10 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     }
 
     /// Tries to find a nontrivial SCC and if it finds one, asserts that it is the only one.
-    pub fn singleton_nontrivial(&self) -> Option<&Scc<'a, Ts>> {
+    pub fn singleton_nontrivial(&self) -> Option<&Scc<'a, Ts>>
+    where
+        EdgeColor<Ts>: Hash + Eq,
+    {
         for i in 0..self.dag.size() {
             if self.dag[i].is_trivial() || self.dag[i].is_transient() {
                 continue;

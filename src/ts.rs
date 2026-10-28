@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use std::borrow::Cow;
 use tracing::trace;
 
 use crate::{
@@ -150,8 +151,14 @@ pub trait TransitionSystem: Sized {
     fn state_indices_with_color(
         &self,
     ) -> impl Iterator<Item = (Self::StateIndex, Self::StateColor)> {
-        self.state_indices()
-            .map(|q| (q, self.state_color(q).expect("Every state must be colored")))
+        self.state_indices().map(|q| {
+            (
+                q,
+                self.state_color(q)
+                    .expect("Every state must be colored")
+                    .into_owned(),
+            )
+        })
     }
 
     /// Helper function which creates an expression from the given symbol.
@@ -205,7 +212,7 @@ pub trait TransitionSystem: Sized {
                 self.edges_from(q)
                     .expect("should return iterator for state that exists")
             })
-            .map(|t| t.color().clone())
+            .map(|t| t.color().into_owned())
     }
 
     /// Returns an iterator giving all **unique** colors that are used by the edges of `self`.
@@ -326,7 +333,7 @@ pub trait TransitionSystem: Sized {
     }
 
     /// Returns the color of the given `state`, if it exists. Otherwise, `None` is returned.
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor>;
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>>;
 
     /// Attempts to find a word which leads from the state `from` to state `to`. If no such
     /// word exists, `None` is returned.
@@ -382,7 +389,7 @@ pub trait TransitionSystem: Sized {
         StateColor<Self>: Eq,
     {
         self.state_indices()
-            .find(|index| self.state_color(*index).as_ref() == Some(color))
+            .find(|index| self.state_color(*index).as_deref() == Some(color))
     }
 
     /// Returns true if and only if a state with the given `color` exists.
@@ -634,7 +641,7 @@ pub trait TransitionSystem: Sized {
         Self: Sized + Pointed,
     {
         self.reachable_states()
-            .map(|q| self.state_color(q).unwrap())
+            .map(|q| self.state_color(q).unwrap().into_owned())
     }
 
     /// Returns an iterator over the indices of the states that are reachable from the initial state.
@@ -713,7 +720,7 @@ impl<Ts: TransitionSystem> TransitionSystem for &Ts {
         Ts::edges_from(self, state)
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         Ts::state_color(self, state)
     }
 }
@@ -758,7 +765,7 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
         Ts::edges_from(self, state)
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         Ts::state_color(self, state)
     }
 }
@@ -828,6 +835,7 @@ pub trait Pointed: TransitionSystem {
     fn initial_color(&self) -> Self::StateColor {
         self.state_color(self.initial())
             .expect("Initial state must exist and be colored!")
+            .into_owned()
     }
 }
 
@@ -860,7 +868,7 @@ mod tests {
         let q = ts.add_state(true);
         let p = ts.add_state(false);
         assert!(ts.edges_from(q).is_some());
-        assert_eq!(ts.state_color(p), Some(false));
+        assert_eq!(ts.state_color(p).as_deref(), Some(&false));
         assert!(ts.edges_from(17).is_none());
         assert_eq!(ts.state_color(17), None);
         // a removed state no longer exists

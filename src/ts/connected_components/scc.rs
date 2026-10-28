@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::{cell::OnceCell, collections::BTreeSet, fmt::Debug, hash::Hash};
 
@@ -131,6 +132,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
             self.ts
                 .state_color(*q)
                 .expect("State is in SCC but not in Ts")
+                .into_owned()
         })
     }
 
@@ -158,7 +160,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                 for edge in it {
                     let p = edge.target();
                     if !self.states.contains(&p) {
-                        edges.insert((*q, edge.expression().clone(), edge.color().clone(), p));
+                        edges.insert((*q, edge.expression().clone(), edge.color().into_owned(), p));
                     }
                 }
             }
@@ -180,7 +182,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                     let p = edge.target();
                     for a in edge.expression().symbols() {
                         if !self.states.contains(&p) {
-                            edges.insert((*q, a, edge.color().clone(), p));
+                            edges.insert((*q, a, edge.color().into_owned(), p));
                         }
                     }
                 }
@@ -204,7 +206,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                 for edge in it {
                     let p = edge.target();
                     if self.states.contains(&p) {
-                        edges.insert((*q, edge.expression().clone(), edge.color().clone(), p));
+                        edges.insert((*q, edge.expression().clone(), edge.color().into_owned(), p));
                     }
                 }
             }
@@ -228,7 +230,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                     let p = edge.target();
                     for a in edge.expression().symbols() {
                         if self.states.contains(&p) {
-                            edges.insert((*q, a, edge.color().clone(), p));
+                            edges.insert((*q, a, edge.color().into_owned(), p));
                         }
                     }
                 }
@@ -273,7 +275,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         Some(
             self.states
                 .iter()
-                .filter_map(|q| self.ts.state_color(*q))
+                .filter_map(|q| self.ts.state_color(*q).map(Cow::into_owned))
                 .collect(),
         )
     }

@@ -156,7 +156,7 @@ pub trait Deterministic: TransitionSystem {
             None,
             "There are multiple symbols for this expression"
         );
-        Some(self.edge(state, sym)?.color().clone())
+        Some(self.edge(state, sym)?.color().into_owned())
     }
 
     /// Attempts to find the minimal representative of the indexed `state`, which the the length-lexicographically
@@ -292,7 +292,10 @@ pub trait Deterministic: TransitionSystem {
         &self,
         origin: StateIndex<Self>,
         word: W,
-    ) -> Option<StateColorSet<Self>> {
+    ) -> Option<StateColorSet<Self>>
+    where
+        StateColor<Self>: Eq + std::hash::Hash,
+    {
         self.omega_run_from::<W, StateColorSet<_>>(origin, word)
             .into_output()
     }
@@ -306,6 +309,7 @@ pub trait Deterministic: TransitionSystem {
     ) -> Option<StateColorSet<Self>>
     where
         Self: Pointed,
+        StateColor<Self>: Eq + std::hash::Hash,
     {
         self.recurrent_state_colors_from(self.initial(), word)
     }
@@ -320,6 +324,7 @@ pub trait Deterministic: TransitionSystem {
     ) -> Option<EdgeColorSet<Self>>
     where
         W: OmegaWord<Symbol = SymbolOf<Self>>,
+        EdgeColor<Self>: Eq + std::hash::Hash,
     {
         self.omega_run_from::<W, EdgeColorSet<_>>(origin, word)
             .into_output()
@@ -332,6 +337,7 @@ pub trait Deterministic: TransitionSystem {
     where
         W: OmegaWord<Symbol = SymbolOf<Self>>,
         Self: Pointed,
+        EdgeColor<Self>: Eq + std::hash::Hash,
     {
         self.recurrent_edge_colors_from(self.initial(), word)
     }
@@ -462,7 +468,8 @@ pub trait Deterministic: TransitionSystem {
                 state_decorator(
                     id,
                     self.state_color(id)
-                        .expect("Every state should be colored!"),
+                        .expect("Every state should be colored!")
+                        .into_owned(),
                 )
                 .to_string(),
             ];
@@ -622,7 +629,7 @@ where
         Some(ProductTransition::new(
             ProductIndex(l, r),
             ll.expression(),
-            (ll.color(), rr.color()),
+            (ll.color().into_owned(), rr.color().into_owned()),
             ProductIndex(ll.target(), rr.target()),
         ))
     }

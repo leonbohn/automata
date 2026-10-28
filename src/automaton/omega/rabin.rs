@@ -75,7 +75,7 @@ impl<C: Color + Ord> RabinPair<C> {
 
 impl<T: Deterministic> Semantics<T, true> for RabinCondition<EdgeColor<T>>
 where
-    EdgeColor<T>: Color + Ord,
+    EdgeColor<T>: Color + Ord + Eq + std::hash::Hash,
 {
     type Output = bool;
     type Observer = run::EdgeColorSet<T>;

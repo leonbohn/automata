@@ -2,6 +2,7 @@ use crate::Color;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{EdgeExpression, IdType, IsEdge, StateIndex};
 use crate::{Pointed, TransitionSystem};
+use std::borrow::Cow;
 use std::{fmt::Debug, marker::PhantomData};
 
 /// A transition system that maps the edge colors of a given transition system to a new type.
@@ -73,7 +74,7 @@ where
         self.ts().state_indices()
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.ts().state_color(state)
     }
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -146,13 +147,13 @@ where
         self.target
     }
 
-    fn color(&self) -> D {
-        (self.f)(
+    fn color(&self) -> Cow<'_, D> {
+        Cow::Owned((self.f)(
             self.pre_transition.source(),
             self.pre_transition.expression(),
-            self.pre_transition.color(),
+            self.pre_transition.color().into_owned(),
             self.target,
-        )
+        ))
     }
 
     fn expression(&self) -> &'a E {
@@ -257,13 +258,13 @@ where
         self.from
     }
 
-    fn color(&self) -> D {
-        (self.f)(
+    fn color(&self) -> Cow<'_, D> {
+        Cow::Owned((self.f)(
             self.from,
             self.transition.expression(),
-            self.transition.color(),
+            self.transition.color().into_owned(),
             self.transition.target(),
-        )
+        ))
     }
 
     fn expression(&self) -> &'ts E {
@@ -336,7 +337,7 @@ where
         self.ts().state_indices()
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.ts().state_color(state)
     }
 
@@ -395,8 +396,8 @@ where
         self.transition.target()
     }
 
-    fn color(&self) -> D {
-        (self.f)(self.transition.color())
+    fn color(&self) -> Cow<'_, D> {
+        Cow::Owned((self.f)(self.transition.color().into_owned()))
     }
 
     fn expression(&self) -> &'ts E {
@@ -455,8 +456,8 @@ impl<'a, Idx: IdType, E, C: Color, D: Color, F: Fn(C) -> D, T: IsEdge<'a, E, Idx
         self.pre_transition.target()
     }
 
-    fn color(&self) -> D {
-        (self.f)(self.pre_transition.color())
+    fn color(&self) -> Cow<'_, D> {
+        Cow::Owned((self.f)(self.pre_transition.color().into_owned()))
     }
 
     fn expression(&self) -> &'a E {
@@ -568,9 +569,9 @@ where
         self.ts().state_indices()
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        let color = self.ts().state_color(state)?;
-        Some((self.f())(color))
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
+        let color = self.ts().state_color(state)?.into_owned();
+        Some(Cow::Owned((self.f())(color)))
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {

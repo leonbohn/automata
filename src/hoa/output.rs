@@ -42,7 +42,7 @@ pub trait WriteHoa: TransitionSystem + Pointed {
                 self.write_state_id(w, edge.target())?;
 
                 w.write_char(' ')?;
-                self.write_edge_color(w, edge.color())?;
+                self.write_edge_color(w, edge.color().into_owned())?;
             }
         }
 

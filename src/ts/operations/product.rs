@@ -3,6 +3,7 @@ use crate::ts::{EdgeExpression, IdType, IsEdge, StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
 use crate::{Show, alphabet::Alphabet};
 use itertools::Itertools;
+use std::borrow::Cow;
 
 /// Trait that abstracts the product operation for transition systems.
 pub trait Product: TransitionSystem + Sized {
@@ -103,11 +104,11 @@ where
         ProductStatesIter::new(&self.0, &self.1)
     }
 
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Self::StateColor> {
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         let ProductIndex(l, r) = state;
         let left = self.0.state_color(l)?;
         let right = self.1.state_color(r)?;
-        Some((left, right))
+        Some(Cow::Owned((left.into_owned(), right.into_owned())))
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -216,8 +217,8 @@ where
         self.target
     }
 
-    fn color(&self) -> (C, D) {
-        self.color.clone()
+    fn color(&self) -> Cow<'_, (C, D)> {
+        Cow::Borrowed(&self.color)
     }
 
     fn expression(&self) -> &'a E {
@@ -285,7 +286,7 @@ where
                         return Some(ProductTransition::new(
                             ProductIndex(l.source(), r.source()),
                             l.expression(),
-                            (l.color(), r.color()),
+                            (l.color().into_owned(), r.color().into_owned()),
                             ProductIndex(l.target(), r.target()),
                         ));
                     }
@@ -313,8 +314,8 @@ where
     LI: IdType,
     RI: IdType,
 {
-    fn color(&self) -> (LC, RC) {
-        self.color.clone()
+    fn color(&self) -> Cow<'_, (LC, RC)> {
+        Cow::Borrowed(&self.color)
     }
 
     fn source(&self) -> ProductIndex<LI, RI> {
@@ -388,7 +389,7 @@ where
                         return Some(ProductPreTransition::new(
                             ProductIndex(left.source(), right.source()),
                             left.expression(),
-                            (left.color(), right.color()),
+                            (left.color().into_owned(), right.color().into_owned()),
                             ProductIndex(left.target(), right.target()),
                         ));
                     }

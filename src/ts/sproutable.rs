@@ -165,7 +165,8 @@ pub trait Sproutable: TransitionSystem {
                 index,
                 out.add_state(
                     ts.state_color(index)
-                        .expect("We assume each state to be colored!"),
+                        .expect("We assume each state to be colored!")
+                        .into_owned(),
                 ),
             );
         }
@@ -175,7 +176,7 @@ pub trait Sproutable: TransitionSystem {
                 out.add_edge((
                     source,
                     edge.expression().clone(),
-                    edge.color(),
+                    edge.color().into_owned(),
                     *map.get_by_left(&edge.target()).unwrap(),
                 ));
             }

@@ -1,16 +1,17 @@
 use crate::Void;
 use crate::ts::IdType;
+use std::borrow::Cow;
 use std::fmt::Debug;
 
 /// This trait is implemented for references to transitions, so that they can be used in
 /// generic contexts. It is automatically implemented for (mutable) references.
-pub trait IsEdge<'ts, E, Idx, C> {
+pub trait IsEdge<'ts, E, Idx, C: Clone> {
     /// Returns the index of the source state of the transition.
     fn source(&self) -> Idx;
     /// Returns the target state of the transition.
     fn target(&self) -> Idx;
     /// Returns the color of the transition.
-    fn color(&self) -> C;
+    fn color(&self) -> Cow<'_, C>;
     /// Gives a reference to the expression that labels the transition.
     fn expression(&self) -> &'ts E;
     /// Destructures the transition into its components.
@@ -22,7 +23,7 @@ pub trait IsEdge<'ts, E, Idx, C> {
             self.source(),
             self.expression(),
             self.target(),
-            self.color(),
+            self.color().into_owned(),
         )
     }
 
@@ -34,7 +35,7 @@ pub trait IsEdge<'ts, E, Idx, C> {
         (
             self.source(),
             self.expression(),
-            (self.target(), self.color()),
+            (self.target(), self.color().into_owned()),
         )
     }
 }
@@ -54,8 +55,8 @@ impl<'a, E, Idx: Copy, C: Clone> IsEdge<'a, E, Idx, C> for &'a Edge<E, Idx, C> {
         self.target
     }
 
-    fn color(&self) -> C {
-        self.color.clone()
+    fn color(&self) -> Cow<'_, C> {
+        Cow::Borrowed(&self.color)
     }
 
     fn expression(&self) -> &'a E {
@@ -127,8 +128,8 @@ impl<'ts, E, Idx: IdType, C: Clone> IsEdge<'ts, E, Idx, C> for EdgeReference<'ts
         self.target
     }
 
-    fn color(&self) -> C {
-        self.color.clone()
+    fn color(&self) -> Cow<'_, C> {
+        Cow::Borrowed(self.color)
     }
 
     fn expression(&self) -> &'ts E {
@@ -169,8 +170,8 @@ impl<'ts, E, Idx: IdType, C: Clone> IsEdge<'ts, E, Idx, C>
         self.target
     }
 
-    fn color(&self) -> C {
-        self.color.clone()
+    fn color(&self) -> Cow<'_, C> {
+        Cow::Borrowed(&self.color)
     }
 
     fn expression(&self) -> &'ts E {

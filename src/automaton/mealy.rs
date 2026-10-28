@@ -53,7 +53,7 @@ where
     pub fn bisimilar<M>(&self, other: &IntoMealyMachine<M>) -> bool
     where
         M: Deterministic<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
-        EdgeColor<M>: Color,
+        EdgeColor<M>: Color + PartialEq,
     {
         self.witness_inequivalence(other).is_none()
     }
@@ -64,7 +64,11 @@ where
         EdgeColor<Self>: Clone + Hash + Eq,
     {
         self.reachable_state_indices_from(self.initial)
-            .flat_map(|o| self.edges_from(o).unwrap().map(|e| IsEdge::color(&e)))
+            .flat_map(|o| {
+                self.edges_from(o)
+                    .unwrap()
+                    .map(|e| IsEdge::color(&e).into_owned())
+            })
             .unique()
     }
 
@@ -79,7 +83,10 @@ where
     >(
         &self,
         other: &IntoMealyMachine<O>,
-    ) -> Option<Vec<SymbolOf<C>>> {
+    ) -> Option<Vec<SymbolOf<C>>>
+    where
+        C::EdgeColor: PartialEq,
+    {
         let prod = self.ts_product(other);
         for rep in prod.minimal_representatives_iter_from(ProductIndex(self.initial, other.initial))
         {
@@ -91,7 +98,7 @@ where
 
                 match other.edge(r, &sym) {
                     Some(e) => {
-                        if edge.color() != e.color() {
+                        if *edge.color() != *e.color() {
                             rep.push(sym);
                             return Some(rep);
                         }
@@ -114,7 +121,10 @@ where
     >(
         &self,
         other: &IntoMealyMachine<O>,
-    ) -> Option<Vec<SymbolOf<C>>> {
+    ) -> Option<Vec<SymbolOf<C>>>
+    where
+        C::EdgeColor: PartialEq,
+    {
         self.witness_restricted_inequivalence(other)
             .or(other.witness_restricted_inequivalence(self))
     }

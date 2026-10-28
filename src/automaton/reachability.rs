@@ -74,7 +74,8 @@ where
     /// Returns true if and only if the given state is accepting, i.e.
     /// colored with `true`. Panics if no state with the given index exists.
     pub fn is_accepting(&self, state: StateIndex<Self>) -> bool {
-        self.state_color(state)
+        *self
+            .state_color(state)
             .expect("can only be called for states that exist!")
     }
 
@@ -154,7 +155,7 @@ where
             .ts_product(other)
             .with_initial(ProductIndex(self.initial, other_initial));
         product.minimal_representatives_iter().find_map(|rep| {
-            let (a, b) = product
+            let (a, b) = *product
                 .state_color(rep.state_index())
                 .expect("Every state must be colored");
             pred(a, b).then(|| rep.into_inner())
@@ -165,7 +166,7 @@ where
     /// the function returns it, otherwise `None`.
     pub fn give_word(&self) -> Option<Vec<SymbolOf<Self>>> {
         self.minimal_representatives_iter().find_map(|rep| {
-            if self
+            if *self
                 .state_color(rep.state_index())
                 .expect("Every state must be colored")
             {
