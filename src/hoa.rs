@@ -217,7 +217,7 @@ mod tests {
         [!0] 3
         --END--
         "#;
-        let auts = hoa_to_ts(hoa);
+        let auts = hoa_to_ts::<true>(hoa);
         assert_eq!(auts.len(), 1);
         let aut = &auts[0];
         assert_eq!(aut.size(), 10);

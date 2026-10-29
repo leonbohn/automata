@@ -1,10 +1,12 @@
 use crate::Void;
 use crate::alphabet::CharAlphabet;
 use crate::automaton::Semantics;
+use crate::automaton::semantics::observe_omega;
 use crate::representation::{CollectTs, IntoTs};
-use crate::ts::{Deterministic, StateColor, SymbolOf};
+use crate::ts::{Deterministic, StateIndex, SymbolOf};
+use crate::word::OmegaWord;
 use crate::word::ReducedOmegaWord;
-use crate::{DTS, TransitionSystem, automaton::InfiniteWordAutomaton, ts::run};
+use crate::{DTS, TransitionSystem, automaton::Automaton, ts::run};
 
 /// Defines the [`Semantics`] of a deterministic Büchi automaton (DBA),
 /// which is an acceptor of infinite words. It considers the set of
@@ -18,9 +20,21 @@ use crate::{DTS, TransitionSystem, automaton::InfiniteWordAutomaton, ts::run};
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, Copy)]
 pub struct BuchiCondition;
 
-impl<T: Deterministic<EdgeColor = bool>> Semantics<T, true> for BuchiCondition {
+impl<T, W> Semantics<T, W> for BuchiCondition
+where
+    T: Deterministic<EdgeColor = bool>,
+    W: OmegaWord<Symbol = SymbolOf<T>>,
+{
     type Observer = run::GreatestEdgeColor<T>;
     type Output = bool;
+    fn observe(
+        &self,
+        ts: &T,
+        initial: StateIndex<T>,
+        word: W,
+    ) -> Option<<Self::Observer as run::Observer<T>>::Current> {
+        observe_omega::<T, W, Self::Observer>(ts, initial, word)
+    }
     fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
         observed
     }
@@ -32,17 +46,14 @@ impl<T: Deterministic<EdgeColor = bool>> Semantics<T, true> for BuchiCondition {
 ///
 /// In a certain sense, it is a special case of a deterministic parity automaton [`super::DPA`] with
 /// min even and priorities 0 and 1.
-pub type DBA<A = CharAlphabet, Q = Void, D = DTS<A, Q, bool>> =
-    InfiniteWordAutomaton<A, BuchiCondition, Q, bool, true, D>;
-/// Helper trait for creating a [`DBA`] from a given transition system.
-pub type IntoDBA<T> = DBA<<T as TransitionSystem>::Alphabet, StateColor<T>, T>;
+pub type DBA<T = DTS<CharAlphabet, Void, bool>> = Automaton<T, BuchiCondition>;
 
-impl<C> IntoDBA<C>
+impl<C> DBA<C>
 where
     C: Deterministic<EdgeColor = bool>,
 {
     /// Performs a streamlining operation akin to [`super::DPA::streamlined`].
-    pub fn streamlined(&self) -> DBA<C::Alphabet>
+    pub fn streamlined(&self) -> DBA<DTS<C::Alphabet, Void, bool>>
     where
         C: IntoTs + Clone,
     {

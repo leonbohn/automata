@@ -85,7 +85,9 @@ pub mod dot;
 
 #[cfg(test)]
 mod tests {
-    pub fn wiki_dfa() -> crate::automaton::DFA<crate::alphabet::CharAlphabet> {
+    use crate::{DTS, Void};
+
+    pub fn wiki_dfa() -> crate::automaton::DFA<DTS<crate::alphabet::CharAlphabet, bool, Void>> {
         use crate::ts::Builder;
 
         Builder::without_edge_colors()

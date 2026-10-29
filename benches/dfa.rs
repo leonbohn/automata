@@ -2,10 +2,10 @@
 
 mod common;
 
-use automata::TransitionSystem;
 use automata::alphabet::CharAlphabet;
 use automata::automaton::{DFA, MooreMachine};
 use automata::representation::CollectTs;
+use automata::{DTS, TransitionSystem};
 use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
 
@@ -61,7 +61,7 @@ fn minimize(dfa: DFA) -> usize {
 }
 
 // A Moore machine whose edges carry colors that are irrelevant for the result (#14).
-fn moore_with_edge_colors(n: usize) -> MooreMachine<CharAlphabet, bool, u32> {
+fn moore_with_edge_colors(n: usize) -> MooreMachine<DTS<CharAlphabet, bool, u32>> {
     let ts = common::scrambled(n, 2)
         .map_edge_colors(|_| 7u32)
         .collect_dts();
@@ -71,7 +71,7 @@ fn moore_with_edge_colors(n: usize) -> MooreMachine<CharAlphabet, bool, u32> {
 #[library_benchmark]
 #[bench::scrambled_1000(args = (1_000), setup = moore_with_edge_colors)]
 #[bench::scrambled_4000(args = (4_000), setup = moore_with_edge_colors)]
-fn minimize_moore_with_edge_colors(mm: MooreMachine<CharAlphabet, bool, u32>) -> usize {
+fn minimize_moore_with_edge_colors(mm: MooreMachine<DTS<CharAlphabet, bool, u32>>) -> usize {
     black_box(mm.minimize().size())
 }
 

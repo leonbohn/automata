@@ -355,7 +355,7 @@ impl<Q: Color, C: Color> Builder<Q, C, true> {
     pub fn into_right_congruence(
         self,
         initial: DefaultIdType,
-    ) -> RightCongruence<CharAlphabet, Q, C> {
+    ) -> RightCongruence<DTS<CharAlphabet, Q, C>> {
         or_panic(self.try_into_right_congruence(initial))
     }
 
@@ -363,7 +363,7 @@ impl<Q: Color, C: Color> Builder<Q, C, true> {
     pub fn try_into_right_congruence(
         self,
         initial: DefaultIdType,
-    ) -> Result<RightCongruence<CharAlphabet, Q, C>, BuilderError> {
+    ) -> Result<RightCongruence<DTS<CharAlphabet, Q, C>>, BuilderError> {
         Ok(self
             .try_into_dts()?
             .with_initial(initial)
@@ -379,7 +379,7 @@ impl<Q: Color, C: Color> Builder<Q, C, true> {
     pub fn into_right_congruence_bare(
         self,
         initial: DefaultIdType,
-    ) -> RightCongruence<CharAlphabet> {
+    ) -> RightCongruence<DTS<CharAlphabet, Void, Void>> {
         or_panic(self.try_into_right_congruence_bare(initial))
     }
 
@@ -387,7 +387,7 @@ impl<Q: Color, C: Color> Builder<Q, C, true> {
     pub fn try_into_right_congruence_bare(
         self,
         initial: DefaultIdType,
-    ) -> Result<RightCongruence<CharAlphabet>, BuilderError> {
+    ) -> Result<RightCongruence<DTS<CharAlphabet, Void, Void>>, BuilderError> {
         Ok(self
             .try_into_dts()?
             .with_initial(initial)
@@ -403,12 +403,15 @@ impl Builder<bool, Void, true> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
     #[track_caller]
-    pub fn into_dfa(self, initial: DefaultIdType) -> DFA<CharAlphabet> {
+    pub fn into_dfa(self, initial: DefaultIdType) -> DFA<DTS<CharAlphabet, bool, Void>> {
         or_panic(self.try_into_dfa(initial))
     }
 
     /// Fallible version of [`Self::into_dfa`].
-    pub fn try_into_dfa(self, initial: DefaultIdType) -> Result<DFA<CharAlphabet>, BuilderError> {
+    pub fn try_into_dfa(
+        self,
+        initial: DefaultIdType,
+    ) -> Result<DFA<DTS<CharAlphabet, bool, Void>>, BuilderError> {
         Ok(self.try_into_dts()?.with_initial(initial).into_dfa())
     }
 }
@@ -419,12 +422,15 @@ impl Builder<Void, bool, true> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
     #[track_caller]
-    pub fn into_dba(self, initial: DefaultIdType) -> DBA<CharAlphabet> {
+    pub fn into_dba(self, initial: DefaultIdType) -> DBA<DTS<CharAlphabet, Void, bool>> {
         or_panic(self.try_into_dba(initial))
     }
 
     /// Fallible version of [`Self::into_dba`].
-    pub fn try_into_dba(self, initial: DefaultIdType) -> Result<DBA<CharAlphabet>, BuilderError> {
+    pub fn try_into_dba(
+        self,
+        initial: DefaultIdType,
+    ) -> Result<DBA<DTS<CharAlphabet, Void, bool>>, BuilderError> {
         Ok(self
             .default_color(Void)
             .try_into_dts()?
@@ -439,12 +445,15 @@ impl Builder<Void, Int, true> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
     #[track_caller]
-    pub fn into_dpa(self, initial: DefaultIdType) -> DPA<CharAlphabet> {
+    pub fn into_dpa(self, initial: DefaultIdType) -> DPA<DTS<CharAlphabet, Void, Int>> {
         or_panic(self.try_into_dpa(initial))
     }
 
     /// Fallible version of [`Self::into_dpa`].
-    pub fn try_into_dpa(self, initial: DefaultIdType) -> Result<DPA<CharAlphabet>, BuilderError> {
+    pub fn try_into_dpa(
+        self,
+        initial: DefaultIdType,
+    ) -> Result<DPA<DTS<CharAlphabet, Void, Int>>, BuilderError> {
         Ok(self
             .default_color(Void)
             .try_into_dts()?
@@ -457,7 +466,7 @@ impl Builder<Void, Int, true> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
     #[track_caller]
-    pub fn into_mealy(self, initial: DefaultIdType) -> MealyMachine<CharAlphabet> {
+    pub fn into_mealy(self, initial: DefaultIdType) -> MealyMachine<DTS<CharAlphabet, Void, Int>> {
         or_panic(self.try_into_mealy(initial))
     }
 
@@ -465,7 +474,7 @@ impl Builder<Void, Int, true> {
     pub fn try_into_mealy(
         self,
         initial: DefaultIdType,
-    ) -> Result<MealyMachine<CharAlphabet>, BuilderError> {
+    ) -> Result<MealyMachine<DTS<CharAlphabet, Void, Int>>, BuilderError> {
         Ok(self
             .default_color(Void)
             .try_into_dts()?
@@ -480,7 +489,7 @@ impl Builder<Int, Void, true> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_into_ts`].
     #[track_caller]
-    pub fn into_moore(self, initial: DefaultIdType) -> MooreMachine<CharAlphabet> {
+    pub fn into_moore(self, initial: DefaultIdType) -> MooreMachine<DTS<CharAlphabet, Int, Void>> {
         or_panic(self.try_into_moore(initial))
     }
 
@@ -488,7 +497,7 @@ impl Builder<Int, Void, true> {
     pub fn try_into_moore(
         self,
         initial: DefaultIdType,
-    ) -> Result<MooreMachine<CharAlphabet>, BuilderError> {
+    ) -> Result<MooreMachine<DTS<CharAlphabet, Int, Void>>, BuilderError> {
         Ok(self.try_into_dts()?.with_initial(initial).into_moore())
     }
 }

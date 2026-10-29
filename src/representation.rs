@@ -100,7 +100,7 @@ pub trait CollectTs: TransitionSystem {
     }
 
     /// Collects into a [`DFA`], with the initial state of `self`. Edge colors are dropped.
-    fn collect_dfa(&self) -> DFA<Self::Alphabet>
+    fn collect_dfa(&self) -> DFA<DTS<Self::Alphabet, bool, Void>>
     where
         Self: Pointed<StateColor = bool>,
     {
@@ -109,7 +109,7 @@ pub trait CollectTs: TransitionSystem {
     }
 
     /// Collects into a [`MooreMachine`], with the initial state of `self`. Edge colors are dropped.
-    fn collect_moore(&self) -> MooreMachine<Self::Alphabet, StateColor<Self>>
+    fn collect_moore(&self) -> MooreMachine<DTS<Self::Alphabet, StateColor<Self>, Void>>
     where
         Self: Pointed,
     {
@@ -117,7 +117,7 @@ pub trait CollectTs: TransitionSystem {
         MooreMachine::from_parts(ts, initial)
     }
     /// Collects into a [`MealyMachine`], with the initial state of `self`.
-    fn collect_mealy(&self) -> MealyMachine<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
+    fn collect_mealy(&self) -> MealyMachine<DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>>
     where
         Self: Pointed,
     {
@@ -125,7 +125,7 @@ pub trait CollectTs: TransitionSystem {
         MealyMachine::from_parts(ts, initial)
     }
     /// Collects into a [`DBA`], with the initial state of `self`. State colors are dropped.
-    fn collect_dba(&self) -> DBA<Self::Alphabet>
+    fn collect_dba(&self) -> DBA<DTS<Self::Alphabet, Void, bool>>
     where
         Self: Pointed<EdgeColor = bool>,
     {
@@ -133,7 +133,7 @@ pub trait CollectTs: TransitionSystem {
         DBA::from_parts(ts, initial)
     }
     /// Collects into a [`DPA`], with the initial state of `self`. State colors are dropped.
-    fn collect_dpa(&self) -> DPA<Self::Alphabet>
+    fn collect_dpa(&self) -> DPA<DTS<Self::Alphabet, Void, Int>>
     where
         Self: Pointed<EdgeColor = Int>,
     {
@@ -143,7 +143,7 @@ pub trait CollectTs: TransitionSystem {
     /// Collects into a [`RightCongruence`], with the initial state of `self`.
     fn collect_right_congruence(
         &self,
-    ) -> RightCongruence<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
+    ) -> RightCongruence<DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>>
     where
         Self: Pointed,
     {
@@ -209,7 +209,7 @@ pub trait IntoTs: TransitionSystem {
     }
 
     /// Turns `self` into a [`MooreMachine`] with the initial state of `self`. Edge colors are dropped.
-    fn into_moore(self) -> MooreMachine<Self::Alphabet, StateColor<Self>>
+    fn into_moore(self) -> MooreMachine<DTS<Self::Alphabet, StateColor<Self>, Void>>
     where
         Self: Pointed,
     {
@@ -221,7 +221,7 @@ pub trait IntoTs: TransitionSystem {
     fn into_moore_with_initial(
         self,
         state: StateIndex<Self>,
-    ) -> MooreMachine<Self::Alphabet, StateColor<Self>> {
+    ) -> MooreMachine<DTS<Self::Alphabet, StateColor<Self>, Void>> {
         let (ts, initial) = self.with_initial(state).into_dts_and_initial();
         assert!(ts.size() > 0);
         MooreMachine::from_parts(ts.linked_map_edges(|_, e, _, _| (e, Void)), initial)
@@ -231,14 +231,17 @@ pub trait IntoTs: TransitionSystem {
     /// # Panics
     ///
     /// Panics if `self` has no states.
-    fn into_mealy(self) -> MealyMachine<Self::Alphabet, Void, EdgeColor<Self>> {
+    fn into_mealy(self) -> MealyMachine<DTS<Self::Alphabet, Void, EdgeColor<Self>>> {
         let ts = self.into_dts().linked_map_states(|_, _| Void);
         assert!(ts.size() > 0);
         MealyMachine::from_parts(ts, 0)
     }
 
     /// Collects the transition system representing `self` and builds a new [`DFA`].
-    fn into_dfa_with_initial(self, initial: StateIndex<Self>) -> DFA<Self::Alphabet>
+    fn into_dfa_with_initial(
+        self,
+        initial: StateIndex<Self>,
+    ) -> DFA<DTS<Self::Alphabet, bool, Void>>
     where
         Self: Deterministic<StateColor = bool>,
     {
@@ -251,7 +254,7 @@ pub trait IntoTs: TransitionSystem {
 
     /// Collects the transition system representing `self` and builds a new [`DFA`], with the initial
     /// state of `self`.
-    fn into_dfa(self) -> DFA<Self::Alphabet>
+    fn into_dfa(self) -> DFA<DTS<Self::Alphabet, bool, Void>>
     where
         Self: Pointed + Congruence<StateColor = bool>,
     {
@@ -260,7 +263,7 @@ pub trait IntoTs: TransitionSystem {
     }
 
     /// Collects the transition system representing `self` and builds a new [`DPA`].
-    fn into_dpa_with_initial(self, initial: StateIndex<Self>) -> DPA<Self::Alphabet>
+    fn into_dpa_with_initial(self, initial: StateIndex<Self>) -> DPA<DTS<Self::Alphabet, Void, Int>>
     where
         Self: Deterministic<EdgeColor = Int>,
     {
@@ -272,7 +275,7 @@ pub trait IntoTs: TransitionSystem {
     }
 
     /// Collects the transition system representing `self` and builds a new [`DPA`].
-    fn into_dpa(self) -> DPA<Self::Alphabet>
+    fn into_dpa(self) -> DPA<DTS<Self::Alphabet, Void, Int>>
     where
         Self: Congruence<EdgeColor = Int>,
     {
@@ -281,7 +284,10 @@ pub trait IntoTs: TransitionSystem {
     }
 
     /// Collects the transition system representing `self` and builds a new [`DBA`].
-    fn into_dba_with_initial(self, initial: StateIndex<Self>) -> DBA<Self::Alphabet>
+    fn into_dba_with_initial(
+        self,
+        initial: StateIndex<Self>,
+    ) -> DBA<DTS<Self::Alphabet, Void, bool>>
     where
         Self: Deterministic<EdgeColor = bool>,
     {
@@ -293,7 +299,7 @@ pub trait IntoTs: TransitionSystem {
     }
 
     /// Collects the transition system representing `self` and builds a new [`DPA`].
-    fn into_dba(self) -> DBA<Self::Alphabet>
+    fn into_dba(self) -> DBA<DTS<Self::Alphabet, Void, bool>>
     where
         Self: Congruence<EdgeColor = bool>,
     {
@@ -305,7 +311,7 @@ pub trait IntoTs: TransitionSystem {
     /// Note, that this method might not preserve state indices!
     fn into_right_congruence(
         self,
-    ) -> RightCongruence<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>
+    ) -> RightCongruence<DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>>>
     where
         Self: Deterministic + Pointed,
     {
@@ -319,7 +325,7 @@ mod impl_into_ts {
     use crate::alphabet::Alphabet;
     use crate::automaton::Automaton;
     use crate::ts::operations::MapStateColor;
-    use crate::ts::{EdgeColor, EdgeExpression, StateColor, StateIndex, SymbolOf, operations};
+    use crate::ts::{EdgeColor, EdgeExpression, StateIndex, SymbolOf, operations};
     use crate::{DTS, TransitionSystem};
 
     impl<A: Alphabet, Q: Color, C: Color> IntoTs for DTS<A, Q, C> {
@@ -388,12 +394,7 @@ mod impl_into_ts {
         R::StateColor: Clone,
     {
     }
-    impl<Z, D, const OMEGA: bool> IntoTs
-        for Automaton<D::Alphabet, Z, StateColor<D>, EdgeColor<D>, D, OMEGA>
-    where
-        D: IntoTs,
-    {
-    }
+    impl<Z, D> IntoTs for Automaton<D, Z> where D: IntoTs {}
 }
 
 #[cfg(test)]

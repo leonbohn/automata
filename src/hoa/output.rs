@@ -1,3 +1,5 @@
+use crate::DTS;
+use crate::Void;
 use itertools::Itertools;
 use tracing::trace;
 
@@ -123,7 +125,7 @@ pub trait HoaSuitableAlphabet: Alphabet {
     fn write_alphabet_description<W: std::fmt::Write>(&self, w: &mut W) -> Result;
 }
 
-impl<A: HoaSuitableAlphabet> WriteHoa for DBA<A> {
+impl<A: HoaSuitableAlphabet> WriteHoa for DBA<DTS<A, Void, bool>> {
     fn write_edge_color<W: std::fmt::Write>(&self, w: &mut W, label: EdgeColor<Self>) -> Result {
         if label {
             write!(w, "{{{}}}", 0)
@@ -157,7 +159,7 @@ impl<A: HoaSuitableAlphabet> WriteHoa for DBA<A> {
     }
 }
 
-impl<A: HoaSuitableAlphabet> WriteHoa for DPA<A> {
+impl<A: HoaSuitableAlphabet> WriteHoa for DPA<DTS<A, Void, Int>> {
     fn write_edge_color<W: std::fmt::Write>(&self, w: &mut W, label: EdgeColor<Self>) -> Result {
         write!(w, "{{{}}}", label)
     }

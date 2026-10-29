@@ -12,9 +12,10 @@ mod muller;
 pub use muller::*;
 
 mod acceptance_mask;
-use super::InfiniteWordAutomaton;
+use super::Automaton;
 use crate::Error;
 use crate::Int;
+use crate::Void;
 use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
 use crate::representation::IntoTs;
 use crate::ts::{Builder, DefaultIdType, DenseId, ForAlphabet, IsEdge, Sproutable};
@@ -22,10 +23,10 @@ use crate::{DTS, Pointed, TS, TransitionSystem};
 pub use acceptance_mask::{AcceptanceError, AcceptanceMask};
 use std::collections::BTreeSet;
 
-/// Type alias for an omega automaton (i.e. an [`InfiniteWordAutomaton`]) that is guaranteed to be
+/// Type alias for an omega automaton (i.e. an automaton over infinite words) that is guaranteed to be
 /// [`crate::Deterministic`].
 pub type DeterministicOmegaAutomaton<A> = OmegaAutomaton<A, true>;
-/// Type alias for an omega automaton (i.e. an [`InfiniteWordAutomaton`]) that is not necessarily
+/// Type alias for an omega automaton (i.e. an automaton over infinite words) that is not necessarily
 /// [`crate::Deterministic`].
 pub type NondeterministicOmegaAutomaton<A> = OmegaAutomaton<A, false>;
 
@@ -34,7 +35,7 @@ pub type NondeterministicOmegaAutomaton<A> = OmegaAutomaton<A, false>;
 /// such as when parsing automata. One should prefer using specific types such as
 /// [`DPA`] whenever possible.
 pub type OmegaAutomaton<A, const DET: bool = true> =
-    InfiniteWordAutomaton<A, OmegaAcceptanceCondition, Int, AcceptanceMask, DET>;
+    Automaton<TS<A, Int, AcceptanceMask, DET>, OmegaAcceptanceCondition>;
 
 /// Disambiguates between the different types of acceptance conditions. This is only
 /// used in conjunction with [`OmegaAutomaton`]/[`DeterministicOmegaAutomaton`] when
@@ -191,7 +192,7 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
     ///
     /// The conversion is not implemented for [`OmegaAcceptanceCondition::Rabin`] and
     /// [`OmegaAcceptanceCondition::Streett`]; these yield [`Error::NotYetImplemented`].
-    pub fn into_dpa(self) -> Result<DPA<A>, Error> {
+    pub fn into_dpa(self) -> Result<DPA<DTS<A, Void, Int>>, Error> {
         match self.acceptance {
             OmegaAcceptanceCondition::Parity(low, high) => self.check_priorities(low, high)?,
             OmegaAcceptanceCondition::MaxParity(low, high) => self.check_priorities(low, high)?,

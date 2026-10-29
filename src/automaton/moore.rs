@@ -3,17 +3,17 @@ use std::fmt::Debug;
 
 use crate::{Color, Int, Lattice, Void, alphabet::CharAlphabet, word::FiniteWord};
 
-use super::{DFA, FiniteWordAutomaton, MealyMachine};
+use super::{Automaton, DFA, MealyMachine};
 use crate::representation::{CollectTs, IntoTs};
 use crate::ts::operations::{Product, ProductIndex};
-use crate::ts::{Deterministic, EdgeColor, StateColor, SymbolOf};
+use crate::ts::{Deterministic, StateColor, SymbolOf};
 use crate::{Congruence, DTS, Pointed, TransitionSystem};
 
 /// Represents the semantics of a Moore machine, it produces the color of the
 /// state that is reached during a run on a word. If the input is empty, it
 /// produces the color of the initial state.
-#[derive(Debug, Clone)]
-pub struct MooreSemantics<Q>(std::marker::PhantomData<Q>);
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct MooreSemantics;
 
 pub trait MooreLike: TransitionSystem<StateColor: Lattice> + Deterministic + Pointed {}
 impl<T: TransitionSystem<StateColor: Lattice> + Deterministic + Pointed> MooreLike for T {}
@@ -32,23 +32,15 @@ impl<T: TransitionSystem<StateColor: Lattice> + Deterministic + Pointed> MooreLi
 /// consider the colors that are produced infinitely often and base acceptance around them. It
 /// is, however, prefered to use a [`MealyMachine`] for this purpose, as for infinite inputs
 /// switching to transition-based acceptance is preferable.
-pub type MooreMachine<A = CharAlphabet, Q = Int, C = Void, D = DTS<A, Q, C>> =
-    FiniteWordAutomaton<A, MooreSemantics<Q>, Q, C, true, D>;
+pub type MooreMachine<T = DTS<CharAlphabet, Int, Void>> = Automaton<T, MooreSemantics>;
 
-/// Helper type that takes a pointed transition system and returns the corresponding
-/// [`MooreMachine`], which the ts can be converted into using [`Into::into`].
-/// For concrete automaton types such as [`crate::automaton::DFA`], the [`crate::automaton::IntoDFA`] type can be used to
-/// obtain the type of a [`DFA`] for the given ts.
-pub type IntoMooreMachine<D> =
-    MooreMachine<<D as TransitionSystem>::Alphabet, StateColor<D>, EdgeColor<D>, D>;
-
-impl<M> IntoMooreMachine<M>
+impl<M> MooreMachine<M>
 where
     M: IntoTs<EdgeColor: Color> + Deterministic,
 {
     /// Decomposes `self` into a sequence of DFAs, where the i-th DFA accepts all words which
     /// produce a color less than or equal to i.
-    pub fn decompose_dfa(&self) -> Vec<DFA<M::Alphabet>>
+    pub fn decompose_dfa(&self) -> Vec<DFA<DTS<M::Alphabet, bool, Void>>>
     where
         StateColor<Self>: Ord + Eq + std::hash::Hash,
     {
@@ -60,7 +52,7 @@ where
     }
 
     /// Builds a DFA that accepts all words which emit a color less than or equal to `color`.
-    pub fn color_or_below_dfa(&self, color: M::StateColor) -> DFA<M::Alphabet>
+    pub fn color_or_below_dfa(&self, color: M::StateColor) -> DFA<DTS<M::Alphabet, bool, Void>>
     where
         StateColor<Self>: Ord,
     {
@@ -75,7 +67,7 @@ where
     /// transition system into a new [`MealyMachine`].
     pub fn push_colors_to_outgoing_edges(
         &self,
-    ) -> MealyMachine<M::Alphabet, M::StateColor, M::StateColor>
+    ) -> MealyMachine<DTS<M::Alphabet, M::StateColor, M::StateColor>>
     where
         M::StateColor: Clone,
     {
@@ -139,11 +131,5 @@ where
             }
         }
         None
-    }
-}
-
-impl<Q> Default for MooreSemantics<Q> {
-    fn default() -> Self {
-        Self(std::marker::PhantomData)
     }
 }

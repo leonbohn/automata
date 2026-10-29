@@ -1,9 +1,11 @@
 use super::{DotStateAttribute, DotTransitionAttribute, Dottable};
-use crate::automaton::{DFA, IntoDPA, IntoMealyMachine, IntoMooreMachine};
+use crate::DTS;
+use crate::Void;
+use crate::automaton::{DFA, DPA, MealyMachine, MooreMachine};
 use crate::ts::{Deterministic, IsEdge, StateColor, StateIndex};
 use crate::{Color, Int, Pointed, Show, TransitionSystem, alphabet::Alphabet};
 
-impl<A: Alphabet> Dottable for DFA<A>
+impl<A: Alphabet> Dottable for DFA<DTS<A, bool, Void>>
 where
     StateIndex<Self>: Show,
 {
@@ -44,7 +46,7 @@ where
         ]
     }
 }
-impl<A: Alphabet, Q: Color, C: Color> Dottable for crate::RightCongruence<A, Q, C>
+impl<A: Alphabet, Q: Color, C: Color> Dottable for crate::RightCongruence<DTS<A, Q, C>>
 where
     StateIndex<Self>: Show,
 {
@@ -84,7 +86,7 @@ where
     }
 }
 
-impl<M> Dottable for IntoMooreMachine<M>
+impl<M> Dottable for MooreMachine<M>
 where
     M: Deterministic,
 {
@@ -122,7 +124,7 @@ where
     }
 }
 
-impl<M> Dottable for IntoMealyMachine<M>
+impl<M> Dottable for MealyMachine<M>
 where
     M: Deterministic,
 {
@@ -164,7 +166,7 @@ where
     }
 }
 
-impl<D> Dottable for IntoDPA<D>
+impl<D> Dottable for DPA<D>
 where
     D: Deterministic<EdgeColor = Int>,
 {

@@ -1,9 +1,11 @@
-use super::{FiniteWordAutomaton, Semantics, StatesWithColor};
+use super::semantics::observe_finite;
+use super::{Automaton, Semantics, StatesWithColor};
 use crate::alphabet::CharAlphabet;
 use crate::representation::CollectTs;
 use crate::ts::operations::{DefaultIfMissing, Product, ProductIndex};
 use crate::ts::run::ReachedStateColor;
-use crate::ts::{Deterministic, EdgeColor, StateIndex, SymbolOf, operations};
+use crate::ts::{Deterministic, StateIndex, SymbolOf, operations};
+use crate::word::FiniteWord;
 use crate::{Congruence, DTS, Pointed, TransitionSystem};
 use crate::{Void, math};
 
@@ -19,9 +21,21 @@ impl std::fmt::Debug for ReachabilityCondition {
     }
 }
 
-impl<T: Deterministic<StateColor = bool>> Semantics<T, false> for ReachabilityCondition {
+impl<T, W> Semantics<T, W> for ReachabilityCondition
+where
+    T: Deterministic<StateColor = bool>,
+    W: FiniteWord<Symbol = SymbolOf<T>>,
+{
     type Output = bool;
     type Observer = ReachedStateColor<T>;
+    fn observe(
+        &self,
+        ts: &T,
+        initial: StateIndex<T>,
+        word: W,
+    ) -> Option<<Self::Observer as crate::ts::run::Observer<T>>::Current> {
+        observe_finite::<T, W, Self::Observer>(ts, initial, word)
+    }
     fn evaluate(
         &self,
         observed: <Self::Observer as crate::ts::run::Observer<T>>::Current,
@@ -31,13 +45,9 @@ impl<T: Deterministic<StateColor = bool>> Semantics<T, false> for ReachabilityCo
 }
 
 /// A deterministic finite automaton (DFA) is a deterministic automaton with a simple acceptance condition. It accepts a finite word if it reaches an accepting state.
-pub type DFA<A = CharAlphabet, C = Void, D = DTS<A, bool, C>> =
-    FiniteWordAutomaton<A, ReachabilityCondition, bool, C, true, D>;
+pub type DFA<T = DTS<CharAlphabet, bool, Void>> = Automaton<T, ReachabilityCondition>;
 
-/// Helper trait for creating a [`DFA`] from a given transition system.
-pub type IntoDFA<T> = DFA<<T as TransitionSystem>::Alphabet, EdgeColor<T>, T>;
-
-impl<D> IntoDFA<operations::WithStateColor<D, operations::DefaultIfMissing<D::StateIndex, bool>>>
+impl<D> DFA<operations::WithStateColor<D, operations::DefaultIfMissing<D::StateIndex, bool>>>
 where
     D: Deterministic,
 {
@@ -67,7 +77,7 @@ where
     }
 }
 
-impl<D> IntoDFA<D>
+impl<D> DFA<D>
 where
     D: Deterministic<StateColor = bool>,
 {
@@ -187,7 +197,7 @@ where
     pub fn union<'a, E>(
         &'a self,
         other: E,
-    ) -> IntoDFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + 'a>
+    ) -> DFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + 'a>
     where
         E: Congruence<Alphabet = D::Alphabet, StateColor = bool> + 'a,
     {
@@ -203,7 +213,7 @@ where
     pub fn intersection<'a, E>(
         &'a self,
         other: E,
-    ) -> IntoDFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + 'a>
+    ) -> DFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + 'a>
     where
         E: Congruence<Alphabet = D::Alphabet, StateColor = bool> + 'a,
     {
@@ -217,7 +227,7 @@ where
     /// Computes the negation of `self` by swapping accepting and non-accepting states.
     pub fn negation(
         &self,
-    ) -> IntoDFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + '_> {
+    ) -> DFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + '_> {
         self.map_state_colors(|x| !x)
             .with_initial(self.initial)
             .collect_dfa()

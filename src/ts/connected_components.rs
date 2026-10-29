@@ -280,7 +280,7 @@ impl<Ts: TransitionSystem> PartialEq for SccDecomposition<'_, Ts> {
 #[cfg(test)]
 mod tests {
     use crate::Void;
-    use crate::alphabet::CharAlphabet;
+
     use crate::math::FxIndexSet;
 
     use crate::ts::Builder;
@@ -289,7 +289,7 @@ mod tests {
         ts::connected_components::{Scc, SccDecomposition},
     };
 
-    pub(super) fn ts() -> RightCongruence<CharAlphabet> {
+    pub(super) fn ts() -> RightCongruence {
         Builder::without_colors()
             .with_edges([
                 (0, 'a', 1),
