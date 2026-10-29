@@ -1,6 +1,5 @@
 use crate::TransitionSystem;
 use crate::automaton::Automaton;
-use crate::ts::{EdgeColor, StateColor};
 use std::fmt::Debug;
 
 /// Auxiliary type that is used as marker for an [`Automaton`] where we are not
@@ -10,8 +9,7 @@ pub struct WithoutCondition;
 
 /// An [`Automaton`] which has no semantics. Essentially, this just fixes one
 /// state as initial.
-pub type WithInitial<T> =
-    Automaton<<T as TransitionSystem>::Alphabet, WithoutCondition, StateColor<T>, EdgeColor<T>, T>;
+pub type WithInitial<T> = Automaton<T, WithoutCondition>;
 
 impl<Ts: TransitionSystem> WithInitial<Ts> {
     /// Decompose `self` into the transition system and the initial state. This operation

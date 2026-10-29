@@ -1,10 +1,12 @@
 use std::collections::BTreeSet;
 
-use crate::automaton::{InfiniteWordAutomaton, Semantics};
+use crate::DTS;
+use crate::automaton::semantics::observe_omega;
+use crate::automaton::{Automaton, Semantics};
 use crate::ts::run::Observer;
-use crate::ts::{Deterministic, EdgeColor, StateColor, run};
+use crate::ts::{Deterministic, EdgeColor, StateIndex, SymbolOf, run};
+use crate::word::OmegaWord;
 use crate::{Color, Void, alphabet::CharAlphabet};
-use crate::{DTS, TransitionSystem};
 
 /// A deterministic Rabin automaton (DRA) uses a [`RabinCondition`] to determine acceptance.
 /// Specifically, such a condition consists of a set of [`RabinPair`]s, which in turn are
@@ -12,10 +14,7 @@ use crate::{DTS, TransitionSystem};
 /// if no color from `fin` is visited infinitely often and at least one color from `inf` is
 /// visited infinitely often. Overall, a Rabin condition is then satisfied if at least one of
 /// its constituent pairs is satisfied.
-pub type DRA<A = CharAlphabet, Q = Void, C = usize, D = DTS<A, Q, C>> =
-    InfiniteWordAutomaton<A, RabinCondition<C>, Q, C, true, D>;
-/// Helper type alias for casting a given transition system `T` into a [`DRA`].
-pub type IntoDRA<T> = DRA<<T as TransitionSystem>::Alphabet, StateColor<T>, EdgeColor<T>, T>;
+pub type DRA<T = DTS<CharAlphabet, Void, usize>> = Automaton<T, RabinCondition<EdgeColor<T>>>;
 
 /// Represents a Rabin condition, which is a set of [`RabinPair`]s. Such a condition is satisfied
 /// if at least one of its pairs is satisfied.
@@ -73,12 +72,22 @@ impl<C: Color + Ord> RabinPair<C> {
     }
 }
 
-impl<T: Deterministic> Semantics<T, true> for RabinCondition<EdgeColor<T>>
+impl<T, W> Semantics<T, W> for RabinCondition<EdgeColor<T>>
 where
+    T: Deterministic,
+    W: OmegaWord<Symbol = SymbolOf<T>>,
     EdgeColor<T>: Color + Ord + Eq + std::hash::Hash,
 {
     type Output = bool;
     type Observer = run::EdgeColorSet<T>;
+    fn observe(
+        &self,
+        ts: &T,
+        initial: StateIndex<T>,
+        word: W,
+    ) -> Option<<Self::Observer as run::Observer<T>>::Current> {
+        observe_omega::<T, W, Self::Observer>(ts, initial, word)
+    }
     fn evaluate(
         &self,
         observed: <Self::Observer as crate::ts::run::Observer<T>>::Current,

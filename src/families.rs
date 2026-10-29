@@ -1,3 +1,4 @@
+use crate::DTS;
 use crate::{
     Int, Void,
     alphabet::{Alphabet, CharAlphabet},
@@ -7,13 +8,15 @@ use crate::{
 
 /// A family of right congruences, indexed by the classes of a leading right congruence.
 pub type FORC<A = CharAlphabet, Q = Void, C = Void> =
-    Family<RightCongruence<A>, RightCongruence<A, Q, C>>;
+    Family<RightCongruence<DTS<A, Void, Void>>, RightCongruence<DTS<A, Q, C>>>;
 
 /// A family of DFAs (an FDFA): a leading right congruence and a DFA for each of its classes.
-pub type FDFA<A = CharAlphabet> = Family<RightCongruence<A>, DFA<A>>;
+pub type FDFA<A = CharAlphabet> =
+    Family<RightCongruence<DTS<A, Void, Void>>, DFA<DTS<A, bool, Void>>>;
 /// A family of weak priority mappings (an FWPM): a leading right congruence and a Mealy machine
 /// without state colors for each of its classes.
-pub type FWPM<A = CharAlphabet, C = Int> = Family<RightCongruence<A>, MealyMachine<A, Void, C>>;
+pub type FWPM<A = CharAlphabet, C = Int> =
+    Family<RightCongruence<DTS<A, Void, Void>>, MealyMachine<DTS<A, Void, C>>>;
 
 mod convert;
 use crate::automaton::{DFA, MealyMachine};
@@ -85,7 +88,7 @@ impl<T: Congruence, X> std::ops::IndexMut<StateIndex<T>> for Family<T, X> {
     }
 }
 
-impl<A: Alphabet, X> Family<RightCongruence<A>, X> {
+impl<A: Alphabet, X> Family<RightCongruence<DTS<A, Void, Void>>, X> {
     /// Creates a family whose leading congruence has just a single class, with the given element.
     pub fn trivial(alphabet: A, progress: X) -> Self {
         let leading = RightCongruence::new_trivial_with_initial_color(alphabet, Void, Void);

@@ -1,8 +1,10 @@
 use crate::{Color, Void, alphabet::CharAlphabet, math};
 
-use crate::automaton::{InfiniteWordAutomaton, Semantics};
-use crate::ts::{Deterministic, EdgeColor, StateColor, run};
-use crate::{DTS, TransitionSystem};
+use crate::DTS;
+use crate::automaton::semantics::observe_omega;
+use crate::automaton::{Automaton, Semantics};
+use crate::ts::{Deterministic, EdgeColor, StateIndex, SymbolOf, run};
+use crate::word::OmegaWord;
 
 /// A deterministic Muller automaton (DMA) uses a [`MullerCondition`] to determine acceptance.
 /// Such a condition consists of a set of sets of colors. It considers an infinite run to
@@ -12,10 +14,7 @@ use crate::{DTS, TransitionSystem};
 /// that this means if a run is not accepting, then the set of colors it visits infinitely
 /// often is not contained in the [`MullerCondition`]. This allows for easy complementation
 /// of a [`DMA`] by simply taking the complement of the [`MullerCondition`].
-pub type DMA<A = CharAlphabet, Q = Void, C = usize, D = DTS<A, Q, C>> =
-    InfiniteWordAutomaton<A, MullerCondition<C>, Q, C, true, D>;
-/// Helper type alias for casting a given transition system `T` into a [`DMA`].
-pub type IntoDMA<T> = DMA<<T as TransitionSystem>::Alphabet, StateColor<T>, EdgeColor<T>, T>;
+pub type DMA<T = DTS<CharAlphabet, Void, usize>> = Automaton<T, MullerCondition<EdgeColor<T>>>;
 
 /// A Muller condition over some [`Color`] `C` is a set of sets of elements of type `C`. It
 /// is satisfied by a set (usually the set of colors that appear infinitely often in a run),
@@ -62,11 +61,21 @@ impl<C: Color + Ord + Eq + std::hash::Hash> MullerCondition<C> {
     }
 }
 
-impl<T: Deterministic<EdgeColor: Eq + std::hash::Hash>> Semantics<T, true>
-    for MullerCondition<EdgeColor<T>>
+impl<T, W> Semantics<T, W> for MullerCondition<EdgeColor<T>>
+where
+    T: Deterministic<EdgeColor: Eq + std::hash::Hash>,
+    W: OmegaWord<Symbol = SymbolOf<T>>,
 {
     type Observer = run::EdgeColorSet<T>;
     type Output = bool;
+    fn observe(
+        &self,
+        ts: &T,
+        initial: StateIndex<T>,
+        word: W,
+    ) -> Option<<Self::Observer as run::Observer<T>>::Current> {
+        observe_omega::<T, W, Self::Observer>(ts, initial, word)
+    }
     fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
         self.0.contains(&observed.0)
     }

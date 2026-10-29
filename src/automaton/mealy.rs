@@ -1,9 +1,9 @@
 use itertools::Itertools;
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash};
 
-use super::FiniteWordAutomaton;
+use super::Automaton;
 use crate::ts::operations::{Product, ProductIndex};
-use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor, SymbolOf};
+use crate::ts::{Deterministic, EdgeColor, IsEdge, SymbolOf};
 use crate::{
     Color, Int, Lattice, Void,
     alphabet::{CharAlphabet, Expression},
@@ -13,8 +13,8 @@ use crate::{DTS, Pointed, TransitionSystem};
 /// Represents the semantics of a Mealy machine. Concretely, this type returns for
 /// a finite run, the last transition color that is taken. It panics if the run has
 /// no transitions at all.
-#[derive(Debug, Clone)]
-pub struct MealySemantics<C>(PhantomData<C>);
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct MealySemantics;
 
 /// Marker trait for deterministic, pointed transition systems whose edge colors form a
 /// [`Lattice`]. Such transition systems can be interpreted as Mealy machines. This trait is
@@ -30,27 +30,15 @@ impl<T: TransitionSystem<EdgeColor: Lattice> + Deterministic + Pointed> MealyLik
 /// Usually, we are interested in the output of the last state that is reached during a run
 /// on a word. In case of a deterministic Mealy machine, this is the only output that is
 /// produced.
-pub type MealyMachine<A = CharAlphabet, Q = Void, C = Int, D = DTS<A, Q, C>> =
-    FiniteWordAutomaton<A, MealySemantics<C>, Q, C, true, D>;
+pub type MealyMachine<T = DTS<CharAlphabet, Void, Int>> = Automaton<T, MealySemantics>;
 
-/// Helper type that takes a pointed transition system and returns the corresponding
-/// [`MealyMachine`].
-pub type IntoMealyMachine<D> = FiniteWordAutomaton<
-    <D as TransitionSystem>::Alphabet,
-    MealySemantics<EdgeColor<D>>,
-    StateColor<D>,
-    EdgeColor<D>,
-    true,
-    D,
->;
-
-impl<C: Deterministic> IntoMealyMachine<C>
+impl<C: Deterministic> MealyMachine<C>
 where
     EdgeColor<C>: Color,
 {
     /// Returns true if and only if both machines are bisimilar, meaning for all possible
     /// inputs, they will produce the same output.
-    pub fn bisimilar<M>(&self, other: &IntoMealyMachine<M>) -> bool
+    pub fn bisimilar<M>(&self, other: &MealyMachine<M>) -> bool
     where
         M: Deterministic<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
         EdgeColor<M>: Color + PartialEq,
@@ -82,7 +70,7 @@ where
         O: Deterministic<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
     >(
         &self,
-        other: &IntoMealyMachine<O>,
+        other: &MealyMachine<O>,
     ) -> Option<Vec<SymbolOf<C>>>
     where
         C::EdgeColor: PartialEq,
@@ -120,19 +108,13 @@ where
         O: Deterministic<Alphabet = C::Alphabet, EdgeColor = C::EdgeColor>,
     >(
         &self,
-        other: &IntoMealyMachine<O>,
+        other: &MealyMachine<O>,
     ) -> Option<Vec<SymbolOf<C>>>
     where
         C::EdgeColor: PartialEq,
     {
         self.witness_restricted_inequivalence(other)
             .or(other.witness_restricted_inequivalence(self))
-    }
-}
-
-impl<Q> Default for MealySemantics<Q> {
-    fn default() -> Self {
-        Self(std::marker::PhantomData)
     }
 }
 

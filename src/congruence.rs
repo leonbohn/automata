@@ -1,7 +1,7 @@
 mod class;
 
 use crate::{
-    Color, Void,
+    Void,
     alphabet::{Alphabet, CharAlphabet},
     word,
     word::OmegaWord,
@@ -16,12 +16,18 @@ mod cayley;
 pub use cayley::{Cayley, RightCayley};
 
 mod minimal_representative;
-use crate::automaton::{DFA, FiniteWordAutomaton};
+use crate::alphabet::Matcher;
+use crate::automaton::DFA;
 use crate::representation::IntoTs;
 use crate::ts::operations::DefaultIfMissing;
-use crate::ts::{Deterministic, EdgeColor, StateColor, StateIndex, SymbolOf};
+use crate::ts::predecessors::PredecessorIterable;
+use crate::ts::{
+    Deterministic, EdgeExpression, EdgeTuple, ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable,
+    StateColor, StateIndex, SymbolOf,
+};
 use crate::{DTS, Pointed, TransitionSystem};
 pub use minimal_representative::{LazyMinimalRepresentatives, MinimalRepresentative, StateNaming};
+use std::borrow::Cow;
 
 /// A congruence is a [`TransitionSystem`], which additionally has a distinguished initial state. On top
 /// of that, a congruence does not have any coloring on either states or symbols. This
@@ -80,22 +86,242 @@ pub trait Congruence: Deterministic + Pointed {
 impl<C: Deterministic + Pointed> Congruence for C {}
 
 /// Represents a right congruence relation, which is in essence a trim, deterministic
-/// transition system with a designated initial state.
-pub type RightCongruence<A = CharAlphabet, Q = Void, C = Void, D = DTS<A, Q, C>> =
-    FiniteWordAutomaton<A, LazyMinimalRepresentatives<D>, Q, C, true, D>;
+/// transition system with a designated initial state. On top of the transition system `T`, it
+/// lazily caches the minimal representatives of its classes, see
+/// [`RightCongruence::minimal_representatives`].
+///
+/// The cache is discarded whenever the transition system is modified through one of the
+/// [`Sproutable`] or [`Shrinkable`] methods. Mutating the system through [`Self::ts_mut`]
+/// does not discard the cache, it is up to the caller to not change the structure then.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RightCongruence<T: TransitionSystem = DTS<CharAlphabet, Void, Void>> {
+    ts: T,
+    initial: T::StateIndex,
+    minimal_representatives: LazyMinimalRepresentatives<T>,
+}
 
-/// Type alias for a [`RightCongruence`] that is obtained by wrapping the given transition system.
-pub type IntoRightCongruence<D> =
-    RightCongruence<<D as TransitionSystem>::Alphabet, StateColor<D>, EdgeColor<D>, D>;
+impl<T: TransitionSystem> RightCongruence<T> {
+    /// Creates a right congruence from a transition system and a designated initial state.
+    pub fn from_parts(ts: T, initial: T::StateIndex) -> Self {
+        Self {
+            ts,
+            initial,
+            minimal_representatives: LazyMinimalRepresentatives::default(),
+        }
+    }
 
-/// Type alias for a [`RightCongruence`] that is by collecting the given transition system.
-pub type CollectRightCongruence<D> =
-    RightCongruence<<D as TransitionSystem>::Alphabet, StateColor<D>, EdgeColor<D>>;
+    /// Creates a right congruence from a pointed transition system.
+    pub fn from_pointed(ts: T) -> Self
+    where
+        T: Pointed,
+    {
+        let initial = ts.initial();
+        Self::from_parts(ts, initial)
+    }
 
-impl<A: Alphabet, Q: Color, C: Color, D> RightCongruence<A, Q, C, D>
-where
-    D: Deterministic<Alphabet = A, StateColor = Q, EdgeColor = C>,
-{
+    /// Decomposes the congruence into the transition system and the initial state.
+    pub fn into_parts(self) -> (T, StateIndex<T>) {
+        (self.ts, self.initial)
+    }
+
+    /// Returns a reference to the underlying transition system.
+    pub fn ts(&self) -> &T {
+        &self.ts
+    }
+
+    /// Gives a mutable reference to the underlying transition system. The cached minimal
+    /// representatives are not invalidated, so the transition structure should not be changed.
+    pub fn ts_mut(&mut self) -> &mut T {
+        &mut self.ts
+    }
+
+    /// Creates a right congruence over the given alphabet with a single state of the given
+    /// color, which is the initial state.
+    pub fn new_with_initial_color(alphabet: T::Alphabet, initial_color: T::StateColor) -> Self
+    where
+        T: ForAlphabet<T::Alphabet> + Sproutable,
+    {
+        let mut ts = T::for_alphabet(alphabet);
+        let initial = ts.add_state(initial_color);
+        Self::from_parts(ts, initial)
+    }
+
+    /// Like [`Self::new_with_initial_color`], but additionally adds a self-loop on the initial
+    /// state for every symbol, each emitting the given edge color.
+    pub fn new_trivial_with_initial_color(
+        alphabet: T::Alphabet,
+        initial_color: T::StateColor,
+        edge_color: T::EdgeColor,
+    ) -> Self
+    where
+        T: ForAlphabet<T::Alphabet> + Sproutable,
+    {
+        let alph = alphabet.clone();
+        let mut out = Self::new_with_initial_color(alphabet, initial_color);
+        let initial = out.initial;
+        for sym in alph.universe() {
+            out.ts.add_edge((
+                initial,
+                alph.make_expression(sym),
+                edge_color.clone(),
+                initial,
+            ));
+        }
+        out
+    }
+
+    fn invalidate(&mut self) {
+        self.minimal_representatives = LazyMinimalRepresentatives::default();
+    }
+}
+
+impl<T: Congruence> From<T> for RightCongruence<T> {
+    fn from(value: T) -> Self {
+        Self::from_pointed(value)
+    }
+}
+
+impl<T: Deterministic> Deterministic for RightCongruence<T> {}
+
+impl<T: TransitionSystem> Pointed for RightCongruence<T> {
+    fn initial(&self) -> Self::StateIndex {
+        self.initial
+    }
+}
+
+impl<T: PredecessorIterable> PredecessorIterable for RightCongruence<T> {
+    type PreEdgeRef<'this>
+        = T::PreEdgeRef<'this>
+    where
+        Self: 'this;
+
+    type EdgesToIter<'this>
+        = T::EdgesToIter<'this>
+    where
+        Self: 'this;
+
+    fn predecessors(&self, state: StateIndex<T>) -> Option<Self::EdgesToIter<'_>> {
+        self.ts.predecessors(state)
+    }
+}
+
+impl<T: TransitionSystem> TransitionSystem for RightCongruence<T> {
+    type Alphabet = T::Alphabet;
+    type StateIndex = T::StateIndex;
+    type StateColor = T::StateColor;
+    type EdgeColor = T::EdgeColor;
+    type EdgeRef<'this>
+        = T::EdgeRef<'this>
+    where
+        Self: 'this;
+    type EdgesFromIter<'this>
+        = T::EdgesFromIter<'this>
+    where
+        Self: 'this;
+    type StateIndices<'this>
+        = T::StateIndices<'this>
+    where
+        Self: 'this;
+
+    fn alphabet(&self) -> &Self::Alphabet {
+        self.ts.alphabet()
+    }
+
+    fn state_bound(&self) -> Option<usize> {
+        self.ts.state_bound()
+    }
+
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        self.ts.state_indices()
+    }
+
+    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
+        self.ts.edges_from(state)
+    }
+
+    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
+        self.ts.state_color(state)
+    }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        self.ts.contains_state_index(index)
+    }
+}
+
+impl<T: Sproutable> Sproutable for RightCongruence<T> {
+    fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
+        self.invalidate();
+        self.ts.add_state(color)
+    }
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
+        self.ts.set_state_color(index, color)
+    }
+    fn add_edge<E>(&mut self, t: E) -> Option<EdgeTuple<Self>>
+    where
+        E: IntoEdgeTuple<Self>,
+    {
+        self.invalidate();
+        self.ts.add_edge(t.into_edge_tuple())
+    }
+}
+
+impl<T: Shrinkable> Shrinkable for RightCongruence<T> {
+    fn remove_state(&mut self, q: StateIndex<Self>) -> Option<Self::StateColor> {
+        self.invalidate();
+        self.ts.remove_state(q)
+    }
+
+    fn remove_edges_from_matching(
+        &mut self,
+        source: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<EdgeTuple<Self>>> {
+        self.invalidate();
+        self.ts.remove_edges_from_matching(source, matcher)
+    }
+
+    fn remove_edges_between_matching(
+        &mut self,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
+        matcher: impl Matcher<EdgeExpression<Self>>,
+    ) -> Option<Vec<EdgeTuple<Self>>> {
+        self.invalidate();
+        self.ts
+            .remove_edges_between_matching(source, target, matcher)
+    }
+
+    fn remove_edges_between(
+        &mut self,
+        source: StateIndex<Self>,
+        target: StateIndex<Self>,
+    ) -> Option<Vec<EdgeTuple<Self>>> {
+        self.invalidate();
+        self.ts.remove_edges_between(source, target)
+    }
+
+    fn remove_edges_from(&mut self, source: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>> {
+        self.invalidate();
+        self.ts.remove_edges_from(source)
+    }
+
+    fn remove_edges_to(&mut self, target: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>> {
+        self.invalidate();
+        self.ts.remove_edges_to(target)
+    }
+}
+
+impl<D: Deterministic> RightCongruence<D> {
+    /// Checks if two finite words are congruent, meaning they reach the same state when
+    /// starting from the initial state.
+    pub fn congruent<W, V>(&self, word: W, other: V) -> bool
+    where
+        W: word::FiniteWord<Symbol = SymbolOf<D>>,
+        V: word::FiniteWord<Symbol = SymbolOf<D>>,
+    {
+        self.reached_state_index(word).unwrap() == self.reached_state_index(other).unwrap()
+    }
+
     /// Computes a DFA that accepts precisely those finite words which loop on the given `class`. Formally,
     /// if `u` represents the given class, then the DFA accepts precisely those words `w` such that `uw`
     /// is congruent to `u`.
@@ -113,7 +339,7 @@ where
     /// assert!(dfa.accepts("b"));
     /// assert!(dfa.equivalent(ts.looping_words(0)));
     /// ```
-    pub fn looping_words(&self, idx: StateIndex<Self>) -> DFA<A>
+    pub fn looping_words(&self, idx: StateIndex<Self>) -> DFA<DTS<D::Alphabet, bool, Void>>
     where
         D: Clone + IntoTs,
     {
@@ -129,8 +355,8 @@ where
 
     /// Returns a reference to the minimal representatives of the classes of the right congruence.
     pub fn minimal_representatives(&self) -> &LazyMinimalRepresentatives<D> {
-        let out = self.acceptance();
-        out.ensure_from(self.ts(), self.initial());
+        let out = &self.minimal_representatives;
+        out.ensure_from(&self.ts, self.initial);
         out
     }
 

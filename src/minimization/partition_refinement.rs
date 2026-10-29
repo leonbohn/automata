@@ -5,6 +5,8 @@
 //! the output of the state, whereas for Mealy machines, we consider the output of the transition.
 //! It is necessary to have two distinct algorithms (so with different names) as there might be
 //! transition systems which have outputs on both the states and the transitions.
+use crate::DTS;
+use crate::Void;
 use std::{collections::BTreeSet, time::Instant};
 
 use crate::automaton::{MealyMachine, MooreMachine};
@@ -186,12 +188,16 @@ where
     collect_partition(&states, &block_of)
 }
 
+/// The [`MealyMachine`] that results from minimizing `D`. The state colors are the classes of
+/// state colors that have been merged.
+pub(crate) type MinimizedMealy<D> = MealyMachine<
+    DTS<<D as TransitionSystem>::Alphabet, Vec<StateColor<D>>, <D as TransitionSystem>::EdgeColor>,
+>;
+
 /// Partition refinement algorithm for deterministic finite automata that have outputs on the edges.
 /// Runs in O(n log n) time, where n is the number of states of the automaton and returns the unique
 /// minimal automaton that is bisimilar to the input.
-pub fn mealy_partition_refinement<D>(
-    mm: D,
-) -> MealyMachine<D::Alphabet, Vec<StateColor<D>>, EdgeColor<D>>
+pub fn mealy_partition_refinement<D>(mm: D) -> MinimizedMealy<D>
 where
     D: Congruence,
     EdgeColor<D>: Color + Eq + std::hash::Hash,
@@ -277,7 +283,7 @@ where
 /// minimal automaton that is bisimilar to the input. This method computes the maximal bisimulation
 /// by using [`moore_greatest_bisimulation`] and then uses the partition to compute the quotient
 /// automaton.
-pub fn moore_partition_refinement<D>(mm: D) -> MooreMachine<D::Alphabet, D::StateColor>
+pub fn moore_partition_refinement<D>(mm: D) -> MooreMachine<DTS<D::Alphabet, D::StateColor, Void>>
 where
     D: Congruence,
     StateColor<D>: Color + Eq + std::hash::Hash,

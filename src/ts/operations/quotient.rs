@@ -1,3 +1,5 @@
+use crate::DTS;
+use crate::Void;
 use crate::{
     RightCongruence,
     partition::Partition,
@@ -76,7 +78,7 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
 
     /// Extracts the underlying right congruence by erasing the state and edge colors and then collecting
     /// into a [`RightCongruence`].
-    pub fn underlying_right_congruence(&self) -> RightCongruence<Ts::Alphabet>
+    pub fn underlying_right_congruence(&self) -> RightCongruence<DTS<Ts::Alphabet, Void, Void>>
     where
         Ts: Deterministic + Pointed + CollectTs,
     {

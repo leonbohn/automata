@@ -5,13 +5,13 @@ use std::{
     hash::Hash,
 };
 
-use crate::automaton::Semantics;
+use crate::automaton::semantics::observe_omega;
+use crate::automaton::{Automaton, Semantics};
 use crate::representation::{CollectTs, IntoTs};
 use crate::ts::operations::Product;
-use crate::ts::{
-    Deterministic, EdgeColor, IsEdge, Shrinkable, StateColor, StateIndex, SymbolOf, operations,
-};
-use crate::{DTS, Pointed, TransitionSystem, automaton::InfiniteWordAutomaton, ts::run};
+use crate::ts::{Deterministic, EdgeColor, IsEdge, Shrinkable, StateIndex, SymbolOf, operations};
+use crate::word::OmegaWord;
+use crate::{DTS, Pointed, TransitionSystem, ts::run};
 use crate::{
     Int, Show, Void,
     alphabet::CharAlphabet,
@@ -27,12 +27,7 @@ use tracing::trace;
 /// defaults to [`MinEvenParityCondition`], meaning the automaton accepts
 /// if the least color that appears infinitely often during
 /// a run is even.
-pub type DPA<A = CharAlphabet, Q = Void, Sem = MinEvenParityCondition, D = DTS<A, Q, Int>> =
-    InfiniteWordAutomaton<A, Sem, Q, Int, true, D>;
-/// Helper type alias for converting a given transition system into a [`DPA`]
-/// with the given semantics.
-pub type IntoDPA<T, Sem = MinEvenParityCondition> =
-    DPA<<T as TransitionSystem>::Alphabet, StateColor<T>, Sem, T>;
+pub type DPA<T = DTS<CharAlphabet, Void, Int>, Sem = MinEvenParityCondition> = Automaton<T, Sem>;
 
 /// Represents a min even parity condition which accepts if and only if the least color
 /// that labels a transition that is taken infinitely often, is even. For the automaton
@@ -44,17 +39,6 @@ pub type IntoDPA<T, Sem = MinEvenParityCondition> =
 /// respectively.
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
 pub struct MinEvenParityCondition;
-
-impl<T> Semantics<T, true> for MinEvenParityCondition
-where
-    T: Deterministic<EdgeColor = Int>,
-{
-    type Output = bool;
-    type Observer = run::EdgeColorLimit<T>;
-    fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
-        observed.is_multiple_of(2)
-    }
-}
 
 /// Defines a [`Semantics`] that outputs `true` if the *maximum* color/priority that
 /// appears infinitely often is *even*. See also [`MinEvenParityCondition`].
@@ -69,7 +53,41 @@ pub struct MinOddParityCondition;
 #[derive(Clone, Debug, Default, Copy, Hash, Eq, PartialEq)]
 pub struct MaxOddParityCondition;
 
-impl<D> IntoDPA<D>
+/// Implements [`Semantics`] for a parity condition. The edge color limit that is observed
+/// is the minimum or maximum, depending on `$max`, and the word is accepted if the parity
+/// of the limit is as given.
+macro_rules! parity_semantics {
+    ($cond:ident, $max:literal, $even:literal) => {
+        impl<T, W> Semantics<T, W> for $cond
+        where
+            T: Deterministic<EdgeColor = Int>,
+            W: OmegaWord<Symbol = SymbolOf<T>>,
+        {
+            type Output = bool;
+            type Observer = run::EdgeColorLimit<T, $max>;
+            fn observe(
+                &self,
+                ts: &T,
+                initial: StateIndex<T>,
+                word: W,
+            ) -> Option<<Self::Observer as run::Observer<T>>::Current> {
+                observe_omega::<T, W, Self::Observer>(ts, initial, word)
+            }
+            fn evaluate(
+                &self,
+                observed: <Self::Observer as run::Observer<T>>::Current,
+            ) -> Self::Output {
+                observed.is_multiple_of(2) == $even
+            }
+        }
+    };
+}
+parity_semantics!(MinEvenParityCondition, false, true);
+parity_semantics!(MaxEvenParityCondition, true, true);
+parity_semantics!(MinOddParityCondition, false, false);
+parity_semantics!(MaxOddParityCondition, true, false);
+
+impl<D> DPA<D>
 where
     D: Deterministic<EdgeColor = Int>,
 {
@@ -126,9 +144,7 @@ where
     /// assert_eq!(streamlined.size(), 1);
     /// assert_eq!(streamlined.last_edge_color("ab"), Some(1))
     /// ```
-    pub fn streamlined(
-        &self,
-    ) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
+    pub fn streamlined(&self) -> DPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
         D: Clone + IntoTs,
@@ -209,7 +225,7 @@ where
     /// # Panics
     /// Panics if the complement cannot be represented, i.e. if the language needs `Int::MAX + 1`
     /// distinct priorities, beginning at 0. Such an automaton has at least that many states.
-    pub fn complement(self) -> DPA<D::Alphabet>
+    pub fn complement(self) -> DPA<DTS<D::Alphabet, Void, Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
         D: Clone + IntoTs,
@@ -248,7 +264,7 @@ where
     ///     .into_dpa(0);
     /// assert!(dpa.complement_without_normalizing().is_none());
     /// ```
-    pub fn complement_without_normalizing(self) -> Option<DPA<D::Alphabet>> {
+    pub fn complement_without_normalizing(self) -> Option<DPA<DTS<D::Alphabet, Void, Int>>> {
         let (low, high) = self.low_and_high_priority();
         let initial = self.initial;
         if low > 0 {
@@ -381,7 +397,7 @@ where
     pub fn witness_colors<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
         k: Int,
-        other: &IntoDPA<O>,
+        other: &DPA<O>,
         l: Int,
     ) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         trace!("attempting to witness colors {k} and {l}");
@@ -423,7 +439,7 @@ where
     /// [`Self::witness_not_subset_of`] in both directions.
     pub fn witness_inequivalence<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
-        other: &IntoDPA<O>,
+        other: &DPA<O>,
     ) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
         self.witness_not_subset_of(other)
             .or(other.witness_not_subset_of(self))
@@ -433,7 +449,7 @@ where
     /// DPAs accept the same language.
     pub fn language_equivalent<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
-        other: &IntoDPA<O>,
+        other: &DPA<O>,
     ) -> bool {
         self.witness_inequivalence(other).is_none()
     }
@@ -442,7 +458,7 @@ where
     /// accepted by `self` is a subset of the language accepted by `other`.
     pub fn included_in<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
-        other: &IntoDPA<O>,
+        other: &DPA<O>,
     ) -> bool {
         self.witness_not_subset_of(other).is_none()
     }
@@ -451,7 +467,7 @@ where
     /// accepted by `self` is a superset of the language accepted by `other`.
     pub fn includes<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
-        other: &IntoDPA<O>,
+        other: &DPA<O>,
     ) -> bool {
         other.witness_not_subset_of(self).is_none()
     }
@@ -460,7 +476,7 @@ where
     /// If no such word exists, `None` is returned.
     pub fn witness_not_subset_of<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
         &self,
-        other: &IntoDPA<O>,
+        other: &DPA<O>,
     ) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
         for i in self.colors().filter(|x| x % 2 == 0) {
             for j in other.colors().filter(|x| x % 2 == 1) {
@@ -483,7 +499,7 @@ where
     /// "Computing the rabin index of a finite automaton". The procedure that this implementation actually uses
     /// is outlined by Schewe and Ehlers in [Natural Colors of Infinite Words](https://arxiv.org/pdf/2207.11000.pdf)
     /// in Section 4.1, Definition 2.
-    pub fn normalized(&self) -> IntoDPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
+    pub fn normalized(&self) -> DPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
         D: Clone + IntoTs,
@@ -848,5 +864,37 @@ mod tests {
         assert_eq!(normalized.last_edge_color("aaa"), Some(0));
         assert_eq!(normalized.last_edge_color("aa"), Some(0));
         assert_eq!(normalized.last_edge_color("aab"), Some(0));
+    }
+
+    #[test]
+    fn parity_variants_and_word_types() {
+        use crate::automaton::{
+            MaxEvenParityCondition, MaxOddParityCondition, MinOddParityCondition,
+        };
+        use crate::ts::Builder;
+
+        // 'a' loops with priority 1, 'b' goes to a state looping with priority 2 on both symbols
+        let ts = Builder::without_state_colors()
+            .with_edges([
+                (0, 'a', 1, 0),
+                (0, 'b', 2, 1),
+                (1, 'a', 2, 1),
+                (1, 'b', 2, 1),
+            ])
+            .into_dts_with_initial(0);
+        let (ts, initial) = ts.into_dts_and_initial();
+        let min_even: DPA<_> = DPA::from_parts(ts.clone(), initial);
+        let max_even: DPA<_, MaxEvenParityCondition> = DPA::from_parts(ts.clone(), initial);
+        let min_odd: DPA<_, MinOddParityCondition> = DPA::from_parts(ts.clone(), initial);
+        let max_odd: DPA<_, MaxOddParityCondition> = DPA::from_parts(ts, initial);
+
+        // a^ω: only priority 1 recurs
+        let a = upw!("a");
+        assert!(!min_even.accepts(&a) && !max_even.accepts(&a));
+        assert!(min_odd.accepts(&a) && max_odd.accepts(&a));
+        // b^ω: only priority 2 recurs
+        let b = upw!("b");
+        assert!(min_even.accepts(&b) && max_even.accepts(&b));
+        assert!(!min_odd.accepts(&b) && !max_odd.accepts(&b));
     }
 }

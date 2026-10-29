@@ -348,7 +348,7 @@ pub fn lassos(count: usize, k: usize, spoke: usize, cycle: usize) -> Vec<(String
 // ---------------------------------------------------------------------------------------------
 
 /// A parity automaton read from a HOA fixture, over a propositional alphabet.
-pub type FixtureDpa = DPA<PropAlphabet>;
+pub type FixtureDpa = DPA<DTS<PropAlphabet, Void, Int>>;
 
 /// The fixtures that stem from LTL formulas, a selection of `benches/fixtures/ltl`.
 ///
