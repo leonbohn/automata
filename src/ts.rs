@@ -300,8 +300,8 @@ pub trait TransitionSystem: Sized {
     ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
     ///     .into_dts_with_initial(0);
     /// let colored = ts.with_state_color(UniformColor(false));
-    /// assert_eq!(colored.reached_state_color("a"), Some(false));
-    /// assert_eq!(colored.with_state_color(UniformColor(true)).reached_state_color("a"), Some(true));
+    /// assert_eq!(colored.run("a").reached_state_color(), Some(false));
+    /// assert_eq!(colored.with_state_color(UniformColor(true)).run("a").reached_state_color(), Some(true));
     /// ```
     #[inline(always)]
     fn with_state_color<P: ProvidesStateColor<Self::StateIndex>>(

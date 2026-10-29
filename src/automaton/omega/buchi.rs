@@ -82,7 +82,9 @@ where
                 // let InfinityColors(colors) = self
                 //     .induced(&full_word, self.initial())
                 //     .expect("word is valid");
-                if let Some(infset) = self.visited_edge_colors_from(good_scc.first(), &full_word)
+                if let Some(infset) = self
+                    .run_from(good_scc.first(), &full_word)
+                    .observe::<crate::ts::run::EdgeColorSequence<_>>()
                     && infset.iter().any(|b| *b)
                 {
                     let spoke = self

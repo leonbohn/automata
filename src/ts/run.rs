@@ -1,26 +1,33 @@
 use crate::{
-    Color,
     alphabet::Symbol,
     math,
     word::Infix,
-    word::{FiniteWord, OmegaWord, ReducedOmegaWord, Word},
+    word::{Finite, FiniteWord, Omega, OmegaWord, ReducedOmegaWord, Word},
 };
 use std::collections::BTreeSet;
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
 
 use crate::TransitionSystem;
-use crate::ts::{Deterministic, EdgeColor, IdType, StateColor, StateIndex, SymbolOf};
+use crate::ts::{Deterministic, EdgeColor, StateColor, StateIndex, SymbolOf};
 
 /// Observes a run on a [`TransitionSystem`] and collects information about it, for example the
 /// state that is reached or the colors that are seen. A run feeds the symbols of a word one by
-/// one to the observer, which can also decide to stop the run.
+/// one to the observer, which also takes the transition.
+///
+/// For an infinite word the observer sees the cycle that the run ends up in, starting in a state
+/// of that cycle and going around it once. What the run does before that is not observed.
 pub trait Observer<T: TransitionSystem>: Sized {
-    /// The information that the observer has collected so far.
+    /// The information that the observer collects.
     type Current;
-    /// Returns the information collected so far.
-    fn current(&self) -> &Self::Current;
+    /// Whether the observer looks at the transitions at all. Passes through the cycle of an
+    /// infinite word are only kept for an observer that does.
+    const OBSERVES: bool = true;
     /// Consumes the observer and returns the collected information.
     fn into_current(self) -> Self::Current;
+    /// Adds what `later` has observed to `self`, where `later` observed the part of the run that
+    /// directly follows the part observed by `self`. A run on an infinite word observes each pass
+    /// through the cycle of the word with its own observer and merges those of the loop.
+    fn merge(&mut self, later: Self);
     /// Creates an observer for a run that starts in `state`.
     fn begin(ts: &T, state: StateIndex<T>) -> Self;
     /// Observes a transition on `sym` taken from `state` and returns the state that is reached, or
@@ -31,13 +38,6 @@ pub trait Observer<T: TransitionSystem>: Sized {
         state: StateIndex<T>,
         sym: SymbolOf<T>,
     ) -> Option<StateIndex<T>>;
-}
-
-/// An [`Observer`] that can also summarize an infinite run, which ends up in a cycle.
-pub trait InfiniteObserver<T: TransitionSystem>: Observer<T> {
-    /// Summarizes the infinite run from the observations `seq` of the iterations of the loop; the
-    /// run enters the cycle (the part that repeats forever) at iteration `time`.
-    fn loop_back(seq: &[Self::Current], ts: &T, time: usize) -> Self::Current;
 }
 
 /// Observes nothing, only the success of the run matters.
@@ -82,36 +82,6 @@ impl<T: TransitionSystem> std::ops::Deref for StateSet<T> {
     }
 }
 
-/// Observes the sequence of visited states. For infinite runs these are the states along
-/// one traversal of the loop.
-pub struct StateSequence<T: TransitionSystem>(Vec<StateIndex<T>>);
-impl<T: TransitionSystem> std::ops::Deref for StateSequence<T> {
-    type Target = Vec<StateIndex<T>>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-/// Observes the sequence of colors of the visited states. For infinite runs these are the
-/// colors along one traversal of the loop.
-pub struct StateColorSequence<T: TransitionSystem>(Vec<StateColor<T>>);
-impl<T: TransitionSystem> std::ops::Deref for StateColorSequence<T> {
-    type Target = Vec<StateColor<T>>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-/// Observes the set of colors of visited states. For infinite runs these are the colors
-/// that are seen infinitely often.
-pub struct StateColorSet<T: TransitionSystem>(math::FxIndexSet<StateColor<T>>);
-impl<T: TransitionSystem> std::ops::Deref for StateColorSet<T> {
-    type Target = math::FxIndexSet<StateColor<T>>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 /// Observes the set of colors of the taken edges. For infinite runs these are the colors
 /// that are seen infinitely often.
 #[derive(Debug)]
@@ -123,8 +93,7 @@ impl<T: TransitionSystem> std::ops::Deref for EdgeColorSet<T> {
     }
 }
 
-/// Observes the sequence of colors of the taken edges. For infinite runs these are the
-/// colors along one traversal of the loop.
+/// Observes the sequence of colors of the taken edges.
 #[derive(Debug)]
 pub struct EdgeColorSequence<T: TransitionSystem>(pub(crate) Vec<EdgeColor<T>>);
 impl<T: TransitionSystem> std::ops::Deref for EdgeColorSequence<T> {
@@ -145,131 +114,163 @@ impl<T: TransitionSystem> std::ops::Deref for Triggers<T> {
     }
 }
 
-/// The run of a deterministic transition system on a word, from a given start state. The
-/// constant `FINITE` says whether the word is finite. The observer `O` collects information
-/// about the run. Call `evaluate` to execute it.
-pub struct Run<
-    'ts,
-    T: Deterministic,
-    W: Word<Symbol = SymbolOf<T>>,
-    const FINITE: bool,
-    O: Observer<T> = NoObserver,
-> {
+/// The run of a deterministic transition system on a word, from a start state. It is created
+/// by [`Deterministic::run`] and executed by one of the methods that consume it. Whether the word
+/// is finite or infinite is determined by its type ([`Word::Kind`]):
+///
+/// ```
+/// use automata::{ts::{Builder, Deterministic, run::EdgeColorSet}, upw};
+///
+/// let ts = Builder::without_state_colors()
+///     .with_transitions([(0, 'a', 1u8, 1), (1, 'b', 2, 0)])
+///     .into_dts_with_initial(0);
+///
+/// assert_eq!(ts.run("ab").reached_state(), Some(0));
+/// let colors = ts.run_from(1, upw!("ba")).observe::<EdgeColorSet<_>>();
+/// assert_eq!(colors.unwrap().len(), 2);
+/// assert!(ts.run(upw!("b")).escape_prefix().is_some());
+/// ```
+///
+/// A run on an infinite word does not allocate, except for what the observer needs.
+#[derive(Debug, Clone)]
+pub struct Run<'ts, T: Deterministic, W> {
     ts: &'ts T,
     start: StateIndex<T>,
     word: W,
-    observer: PhantomData<O>,
 }
 
-impl<T: Deterministic, W: Word<Symbol = SymbolOf<T>>, const FINITE: bool, O: Observer<T>> RunResult
-    for Run<'_, T, W, FINITE, O>
-{
-    type StateColor = StateColor<T>;
-    type EdgeColor = EdgeColor<T>;
-    type StateIndex = StateIndex<T>;
-    type Symbol = SymbolOf<T>;
+/// Executes a run for the kind of word ([`Finite`] or [`Omega`]) that implements it. This is
+/// what lets [`Run`] have the same methods for finite and infinite words.
+pub trait RunKind<T: Deterministic, W> {
+    /// Runs `word` from `start` and returns what the observer `O` has collected, or the
+    /// length of the shortest prefix after which the run escapes (including the escape symbol).
+    fn run<O: Observer<T>>(ts: &T, start: StateIndex<T>, word: &W) -> Result<O::Current, usize>;
 }
 
-impl<'ts, T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>, O: Observer<T>>
-    Run<'ts, T, W, true, O>
-{
-    /// Creates the run of `ts` on the finite word `word` starting in `start`.
-    pub fn new_finite(ts: &'ts T, start: StateIndex<T>, word: W) -> Run<'ts, T, W, true, O> {
-        Run {
-            ts,
-            start,
-            word,
-            observer: PhantomData,
+impl<T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>> RunKind<T, W> for Finite {
+    #[inline]
+    fn run<O: Observer<T>>(ts: &T, start: StateIndex<T>, word: &W) -> Result<O::Current, usize> {
+        let mut observer = O::begin(ts, start);
+        let mut current = start;
+        for (position, sym) in word.symbols().enumerate() {
+            current = observer.observe_one(ts, current, sym).ok_or(position + 1)?;
         }
+        Ok(observer.into_current())
     }
-    /// Executes the run. It either reaches a state, or it escapes the transition system on a
-    /// symbol for which no transition exists.
-    pub fn evaluate(self) -> FiniteRunOutput<T, W, O> {
-        let mut taken = 0;
-        let mut observer = O::begin(self.ts, self.start);
-        let mut current = self.start;
+}
 
-        while let Some(sym) = self.word.nth(taken) {
+impl<T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>> RunKind<T, W> for Omega {
+    fn run<O: Observer<T>>(ts: &T, start: StateIndex<T>, word: &W) -> Result<O::Current, usize> {
+        let cycle = word.cycle();
+        let cycle_len = cycle.len();
+        assert!(cycle_len > 0, "word must be infinite");
+
+        let mut current = start;
+        let mut taken = 0usize;
+        for sym in word.spoke().symbols() {
             taken += 1;
-            if let Some(next) = observer.observe_one(self.ts, current, sym) {
-                current = next;
-            } else {
-                return FiniteRunOutput::Failed(current, EscapePrefix::new(self.word, taken));
-            }
+            current = ts.successor(current, sym).ok_or(taken)?;
         }
-        FiniteRunOutput::Reached(current, observer.into_current())
-    }
-    /// Returns true if the run does not escape the transition system.
-    pub fn is_successful(self) -> bool {
-        matches!(self.evaluate(), FiniteRunOutput::Reached(_, _))
+
+        // Each pass through the cycle of the word has its own observer. The states at the ends of
+        // the passes tell which of them form the loop of the run, those are merged.
+        let mut seen = crate::ts::StateMap::new(None);
+        let mut passes = Vec::new();
+        let mut count = 0usize;
+        seen.insert(current, count);
+        loop {
+            let mut observer = O::begin(ts, current);
+            for sym in cycle.symbols() {
+                taken += 1;
+                current = observer.observe_one(ts, current, sym).ok_or(taken)?;
+            }
+            count += 1;
+            if O::OBSERVES {
+                passes.push(observer);
+            }
+            if let Some(&first) = seen.get(&current) {
+                let mut loop_passes = passes.drain(first.min(passes.len())..);
+                return Ok(match loop_passes.next() {
+                    Some(mut merged) => {
+                        loop_passes.for_each(|pass| merged.merge(pass));
+                        merged.into_current()
+                    }
+                    None => O::begin(ts, current).into_current(),
+                });
+            }
+            seen.insert(current, count);
+        }
     }
 }
 
-impl<'ts, T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserver<T>>
-    Run<'ts, T, W, false, O>
-{
-    /// Creates the run of `ts` on the omega word `word` starting in `start`.
-    pub fn new_infinite(ts: &'ts T, start: StateIndex<T>, word: W) -> Run<'ts, T, W, false, O> {
-        Run {
-            ts,
-            start,
-            word,
-            observer: PhantomData,
-        }
+impl<'ts, T: Deterministic, W: Word<Symbol = SymbolOf<T>>> Run<'ts, T, W> {
+    /// Creates the run of `ts` on `word` starting in `start`.
+    pub fn new(ts: &'ts T, start: StateIndex<T>, word: W) -> Self {
+        Self { ts, start, word }
     }
-    /// Executes the run. It either ends up looping in the transition system, or it escapes it on a
+
+    /// Executes the run. It either completes, with what the observer `O` has collected (for
+    /// an infinite word that is the cycle of the run), or it escapes the transition system on a
     /// symbol for which no transition exists.
-    pub fn evaluate(self) -> InfiniteRunOutput<T, W, O> {
-        let spoke = self.word.spoke_vec();
-        // first evaluate the finite run piece
-        let mut current = match self.ts.finite_run_from::<_, O>(self.start, spoke) {
-            FiniteRunOutput::Reached(r, _) => r,
-            FiniteRunOutput::Failed(state, ep) => {
-                return InfiniteRunOutput::Failed(state, ep.with_word(self.word));
-            }
-        };
-
-        // only the states at the end of each loop iteration are stored, usually far fewer than
-        // there are states, so a dense vector sized by the bound would not pay off
-        let mut seen = crate::ts::StateMap::new(None);
-        let mut iteration = 0;
-        seen.insert(current, iteration);
-        let mut seq = vec![];
-
-        let cycle = self.word.cycle_vec();
-        loop {
-            iteration += 1;
-            match self.ts.finite_run_from::<_, O>(current, &cycle) {
-                FiniteRunOutput::Reached(reached, output) => {
-                    seq.push(output);
-                    if let Some(&prev_iteration) = seen.get(&reached) {
-                        return InfiniteRunOutput::Successful(O::loop_back(
-                            &seq,
-                            self.ts,
-                            prev_iteration,
-                        ));
-                    }
-                    seen.insert(reached, iteration);
-                    current = reached;
-                }
-                FiniteRunOutput::Failed(reached, ep) => {
-                    let length = self.word.spoke_len()
-                        + cycle.len() * (iteration - 1)
-                        + ep.shortest_escaping_length;
-                    return InfiniteRunOutput::Failed(
-                        reached,
-                        EscapePrefix {
-                            word: self.word,
-                            shortest_escaping_length: length,
-                        },
-                    );
-                }
-            }
+    pub fn evaluate<O: Observer<T>>(self) -> RunOutput<W, O::Current>
+    where
+        W::Kind: RunKind<T, W>,
+    {
+        match <W::Kind as RunKind<T, W>>::run::<O>(self.ts, self.start, &self.word) {
+            Ok(observed) => RunOutput::Reached(observed),
+            Err(length) => RunOutput::Escaped(EscapePrefix::new(self.word, length)),
         }
     }
+
+    /// Executes the run and returns what the observer `O` has collected, or `None` if the run
+    /// escapes the transition system.
+    #[inline]
+    pub fn observe<O: Observer<T>>(self) -> Option<O::Current>
+    where
+        W::Kind: RunKind<T, W>,
+    {
+        <W::Kind as RunKind<T, W>>::run::<O>(self.ts, self.start, &self.word).ok()
+    }
+
     /// Returns true if the run does not escape the transition system.
-    pub fn is_successful(self) -> bool {
-        matches!(self.evaluate(), InfiniteRunOutput::Successful(_))
+    #[inline]
+    pub fn is_successful(self) -> bool
+    where
+        W::Kind: RunKind<T, W>,
+    {
+        self.observe::<NoObserver>().is_some()
+    }
+
+    /// Returns the shortest prefix of the word after which the run escapes the transition
+    /// system, or `None` if it does not escape.
+    #[inline]
+    pub fn escape_prefix(self) -> Option<EscapePrefix<W>>
+    where
+        W::Kind: RunKind<T, W>,
+    {
+        self.evaluate::<NoObserver>().into_escape_prefix()
+    }
+}
+
+impl<T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>> Run<'_, T, W> {
+    /// Returns the state that is reached, or `None` if the run escapes.
+    #[inline]
+    pub fn reached_state(self) -> Option<StateIndex<T>> {
+        self.observe::<ReachedState<StateIndex<T>>>()
+    }
+    /// Returns the color of the state that is reached, or `None` if the run escapes.
+    #[inline]
+    pub fn reached_state_color(self) -> Option<StateColor<T>> {
+        self.observe::<ReachedStateColor<T>>()
+    }
+    /// Returns the color of the last edge that is taken, or `None` if the run escapes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the word is empty, as there is no such edge then.
+    #[inline]
+    pub fn last_edge_color(self) -> Option<EdgeColor<T>> {
+        self.observe::<ReachedEdgeColor<T>>()
     }
 }
 
@@ -339,6 +340,7 @@ impl<W: Word> EscapePrefix<W> {
 impl<W: Word> Word for EscapePrefix<W> {
     type Symbol = W::Symbol;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
         if position + 1 >= self.shortest_escaping_length {
             None
@@ -409,78 +411,19 @@ impl<W: Debug> Debug for EscapePrefix<W> {
     }
 }
 
-/// Describes the types that appear in the result of a run.
-pub trait RunResult: Sized {
-    /// The type of the state colors.
-    type StateColor: Color;
-    /// The type of the edge colors.
-    type EdgeColor: Color;
-    /// The type of the state indices.
-    type StateIndex: IdType;
-    /// The type of symbol over which the input word operates.
-    type Symbol: Symbol;
+/// The result of a [`Run`].
+pub enum RunOutput<W, C> {
+    /// The run did not escape, with what the observer has collected.
+    Reached(C),
+    /// The run escaped the transition system on the given escape prefix.
+    Escaped(EscapePrefix<W>),
 }
 
-/// The result of running a finite word.
-pub enum FiniteRunOutput<T: TransitionSystem, W: Word<Symbol = SymbolOf<T>>, O: Observer<T>> {
-    /// The run did not escape, it reached the given state with the given observation.
-    Reached(StateIndex<T>, O::Current),
-    /// The run escaped the transition system from the given state on the given escape prefix.
-    Failed(StateIndex<T>, EscapePrefix<W>),
-}
-
-impl<T: TransitionSystem, W: Word<Symbol = SymbolOf<T>>, O: Observer<T>> FiniteRunOutput<T, W, O> {
-    /// Returns the reached state, or `None` if the run escaped.
-    pub fn into_reached_state(self) -> Option<StateIndex<T>> {
-        match self {
-            FiniteRunOutput::Reached(r, _) => Some(r),
-            _ => None,
-        }
-    }
-    /// Returns the observation, or `None` if the run escaped.
-    pub fn into_output(self) -> Option<O::Current> {
-        match self {
-            FiniteRunOutput::Reached(_, o) => Some(o),
-            _ => None,
-        }
-    }
-}
-
-/// The result of running an omega word.
-pub enum InfiniteRunOutput<
-    T: TransitionSystem,
-    W: OmegaWord<Symbol = SymbolOf<T>>,
-    O: InfiniteObserver<T>,
-> {
-    /// The run loops in the transition system, with the given observation of the loop.
-    Successful(O::Current),
-    /// The run escaped the transition system from the given state on the given escape prefix.
-    Failed(StateIndex<T>, EscapePrefix<W>),
-}
-
-impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserver<T>> Debug
-    for InfiniteRunOutput<T, W, O>
-where
-    W: Debug,
-    O::Current: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InfiniteRunOutput::Failed(q, esc) => {
-                write!(f, "failed from {q:?} with escape prefix {esc:?}")
-            }
-            InfiniteRunOutput::Successful(ind) => write!(f, "successfully induced {ind:?}"),
-        }
-    }
-}
-
-impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserver<T>>
-    InfiniteRunOutput<T, W, O>
-{
+impl<W, C> RunOutput<W, C> {
     /// Returns true if the run does not escape the transition system.
     #[inline(always)]
     pub fn is_successful(&self) -> bool {
-        matches!(self, InfiniteRunOutput::Successful(_))
+        matches!(self, RunOutput::Reached(_))
     }
     /// Returns true if the run escapes the transition system.
     #[inline(always)]
@@ -489,17 +432,9 @@ impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserve
     }
     /// Returns the observation, or `None` if the run escaped.
     #[inline(always)]
-    pub fn into_output(self) -> Option<O::Current> {
+    pub fn into_output(self) -> Option<C> {
         match self {
-            Self::Successful(o) => Some(o),
-            _ => None,
-        }
-    }
-    /// Returns the state from which the run escaped, or `None` if it did not.
-    #[inline(always)]
-    pub fn into_escape_state(self) -> Option<StateIndex<T>> {
-        match self {
-            Self::Failed(state, _phantom) => Some(state),
+            Self::Reached(c) => Some(c),
             _ => None,
         }
     }
@@ -507,24 +442,31 @@ impl<T: TransitionSystem, W: OmegaWord<Symbol = SymbolOf<T>>, O: InfiniteObserve
     #[inline(always)]
     pub fn into_escape_prefix(self) -> Option<EscapePrefix<W>> {
         match self {
-            Self::Failed(_, ep) => Some(ep),
+            Self::Escaped(ep) => Some(ep),
             _ => None,
+        }
+    }
+}
+
+impl<W: Debug, C: Debug> Debug for RunOutput<W, C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RunOutput::Escaped(esc) => write!(f, "escaped with {esc:?}"),
+            RunOutput::Reached(observed) => write!(f, "reached {observed:?}"),
         }
     }
 }
 
 mod impls {
     use super::*;
-    use crate::TransitionSystem;
     use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor, StateIndex, SymbolOf};
     use crate::{Lattice, math};
 
     impl<T: Deterministic> Observer<T> for NoObserver {
-        type Current = ();
         #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            &()
-        }
+        fn merge(&mut self, _later: Self) {}
+        type Current = ();
+        const OBSERVES: bool = false;
         #[inline(always)]
         fn into_current(self) -> Self::Current {}
         #[inline(always)]
@@ -542,16 +484,12 @@ mod impls {
         }
     }
 
-    impl<T: Deterministic> InfiniteObserver<T> for NoObserver {
-        fn loop_back(_seq: &[Self::Current], _ts: &T, _time: usize) -> Self::Current {}
-    }
-
     impl<T: Deterministic> Observer<T> for ReachedState<StateIndex<T>> {
-        type Current = StateIndex<T>;
         #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            &self.0
+        fn merge(&mut self, later: Self) {
+            self.0 = later.0;
         }
+        type Current = StateIndex<T>;
         #[inline(always)]
         fn begin(_ts: &T, state: StateIndex<T>) -> Self {
             Self(state)
@@ -572,11 +510,11 @@ mod impls {
         }
     }
     impl<T: Deterministic> Observer<T> for ReachedStateColor<T> {
-        type Current = StateColor<T>;
         #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            &self.0
+        fn merge(&mut self, later: Self) {
+            self.0 = later.0;
         }
+        type Current = StateColor<T>;
         #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
@@ -598,11 +536,11 @@ mod impls {
         }
     }
     impl<T: Deterministic> Observer<T> for ReachedEdgeColor<T> {
-        type Current = EdgeColor<T>;
         #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            self.0.as_ref().unwrap()
+        fn merge(&mut self, later: Self) {
+            self.0 = later.0.or(self.0.take());
         }
+        type Current = EdgeColor<T>;
         #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0.unwrap()
@@ -629,11 +567,15 @@ mod impls {
     impl<T: Deterministic<StateColor: Lattice>, const MAX: bool> Observer<T>
         for StateColorLimit<T, MAX>
     {
-        type Current = StateColor<T>;
         #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            &self.0
+        fn merge(&mut self, later: Self) {
+            if MAX {
+                self.0.join_assign(&later.0)
+            } else {
+                self.0.meet_assign(&later.0)
+            }
         }
+        type Current = StateColor<T>;
         #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
@@ -658,28 +600,20 @@ mod impls {
             Some(succ)
         }
     }
-    impl<T: Deterministic<StateColor: Lattice>, const MAX: bool> InfiniteObserver<T>
-        for StateColorLimit<T, MAX>
-    {
-        #[inline(always)]
-        fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            if MAX {
-                Lattice::join_iter(seq[time..].iter())
-            } else {
-                Lattice::meet_iter(seq[time..].iter())
-            }
-        }
-    }
 
     impl<T: Deterministic, const MAX: bool> Observer<T> for EdgeColorLimit<T, MAX>
     where
         EdgeColor<T>: Lattice,
     {
-        type Current = EdgeColor<T>;
         #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            &self.0
+        fn merge(&mut self, later: Self) {
+            if MAX {
+                self.0.join_assign(&later.0)
+            } else {
+                self.0.meet_assign(&later.0)
+            }
         }
+        type Current = EdgeColor<T>;
         #[inline(always)]
         fn into_current(self) -> Self::Current {
             self.0
@@ -709,26 +643,12 @@ mod impls {
             Some(e.target())
         }
     }
-    impl<T: Deterministic, const MAX: bool> InfiniteObserver<T> for EdgeColorLimit<T, MAX>
-    where
-        EdgeColor<T>: Lattice,
-    {
-        #[inline(always)]
-        fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            if MAX {
-                Lattice::join_iter(seq[time..].iter())
-            } else {
-                Lattice::meet_iter(seq[time..].iter())
-            }
-        }
-    }
 
-    impl<T: TransitionSystem> Default for StateSet<T> {
-        fn default() -> Self {
-            Self(Default::default())
-        }
-    }
     impl<T: Deterministic> Observer<T> for StateSet<T> {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            self.0.extend(later.0.iter());
+        }
         type Current = Self;
         #[inline(always)]
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
@@ -738,10 +658,6 @@ mod impls {
         }
         #[inline(always)]
         fn into_current(self) -> Self::Current {
-            self
-        }
-        #[inline(always)]
-        fn current(&self) -> &Self::Current {
             self
         }
         #[inline(always)]
@@ -756,143 +672,16 @@ mod impls {
             Some(successor)
         }
     }
-    impl<T: Deterministic> InfiniteObserver<T> for StateSet<T> {
-        #[inline(always)]
-        fn loop_back(seq: &[Self::Current], ts: &T, time: usize) -> Self::Current {
-            let mut acc = Self(crate::ts::StateSet::new(ts.state_bound()));
-            for x in &seq[time..] {
-                acc.0.extend(x.0.iter());
-            }
-            acc
-        }
-    }
-
-    impl<T: Deterministic> Observer<T> for StateSequence<T> {
-        type Current = Vec<StateIndex<T>>;
-        #[inline(always)]
-        fn begin(_ts: &T, state: StateIndex<T>) -> Self {
-            Self(vec![state])
-        }
-        #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            &self.0
-        }
-        #[inline(always)]
-        fn into_current(self) -> Self::Current {
-            self.0
-        }
-        #[inline(always)]
-        fn observe_one(
-            &mut self,
-            ts: &T,
-            state: StateIndex<T>,
-            sym: SymbolOf<T>,
-        ) -> Option<StateIndex<T>> {
-            let successor = ts.successor(state, sym)?;
-            self.0.push(successor);
-            Some(successor)
-        }
-    }
-    impl<T: Deterministic> InfiniteObserver<T> for StateSequence<T> {
-        #[inline(always)]
-        fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            seq[time..].iter().fold(vec![], |mut acc, x| {
-                acc.extend(x);
-                acc
-            })
-        }
-    }
-
-    impl<T: Deterministic> Observer<T> for StateColorSequence<T> {
-        type Current = Vec<StateColor<T>>;
-        #[inline(always)]
-        fn begin(ts: &T, state: StateIndex<T>) -> Self {
-            Self(vec![ts.state_color(state).unwrap().into_owned()])
-        }
-        #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            &self.0
-        }
-        #[inline(always)]
-        fn into_current(self) -> Self::Current {
-            self.0
-        }
-        #[inline(always)]
-        fn observe_one(
-            &mut self,
-            ts: &T,
-            state: StateIndex<T>,
-            sym: SymbolOf<T>,
-        ) -> Option<StateIndex<T>> {
-            let successor = ts.successor(state, sym)?;
-            self.0.push(ts.state_color(successor).unwrap().into_owned());
-            Some(successor)
-        }
-    }
-    impl<T: Deterministic> InfiniteObserver<T> for StateColorSequence<T> {
-        #[inline(always)]
-        fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            seq[time..].iter().fold(vec![], |mut acc, x| {
-                acc.extend(x.iter().cloned());
-                acc
-            })
-        }
-    }
-
-    impl<T: TransitionSystem> Default for StateColorSet<T> {
-        fn default() -> Self {
-            Self(Default::default())
-        }
-    }
-    impl<T: Deterministic<StateColor: Eq + std::hash::Hash>> Observer<T> for StateColorSet<T> {
-        type Current = Self;
-        #[inline(always)]
-        fn begin(ts: &T, state: StateIndex<T>) -> Self {
-            let start = ts.state_color(state).unwrap().into_owned();
-            Self(math::FxIndexSet::from_iter([start]))
-        }
-        #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            self
-        }
-        #[inline(always)]
-        fn into_current(self) -> Self::Current {
-            self
-        }
-        #[inline(always)]
-        fn observe_one(
-            &mut self,
-            ts: &T,
-            state: StateIndex<T>,
-            sym: SymbolOf<T>,
-        ) -> Option<StateIndex<T>> {
-            let t = ts.edge(state, sym)?;
-            let c = ts.state_color(t.target()).unwrap();
-            if !self.0.contains(&*c) {
-                self.0.insert(c.into_owned());
-            }
-            Some(t.target())
-        }
-    }
-    impl<T: Deterministic<StateColor: Eq + std::hash::Hash>> InfiniteObserver<T> for StateColorSet<T> {
-        #[inline(always)]
-        fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            seq[time..].iter().fold(Default::default(), |mut acc, x| {
-                acc.0.extend(x.0.iter().cloned());
-                acc
-            })
-        }
-    }
 
     impl<T: Deterministic<EdgeColor: Eq + std::hash::Hash>> Observer<T> for EdgeColorSet<T> {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            self.0.extend(later.0);
+        }
         type Current = Self;
         #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
             Self(math::FxIndexSet::default())
-        }
-        #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            self
         }
         #[inline(always)]
         fn into_current(self) -> Self::Current {
@@ -913,19 +702,6 @@ mod impls {
             Some(t.target())
         }
     }
-    impl<T: Deterministic<EdgeColor: Eq + std::hash::Hash>> InfiniteObserver<T> for EdgeColorSet<T> {
-        #[inline(always)]
-        fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            Self(
-                seq[time..]
-                    .iter()
-                    .fold(math::FxIndexSet::default(), |mut acc, x| {
-                        acc.extend(x.0.iter().cloned());
-                        acc
-                    }),
-            )
-        }
-    }
     impl<T: Deterministic> Clone for EdgeColorSet<T> {
         fn clone(&self) -> Self {
             Self(self.0.clone())
@@ -933,14 +709,14 @@ mod impls {
     }
 
     impl<T: Deterministic> Observer<T> for EdgeColorSequence<T> {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            self.0.extend(later.0);
+        }
         type Current = Vec<EdgeColor<T>>;
         #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
             Self(vec![])
-        }
-        #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            &self.0
         }
         #[inline(always)]
         fn into_current(self) -> Self::Current {
@@ -958,18 +734,6 @@ mod impls {
             Some(t.target())
         }
     }
-    impl<T: Deterministic> InfiniteObserver<T> for EdgeColorSequence<T> {
-        #[inline(always)]
-        fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            seq[time..].iter().fold(
-                Vec::with_capacity((seq.len() - time) * seq[time].len()),
-                |mut acc, x| {
-                    acc.extend(x.iter().cloned());
-                    acc
-                },
-            )
-        }
-    }
     impl<T: Deterministic> Clone for EdgeColorSequence<T> {
         fn clone(&self) -> Self {
             Self(self.0.clone())
@@ -977,12 +741,11 @@ mod impls {
     }
 
     impl<T: Deterministic> Observer<T> for Triggers<T> {
-        type Current = BTreeSet<(StateIndex<T>, SymbolOf<T>)>;
-
         #[inline(always)]
-        fn current(&self) -> &Self::Current {
-            &self.0
+        fn merge(&mut self, later: Self) {
+            self.0.extend(later.0);
         }
+        type Current = BTreeSet<(StateIndex<T>, SymbolOf<T>)>;
 
         #[inline(always)]
         fn into_current(self) -> Self::Current {
@@ -1006,18 +769,6 @@ mod impls {
             Some(successor)
         }
     }
-    impl<T: Deterministic> InfiniteObserver<T> for Triggers<T> {
-        #[inline(always)]
-        fn loop_back(seq: &[Self::Current], _ts: &T, time: usize) -> Self::Current {
-            assert!(!seq.is_empty());
-            assert!(time < seq.len());
-
-            seq[time..].iter().fold(BTreeSet::default(), |mut acc, x| {
-                acc.extend(x.iter().cloned());
-                acc
-            })
-        }
-    }
 }
 
 #[cfg(test)]
@@ -1032,12 +783,47 @@ mod tests {
             .into_dts_with_initial(0);
 
         let w0 = upw!("a");
-        assert_eq!(dts.omega_escape_prefix(&w0), None);
+        assert_eq!(dts.run(&w0).escape_prefix(), None);
         let w1 = upw!("a", "b");
         assert_eq!(
-            dts.omega_escape_prefix(&w1),
+            dts.run(&w1).escape_prefix(),
             Some(EscapePrefix::new(&w1, 2))
         );
+    }
+
+    #[test]
+    fn omega_run_observes_only_the_cycle_of_the_run() {
+        use crate::ts::run::EdgeColorSet;
+
+        // a^ω goes through the passes 0, 1, 2, 3, 4, 2, ...; only the colors 3, 4, 5 are in the cycle
+        let dts = Builder::without_state_colors()
+            .with_transitions([
+                (0, 'a', 1u8, 1),
+                (1, 'a', 2, 2),
+                (2, 'a', 3, 3),
+                (3, 'a', 4, 4),
+                (4, 'a', 5, 2),
+            ])
+            .into_dts_with_initial(0);
+
+        let colors = dts.run(upw!("a")).observe::<EdgeColorSet<_>>().unwrap();
+        let mut colors: Vec<_> = colors.iter().copied().collect();
+        colors.sort();
+        assert_eq!(colors, vec![3, 4, 5]);
+        // a cycle that is a multiple of the period of the run gives the same result
+        let colors = dts.run(upw!("a", "aaaaaa")).observe::<EdgeColorSet<_>>();
+        assert_eq!(colors.unwrap().len(), 3);
+    }
+
+    #[test]
+    fn omega_run_escapes_in_a_later_pass_of_the_cycle() {
+        // the cycle ab runs through 0, 1, 2, 3, 4, which has no transition on a: escape after 4 symbols
+        let dts = Builder::without_colors()
+            .with_transitions([(0, 'a', 1), (1, 'b', 2), (2, 'a', 3), (3, 'b', 4)])
+            .into_dts_with_initial(0);
+        let word = upw!("ab");
+        let escape = dts.run(&word).escape_prefix().expect("must escape");
+        assert_eq!(escape.len(), 4);
     }
 
     #[test]
@@ -1046,10 +832,10 @@ mod tests {
             .with_transitions([(0, 'a', 1), (1, 'a', 0)])
             .into_dts_with_initial(0);
         let word = upw!("b");
-        let escape = dts.omega_escape_prefix(&word).expect("must escape");
+        let escape = dts.run(&word).escape_prefix().expect("must escape");
         assert_eq!(escape.len(), 0);
         assert!(escape.is_empty());
-        let longer = dts.omega_escape_prefix(upw!("a", "b")).unwrap();
+        let longer = dts.run(upw!("a", "b")).escape_prefix().unwrap();
         assert_eq!(longer.len(), 1);
         assert!(!longer.is_empty());
     }
@@ -1065,14 +851,8 @@ mod tests {
             .into_dts_with_initial(0);
 
         let word = upw!("a");
-        let greatest = dts
-            .omega_run::<_, GreatestStateColor<_>>(&word)
-            .into_output()
-            .unwrap();
-        let least = dts
-            .omega_run::<_, LeastStateColor<_>>(&word)
-            .into_output()
-            .unwrap();
+        let greatest = dts.run(&word).observe::<GreatestStateColor<_>>().unwrap();
+        let least = dts.run(&word).observe::<LeastStateColor<_>>().unwrap();
         assert_eq!(greatest, 7);
         assert_eq!(least, 2);
     }
@@ -1084,8 +864,12 @@ mod tests {
             .with_transitions([(0, 'a', 0.5f64, 1), (1, 'a', 1.5, 0)])
             .into_dts_with_initial(0);
 
-        assert_eq!(dts.last_edge_color("aa"), Some(1.5));
-        assert_eq!(dts.visited_edge_colors("aaa"), Some(vec![0.5, 1.5, 0.5]));
+        assert_eq!(dts.run("aa").last_edge_color(), Some(1.5));
+        assert_eq!(
+            dts.run("aaa")
+                .observe::<crate::ts::run::EdgeColorSequence<_>>(),
+            Some(vec![0.5, 1.5, 0.5])
+        );
         assert_eq!(
             TransitionSystem::edges_from(dts.ts(), 0)
                 .unwrap()

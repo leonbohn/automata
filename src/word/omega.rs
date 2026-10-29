@@ -34,7 +34,7 @@ use super::{FiniteWord, Word};
 /// assert_eq!(word.loop_index(), 3);
 /// assert_eq!(word.cycle_len(), 3);
 /// ```
-pub trait OmegaWord: Word {
+pub trait OmegaWord: Word<Kind = super::Omega> {
     /// The type of finite word representing the spoke, i.e. the finite prefix of the word
     /// before the loop index.  
     type Spoke<'this>: FiniteWord<Symbol = Self::Symbol>
@@ -252,6 +252,7 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
 impl<S: Symbol> Word for PeriodicOmegaWord<S> {
     type Symbol = S;
     const FINITE: bool = false;
+    type Kind = crate::word::Omega;
     fn nth(&self, position: usize) -> Option<S> {
         self.representation
             .get(position % self.representation.len())
@@ -319,6 +320,7 @@ impl<S: Symbol> Show for ReducedOmegaWord<S> {
 impl<S: Symbol> Word for ReducedOmegaWord<S> {
     type Symbol = S;
     const FINITE: bool = false;
+    type Kind = crate::word::Omega;
     fn nth(&self, position: usize) -> Option<S> {
         if position >= self.word.len() {
             let loop_position = (position - self.loop_index) % self.cycle_len();
@@ -501,6 +503,7 @@ pub struct Epsilon<S>(PhantomData<S>);
 impl<S: Symbol> Word for Epsilon<S> {
     type Symbol = S;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, _position: usize) -> Option<S> {
         None
     }
@@ -540,6 +543,7 @@ impl<W: FiniteWord> OmegaIteration<W> {
 impl<W: FiniteWord> Word for OmegaIteration<W> {
     type Symbol = W::Symbol;
     const FINITE: bool = false;
+    type Kind = crate::word::Omega;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
         self.0.nth(position % self.0.len())
     }

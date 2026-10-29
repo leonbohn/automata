@@ -64,6 +64,7 @@ impl<S: Symbol> std::fmt::Display for Class<S> {
 impl<S: Symbol> Word for Class<S> {
     type Symbol = S;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<S> {
         self.0.get(position).cloned()
     }

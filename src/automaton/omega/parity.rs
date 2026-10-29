@@ -140,10 +140,10 @@ where
     ///     .with_transitions([(0, 'a', 0, 1), (0, 'b', 1, 1),
     ///                        (1, 'a', 0, 0), (1, 'b', 3, 0)])
     ///     .into_dpa(0);
-    /// assert_eq!(dpa.last_edge_color("ab"), Some(3));
+    /// assert_eq!(dpa.run("ab").last_edge_color(), Some(3));
     /// let streamlined = dpa.streamlined();
     /// assert_eq!(streamlined.state_count(), 1);
-    /// assert_eq!(streamlined.last_edge_color("ab"), Some(1))
+    /// assert_eq!(streamlined.run("ab").last_edge_color(), Some(1))
     /// ```
     pub fn streamlined(
         &self,
@@ -665,7 +665,7 @@ mod tests {
         assert!(normalized.language_equivalent(&dpa));
 
         for (input, expected) in [("a", 0), ("b", 0), ("ba", 0), ("bb", 1)] {
-            assert_eq!(normalized.last_edge_color(input), Some(expected))
+            assert_eq!(normalized.run(input).last_edge_color(), Some(expected))
         }
     }
 
@@ -843,7 +843,7 @@ mod tests {
 
         let cong = RightCongruence::from_pointed(dpa.prefix_congruence());
         assert_eq!(cong.state_count(), 2);
-        assert_eq!(cong.initial(), cong.reached_state_index("aa").unwrap());
+        assert_eq!(cong.initial(), cong.reached_state("aa").unwrap());
         assert!(cong.congruent("", "aa"));
         assert!(cong.congruent("ab", "baaba"));
 
@@ -873,9 +873,9 @@ mod tests {
             .into_dpa(0);
 
         let normalized = dpa.normalized();
-        assert_eq!(normalized.last_edge_color("aaa"), Some(0));
-        assert_eq!(normalized.last_edge_color("aa"), Some(0));
-        assert_eq!(normalized.last_edge_color("aab"), Some(0));
+        assert_eq!(normalized.run("aaa").last_edge_color(), Some(0));
+        assert_eq!(normalized.run("aa").last_edge_color(), Some(0));
+        assert_eq!(normalized.run("aab").last_edge_color(), Some(0));
     }
 
     #[test]

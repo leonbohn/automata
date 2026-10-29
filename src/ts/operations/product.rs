@@ -386,10 +386,10 @@ mod tests {
             .default_color(Void)
             .with_transitions([(0, 'a', 0, 0)])
             .into_mealy(0);
-        assert!((&l).ts_product(&l).reached_state_index("b").is_some());
+        assert!((&l).ts_product(&l).reached_state("b").is_some());
         let prod = l.ts_product(r);
-        assert!(prod.reached_state_index("a").is_some());
-        assert!(prod.reached_state_index("b").is_none());
+        assert!(prod.reached_state("a").is_some());
+        assert!(prod.reached_state("b").is_none());
     }
 
     #[test]

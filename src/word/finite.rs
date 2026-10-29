@@ -7,7 +7,7 @@ use crate::{alphabet::Symbol, show::Show};
 use super::{Concat, PeriodicOmegaWord, Repeat, Word, omega::OmegaIteration};
 
 /// A finite word is a [`Word`] that has a finite length.
-pub trait FiniteWord: Word {
+pub trait FiniteWord: Word<Kind = super::Finite> {
     /// Type for an iterator over the symbols making up the word.
     type Symbols<'this>: Iterator<Item = Self::Symbol>
     where
@@ -157,6 +157,7 @@ impl<S: Symbol, const N: usize> FiniteWord for [S; N] {
 impl<S: Symbol, const N: usize> Word for [S; N] {
     type Symbol = S;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<S> {
         self.get(position).cloned()
     }
@@ -183,6 +184,7 @@ impl<S: Symbol, Fw: FiniteWord<Symbol = S> + ?Sized> FiniteWord for &Fw {
 impl<S: Symbol> Word for VecDeque<S> {
     type Symbol = S;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {
             Some(self[position])
@@ -210,6 +212,7 @@ impl<S: Symbol> FiniteWord for VecDeque<S> {
 impl Word for str {
     type Symbol = char;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<char> {
         self.chars().nth(position)
     }
@@ -233,6 +236,7 @@ impl FiniteWord for str {
 impl Word for String {
     type Symbol = char;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<char> {
         self.chars().nth(position)
     }
@@ -264,6 +268,7 @@ impl FiniteWord for String {
 impl<S: Symbol> Word for Vec<S> {
     type Symbol = S;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {
             Some(self[position])
@@ -297,6 +302,7 @@ impl<S: Symbol> FiniteWord for Vec<S> {
 impl<S: Symbol> Word for [S] {
     type Symbol = S;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {
             Some(self[position])

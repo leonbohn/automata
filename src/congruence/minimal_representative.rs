@@ -118,6 +118,7 @@ impl<T: TransitionSystem> std::ops::DerefMut for MinimalRepresentative<T> {
 impl<T: TransitionSystem> Word for MinimalRepresentative<T> {
     type Symbol = SymbolOf<T>;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<SymbolOf<T>> {
         self.0.get(position).copied()
     }

@@ -32,6 +32,7 @@ impl<W: FiniteWord> FiniteWord for Repeat<W> {
 impl<W: FiniteWord> Word for Repeat<W> {
     type Symbol = W::Symbol;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
 
     fn nth(&self, position: usize) -> Option<W::Symbol> {
         if position < self.word.len() * self.times {

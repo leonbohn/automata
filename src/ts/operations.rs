@@ -52,14 +52,14 @@ mod tests {
             .into_dfa(0);
 
         let xxx = dfa.ts_product(dfb);
-        assert_eq!(xxx.reached_state_index("abb"), Some(ProductIndex(0, 0)));
-        assert_eq!(xxx.reached_state_color("aa"), Some((false, true)));
+        assert_eq!(xxx.reached_state("abb"), Some(ProductIndex(0, 0)));
+        assert_eq!(xxx.run("aa").reached_state_color(), Some((false, true)));
 
         let yyy = xxx
             .clone()
             .reachable_part()
             .map_state_colors(|(a, b)| a || b)
             .into_dfa();
-        assert_eq!(yyy.reached_state_color("aa"), Some(true));
+        assert_eq!(yyy.run("aa").reached_state_color(), Some(true));
     }
 }
