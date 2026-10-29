@@ -48,10 +48,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - `Sproutable`, `Shrinkable`, `Dottable`, `CollectTs`, `IntoTs` and `WriteHoa` require `States`; the finite-state algorithms (SCCs of a whole system, minimization, `Family`, `TransitionMonoid`, `Cayley::new`, `DPA`/`DBA`/`DFA` methods that enumerate states) carry a `States` bound.
   - `Deterministic::build_transition_table` takes the states to print as first argument so that it works for implicit systems.
   - `contains_state` is constant time for the linked list, `Automaton`, `RightCongruence`, `ReachablePart`, `Quotient`, `Cayley`, `RightCayley`, `WordTs` and all adapters (they forward to the wrapped system; `RestrictByStateIndex` also checks its filter).
-  - `Deterministic::successor_index`, `edge_color` and `is_loop_on` no longer check `contains_state_index` (`edges_from` already returns `None` for unknown states); `is_loop_on` and `is_reachable_from` no longer panic on unknown states.
+  - `Deterministic::successor`, `edge_color` and `is_loop_on` no longer check `contains_state_index` (`edges_from` already returns `None` for unknown states); `is_loop_on` and `is_reachable_from` no longer panic on unknown states.
 
 ### Removed
 
+- **Breaking:** `Deterministic::edge(state, symbol)` is now the required method and takes a symbol instead of a `Matcher`; the default that scanned `edges_from` is gone, so no provided method of `Deterministic` calls `edges_from` any more and lazy views can no longer recurse between the two. Views implement `edge` and derive `edges_from` with `DeterministicEdgesFrom`; storages implement both. `Deterministic::successor_index` is renamed to `successor` (#45).
 - **Breaking:** `TransitionSystem::maybe_initial_state` (use `Dottable::dot_initial_state`), `hint_size` (it was never overridden; use `state_bound`), `make_expression` (use `alphabet().make_expression`), `edges_matching`, `all_accepting_dfa` (use `map_state_colors(|_| true)`), `is_reachable`, `reachable_states`, `reachable_states_from` and `reachable_state_colors` (use `reachable_state_indices*`, which return the same `Bfs`), and `IntoTs for MatchingProduct` (#44).
 - **Breaking:** `Dottable::try_open_svg_in_firefox`, use `display_rendered` or `display_rendered_graphviz`.
 
