@@ -1210,4 +1210,14 @@ mod tests {
         ts.check_consistency();
         assert!(ts.remove_edge(EdgeId(1_000_000)).is_none());
     }
+
+    #[test]
+    fn edge_bookkeeping_is_24_bytes() {
+        use super::linked_edge::LinkedEdge;
+        use std::mem::size_of;
+        // endpoints and four links, all u32
+        assert_eq!(size_of::<LinkedEdge<(), ()>>(), 24);
+        assert_eq!(size_of::<LinkedEdge<char, ()>>(), 28);
+        assert_eq!(size_of::<LinkedEdge<char, u32>>(), 32);
+    }
 }

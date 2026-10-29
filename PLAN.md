@@ -67,7 +67,6 @@ This repo was extracted from `leonbohn/frieda` with its history. The extraction 
 
 Performance (measure with benchmarks first, see Phase 4):
 - `src/ts/connected_components/tarjan.rs`: for every back edge the stack is walked linearly (`skip_while`), which can make SCC computation quadratic; the `tee()` has an unused half.
-- `src/ts/impls/linked.rs`: state removal removes edges one by one via repeated first-edge lookups.
 - `src/minimization/partition_refinement.rs`: open question whether edge colors can be dropped entirely when collecting into a Moore machine.
 
 Correctness and design:
