@@ -5,10 +5,9 @@
 //! service lists them in the detail view of a run only). Same inputs as the other targets,
 //! just fewer of them.
 
-use automata::{Pointed, States};
 mod common;
 
-use automata::TransitionSystem;
+use automata::{Pointed, States, TransitionSystem};
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
 

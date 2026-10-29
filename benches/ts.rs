@@ -1,6 +1,5 @@
 //! Building, traversing, transforming and shrinking transition systems.
 
-use automata::{Pointed, States};
 mod common;
 
 use automata::alphabet::CharAlphabet;
@@ -9,7 +8,7 @@ use automata::ts::operations::{MatchingProduct, ProductIndex};
 use automata::ts::{
     Builder, Deterministic, ForAlphabet, PredecessorIterable, Shrinkable, Sproutable,
 };
-use automata::{DTS, Int, TransitionSystem, Void};
+use automata::{DTS, Int, Pointed, States, TransitionSystem, Void};
 use common::Dts;
 use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;

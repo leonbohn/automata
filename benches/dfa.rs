@@ -5,7 +5,7 @@ mod common;
 use automata::alphabet::CharAlphabet;
 use automata::automaton::{DFA, MooreMachine};
 use automata::representation::CollectTs;
-use automata::{DTS, TransitionSystem};
+use automata::{DTS, States, TransitionSystem};
 use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
 
@@ -68,7 +68,6 @@ fn moore_with_edge_colors(n: usize) -> MooreMachine<DTS<CharAlphabet, bool, u32>
     MooreMachine::from_parts(ts, 0)
 }
 
-use automata::States;
 #[library_benchmark]
 #[bench::scrambled_1000(args = (1_000), setup = moore_with_edge_colors)]
 #[bench::scrambled_4000(args = (4_000), setup = moore_with_edge_colors)]

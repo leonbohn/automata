@@ -4,7 +4,7 @@ use tracing::trace;
 
 use crate::{
     Color, Show, Void,
-    alphabet::{Alphabet, Expression, Matcher},
+    alphabet::{Alphabet, Expression},
     partition::Partition,
 };
 use crate::{DTS, congruence::StateNaming};
@@ -124,12 +124,6 @@ pub trait TransitionSystem: Sized {
         Some(self.edges_from(state)?.map(|edge| edge.target()))
     }
 
-    /// Helper function which creates an expression from the given symbol.
-    /// This is a convenience function that simply calls [`Alphabet::make_expression`].
-    fn make_expression(&self, sym: SymbolOf<Self>) -> EdgeExpression<Self> {
-        self.alphabet().make_expression(sym)
-    }
-
     /// Consumes `self` and sets the given `initial` to be the designated initial state. This constructs
     /// an instance of [`crate::automaton::WithInitial`] which is in turn simply an [`crate::Automaton`]
     /// without semantics.
@@ -138,22 +132,6 @@ pub trait TransitionSystem: Sized {
         Self: Sized,
     {
         crate::automaton::WithInitial::from_parts(self, initial)
-    }
-
-    /// Returns an iterator over all transitions that start in the given `state` and whose expression
-    /// matches the given `sym`. If the state does not exist, `None` is returned.
-    fn edges_matching(
-        &self,
-        state: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<impl Iterator<Item = EdgeRef<'_, Self>>>
-    where
-        EdgeColor<Self>: Clone,
-    {
-        Some(
-            self.edges_from(state)?
-                .filter(move |t| matcher.matches(t.expression())),
-        )
     }
 
     /// Returns true if and only if there exists a transition from the given `source` state to the
@@ -333,20 +311,27 @@ pub trait TransitionSystem: Sized {
         operations::MapStateColor::new(self, f)
     }
 
-    /// Turns `self` into a DFA that accepts all words, i.e. all states are accepting.
-    fn all_accepting_dfa(self) -> operations::MapStateColor<Self, fn(Self::StateColor) -> bool>
+    /// Computes the [`connected_components::SccDecomposition`] of self, restricted
+    /// to the set of vertices that is given.
+    #[inline(always)]
+    fn reachable_sccs_from<I: IntoIterator<Item = StateIndex<Self>>>(
+        &self,
+        from: I,
+    ) -> SccDecomposition<'_, Self>
     where
         Self: Sized,
     {
-        self.map_state_colors(|_| true)
+        connected_components::tarjan_scc_iterative_from(self, from)
     }
 
-    /// Returns `true` iff the given state is reachable from the initial state.
-    fn is_reachable(&self, state: StateIndex<Self>) -> bool
+    /// Performs an SCC decomposition of self using Kosaraju's algorithm, starting from the state `start`. This is an
+    /// efficient algorithm and it might provide more performance over Tarjan's algorithm in some cases.
+    fn sccs_kosaraju(&self, start: Self::StateIndex) -> SccDecomposition<'_, Self>
     where
-        Self: Sized + Pointed,
+        Self: Sized,
+        Self: PredecessorIterable,
     {
-        self.is_reachable_from(self.initial(), state)
+        connected_components::kosaraju(self, start)
     }
 
     /// Returns `true` iff the given `state` is reachable from the given `origin` state.
@@ -394,24 +379,6 @@ pub trait TransitionSystem: Sized {
         LengthLexicographicMinimalRepresentatives::new(self, state)
     }
 
-    /// Returns an iterator over the indices of the states that are reachable from the initial state. The iterator yields tuples
-    /// (State Index, State Color)
-    fn reachable_states(&self) -> Bfs<'_, Self>
-    where
-        Self: Sized + Pointed,
-    {
-        Bfs::new(self, self.initial())
-    }
-
-    /// Returns an iterator over all state colors that are reachable from the initial state. May yield the same color multiple times.
-    fn reachable_state_colors(&self) -> impl Iterator<Item = Self::StateColor> + '_
-    where
-        Self: Sized + Pointed,
-    {
-        self.reachable_states()
-            .map(|q| self.state_color(q).unwrap().into_owned())
-    }
-
     /// Returns an iterator over the indices of the states that are reachable from the initial state.
     fn reachable_state_indices(&self) -> Bfs<'_, Self>
     where
@@ -422,14 +389,6 @@ pub trait TransitionSystem: Sized {
 
     /// Returns an iterator over the indices of the states that are reachable from the given `state`.
     fn reachable_state_indices_from(&self, state: Self::StateIndex) -> Bfs<'_, Self>
-    where
-        Self: Sized,
-    {
-        Bfs::new(self, state)
-    }
-
-    /// Returns an iterator over the states that are reachable from the given `state`.
-    fn reachable_states_from(&self, state: StateIndex<Self>) -> Bfs<'_, Self>
     where
         Self: Sized,
     {
@@ -618,19 +577,6 @@ pub trait States: TransitionSystem {
         operations::Quotient::new(self, partition)
     }
 
-    /// Computes the [`connected_components::SccDecomposition`] of self, restricted
-    /// to the set of vertices that is given.
-    #[inline(always)]
-    fn reachable_sccs_from<I: IntoIterator<Item = StateIndex<Self>>>(
-        &self,
-        from: I,
-    ) -> SccDecomposition<'_, Self>
-    where
-        Self: Sized,
-    {
-        connected_components::tarjan_scc_iterative_from(self, from)
-    }
-
     /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly
     /// connected components. Uses Tarjan's algorithm.
     #[inline(always)]
@@ -639,16 +585,6 @@ pub trait States: TransitionSystem {
         Self: Sized,
     {
         tarjan_scc_iterative(self)
-    }
-
-    /// Performs an SCC decomposition of self using Kosaraju's algorithm, starting from the state `start`. This is an
-    /// efficient algorithm and it might provide more performance over Tarjan's algorithm in some cases.
-    fn sccs_kosaraju(&self, start: Self::StateIndex) -> SccDecomposition<'_, Self>
-    where
-        Self: Sized,
-        Self: PredecessorIterable,
-    {
-        connected_components::kosaraju(self, start)
     }
 
     /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly

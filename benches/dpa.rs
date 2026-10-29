@@ -6,7 +6,7 @@ mod common;
 use automata::automaton::DPA;
 use automata::hoa::WriteHoa;
 use automata::representation::CollectTs;
-use automata::{Int, TransitionSystem};
+use automata::{Int, States, TransitionSystem};
 use common::FixtureDpa;
 use gungraun::prelude::*;
 use std::hint::black_box;
@@ -23,7 +23,6 @@ fn chain(n: usize) -> DPA {
 
 // ---- normalization -----------------------------------------------------------------------------
 
-use automata::States;
 #[library_benchmark]
 #[bench::scrambled_1000(args = (1_000), setup = scrambled)]
 #[bench::scrambled_4000(args = (4_000), setup = scrambled)]
