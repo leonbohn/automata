@@ -78,7 +78,7 @@ pub trait CollectTs: States {
         }
 
         debug_assert_eq!(self.state_count(), out.state_count());
-        out.verify_state();
+        out.check_consistency();
 
         out
     }

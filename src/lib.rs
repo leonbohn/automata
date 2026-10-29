@@ -42,7 +42,7 @@ pub use show::Show;
 
 /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
 pub type TS<A = alphabet::CharAlphabet, Q = Void, C = Void, const DET: bool = true> =
-    ts::LinkedListTransitionSystem<A, Q, C, DET>;
+    ts::LinkedTs<A, Q, C, DET>;
 /// Points to the default implementation of [`TransitionSystem`] in the [`Deterministic`] case.
 pub type DTS<A = alphabet::CharAlphabet, Q = Void, C = Void> = TS<A, Q, C, true>;
 /// Points to the default implementation of [`TransitionSystem`] in the case where it is

@@ -4,14 +4,13 @@ use std::borrow::Cow;
 use std::{fmt::Debug, hash::Hash};
 
 use crate::ts::{
-    Builder, DefaultIdType, DenseId, Deterministic, EdgeColor, EdgeExpression, EdgeOf, EdgeTuple,
-    ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable, StateColor, StateIndex,
+    Builder, DefaultIdType, DenseId, Deterministic, EdgeColor, EdgeExpression, EdgeId, EdgeOf,
+    EdgeTuple, ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable, StateColor, StateIndex,
 };
 
 mod linked_state;
-pub use linked_state::{
-    LinkedListTransitionSystemEdgesToIter, LinkedListTransitionSystemState, NTSEdgesFromIter,
-};
+use linked_state::LinkedState;
+pub use linked_state::{LinkedEdgesFrom, LinkedEdgesTo};
 
 mod linked_edge;
 use crate::TransitionSystem;
@@ -21,43 +20,86 @@ use crate::{
     alphabet::{Alphabet, CharAlphabet, Matcher},
     math,
 };
-pub use linked_edge::LinkedListTransitionSystemEdge;
+use linked_edge::{LinkedEdge, NONE};
 use tracing::{trace, warn};
 
-/// Represents a non-deterministic transition system. It stores an [`Alphabet`], a list of `LinkedListTransitionSystemState`s and a list of `LinkedListTransitionSystemEdge`s.
+/// A transition system that stores its states and edges in two vectors and links the edges of each
+/// state into lists. It is non-deterministic and works for any [`Alphabet`].
+///
+/// # Layout
+/// Every edge stores its endpoints and the links of the out-list of its source and the in-list of its
+/// target as `u32`s, with `u32::MAX` standing for "no edge". That is 24 bytes of bookkeeping per
+/// edge. Predecessors are therefore available without a separate index.
+///
+/// # Stable ids
+/// Removing an edge or a state leaves a tombstone instead of moving another element into its slot, so
+/// the [`EdgeId`] returned by [`LinkedTs::insert_edge`] and the state indices stay valid. Ids are never
+/// reused. The memory of tombstones is only given back by [`LinkedTs::compact`], which returns
+/// a [`Compaction`] to translate old ids into new ones. Collecting a transition system into a new one
+/// compacts as well.
+///
+/// The `DET` parameter only decides whether adding an edge replaces an overlapping one.
 #[derive(Clone)]
-pub struct LinkedListTransitionSystem<
-    A: Alphabet = CharAlphabet,
-    Q = Void,
-    C = Void,
-    const DET: bool = true,
-> {
+pub struct LinkedTs<A: Alphabet = CharAlphabet, Q = Void, C = Void, const DET: bool = true> {
     alphabet: A,
-    states: Vec<LinkedListTransitionSystemState<Q>>,
-    edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
+    states: Vec<LinkedState<Q>>,
+    edges: Vec<LinkedEdge<A::Expression, C>>,
+    live_edges: usize,
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSystem<A, Q, C, DET> {
+/// The renaming of states and edges that [`LinkedTs::compact`] performed.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Compaction {
+    states: Vec<Option<DefaultIdType>>,
+    edges: Vec<Option<EdgeId>>,
+}
+
+impl Compaction {
+    /// The new index of the state that had index `old` before compaction, or `None` if that state
+    /// had been removed.
+    pub fn state(&self, old: DefaultIdType) -> Option<DefaultIdType> {
+        self.states.get(old as usize).copied().flatten()
+    }
+
+    /// The new id of the edge that had id `old` before compaction, or `None` if that edge had been
+    /// removed.
+    pub fn edge(&self, old: EdgeId) -> Option<EdgeId> {
+        self.edges.get(old.into_usize()).copied().flatten()
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedTs<A, Q, C, DET> {
+    /// Builds a new empty transition system for the given alphabet with room for `cap` states and
+    /// edges.
+    pub fn with_capacity(alphabet: A, cap: usize) -> Self {
+        Self {
+            alphabet,
+            states: Vec::with_capacity(cap),
+            edges: Vec::with_capacity(cap),
+            live_edges: 0,
+        }
+    }
+
     /// Pairs the color of every state with its index, so that afterwards the original indices
     /// can be recovered even if states are removed or renumbered.
-    pub fn zip_state_indices(self) -> LinkedListTransitionSystem<A, (DefaultIdType, Q), C, DET> {
-        LinkedListTransitionSystem {
+    pub fn zip_state_indices(self) -> LinkedTs<A, (DefaultIdType, Q), C, DET> {
+        LinkedTs {
             alphabet: self.alphabet,
             edges: self.edges,
+            live_edges: self.live_edges,
             states: self
                 .states
                 .into_iter()
                 .enumerate()
-                .map(|(i, s)| s.zip_prepend(DenseId::from_usize(i)))
+                .map(|(i, s)| s.map_occupied(|c| (DenseId::from_usize(i), c)))
                 .collect(),
         }
     }
 
-    /// Maps the colors of the states with `state_f`, which also gets the index of the state.
-    pub fn linked_map_states<QQ: Color, StateF>(
-        self,
-        state_f: StateF,
-    ) -> LinkedListTransitionSystem<A, QQ, C, DET>
+    /// Maps the colors of the states with `state_f`, which also gets the index of the state. Compacts
+    /// first, so the indices passed to `state_f` and the ids of the result are the ones after
+    /// compaction.
+    pub fn linked_map_states<QQ: Color, StateF>(self, state_f: StateF) -> LinkedTs<A, QQ, C, DET>
     where
         StateF: Fn(StateIndex<Self>, Q) -> QQ,
     {
@@ -65,11 +107,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
     }
 
     /// Maps the edges with `edge_f`, which gets source, expression, color and target of an edge and
-    /// returns its new expression and color.
-    pub fn linked_map_edges<CC: Color, EdgeF>(
-        self,
-        edge_f: EdgeF,
-    ) -> LinkedListTransitionSystem<A, Q, CC, DET>
+    /// returns its new expression and color. Compacts first.
+    pub fn linked_map_edges<CC: Color, EdgeF>(self, edge_f: EdgeF) -> LinkedTs<A, Q, CC, DET>
     where
         EdgeF: Fn(
             StateIndex<Self>,
@@ -83,10 +122,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
 
     /// Maps states and edges at once, see [`Self::linked_map_states`] and [`Self::linked_map_edges`].
     pub fn linked_map<QQ: Color, CC: Color, StateF, EdgeF>(
-        self,
+        mut self,
         state_f: StateF,
         edge_f: EdgeF,
-    ) -> LinkedListTransitionSystem<A, QQ, CC, DET>
+    ) -> LinkedTs<A, QQ, CC, DET>
     where
         StateF: Fn(StateIndex<Self>, Q) -> QQ,
         EdgeF: Fn(
@@ -96,8 +135,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
             StateIndex<Self>,
         ) -> (EdgeExpression<Self>, CC),
     {
-        LinkedListTransitionSystem {
+        self.compact();
+        LinkedTs {
             alphabet: self.alphabet,
+            live_edges: self.live_edges,
             states: self
                 .states
                 .into_iter()
@@ -107,209 +148,279 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
             edges: self
                 .edges
                 .into_iter()
-                .map(|e| {
-                    e.map(|q, e, c, p| edge_f(DenseId::from_usize(q), e, c, DenseId::from_usize(p)))
-                })
+                .map(|e| e.map(&edge_f))
                 .collect(),
         }
     }
 
-    /// This removes a state from the NTS and returns the color of the removed state.
-    /// This method also removes any incoming edges to this state.
-    pub(crate) fn linked_remove_state(&mut self, state: usize) -> Option<Q> {
-        if state >= self.states.len() {
-            warn!("tried to remove state {state} which is out of range");
+    /// The number of edges, tombstones not counted.
+    pub fn edge_count(&self) -> usize {
+        self.live_edges
+    }
+
+    /// One more than the largest [`EdgeId`] that was handed out so far. Use this to size a table
+    /// that is indexed by edge ids.
+    pub fn edge_bound(&self) -> usize {
+        self.edges.len()
+    }
+
+    /// Adds the edge `source --expression|color--> target`, without checking whether it overlaps
+    /// with an existing edge, and returns its id.
+    ///
+    /// # Panics
+    /// Panics if `source` or `target` is not a state of `self`.
+    pub fn insert_edge(
+        &mut self,
+        source: StateIndex<Self>,
+        expression: EdgeExpression<Self>,
+        color: EdgeColor<Self>,
+        target: StateIndex<Self>,
+    ) -> EdgeId {
+        assert!(
+            self.contains_state(source),
+            "cannot add edge from non-existent state {source:?}"
+        );
+        assert!(
+            self.contains_state(target),
+            "cannot add edge to non-existent state {target:?}"
+        );
+        let id = u32::try_from(self.edges.len())
+            .ok()
+            .filter(|id| *id != NONE)
+            .expect("too many edges for 32 bit ids");
+
+        let mut edge = LinkedEdge::new(source, expression, color, target);
+
+        let first_out = self.states[source as usize].first_out_edge();
+        if first_out != NONE {
+            self.edges[first_out as usize].out_prev = id;
+            edge.out_next = first_out;
+        }
+        self.states[source as usize].set_first_out_edge(id);
+
+        let first_in = self.states[target as usize].first_in_edge();
+        if first_in != NONE {
+            self.edges[first_in as usize].in_prev = id;
+            edge.in_next = first_in;
+        }
+        self.states[target as usize].set_first_in_edge(id);
+
+        self.edges.push(edge);
+        self.live_edges += 1;
+        EdgeId(id)
+    }
+
+    /// Removes the edge with the given id and returns it. Returns `None` if there is no such edge,
+    /// because it was removed already or never existed. The ids of all other edges stay valid.
+    pub fn remove_edge(&mut self, id: EdgeId) -> Option<EdgeTuple<Self>> {
+        let idx = id.into_usize();
+        if !self.edges.get(idx)?.is_live() {
+            trace!("tried to remove edge {id} which does not exist");
             return None;
         }
-        if self.states[state].is_vacant() {
-            warn!("cannot remove vacant state {state}");
-            return None;
+        let LinkedEdge {
+            source,
+            target,
+            out_prev,
+            out_next,
+            in_prev,
+            in_next,
+            ..
+        } = self.edges[idx];
+
+        if out_prev != NONE {
+            self.edges[out_prev as usize].out_next = out_next;
+        } else {
+            self.states[source as usize].set_first_out_edge(out_next);
+        }
+        if out_next != NONE {
+            self.edges[out_next as usize].out_prev = out_prev;
+        }
+        if in_prev != NONE {
+            self.edges[in_prev as usize].in_next = in_next;
+        } else {
+            self.states[target as usize].set_first_in_edge(in_next);
+        }
+        if in_next != NONE {
+            self.edges[in_next as usize].in_prev = in_prev;
         }
 
+        let edge = &mut self.edges[idx];
+        let removed = (source, edge.expression.clone(), edge.color.clone(), target);
+        edge.tombstone();
+        self.live_edges -= 1;
+        Some(removed)
+    }
+
+    /// The edge with the given id, if it exists.
+    pub fn edge_by_id(&self, id: EdgeId) -> Option<EdgeOf<'_, Self>> {
+        let edge = self.edges.get(id.into_usize())?;
+        edge.is_live().then(|| edge.as_edge_ref())
+    }
+
+    /// A mutable reference to the color of the edge with the given id, if it exists.
+    pub fn edge_color_mut(&mut self, id: EdgeId) -> Option<&mut EdgeColor<Self>> {
+        let edge = self.edges.get_mut(id.into_usize())?;
+        edge.is_live().then_some(&mut edge.color)
+    }
+
+    /// A mutable reference to the color of the given state, if it exists.
+    pub fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>> {
+        self.states.get_mut(state.into_usize())?.color_mut()
+    }
+
+    /// Removes a state and every edge into or out of it, and returns the color of the state. The
+    /// indices of the other states stay valid.
+    pub(crate) fn linked_remove_state(&mut self, state: StateIndex<Self>) -> Option<Q> {
+        if !self.contains_state(state) {
+            warn!("tried to remove state {state} which does not exist");
+            return None;
+        }
         let mut ids = self.out_edge_ids(state, |_| true);
         ids.extend(self.in_edge_ids(state, |_| true));
+        // a loop is in both lists
+        ids.sort_unstable();
+        ids.dedup();
         self.remove_edge_ids(ids);
-
-        self.vacate_state_index(state)
+        debug_assert_eq!(self.states[state as usize].first_out_edge(), NONE);
+        debug_assert_eq!(self.states[state as usize].first_in_edge(), NONE);
+        self.states[state as usize].vacate()
     }
 
-    fn vacate_state_index(&mut self, state: usize) -> Option<Q> {
-        assert_eq!(self.first_in_edge(state), None);
-        assert_eq!(self.first_out_edge(state), None);
-
-        self.states[state].vacate()
-    }
-
-    fn swap_remove_edge(&mut self, id: usize) -> Option<EdgeTuple<Self>> {
-        if id >= self.edges.len() {
-            warn!("tried to remove edge {id} which is not in rante");
-            return None;
-        }
-
-        if let Some(in_prev) = self.edges[id].in_prev {
-            self.edges[in_prev].in_next = self.edges[id].in_next;
-        } else {
-            // there is no predecessor, so we should update the first_in_edge
-            assert_eq!(self.states[self.edges[id].target].first_in_edge(), Some(id));
-            self.states
-                .get_mut(self.edges[id].target)
-                .unwrap()
-                .set_first_in_edge(self.edges[id].in_next);
-        }
-        if let Some(in_next) = self.edges[id].in_next {
-            self.edges[in_next].in_prev = self.edges[id].in_prev;
-        }
-
-        if let Some(out_prev) = self.edges[id].out_prev {
-            self.edges[out_prev].out_next = self.edges[id].out_next;
-        } else {
-            // there is no predecessor, so we should update the first_out_edge
-            assert_eq!(
-                self.states[self.edges[id].source].first_out_edge(),
-                Some(id)
-            );
-            self.states
-                .get_mut(self.edges[id].source)
-                .unwrap()
-                .set_first_out_edge(self.edges[id].out_next);
-        }
-
-        if let Some(out_next) = self.edges[id].out_next {
-            self.edges[out_next].out_prev = self.edges[id].out_prev;
-        }
-
-        let swapped_in = self.edges.len() - 1;
-        if swapped_in != id {
-            // fix pointers if edge that is swapped in was first in list
-            if let Some(prev) = self.edges[swapped_in].in_prev {
-                self.edges[prev].in_next = Some(id);
-            } else {
-                let q = self.edges[swapped_in].target;
-                assert!(q < self.states.len());
-                self.states[q].set_first_in_edge(Some(id));
-            }
-            if let Some(prev) = self.edges[swapped_in].out_prev {
-                self.edges[prev].out_next = Some(id)
-            } else {
-                let q = self.edges[swapped_in].source;
-                assert!(q < self.states.len());
-                self.states[q].set_first_out_edge(Some(id));
-            }
-
-            if let Some(next) = self.edges[swapped_in].in_next {
-                if self.edges[next].in_prev.is_none() {
-                    panic!(
-                        "unacceptable state of linked list, no in_prev stored for {next}\n{self:?}"
-                    );
-                }
-                self.edges[next].in_prev = Some(id)
-            }
-            if let Some(next) = self.edges[swapped_in].out_next {
-                if self.edges[next].out_prev.is_none() {
-                    panic!(
-                        "unacceptable state of linked list, no out_prev stored for {next}\n{self:?}"
-                    );
-                }
-                self.edges[next].out_prev = Some(id)
-            }
-        }
-
-        Some(self.edges.swap_remove(id).into_tuple())
-    }
-
-    /// Applies the given function `f` to every edge and removes those for which `true` is
-    /// returned.
-    pub fn filter_swap_remove_edges<F>(&mut self, f: F) -> Vec<EdgeTuple<Self>>
+    /// Removes all edges for which `f` returns `true`, by scanning all of them, and returns
+    /// them.
+    pub fn filter_remove_edges<F>(&mut self, f: F) -> Vec<EdgeTuple<Self>>
     where
         F: Fn(StateIndex<Self>, &EdgeExpression<Self>, &EdgeColor<Self>, StateIndex<Self>) -> bool,
     {
-        let mut i = 0;
-        let mut removed = vec![];
-        while i < self.edges.len() {
-            let (q, e, c, p) = self.edges[i].borrowed_tuple();
-            if !f(q, e, c, p) {
-                // we keep the edge and go to next one
-                i += 1;
-                continue;
-            }
-            // we do not keep the edge. swap remove it and do not increment
-            // i as the swapped in edge needs to be checked as well.
-            removed.push(
-                self.swap_remove_edge(i)
-                    .expect("should be able to remove edge that exists"),
-            );
-        }
-        removed
+        let ids: Vec<EdgeId> = self
+            .edges
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.is_live() && f(e.source, &e.expression, &e.color, e.target))
+            .map(|(i, _)| EdgeId::from_usize(i))
+            .collect();
+        ids.into_iter()
+            .map(|id| self.remove_edge(id).expect("the edge is live"))
+            .collect()
     }
 
     /// The ids of the edges in the out-list of `state` for which `keep` holds, in list order.
-    fn out_edge_ids(&self, state: usize, mut keep: impl FnMut(usize) -> bool) -> Vec<usize> {
+    fn out_edge_ids(&self, state: u32, mut keep: impl FnMut(usize) -> bool) -> Vec<EdgeId> {
         let mut ids = Vec::new();
-        let mut next = self.states.get(state).and_then(|s| s.first_out_edge());
-        while let Some(id) = next {
-            if keep(id) {
-                ids.push(id);
+        let mut next = self
+            .states
+            .get(state as usize)
+            .map_or(NONE, |s| s.first_out_edge());
+        while next != NONE {
+            if keep(next as usize) {
+                ids.push(EdgeId(next));
             }
-            next = self.edges[id].out_next;
+            next = self.edges[next as usize].out_next;
         }
         ids
     }
 
     /// The ids of the edges in the in-list of `state` for which `keep` holds, in list order.
-    fn in_edge_ids(&self, state: usize, mut keep: impl FnMut(usize) -> bool) -> Vec<usize> {
+    fn in_edge_ids(&self, state: u32, mut keep: impl FnMut(usize) -> bool) -> Vec<EdgeId> {
         let mut ids = Vec::new();
-        let mut next = self.states.get(state).and_then(|s| s.first_in_edge());
-        while let Some(id) = next {
-            if keep(id) {
-                ids.push(id);
+        let mut next = self
+            .states
+            .get(state as usize)
+            .map_or(NONE, |s| s.first_in_edge());
+        while next != NONE {
+            if keep(next as usize) {
+                ids.push(EdgeId(next));
             }
-            next = self.edges[id].in_next;
+            next = self.edges[next as usize].in_next;
         }
         ids
     }
 
-    /// Removes the edges with the given ids (duplicates are ignored) and returns them.
-    ///
-    /// [`Self::swap_remove_edge`] moves the last edge into the freed slot. Removing in descending
-    /// order keeps the remaining ids valid: the edge that is moved is either itself removed
-    /// already (it has the largest id) or ends up in a slot that is not in the list anymore.
-    fn remove_edge_ids(&mut self, mut ids: Vec<usize>) -> Vec<EdgeTuple<Self>> {
-        ids.sort_unstable_by(|a, b| b.cmp(a));
-        ids.dedup();
+    /// Removes the edges with the given ids and returns them. Ids stay valid, so the order does
+    /// not matter.
+    fn remove_edge_ids(&mut self, ids: Vec<EdgeId>) -> Vec<EdgeTuple<Self>> {
         ids.into_iter()
-            .map(|id| {
-                self.swap_remove_edge(id)
-                    .expect("should be able to remove edge that exists")
-            })
+            .filter_map(|id| self.remove_edge(id))
             .collect()
     }
 
-    fn out_edge_position(
-        &self,
-        from: usize,
-        matcher: impl Matcher<A::Expression>,
-    ) -> Option<usize> {
-        let mut idx = self.states.get(from)?.first_out_edge()?;
-        loop {
-            if matcher.matches(&self.edges[idx].expression) {
-                return Some(idx);
+    fn out_edge_position(&self, from: u32, matcher: impl Matcher<A::Expression>) -> Option<usize> {
+        let mut idx = self.states.get(from as usize)?.first_out_edge();
+        while idx != NONE {
+            let edge = &self.edges[idx as usize];
+            if matcher.matches(&edge.expression) {
+                return Some(idx as usize);
             }
-            idx = self.edges[idx].out_next?;
+            idx = edge.out_next;
         }
+        None
     }
 
-    /// Builds a new non-deterministic transition system for the given alphabet with a specified capacity.
-    pub fn with_capacity(alphabet: A, cap: usize) -> Self {
-        Self {
-            alphabet,
-            states: Vec::with_capacity(cap),
-            edges: Vec::with_capacity(cap),
+    /// Gives back the memory of removed states and edges. States and edges are renumbered
+    /// consecutively, keeping their order, so **all previously handed out indices and edge ids are
+    /// invalidated**. The returned [`Compaction`] translates old ones into new ones.
+    pub fn compact(&mut self) -> Compaction {
+        let mut state_map = vec![None; self.states.len()];
+        let mut next = 0;
+        for (i, s) in self.states.iter().enumerate() {
+            if s.is_occupied() {
+                state_map[i] = Some(next);
+                next += 1;
+            }
+        }
+        let mut edge_map = vec![None; self.edges.len()];
+        let mut next = 0;
+        for (i, e) in self.edges.iter().enumerate() {
+            if e.is_live() {
+                edge_map[i] = Some(EdgeId(next));
+                next += 1;
+            }
+        }
+        let edge = |old: u32| {
+            if old == NONE {
+                NONE
+            } else {
+                edge_map[old as usize]
+                    .expect("links only point to live edges")
+                    .0
+            }
+        };
+        let state = |old: u32| state_map[old as usize].expect("edges only touch occupied states");
+
+        let mut edges = Vec::with_capacity(self.live_edges);
+        for mut e in std::mem::take(&mut self.edges) {
+            if !e.is_live() {
+                continue;
+            }
+            e.source = state(e.source);
+            e.target = state(e.target);
+            e.out_prev = edge(e.out_prev);
+            e.out_next = edge(e.out_next);
+            e.in_prev = edge(e.in_prev);
+            e.in_next = edge(e.in_next);
+            edges.push(e);
+        }
+        let mut states = Vec::with_capacity(state_map.len());
+        for s in std::mem::take(&mut self.states) {
+            match s {
+                LinkedState::Vacant => {}
+                LinkedState::Occupied(c, out, inn) => {
+                    states.push(LinkedState::Occupied(c, edge(out), edge(inn)))
+                }
+            }
+        }
+        self.states = states;
+        self.edges = edges;
+        Compaction {
+            states: state_map,
+            edges: edge_map,
         }
     }
 
     /// Turns `self` into a deterministic transition system. If `self` is not deterministic,
     /// it is returned unchanged as the error.
-    pub fn try_into_deterministic(self) -> Result<LinkedListTransitionSystem<A, Q, C, true>, Self> {
+    pub fn try_into_deterministic(self) -> Result<LinkedTs<A, Q, C, true>, Self> {
         if self.is_deterministic() {
             Ok(recast(self))
         } else {
@@ -318,96 +429,87 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
     }
 
     /// Forgets that `self` is deterministic.
-    pub fn into_nondeterministic(self) -> LinkedListNondeterministic<A, Q, C> {
+    pub fn into_nondeterministic(self) -> LinkedNondeterministic<A, Q, C> {
         recast(self)
     }
 
-    fn first_out_edge(&self, idx: usize) -> Option<usize> {
-        self.states.get(idx)?.first_out_edge()
-    }
-
-    fn first_in_edge(&self, idx: usize) -> Option<usize> {
-        self.states.get(idx)?.first_in_edge()
-    }
-
-    /// Builds a new [`crate::NTS`] from its constituent parts.
-    ///
-    /// This assumes that no vacant entries exist!
-    pub fn from_parts(
-        alphabet: A,
-        states: Vec<LinkedListTransitionSystemState<Q>>,
-        edges: Vec<LinkedListTransitionSystemEdge<A::Expression, C>>,
-    ) -> Self {
-        debug_assert!(states.iter().all(|s| s.is_occupied()));
-        Self {
-            alphabet,
-            states,
-            edges,
-        }
-    }
-
-    /// Decomposes `self` into a tuple of its constituents.
-    pub fn into_parts(self) -> IntoLinkedListNondeterministic<Self> {
-        (self.alphabet, self.states, self.edges)
-    }
-
-    #[cfg(debug_assertions)]
-    pub(crate) fn verify_state(&self) {
-        for i in 0..self.states.len() {
-            if let Some((_, first_out, first_in)) = self.states[i].occupation() {
-                if let Some(first_out) = first_out {
-                    assert!(first_out < self.edges.len());
-                }
-                if let Some(first_in) = first_in {
-                    assert!(first_in < self.edges.len());
-                }
+    /// Checks the invariants of the data structure and panics if one is violated:
+    /// - all links point to live edges that share the respective endpoint and are linked back,
+    /// - tombstones are in no list and states that are vacant have no edges,
+    /// - every live edge is in the out-list of its source and in the in-list of its target,
+    /// - the number of live edges is correct.
+    pub fn check_consistency(&self) {
+        let live = |i: u32| {
+            assert!(
+                (i as usize) < self.edges.len() && self.edges[i as usize].is_live(),
+                "link to edge {i} which is not live"
+            )
+        };
+        let mut seen_out = vec![false; self.edges.len()];
+        let mut seen_in = vec![false; self.edges.len()];
+        for (q, state) in self.states.iter().enumerate() {
+            if state.is_vacant() {
+                continue;
+            }
+            let (mut prev, mut next) = (NONE, state.first_out_edge());
+            while next != NONE {
+                live(next);
+                let e = &self.edges[next as usize];
+                assert_eq!(e.source as usize, q, "edge {next} is in the wrong out-list");
+                assert_eq!(e.out_prev, prev, "broken out-list at edge {next}");
+                assert!(!seen_out[next as usize], "cycle in out-list of state {q}");
+                seen_out[next as usize] = true;
+                (prev, next) = (next, e.out_next);
+            }
+            let (mut prev, mut next) = (NONE, state.first_in_edge());
+            while next != NONE {
+                live(next);
+                let e = &self.edges[next as usize];
+                assert_eq!(e.target as usize, q, "edge {next} is in the wrong in-list");
+                assert_eq!(e.in_prev, prev, "broken in-list at edge {next}");
+                assert!(!seen_in[next as usize], "cycle in in-list of state {q}");
+                seen_in[next as usize] = true;
+                (prev, next) = (next, e.in_next);
             }
         }
-        for i in 0..self.edges.len() {
-            if let Some(in_prev) = self.edges[i].in_prev {
-                assert!(in_prev < self.edges.len());
-                assert_eq!(self.edges[in_prev].in_next, Some(i));
-                assert_eq!(self.edges[in_prev].target, self.edges[i].target);
-            }
-            if let Some(out_prev) = self.edges[i].out_prev {
-                assert!(out_prev < self.edges.len());
-                assert_eq!(self.edges[out_prev].out_next, Some(i));
-                assert_eq!(self.edges[out_prev].source, self.edges[i].source);
-            }
-            if let Some(in_next) = self.edges[i].in_next {
-                assert!(in_next < self.edges.len());
-                assert_eq!(self.edges[in_next].in_prev, Some(i));
-                assert_eq!(self.edges[in_next].target, self.edges[i].target);
-            }
-            if let Some(out_next) = self.edges[i].out_next {
-                assert!(out_next < self.edges.len());
-                assert_eq!(self.edges[out_next].out_prev, Some(i));
-                assert_eq!(self.edges[out_next].source, self.edges[i].source);
+        let mut count = 0;
+        for (i, e) in self.edges.iter().enumerate() {
+            if e.is_live() {
+                count += 1;
+                assert!(
+                    self.contains_state(e.source),
+                    "edge {i} starts in a removed state"
+                );
+                assert!(
+                    self.contains_state(e.target),
+                    "edge {i} ends in a removed state"
+                );
+                assert!(seen_out[i], "edge {i} is not in its out-list");
+                assert!(seen_in[i], "edge {i} is not in its in-list");
+            } else {
+                assert!(!seen_out[i] && !seen_in[i], "removed edge {i} is linked");
             }
         }
+        assert_eq!(count, self.live_edges, "wrong number of edges");
     }
-    #[cfg(not(debug_assertions))]
-    pub(crate) fn verify_state(&self) {}
 }
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color + PartialEq>
-    LinkedListTransitionSystem<A, (X, Q), C, DET>
+    LinkedTs<A, (X, Q), C, DET>
 {
     /// Drops the first component of the state colors, the inverse of pairing them (see
     /// [`Self::zip_state_indices`]).
-    pub fn unzip_state_color(self) -> LinkedListTransitionSystem<A, Q, C, DET> {
-        LinkedListTransitionSystem {
+    pub fn unzip_state_color(self) -> LinkedTs<A, Q, C, DET> {
+        LinkedTs {
             alphabet: self.alphabet,
             edges: self.edges,
-            states: self.states.into_iter().map(|q| q.unzip()).collect(),
+            live_edges: self.live_edges,
+            states: self
+                .states
+                .into_iter()
+                .map(|s| s.map_occupied(|(_, q)| q))
+                .collect(),
         }
-    }
-
-    /// Returns the position of the first state whose color has `first` as its first component.
-    pub fn position_by_first(self, first: X) -> Option<usize> {
-        self.states
-            .iter()
-            .position(|s| s.is_occupied() && s.occupation().unwrap().0.0.eq(&first))
     }
 
     /// Returns the index of the first state whose color has `left` as its first component.
@@ -422,43 +524,32 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color + PartialEq>
     }
 }
 
-/// Type alias for the constituent parts of an [`crate::NTS`] with the same associated types as the
-/// transition sytem `D`.
-pub type IntoLinkedListNondeterministic<D> = (
-    <D as TransitionSystem>::Alphabet,
-    Vec<LinkedListTransitionSystemState<StateColor<D>>>,
-    Vec<LinkedListTransitionSystemEdge<EdgeExpression<D>, EdgeColor<D>>>,
-);
+/// The non-deterministic linked transition system.
+pub type LinkedNondeterministic<A = CharAlphabet, Q = Void, C = Void> = LinkedTs<A, Q, C, false>;
 
-pub type LinkedListNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
-    LinkedListTransitionSystem<A, Q, C, false>;
-
-impl<A: Alphabet, Q: Color, C: Color> Deterministic for LinkedListTransitionSystem<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> Deterministic for LinkedTs<A, Q, C> {
     /// Scans the out-list of `state` for an edge matching `symbol`; there is no constant-time lookup yet.
     #[inline]
     fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
-        let position = self.out_edge_position(state.into_usize(), symbol)?;
+        let position = self.out_edge_position(state, symbol)?;
         Some(self.edges[position].as_edge_ref())
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable
-    for LinkedListTransitionSystem<A, Q, C, DET>
-{
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for LinkedTs<A, Q, C, DET> {
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
-        let id = self.states.len();
-        let state = LinkedListTransitionSystemState::new(color);
-        self.states.push(state);
-        id.try_into().unwrap()
+        let id = u32::try_from(self.states.len())
+            .ok()
+            .filter(|id| *id != NONE)
+            .expect("too many states for 32 bit ids");
+        self.states.push(LinkedState::new(color));
+        id
     }
     fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
-        if index >= self.states.len().try_into().unwrap() {
-            panic!(
-                "Index {index} is out of bounds, there are only {} states",
-                self.states.len()
-            );
+        match self.state_color_mut(index) {
+            Some(slot) => *slot = color,
+            None => panic!("cannot color state {index}, it does not exist"),
         }
-        self.states[index.into_usize()].set_color(color);
     }
 
     fn add_edge<E>(&mut self, t: E) -> Option<crate::ts::EdgeTuple<Self>>
@@ -468,69 +559,30 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable
         let (q, a, c, p) = t.into_edge_tuple();
 
         let mut out = None;
-        if DET && let Some(pos) = self.out_edge_position(q.into_usize(), &a) {
+        if DET && let Some(pos) = self.out_edge_position(q, &a) {
             trace!("found previously existing edge {pos} in deterministic automaton");
-            out = Some(self.swap_remove_edge(pos).unwrap());
+            out = self.remove_edge(EdgeId::from_usize(pos));
         }
-
-        let mut edge = LinkedListTransitionSystemEdge::new(q, a, c, p);
-        let edge_id = self.edges.len();
-
-        let q = q.try_into().unwrap();
-        let p = p.try_into().unwrap();
-        assert!(
-            q < self.states.len(),
-            "cannot add edge from non-existent state {q:?}"
-        );
-        assert!(
-            p < self.states.len(),
-            "cannot add edge to non-existent state {q:?}"
-        );
-        if let Some(first_out) = self.first_out_edge(q) {
-            assert!(first_out < self.edges.len());
-            assert!(self.edges[first_out].out_prev.is_none());
-
-            self.edges[first_out].out_prev = Some(edge_id);
-            edge.out_next = Some(first_out);
-        } else {
-            assert!(self.states[q].first_out_edge().is_none());
-        }
-        self.states[q].set_first_out_edge(Some(edge_id));
-
-        if let Some(first_in) = self.first_in_edge(p) {
-            assert!(first_in < self.edges.len());
-            assert!(self.edges[first_in].in_prev.is_none());
-
-            self.edges[first_in].in_prev = Some(edge_id);
-            edge.in_next = Some(first_in);
-        } else {
-            assert!(self.states[p].first_in_edge().is_none());
-        }
-        self.states[p].set_first_in_edge(Some(edge_id));
-
-        self.edges.push(edge);
+        self.insert_edge(q, a, c, p);
         out
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
-    for LinkedListTransitionSystem<A, Q, C, DET>
-{
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for LinkedTs<A, Q, C, DET> {
     fn remove_edges_from_matching(
         &mut self,
         source: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
-        let id = source.into_usize();
-        if id >= self.states.len() || self.states[id].is_vacant() {
+        if !self.contains_state(source) {
             trace!("cannot remove edges from state that does not exist");
             return None;
         }
-        let ids = self.out_edge_ids(id, |e| matcher.matches(&self.edges[e].expression));
+        let ids = self.out_edge_ids(source, |e| matcher.matches(&self.edges[e].expression));
         Some(self.remove_edge_ids(ids))
     }
     fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        self.linked_remove_state(state.into_usize())
+        self.linked_remove_state(state)
     }
 
     fn remove_edges_between_matching(
@@ -539,18 +591,12 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
         target: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
-        let id = source.into_usize();
-        if id >= self.states.len() || self.states[id].is_vacant() {
-            trace!("cannot remove edges from state that does not exist");
+        if !self.contains_state(source) || !self.contains_state(target) {
+            trace!("cannot remove edges between states that do not exist");
             return None;
         }
-        let id = target.into_usize();
-        if id >= self.states.len() || self.states[id].is_vacant() {
-            trace!("cannot remove edges to state that does not exist");
-            return None;
-        }
-        let ids = self.out_edge_ids(source.into_usize(), |e| {
-            self.edges[e].target == id && matcher.matches(&self.edges[e].expression)
+        let ids = self.out_edge_ids(source, |e| {
+            self.edges[e].target == target && matcher.matches(&self.edges[e].expression)
         });
         Some(self.remove_edge_ids(ids))
     }
@@ -560,17 +606,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
         source: StateIndex<Self>,
         target: StateIndex<Self>,
     ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
-        let id = source.into_usize();
-        if id >= self.states.len() || self.states[id].is_vacant() {
-            trace!("cannot remove edges from state that does not exist");
+        if !self.contains_state(source) || !self.contains_state(target) {
+            trace!("cannot remove edges between states that do not exist");
             return None;
         }
-        let id = target.into_usize();
-        if id >= self.states.len() || self.states[id].is_vacant() {
-            trace!("cannot remove edges to state that does not exist");
-            return None;
-        }
-        let ids = self.out_edge_ids(source.into_usize(), |e| self.edges[e].target == id);
+        let ids = self.out_edge_ids(source, |e| self.edges[e].target == target);
         Some(self.remove_edge_ids(ids))
     }
 
@@ -578,12 +618,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
         &mut self,
         source: StateIndex<Self>,
     ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
-        let id = source.into_usize();
-        if id >= self.states.len() || self.states[id].is_vacant() {
+        if !self.contains_state(source) {
             trace!("cannot remove edges from state that does not exist");
             return None;
         }
-        let ids = self.out_edge_ids(id, |_| true);
+        let ids = self.out_edge_ids(source, |_| true);
         Some(self.remove_edge_ids(ids))
     }
 
@@ -591,17 +630,16 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
         &mut self,
         target: StateIndex<Self>,
     ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
-        let id = target.into_usize();
-        if id >= self.states.len() || self.states[id].is_vacant() {
+        if !self.contains_state(target) {
             trace!("cannot remove edges to state that does not exist");
             return None;
         }
-        let ids = self.in_edge_ids(id, |_| true);
+        let ids = self.in_edge_ids(target, |_| true);
         Some(self.remove_edge_ids(ids))
     }
 }
 
-impl<Q, C, const DET: bool> LinkedListTransitionSystem<CharAlphabet, Q, C, DET> {
+impl<Q, C, const DET: bool> LinkedTs<CharAlphabet, Q, C, DET> {
     /// Returns a transition system builder for a non-deterministic transition system. This should be the main method for the
     /// construction of non-deterministic transition systems on the fly.
     ///
@@ -627,9 +665,7 @@ impl<Q, C, const DET: bool> LinkedListTransitionSystem<CharAlphabet, Q, C, DET> 
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
-    for LinkedListTransitionSystem<A, Q, C, DET>
-{
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for LinkedTs<A, Q, C, DET> {
     type StateIndex = DefaultIdType;
 
     type StateColor = Q;
@@ -637,7 +673,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     type EdgeColor = C;
 
     type EdgesFromIter<'this>
-        = NTSEdgesFromIter<'this, A::Expression, C>
+        = LinkedEdgesFrom<'this, A::Expression, C>
     where
         Self: 'this;
 
@@ -648,13 +684,11 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        if !self.states.get(state.into_usize())?.is_occupied() {
+        let state = self.states.get(state.into_usize())?;
+        if state.is_vacant() {
             return None;
         }
-        Some(NTSEdgesFromIter::new(
-            &self.edges,
-            self.first_out_edge(state.into_usize()),
-        ))
+        Some(LinkedEdgesFrom::new(&self.edges, state.first_out_edge()))
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
@@ -669,9 +703,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> States
-    for LinkedListTransitionSystem<A, Q, C, DET>
-{
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> States for LinkedTs<A, Q, C, DET> {
     type StatesIter<'this>
         = LinkedStateIndices<'this, Q>
     where
@@ -688,7 +720,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> States
     }
 }
 
-pub struct LinkedStateIndices<'ts, Q: Color>(&'ts [LinkedListTransitionSystemState<Q>], usize);
+/// Iterates over the indices of the states of a [`LinkedTs`], skipping removed ones.
+pub struct LinkedStateIndices<'ts, Q: Color>(&'ts [LinkedState<Q>], usize);
 
 impl<Q: Color> Iterator for LinkedStateIndices<'_, Q> {
     type Item = DefaultIdType;
@@ -703,15 +736,9 @@ impl<Q: Color> Iterator for LinkedStateIndices<'_, Q> {
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A>
-    for LinkedListTransitionSystem<A, Q, C, DET>
-{
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A> for LinkedTs<A, Q, C, DET> {
     fn for_alphabet(alphabet: A) -> Self {
-        Self {
-            alphabet,
-            states: vec![],
-            edges: vec![],
-        }
+        Self::with_capacity(alphabet, 0)
     }
 
     fn for_alphabet_size_hint(from: A, size_hint: usize) -> Self {
@@ -719,34 +746,49 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A>
             alphabet: from,
             states: Vec::with_capacity(size_hint),
             edges: vec![],
+            live_edges: 0,
         }
     }
 }
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
-    for LinkedListTransitionSystem<A, Q, C, DET>
+    for LinkedTs<A, Q, C, DET>
 {
     type EdgesToIter<'this>
-        = LinkedListTransitionSystemEdgesToIter<'this, A::Expression, C, DET>
+        = LinkedEdgesTo<'this, A::Expression, C>
     where
         Self: 'this;
 
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
-        assert!(state.into_usize() < self.states.len());
+        let state = self.states.get(state.into_usize())?;
+        if state.is_vacant() {
+            return None;
+        }
+        Some(LinkedEdgesTo::new(&self.edges, state.first_in_edge()))
+    }
+}
 
-        Some(LinkedListTransitionSystemEdgesToIter::new(
-            &self.edges,
-            self.first_in_edge(state.into_usize()),
-        ))
+impl<A: Alphabet, Q, C: Clone + Hash + Eq, const DET: bool> LinkedTs<A, Q, C, DET> {
+    /// The edges leaving `q` as a set, to compare systems regardless of the order of their edges.
+    fn edge_set(&self, q: u32) -> math::FxIndexSet<(&A::Expression, Cow<'_, C>, u32)>
+    where
+        A::Expression: Hash + Eq,
+    {
+        LinkedEdgesFrom::new(&self.edges, self.states[q as usize].first_out_edge())
+            .map(|e| {
+                let (expression, target) = (e.expression(), e.target());
+                (expression, e.into_color(), target)
+            })
+            .collect()
     }
 }
 
 /// Two systems are equal if they have the same alphabet and the same number of states, and every
 /// state has the same color and the same set of edges in both. Note that this compares state
 /// indices, so it is not an isomorphism check: systems that differ only by a renaming of the
-/// states are not equal.
+/// states are not equal. Removed states and edges are not compared.
 impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Clone + Hash + Debug + Eq, const DET: bool>
-    PartialEq for LinkedListTransitionSystem<A, Q, C, DET>
+    PartialEq for LinkedTs<A, Q, C, DET>
 {
     fn eq(&self, other: &Self) -> bool {
         if self.alphabet != other.alphabet {
@@ -758,43 +800,26 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Clone + Hash + Debug + Eq
             return false;
         }
 
-        self.states.iter().zip(other.states.iter()).all(|(x, y)| {
-            if x.is_vacant() || y.is_vacant() {
-                return false;
-            }
-            if x.color() != y.color() {
-                return false;
-            }
-            let edges = x
-                .edges_from_iter(&self.edges)
-                .expect("the state exists")
-                .map(|e| {
-                    let (expression, target) = (e.expression(), e.target());
-                    (expression, e.into_color(), target)
-                })
-                .collect::<math::FxIndexSet<_>>();
-
-            let other_edges = y
-                .edges_from_iter(&other.edges)
-                .expect("state exists")
-                .map(|e| {
-                    let (expression, target) = (e.expression(), e.target());
-                    (expression, e.into_color(), target)
-                })
-                .collect::<math::FxIndexSet<_>>();
-
-            edges == other_edges
-        })
+        self.states
+            .iter()
+            .zip(other.states.iter())
+            .enumerate()
+            .all(|(q, (x, y))| {
+                if x.is_vacant() || y.is_vacant() {
+                    return x.is_vacant() && y.is_vacant();
+                }
+                x.color() == y.color() && self.edge_set(q as u32) == other.edge_set(q as u32)
+            })
     }
 }
 
 impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Clone + Hash + Debug + Eq, const DET: bool>
-    Eq for LinkedListTransitionSystem<A, Q, C, DET>
+    Eq for LinkedTs<A, Q, C, DET>
 {
 }
 
 impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color, const DET: bool> std::fmt::Debug
-    for LinkedListTransitionSystem<A, Q, C, DET>
+    for LinkedTs<A, Q, C, DET>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for q in self.states() {
@@ -818,20 +843,22 @@ impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color, const DET: bool> std::fm
 }
 
 fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>(
-    ts: LinkedListTransitionSystem<A, Q, C, DET>,
-) -> LinkedListTransitionSystem<A, Q, C, OUT_DET> {
+    ts: LinkedTs<A, Q, C, DET>,
+) -> LinkedTs<A, Q, C, OUT_DET> {
     if !DET && OUT_DET && !ts.is_deterministic() {
         panic!("cannot convert non-deterministic transition system to deterministic");
     }
-    let LinkedListTransitionSystem {
+    let LinkedTs {
         alphabet,
         states,
         edges,
+        live_edges,
     } = ts;
-    LinkedListTransitionSystem {
+    LinkedTs {
         alphabet,
         states,
         edges,
+        live_edges,
     }
 }
 
@@ -840,6 +867,7 @@ mod tests {
     use crate::States;
     use crate::TransitionSystem;
     use crate::alphabet::CharAlphabet;
+    use crate::ts::DenseId;
     use crate::ts::{Builder, Deterministic, ForAlphabet, Shrinkable, Sproutable};
 
     #[test]
@@ -937,39 +965,39 @@ mod tests {
             for p in 0..n {
                 let (mut fast, mut slow) = (tangle(n), tangle(n));
                 let a = fast.remove_edges_between(q, p).unwrap();
-                let b = slow.filter_swap_remove_edges(|s, _, _, t| s == q && t == p);
+                let b = slow.filter_remove_edges(|s, _, _, t| s == q && t == p);
                 assert_eq!(sorted(a), sorted(b));
-                fast.verify_state();
+                fast.check_consistency();
                 assert_eq!(fast.state_count(), slow.state_count());
 
                 let a = fast.remove_edges_between_matching(q, p, 'a');
-                let b = slow.filter_swap_remove_edges(|s, e, _, t| s == q && t == p && *e == 'a');
+                let b = slow.filter_remove_edges(|s, e, _, t| s == q && t == p && *e == 'a');
                 assert_eq!(sorted(a.unwrap()), sorted(b));
-                fast.verify_state();
+                fast.check_consistency();
             }
             let (mut fast, mut slow) = (tangle(n), tangle(n));
             let a = fast.remove_edges_from_matching(q, 'b').unwrap();
-            let b = slow.filter_swap_remove_edges(|s, e, _, _| s == q && *e == 'b');
+            let b = slow.filter_remove_edges(|s, e, _, _| s == q && *e == 'b');
             assert_eq!(sorted(a), sorted(b));
-            fast.verify_state();
+            fast.check_consistency();
             let a = fast.remove_edges_from(q).unwrap();
-            let b = slow.filter_swap_remove_edges(|s, _, _, _| s == q);
+            let b = slow.filter_remove_edges(|s, _, _, _| s == q);
             assert_eq!(sorted(a), sorted(b));
-            fast.verify_state();
+            fast.check_consistency();
             let a = fast.remove_edges_to(q).unwrap();
-            let b = slow.filter_swap_remove_edges(|_, _, _, t| t == q);
+            let b = slow.filter_remove_edges(|_, _, _, t| t == q);
             assert_eq!(sorted(a), sorted(b));
-            fast.verify_state();
+            fast.check_consistency();
 
             // removing a state removes all edges around it, loops included
             let mut ts = tangle(n);
-            let before = ts.edges.len();
+            let before = ts.edge_count();
             let touching = tangle(n)
-                .filter_swap_remove_edges(|s, _, _, t| s == q || t == q)
+                .filter_remove_edges(|s, _, _, t| s == q || t == q)
                 .len();
             assert!(ts.remove_state(q).is_some());
-            ts.verify_state();
-            assert_eq!(ts.edges.len(), before - touching);
+            ts.check_consistency();
+            assert_eq!(ts.edge_count(), before - touching);
         }
     }
 
@@ -984,7 +1012,8 @@ mod tests {
         ts.add_edge((0, 'b', 0));
         ts.add_edge((1, 'b', 1));
 
-        assert!(ts.swap_remove_edge(0).is_some());
+        assert!(ts.remove_edge(crate::ts::EdgeId(0)).is_some());
+        assert!(ts.remove_edge(crate::ts::EdgeId(0)).is_none());
         assert_eq!(ts.successor(0, 'a'), None);
 
         assert_eq!(ts.add_edge((0, 'a', 0)), None);
@@ -992,5 +1021,107 @@ mod tests {
             ts.reachable_state_indices_from(0).collect::<Vec<_>>(),
             vec![0]
         );
+    }
+
+    #[test]
+    fn edge_ids_are_stable_and_not_reused() {
+        use crate::ts::EdgeId;
+        let mut ts = tangle(5);
+        let ids: Vec<EdgeId> = (0..ts.edge_bound()).map(EdgeId::from_usize).collect();
+        let kept: Vec<_> = ids.iter().filter(|id| id.0 % 3 != 0).copied().collect();
+        let before: Vec<_> = kept
+            .iter()
+            .map(|id| ts.edge_by_id(*id).unwrap().into_tuple())
+            .collect();
+        for id in ids.iter().filter(|id| id.0 % 3 == 0) {
+            assert!(ts.remove_edge(*id).is_some());
+            ts.check_consistency();
+        }
+        let after: Vec<_> = kept
+            .iter()
+            .map(|id| ts.edge_by_id(*id).unwrap().into_tuple())
+            .collect();
+        assert_eq!(before, after);
+        assert!(ts.edge_by_id(EdgeId(0)).is_none());
+
+        // a new edge never takes the id of a removed one
+        let fresh = ts.insert_edge(0, 'a', 99, 0);
+        assert_eq!(fresh.into_usize(), ids.len());
+        ts.check_consistency();
+    }
+
+    #[test]
+    fn color_mut_changes_colors() {
+        use crate::ts::EdgeId;
+        let mut ts = tangle(3);
+        *ts.state_color_mut(1).unwrap() = 77;
+        assert_eq!(ts.state_color(1).unwrap().into_owned(), 77);
+        *ts.edge_color_mut(EdgeId(2)).unwrap() = 55;
+        assert_eq!(*ts.edge_by_id(EdgeId(2)).unwrap().color(), 55);
+        assert!(ts.state_color_mut(3).is_none());
+        assert!(ts.edge_color_mut(EdgeId(10_000)).is_none());
+        ts.remove_edge(EdgeId(2));
+        assert!(ts.edge_color_mut(EdgeId(2)).is_none());
+    }
+
+    #[test]
+    fn compact_renumbers_and_keeps_structure() {
+        use crate::ts::EdgeId;
+        let mut ts = tangle(6);
+        ts.remove_state(2);
+        ts.remove_edge(EdgeId(3));
+        let reference = ts.clone();
+        let edges_before = ts.edge_count();
+        let map = ts.compact();
+        ts.check_consistency();
+        assert_eq!(ts.edge_count(), edges_before);
+        assert_eq!(ts.edge_bound(), edges_before);
+        assert_eq!(ts.state_count(), 5);
+        assert_eq!(map.state(2), None);
+        assert_eq!(map.state(3), Some(2));
+        assert_eq!(map.edge(EdgeId(3)), None);
+        for q in reference.states() {
+            let new = map.state(q).unwrap();
+            assert_eq!(ts.state_color(new), reference.state_color(q));
+            let mut old_edges: Vec<_> = reference
+                .edges_from(q)
+                .unwrap()
+                .map(|e| (map.state(e.target()).unwrap(), *e.expression(), *e.color()))
+                .collect();
+            let mut new_edges: Vec<_> = ts
+                .edges_from(new)
+                .unwrap()
+                .map(|e| (e.target(), *e.expression(), *e.color()))
+                .collect();
+            old_edges.sort();
+            new_edges.sort();
+            assert_eq!(old_edges, new_edges);
+        }
+    }
+
+    #[test]
+    fn predecessors_after_removal() {
+        use crate::ts::PredecessorIterable;
+        let mut ts = tangle(4);
+        ts.remove_edges_from(1);
+        ts.remove_state(3);
+        ts.check_consistency();
+        for q in ts.states().collect::<Vec<_>>() {
+            let mut preds: Vec<_> = ts.predecessors(q).unwrap().map(|e| e.source()).collect();
+            let mut expected: Vec<_> = ts
+                .states()
+                .flat_map(|p| {
+                    ts.edges_from(p)
+                        .unwrap()
+                        .filter(move |e| e.target() == q)
+                        .map(|e| e.source())
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            preds.sort();
+            expected.sort();
+            assert_eq!(preds, expected);
+        }
+        assert!(ts.predecessors(3).is_none());
     }
 }
