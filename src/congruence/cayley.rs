@@ -1,7 +1,8 @@
 use crate::alphabet::{Alphabet, CharAlphabet, Directional, InvertibleChar, Matcher};
+use crate::ts::EdgeOf;
 use crate::ts::States;
 use crate::ts::{
-    Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, EdgeReference, StateColor,
+    Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, EdgeRef, StateColor,
     StateIndex, SymbolOf,
 };
 use crate::{Pointed, TransitionSystem};
@@ -68,11 +69,6 @@ where
 
     type EdgeColor = ();
 
-    type EdgeRef<'this>
-        = EdgeReference<'this, InvertibleChar, usize, ()>
-    where
-        Self: 'this;
-
     type EdgesFromIter<'this>
         = DeterministicEdgesFrom<'this, Self>
     where
@@ -123,14 +119,14 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         let expression = self.expressions.iter().find(|e| symbol.matches(*e))?;
         let target = if expression.is_inverted() {
             self.m.left_successor(state, expression.symbol())?
         } else {
             self.m.right_successor(state, expression.symbol())?
         };
-        Some(EdgeReference::new(state, expression, &(), target))
+        Some(EdgeRef::borrowed(state, expression, &(), target))
     }
 }
 
@@ -199,11 +195,6 @@ where
 
     type EdgeColor = ();
 
-    type EdgeRef<'this>
-        = EdgeReference<'this, EdgeExpression<Ts>, usize, ()>
-    where
-        Self: 'this;
-
     type EdgesFromIter<'this>
         = DeterministicEdgesFrom<'this, Self>
     where
@@ -254,10 +245,10 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         let (symbol, expression) = self.expressions.iter().find(|(_, e)| symbol.matches(*e))?;
         let target = self.m.right_successor(state, *symbol)?;
-        Some(EdgeReference::new(state, expression, &(), target))
+        Some(EdgeRef::borrowed(state, expression, &(), target))
     }
 }
 impl<Ts> RightCayley<Ts>
@@ -276,7 +267,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ts::{Builder, IsEdge};
+    use crate::ts::Builder;
 
     fn parity_dfa() -> crate::automaton::DFA {
         Builder::without_edge_colors()

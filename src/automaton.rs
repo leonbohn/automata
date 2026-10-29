@@ -1,3 +1,4 @@
+use crate::ts::EdgeOf;
 use crate::ts::SymbolOf;
 mod acceptance_type;
 use crate::ts::States;
@@ -229,17 +230,12 @@ impl<T: TransitionSystem, Sem> AsRef<Automaton<T, Sem>> for Automaton<T, Sem> {
 }
 
 impl<T: Deterministic, Sem> Deterministic for Automaton<T, Sem> {
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         self.ts.edge(state, symbol)
     }
 }
 
 impl<T: PredecessorIterable, Sem> PredecessorIterable for Automaton<T, Sem> {
-    type PreEdgeRef<'this>
-        = T::PreEdgeRef<'this>
-    where
-        Self: 'this;
-
     type EdgesToIter<'this>
         = T::EdgesToIter<'this>
     where
@@ -325,11 +321,6 @@ impl<T: TransitionSystem, Sem> TransitionSystem for Automaton<T, Sem> {
     type StateColor = T::StateColor;
 
     type EdgeColor = T::EdgeColor;
-
-    type EdgeRef<'this>
-        = T::EdgeRef<'this>
-    where
-        Self: 'this;
 
     type EdgesFromIter<'this>
         = T::EdgesFromIter<'this>

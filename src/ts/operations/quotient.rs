@@ -1,11 +1,12 @@
 use crate::DTS;
 use crate::Void;
 use crate::ts::States;
+use crate::ts::{EdgeOf, EdgeRef};
 use crate::{
     RightCongruence,
     partition::Partition,
     representation::CollectTs,
-    ts::{Deterministic, EdgeExpression, IsEdge, Pointed, StateIndex, SymbolOf, TransitionSystem},
+    ts::{Deterministic, EdgeExpression, Pointed, StateIndex, SymbolOf, TransitionSystem},
 };
 use crate::{
     alphabet::{Alphabet, Matcher},
@@ -108,47 +109,6 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
     }
 }
 
-/// A transition in the [`Quotient`] of a [`TransitionSystem`]. We assume that
-/// a quotient can only be built from a [`Partition`] that is
-/// a congruence (i.e. the quotient transition system is deterministic).
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct QuotientTransition<'a, Idx, E, C> {
-    source: Idx,
-    expression: &'a E,
-    colors: Vec<C>,
-    target: Idx,
-}
-
-impl<'a, Idx: Copy, E, C: Clone> IsEdge<'a, E, Idx, Vec<C>> for QuotientTransition<'a, Idx, E, C> {
-    fn target(&self) -> Idx {
-        self.target
-    }
-
-    fn color(&self) -> Cow<'_, Vec<C>> {
-        Cow::Borrowed(&self.colors)
-    }
-
-    fn expression(&self) -> &'a E {
-        self.expression
-    }
-
-    fn source(&self) -> Idx {
-        self.source
-    }
-}
-
-impl<'a, Idx, E, C> QuotientTransition<'a, Idx, E, C> {
-    /// Build a new quotient transition from the given parts.
-    pub fn new(source: Idx, expression: &'a E, colors: Vec<C>, target: Idx) -> Self {
-        Self {
-            source,
-            expression,
-            colors,
-            target,
-        }
-    }
-}
-
 /// Allows iterating over the edges originating from a state in the [`Quotient`]
 /// of a [`TransitionSystem`].
 #[derive(Clone)]
@@ -163,7 +123,7 @@ where
     Ts: Deterministic,
     I: Iterator<Item = SymbolOf<Ts>>,
 {
-    type Item = QuotientTransition<'a, usize, EdgeExpression<Ts>, Ts::EdgeColor>;
+    type Item = EdgeRef<'a, usize, EdgeExpression<Ts>, Vec<Ts::EdgeColor>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let sym = self.it.next()?;
@@ -189,11 +149,6 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
     type StateColor = Vec<Ts::StateColor>;
 
     type EdgeColor = Vec<Ts::EdgeColor>;
-
-    type EdgeRef<'this>
-        = QuotientTransition<'this, usize, EdgeExpression<Self>, Ts::EdgeColor>
-    where
-        Self: 'this;
 
     type EdgesFromIter<'this>
         = QuotientEdgesFrom<'this, Ts, <Self::Alphabet as Alphabet>::Universe<'this>>
@@ -245,14 +200,14 @@ impl<Ts: Deterministic> States for Quotient<Ts> {
     }
 }
 impl<D: Deterministic> Deterministic for Quotient<D> {
-    fn edge(&self, origin: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, origin: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         let (states, colors): (BTreeSet<_>, Vec<_>) = self
             .class_iter_by_id(origin)?
             .filter_map(|q| {
                 self.ts.edge(q, symbol).map(|tt| {
                     (
                         self.find_id_by_state(tt.target()).expect("Unknown state"),
-                        tt.color().into_owned(),
+                        tt.color().clone(),
                     )
                 })
             })
@@ -272,12 +227,12 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
                         }
                     })
                     .unwrap();
-                Some(QuotientTransition {
-                    source: origin,
+                Some(EdgeRef::owned(
+                    origin,
                     expression,
                     colors,
-                    target: states.into_iter().next().unwrap(),
-                })
+                    states.into_iter().next().unwrap(),
+                ))
             }
             _ => {
                 let string = format!(
@@ -321,7 +276,7 @@ mod tests {
     #[test]
     fn quotient_iterates_edges() {
         use crate::TransitionSystem;
-        use crate::ts::{Deterministic, IsEdge};
+        use crate::ts::Deterministic;
         let dfa = wiki_dfa();
         let a = dfa.quotient(Partition::new([vec![0, 1], vec![5], vec![2, 3, 4]]));
         for q in a.states() {

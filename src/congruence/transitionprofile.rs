@@ -2,7 +2,7 @@ use crate::States;
 use std::borrow::Cow;
 use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
-use crate::ts::{Deterministic, EdgeColor, IdType, IsEdge, StateColor, SymbolOf};
+use crate::ts::{Deterministic, EdgeColor, IdType, StateColor, SymbolOf};
 use crate::{Pointed, TransitionSystem};
 use crate::{Show, Void, alphabet::Alphabet, word::FiniteWord};
 use itertools::Itertools;
@@ -179,7 +179,7 @@ impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunSignature<Idx, Q, C> {
                 let target = tt.target();
                 let mut sc = Q::from_or_neutral(ts.state_color(target).map(Cow::into_owned));
                 sc.update(self.sc());
-                let mut ec = C::from(tt.color().into_owned());
+                let mut ec = C::from(tt.color().clone());
                 ec.update(self.ec());
 
                 Some(Self(target, sc, ec))

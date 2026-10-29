@@ -1,7 +1,9 @@
-use crate::Void;
-
-mod map;
-pub use map::*;
+mod recolor;
+pub use recolor::{
+    ColorFn, DefaultIfMissing, EdgeFn, EdgeRecolor, EraseColors, EraseEdgeColors, EraseStateColors,
+    Keep, Provided, ProvidesStateColor, Recolor, RecolorEdges, StateColorFn, StateRecolor,
+    UniformColor,
+};
 
 mod product;
 pub use product::*;
@@ -19,17 +21,7 @@ mod reverse;
 pub use reverse::Reversed;
 
 mod quotient;
-pub use quotient::{Quotient, QuotientEdgesFrom, QuotientTransition};
-
-mod with_state_color;
-pub use with_state_color::{DefaultIfMissing, ProvidesStateColor, UniformColor, WithStateColor};
-
-use super::{EdgeColor, StateColor};
-
-/// Type alias for the transition system that results from erasing all
-/// colors, c.f. [`super::TransitionSystem::erase_colors`].
-pub type EraseColors<Ts> =
-    MapEdgeColor<MapStateColor<Ts, fn(StateColor<Ts>) -> Void>, fn(EdgeColor<Ts>) -> Void>;
+pub use quotient::{Quotient, QuotientEdgesFrom};
 
 #[cfg(test)]
 mod tests {

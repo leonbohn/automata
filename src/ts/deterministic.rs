@@ -1,22 +1,17 @@
 use super::AccessWords;
-use super::operations::MapEdges;
-use super::operations::MapStateColor;
 use super::operations::MatchingProduct;
-use super::operations::ProductTransition;
+use super::operations::ProductIndex;
 use super::operations::RestrictByStateIndex;
 use super::operations::StateIndexFilter;
-use super::operations::{MapEdgeColor, ProductIndex};
-use super::operations::{MappedEdge, MappedTransition};
 use super::run::Run;
 use crate::congruence::MinimalRepresentative;
-use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateColor, StateIndex, SymbolOf};
+use crate::ts::{EdgeColor, EdgeExpression, EdgeOf, EdgeRef, StateColor, StateIndex, SymbolOf};
+use crate::{Pointed, States, TransitionSystem};
 use crate::{
-    Color,
     alphabet::{Alphabet, Expression},
     word,
     word::{FiniteWord, Word},
 };
-use crate::{Pointed, States, TransitionSystem};
 use itertools::Itertools;
 
 /// Marks a [`TransitionSystem`] as deterministic: for every state and every symbol of the alphabet there is
@@ -34,7 +29,7 @@ pub trait Deterministic: TransitionSystem {
     /// ```
     /// use automata::{
     ///     Void,
-    ///     ts::{Deterministic, IsEdge, Builder},
+    ///     ts::{Deterministic, Builder},
     /// };
     ///
     /// let ts = Builder::without_state_colors()
@@ -46,7 +41,7 @@ pub trait Deterministic: TransitionSystem {
     /// assert_eq!(ts.edge(0, 'b'), None);
     /// assert_eq!(ts.edge(3, 'a'), None);
     /// ```
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>>;
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>>;
 
     /// Returns the target of the edge leaving `state` on `symbol`, if it exists.
     fn successor(
@@ -74,7 +69,7 @@ pub trait Deterministic: TransitionSystem {
     ) -> Result<X, Y>
     where
         W: AsRef<[SymbolOf<Self>]>,
-        F: Fn(&Self, &mut X, Self::EdgeRef<'_>),
+        F: Fn(&Self, &mut X, EdgeOf<'_, Self>),
         G: Fn(&Self, X, StateIndex<Self>, SymbolOf<Self>) -> Y,
     {
         let mut current_state = source;
@@ -112,7 +107,7 @@ pub trait Deterministic: TransitionSystem {
             None,
             "There are multiple symbols for this expression"
         );
-        Some(self.edge(state, sym)?.color().into_owned())
+        Some(self.edge(state, sym)?.color().clone())
     }
 
     /// Attempts to find the minimal representative of the indexed `state`, which the the length-lexicographically
@@ -197,7 +192,7 @@ pub trait Deterministic: TransitionSystem {
     ) -> String
     where
         SD: Fn(Self::StateIndex, StateColor<Self>) -> String,
-        ED: Fn(Self::EdgeRef<'a>) -> String,
+        ED: Fn(EdgeOf<'a, Self>) -> String,
     {
         let mut builder = tabled::builder::Builder::default();
         builder.push_record(
@@ -242,14 +237,14 @@ pub trait Deterministic: TransitionSystem {
 
 impl<D: Deterministic> Deterministic for &D {
     #[inline(always)]
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         D::edge(self, state, symbol)
     }
 }
 
 impl<D: Deterministic> Deterministic for &mut D {
     #[inline(always)]
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         D::edge(self, state, symbol)
     }
 }
@@ -271,41 +266,16 @@ where
         let right = self.1.edge_color(r, expression)?;
         Some((left, right))
     }
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         let ProductIndex(l, r) = state;
 
         let ll = self.0.edge(l, symbol)?;
         let rr = self.1.edge(r, symbol)?;
-        Some(ProductTransition::new(
+        Some(EdgeRef::owned(
             ProductIndex(l, r),
             ll.expression(),
-            (ll.color().into_owned(), rr.color().into_owned()),
+            (ll.color().clone(), rr.color().clone()),
             ProductIndex(ll.target(), rr.target()),
-        ))
-    }
-}
-
-impl<D, Ts, F> Deterministic for MapStateColor<Ts, F>
-where
-    D: Color,
-    Ts: Deterministic,
-    F: Fn(Ts::StateColor) -> D,
-{
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
-        self.ts().edge(state, symbol)
-    }
-}
-
-impl<D, Ts, F> Deterministic for MapEdgeColor<Ts, F>
-where
-    D: Color,
-    Ts: Deterministic,
-    F: Fn(Ts::EdgeColor) -> D,
-{
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
-        Some(MappedTransition::new(
-            self.ts().edge(state, symbol)?,
-            self.f(),
         ))
     }
 }
@@ -314,28 +284,13 @@ impl<Ts: Deterministic, F> Deterministic for RestrictByStateIndex<Ts, F>
 where
     F: StateIndexFilter<Ts::StateIndex>,
 {
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         if !self.filter().is_unmasked(state) {
             return None;
         }
         self.ts()
             .edge(state, symbol)
             .filter(|e| self.filter().is_unmasked(e.target()))
-    }
-}
-
-impl<Ts, D, F> Deterministic for MapEdges<Ts, F>
-where
-    Ts: Deterministic,
-    D: Color,
-    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
-{
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
-        Some(MappedEdge::new(
-            self.ts().edge(state, symbol)?,
-            state,
-            self.f(),
-        ))
     }
 }
 

@@ -1,5 +1,6 @@
 use crate::TransitionSystem;
-use crate::ts::{Deterministic, Edge, IdType, IsEdge, SymbolOf};
+use crate::ts::EdgeOf;
+use crate::ts::{Deterministic, IdType, SymbolOf};
 use crate::{Show, alphabet::Alphabet};
 use itertools::{Either, Itertools};
 
@@ -127,13 +128,13 @@ impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
 
     /// Attempts to extend the path in the given `ts` by the given `symbol`. If the path can be extended,
     /// the transition is returned. Otherwise, `None` is returned.
-    pub fn extend_in<'a, D>(&mut self, ts: &'a D, symbol: SymbolOf<D>) -> Option<D::EdgeRef<'a>>
+    pub fn extend_in<'a, D>(&mut self, ts: &'a D, symbol: SymbolOf<D>) -> Option<EdgeOf<'a, D>>
     where
         D: Deterministic<StateColor = Q, EdgeColor = C, StateIndex = Idx, Alphabet = A>,
     {
         let transition = ts.edge(self.end, symbol)?;
         self.transitions
-            .push((self.end, symbol, transition.color().into_owned()));
+            .push((self.end, symbol, transition.color().clone()));
         self.end = transition.target();
         self.state_colors.push(
             ts.state_color(self.end)
@@ -200,19 +201,14 @@ impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
     }
 
     /// Returns an iterator over the transitions in the form (src, symbol, color, target)
-    pub fn transitions(&self) -> impl Iterator<Item = Edge<A::Symbol, Idx, C>> + '_ {
+    pub fn transitions(&self) -> impl Iterator<Item = (Idx, A::Symbol, C, Idx)> + '_ {
         if let Some(last) = self.transitions.last() {
             Either::Left(
                 self.transitions
                     .iter()
                     .tuple_windows::<(_, _)>()
-                    .map(|((q0, a0, c0), (q1, _, _))| Edge::new(*q0, *a0, c0.clone(), *q1))
-                    .chain(std::iter::once(Edge::new(
-                        last.0,
-                        last.1,
-                        last.2.clone(),
-                        self.end,
-                    ))),
+                    .map(|((q0, a0, c0), (q1, _, _))| (*q0, *a0, c0.clone(), *q1))
+                    .chain(std::iter::once((last.0, last.1, last.2.clone(), self.end))),
             )
         } else {
             Either::Right(std::iter::empty())
@@ -220,14 +216,14 @@ impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
     }
 
     /// Consumes `self` and returns an iterator over the transitions in the form (src, symbol, color, target)
-    pub fn into_transitions(self) -> impl Iterator<Item = Edge<A::Symbol, Idx, C>> {
+    pub fn into_transitions(self) -> impl Iterator<Item = (Idx, A::Symbol, C, Idx)> {
         if let Some(last) = self.transitions.last().cloned() {
             Either::Left(
                 self.transitions
                     .into_iter()
                     .tuple_windows::<(_, _)>()
-                    .map(|((q0, a0, c0), (q1, _, _))| Edge::new(q0, a0, c0, q1))
-                    .chain(std::iter::once(Edge::new(last.0, last.1, last.2, self.end))),
+                    .map(|((q0, a0, c0), (q1, _, _))| (q0, a0, c0, q1))
+                    .chain(std::iter::once((last.0, last.1, last.2, self.end))),
             )
         } else {
             Either::Right(std::iter::empty())
@@ -319,7 +315,7 @@ impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Lasso<A, Idx, Q, C> {
 
     /// Gives the transitions along the loop, so transitions that appear infinitely often
     /// as tuples of the form (src, smbol, target, color)
-    pub fn recurrent_transitions(&self) -> impl Iterator<Item = Edge<A::Symbol, Idx, C>> + '_ {
+    pub fn recurrent_transitions(&self) -> impl Iterator<Item = (Idx, A::Symbol, C, Idx)> + '_ {
         self.cycle.transitions()
     }
 
@@ -341,7 +337,7 @@ impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Lasso<A, Idx, Q, C> {
 
     /// Consumes `self` and gives the transitions along the loop, so transitions that appear infinitely often
     /// as tuples of the form (src, smbol, target, color)
-    pub fn into_recurrent_transitions(self) -> impl Iterator<Item = Edge<A::Symbol, Idx, C>> {
+    pub fn into_recurrent_transitions(self) -> impl Iterator<Item = (Idx, A::Symbol, C, Idx)> {
         self.cycle.into_transitions()
     }
 
@@ -362,7 +358,7 @@ impl<A: Alphabet, Idx: IdType, Q: Show, C: Show> Show for Lasso<A, Idx, Q, C> {
 mod tests {
     use crate::alphabet::CharAlphabet;
 
-    use crate::ts::{Edge, Path};
+    use crate::ts::Path;
 
     #[test]
     fn debug_display_path() {
@@ -380,11 +376,7 @@ mod tests {
             vec![true, false, true],
             vec![(0, 'a', false), (1, 'b', true), (2, 'c', false)],
         );
-        let transitions = vec![
-            Edge::new(0, 'a', false, 1),
-            Edge::new(1, 'b', true, 2),
-            Edge::new(2, 'c', false, 0),
-        ];
+        let transitions = vec![(0, 'a', false, 1), (1, 'b', true, 2), (2, 'c', false, 0)];
 
         assert!(path.transitions().eq(transitions));
     }

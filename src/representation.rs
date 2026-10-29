@@ -5,8 +5,7 @@ use std::collections::BTreeSet;
 
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
 use crate::ts::{
-    DefaultIdType, Deterministic, EdgeColor, ForAlphabet, IsEdge, Sproutable, StateColor,
-    StateIndex,
+    DefaultIdType, Deterministic, EdgeColor, ForAlphabet, Sproutable, StateColor, StateIndex,
 };
 use crate::{Congruence, DTS, Pointed, RightCongruence, TransitionSystem};
 
@@ -72,7 +71,7 @@ pub trait CollectTs: States {
                 out.add_edge((
                     *map.get(&e.source()).unwrap(),
                     e.expression().clone(),
-                    e.color().into_owned(),
+                    e.color().clone(),
                     *map.get(&e.target()).unwrap(),
                 ));
             }
@@ -325,8 +324,7 @@ mod impl_into_ts {
     use super::*;
     use crate::alphabet::Alphabet;
     use crate::automaton::Automaton;
-    use crate::ts::operations::MapStateColor;
-    use crate::ts::{EdgeColor, EdgeExpression, StateIndex, operations};
+    use crate::ts::operations;
     use crate::{DTS, TransitionSystem};
 
     impl<A: Alphabet, Q: Color, C: Color> IntoTs for DTS<A, Q, C> {
@@ -339,53 +337,16 @@ mod impl_into_ts {
         //     self
         // }
     }
-    impl<T: IntoTs, C: Color, F> IntoTs for operations::MapEdgeColor<T, F>
+    impl<T: IntoTs, FS, FE> IntoTs for operations::Recolor<T, FS, FE>
     where
-        F: Fn(EdgeColor<T>) -> C,
+        FS: operations::StateRecolor<T>,
+        FE: operations::EdgeRecolor<T>,
     {
-        // fn into_dts_preserving(self) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<T>), C> {
-        //     let (ts, f) = self.into_parts();
-        //     ts.into_dts_preserving()
-        //         .linked_map_edges(|_, e, c, _| (e, f(c)))
-        // }
-        // fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
-        //     let (ts, f) = self.into_parts();
-        //     ts.into_dts().linked_map_edges(|_, e, c, _| (e, f(c)))
-        // }
-    }
-    impl<T: IntoTs, Q: Color, F> IntoTs for MapStateColor<T, F>
-    where
-        T: TransitionSystem,
-        F: Fn(T::StateColor) -> Q,
-    {
-        // fn into_dts(self) -> DTS<Self::Alphabet, Q, EdgeColor<Self>> {
-        //     let (ts, f) = self.into_parts();
-        //     ts.into_dts().linked_map_states(|_, c| f(c))
-        // }
-        // fn into_dts_preserving(
-        //     self,
-        // ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
-        //     let (ts, f) = self.into_parts();
-        //     ts.into_dts_preserving()
-        //         .linked_map_states(|_, (i, c)| (i, f(c)))
-        // }
     }
     impl<T: IntoTs, F> IntoTs for operations::RestrictByStateIndex<T, F> where
         F: operations::StateIndexFilter<T::StateIndex>
     {
     }
-    impl<Ts: IntoTs, P: operations::ProvidesStateColor<Ts::StateIndex>> IntoTs
-        for operations::WithStateColor<Ts, P>
-    {
-    }
-    impl<T, D, F> IntoTs for operations::MapEdges<T, F>
-    where
-        T: IntoTs,
-        D: Color,
-        F: Fn(StateIndex<T>, &EdgeExpression<T>, EdgeColor<T>, StateIndex<T>) -> D,
-    {
-    }
-
     impl<Ts: TransitionSystem> IntoTs for operations::ReachablePart<Ts> {}
     impl<Sem, D> IntoTs for Automaton<D, Sem> where D: IntoTs {}
 }

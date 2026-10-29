@@ -19,7 +19,7 @@ use crate::Void;
 use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
 use crate::representation::IntoTs;
 use crate::ts::States;
-use crate::ts::{Builder, DefaultIdType, DenseId, ForAlphabet, IsEdge, Sproutable};
+use crate::ts::{Builder, DefaultIdType, DenseId, ForAlphabet, Sproutable};
 use crate::{DTS, Pointed, TS, TransitionSystem};
 pub use acceptance_mask::{AcceptanceError, AcceptanceMask};
 use std::collections::BTreeSet;
@@ -247,14 +247,9 @@ impl From<DeterministicOmegaAutomaton<PropAlphabet>> for DeterministicOmegaAutom
             .with_transitions(value.states().flat_map(|q| {
                 assert!(q < size);
                 value.edges_from(q).unwrap().flat_map(|edge| {
-                    edge.expression().chars_iter().map(move |sym| {
-                        (
-                            edge.source(),
-                            sym,
-                            IsEdge::color(&edge).into_owned(),
-                            edge.target(),
-                        )
-                    })
+                    edge.expression()
+                        .chars_iter()
+                        .map(move |sym| (edge.source(), sym, edge.color().clone(), edge.target()))
                 })
             }))
             .into_dts();
@@ -286,7 +281,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
                     edge.source(),
                     ts.alphabet()
                         .make_expression(ts.alphabet().char_to_symbol(*edge.expression())),
-                    edge.color().into_owned(),
+                    edge.color().clone(),
                     edge.target(),
                 ));
             }

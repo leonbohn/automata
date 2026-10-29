@@ -1,5 +1,6 @@
 mod class;
 
+use crate::ts::EdgeOf;
 use crate::ts::States;
 use crate::{
     Void,
@@ -183,7 +184,7 @@ impl<T: Congruence> From<T> for RightCongruence<T> {
 }
 
 impl<T: Deterministic> Deterministic for RightCongruence<T> {
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         self.ts.edge(state, symbol)
     }
 }
@@ -195,11 +196,6 @@ impl<T: TransitionSystem> Pointed for RightCongruence<T> {
 }
 
 impl<T: PredecessorIterable> PredecessorIterable for RightCongruence<T> {
-    type PreEdgeRef<'this>
-        = T::PreEdgeRef<'this>
-    where
-        Self: 'this;
-
     type EdgesToIter<'this>
         = T::EdgesToIter<'this>
     where
@@ -218,11 +214,6 @@ impl<T: TransitionSystem> TransitionSystem for RightCongruence<T> {
     type StateColor = T::StateColor;
 
     type EdgeColor = T::EdgeColor;
-
-    type EdgeRef<'this>
-        = T::EdgeRef<'this>
-    where
-        Self: 'this;
 
     type EdgesFromIter<'this>
         = T::EdgesFromIter<'this>

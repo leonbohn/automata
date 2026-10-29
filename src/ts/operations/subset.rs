@@ -1,10 +1,11 @@
+use crate::ts::EdgeOf;
 use crate::ts::SymbolOf;
 use std::borrow::Cow;
 use std::{cell::RefCell, fmt::Debug};
 
 use crate::ts::{
-    Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, IsEdge, Pointed, StateIndex,
-    TransitionSystem, edge::TransitionOwnedColor,
+    Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, EdgeRef, Pointed, StateIndex,
+    TransitionSystem,
 };
 use crate::{
     alphabet::{Alphabet, Matcher},
@@ -110,7 +111,7 @@ pub struct SubsetConstruction<Ts: TransitionSystem> {
 }
 
 impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
-    fn edge(&self, source: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, source: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         let (colorset, mut stateset): (Vec<Ts::EdgeColor>, StateSet<Ts>) = self
             .states
             .borrow()
@@ -119,7 +120,7 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
             .flat_map(|q| {
                 self.ts.edges_from(*q).unwrap().filter_map(|tt| {
                     if symbol.matches(tt.expression()) {
-                        Some((tt.color().into_owned(), tt.target()))
+                        Some((tt.color().clone(), tt.target()))
                     } else {
                         None
                     }
@@ -134,14 +135,14 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
             .unwrap();
 
         if let Some(&id) = self.ids.borrow().get(&stateset) {
-            return Some(TransitionOwnedColor::new(source, expression, colorset, id));
+            return Some(EdgeRef::owned(source, expression, colorset, id));
         }
 
         let mut states = self.states.borrow_mut();
         let id = states.len();
         self.ids.borrow_mut().insert(stateset.clone(), id);
         states.push(stateset);
-        Some(TransitionOwnedColor::new(source, expression, colorset, id))
+        Some(EdgeRef::owned(source, expression, colorset, id))
     }
 }
 
@@ -157,11 +158,6 @@ impl<Ts: TransitionSystem> TransitionSystem for SubsetConstruction<Ts> {
     type StateColor = Vec<Ts::StateColor>;
 
     type EdgeColor = Vec<Ts::EdgeColor>;
-
-    type EdgeRef<'this>
-        = TransitionOwnedColor<'this, EdgeExpression<Ts>, usize, Self::EdgeColor>
-    where
-        Self: 'this;
 
     type EdgesFromIter<'this>
         = DeterministicEdgesFrom<'this, Self>
@@ -267,7 +263,7 @@ mod tests {
     #[test]
     fn subset_construction_iterates_edges() {
         use crate::TransitionSystem;
-        use crate::ts::{Deterministic, IsEdge};
+        use crate::ts::Deterministic;
         let nts = NTS::builder()
             .default_color(false)
             .with_transitions([

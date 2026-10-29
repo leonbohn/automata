@@ -27,7 +27,8 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
   - `src/math.rs`, `src/dag.rs`, `src/color.rs` (`Int`, `Void`, `Color`, `Lattice`), `src/show.rs` (`Show`).
 - `src/ts.rs` and `src/ts/`: the `TransitionSystem` trait and everything around it. `TransitionSystem` only needs `edges_from` and `state_color` (algorithms that follow successors are bounded on it); `States` adds enumeration of the states (`states`, `state_count`, `contains_state`, SCCs of the whole system, `quotient`, ...). Implicit systems (`SubsetConstruction`, `MatchingProduct`) do not implement `States`; `Pointed::reachable_part` explores them into a `ReachablePart`, which does.
   - `impls/`: `LinkedListTransitionSystem` (the only implementation; aliases `TS`, `DTS`, `NTS`).
-  - `operations/`: lazy adapters (`map`, `product`, `quotient`, `reachable`, `restricted`, `reverse`, `subset`, `with_state_color`).
+  - `operations/`: lazy adapters (`recolor`, `product`, `quotient`, `reachable`, `restricted`, `reverse`, `subset`). `recolor.rs` holds the single coloring adapter `Recolor` (a `StateRecolor` and an `EdgeRecolor`, with `Keep` for the side that stays unchanged), which every `map_*`, `with_state_color` and `erase_*` returns and which serves successors and predecessors from one iterator type.
+  - `edge.rs`: `EdgeRef`, the only edge reference type. `edges_from` and `predecessors` yield `ts::EdgeOf<'_, Self>`, with a borrowed color for storages and an owned one for adapters; `EdgeTuple` stays for the `Builder`.
   - `run.rs`/`path.rs`: runs with `Observer`s, `Path`, `Lasso`.
   - `connected_components/`: Tarjan SCCs, `SccDecomposition`. `reachable.rs`: reachability, minimal representatives. `builder.rs`: `Builder`.
   - Capability traits: `Deterministic`, `Pointed`, `Sproutable`, `Shrinkable`, `PredecessorIterable`; conversions in `representation.rs` (`CollectTs`, `IntoTs`).
@@ -35,7 +36,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 - `src/automaton.rs` and `src/automaton/`: `Automaton<T, Sem>` pairs a TS `T` with an initial state and acceptance condition `Sem`; the word type `W` of `Semantics<T, W>` selects finite or omega semantics. Aliases `DFA<T>`, `DBA<T>`, `DPA<T, Sem>`, Moore/Mealy. `RightCongruence<T>` (in `congruence.rs`) is its own struct. `omega/` has `buchi`, `parity` (four min/max even/odd variants), `rabin`, `muller`; the `Semantics` trait defines acceptance.
 - `src/congruence/` (right congruences, Cayley graphs, transition profiles), `src/minimization/partition_refinement.rs`, `src/families/` (FDFA, FWPM), `src/hoa/` (feature `hoa`), `src/dot.rs` (Graphviz/dot output and rendering), `src/random/` (feature `random`).
 
-Edges are labeled with alphabet *expressions*; a *transition* is the concrete (state, symbol) step. Capabilities are layered via extra traits rather than one large trait; add a trait or blanket impl rather than extending `TransitionSystem`.
+Edges are labeled with alphabet *expressions*; a *transition* is the concrete (state, symbol) step. Every edge is handed out as an `EdgeRef`, so adding a storage or an adapter does not add an edge type. Capabilities are layered via extra traits rather than one large trait; add a trait or blanket impl rather than extending `TransitionSystem`.
 
 Features: `default = ["hoa"]`; opt-in: `random`, `render` (SVG/PNG via `resvg`/`layout-rs`, experimental), `graphviz` (calls the `dot` executable, implies `render`). Text `dot` output is always available.
 

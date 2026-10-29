@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::{cell::OnceCell, collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use crate::congruence::MinimalRepresentative;
-use crate::ts::{AccessWords, EdgeColor, EdgeExpression, IsEdge, StateIndex, SymbolOf};
+use crate::ts::{AccessWords, EdgeColor, EdgeExpression, StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
 use crate::{alphabet::Expression, math::FxIndexSet};
 use itertools::Itertools;
@@ -169,7 +169,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                 for edge in it {
                     let p = edge.target();
                     if !self.states.contains(&p) {
-                        edges.insert((*q, edge.expression().clone(), edge.color().into_owned(), p));
+                        edges.insert((*q, edge.expression().clone(), edge.color().clone(), p));
                     }
                 }
             }
@@ -191,7 +191,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                     let p = edge.target();
                     for a in edge.expression().symbols() {
                         if !self.states.contains(&p) {
-                            edges.insert((*q, a, edge.color().into_owned(), p));
+                            edges.insert((*q, a, edge.color().clone(), p));
                         }
                     }
                 }
@@ -215,7 +215,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                 for edge in it {
                     let p = edge.target();
                     if self.states.contains(&p) {
-                        edges.insert((*q, edge.expression().clone(), edge.color().into_owned(), p));
+                        edges.insert((*q, edge.expression().clone(), edge.color().clone(), p));
                     }
                 }
             }
@@ -239,7 +239,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                     let p = edge.target();
                     for a in edge.expression().symbols() {
                         if self.states.contains(&p) {
-                            edges.insert((*q, a, edge.color().into_owned(), p));
+                            edges.insert((*q, a, edge.color().clone(), p));
                         }
                     }
                 }

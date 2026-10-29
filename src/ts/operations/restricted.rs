@@ -1,8 +1,9 @@
+use crate::ts::EdgeOf;
 use crate::ts::SymbolOf;
 
 use crate::ts::States;
 use crate::ts::predecessors::PredecessorIterable;
-use crate::ts::{Deterministic, EdgeColor, IdType, IsEdge, StateIndex};
+use crate::ts::{Deterministic, EdgeColor, IdType, StateIndex};
 use crate::{Congruence, Pointed, TransitionSystem};
 use std::borrow::Cow;
 use std::collections::BTreeSet;
@@ -10,8 +11,9 @@ use std::marker::PhantomData;
 
 /// Abstracts the filtering of a transition system's state indices. This trait is implemented by
 /// functions which take a state index and return a boolean value indicating whether the state index
-/// should be filtered out or not. It is also implemented by [`Vec`] and [`crate::math::FxIndexSet`] which are used to
-/// filter out state indices that are not contained in the vector or set.
+/// should be filtered out or not. It is also implemented by [`crate::ts::StateSet`] and [`BTreeSet`], which keep exactly the
+/// state indices that they contain. A `StateSet` answers in constant time, a `Vec` would need a
+/// linear scan per edge and is therefore not accepted.
 pub trait StateIndexFilter<Idx: IdType> {
     /// This method is called to check whether an index should be present in a filtered transition
     /// system or not. Any index for which the function returns `true`, will be present, while all those
@@ -37,7 +39,7 @@ where
     }
 }
 
-impl<Idx> StateIndexFilter<Idx> for Vec<Idx>
+impl<Idx> StateIndexFilter<Idx> for crate::ts::StateSet<Idx>
 where
     Idx: IdType,
 {
@@ -74,11 +76,6 @@ where
     type EdgeColor = Ts::EdgeColor;
 
     type StateColor = Ts::StateColor;
-
-    type EdgeRef<'this>
-        = Ts::EdgeRef<'this>
-    where
-        Self: 'this;
 
     type EdgesFromIter<'this>
         = RestrictedEdgesFromIter<'this, Ts, F>
@@ -229,7 +226,7 @@ impl<'a, Ts: TransitionSystem + 'a, F> Iterator for RestrictedEdgesFromIter<'a, 
 where
     F: StateIndexFilter<Ts::StateIndex>,
 {
-    type Item = Ts::EdgeRef<'a>;
+    type Item = EdgeOf<'a, Ts>;
     fn next(&mut self) -> Option<Self::Item> {
         self.it
             .by_ref()
@@ -248,7 +245,7 @@ impl<'a, Ts: PredecessorIterable + 'a, F> Iterator for RestrictedEdgesToIter<'a,
 where
     F: StateIndexFilter<Ts::StateIndex>,
 {
-    type Item = Ts::PreEdgeRef<'a>;
+    type Item = EdgeOf<'a, Ts>;
     fn next(&mut self) -> Option<Self::Item> {
         self.it
             .by_ref()
@@ -290,11 +287,6 @@ where
     type StateColor = D::StateColor;
 
     type EdgeColor = D::EdgeColor;
-
-    type EdgeRef<'this>
-        = D::EdgeRef<'this>
-    where
-        Self: 'this;
 
     type EdgesFromIter<'this>
         = ColorRestrictedEdgesFrom<'this, D>
@@ -350,11 +342,6 @@ where
 }
 
 impl<D: PredecessorIterable<EdgeColor = usize>> PredecessorIterable for EdgeColorRestricted<D> {
-    type PreEdgeRef<'this>
-        = D::PreEdgeRef<'this>
-    where
-        Self: 'this;
-
     type EdgesToIter<'this>
         = ColorRestrictedEdgesTo<'this, &'this D>
     where
@@ -374,7 +361,7 @@ where
     D: Deterministic,
     EdgeColor<D>: Ord,
 {
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         self.ts()
             .edge(state, symbol)
             .filter(|t| *t.color() <= self.max && self.min <= *t.color())
@@ -394,7 +381,7 @@ impl<'a, D: TransitionSystem> Iterator for ColorRestrictedEdgesFrom<'a, D>
 where
     EdgeColor<D>: Ord,
 {
-    type Item = D::EdgeRef<'a>;
+    type Item = EdgeOf<'a, D>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.it
@@ -427,7 +414,7 @@ impl<'a, D: PredecessorIterable> Iterator for ColorRestrictedEdgesTo<'a, D>
 where
     EdgeColor<D>: Ord,
 {
-    type Item = D::PreEdgeRef<'a>;
+    type Item = EdgeOf<'a, D>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.it
@@ -471,5 +458,19 @@ mod tests {
 
         let restricted = dfa.restrict_state_indices(|idx| idx != 2);
         assert!(!restricted.into_dfa().accepts("aa"));
+    }
+
+    #[test]
+    fn restricting_by_a_state_set() {
+        use crate::ts::{Builder, Deterministic, StateSet, States};
+        let ts = Builder::without_colors()
+            .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
+            .into_dts_with_initial(0);
+        let keep: StateSet<u32> = [0, 1].into_iter().collect();
+        let restricted = (&ts).restrict_state_indices(keep);
+        assert_eq!(restricted.reached_state("a"), Some(1));
+        assert_eq!(restricted.reached_state("aa"), None);
+        assert!(restricted.contains_state(1));
+        assert!(!restricted.contains_state(2));
     }
 }

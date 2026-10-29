@@ -1,7 +1,6 @@
 use super::LinkedListTransitionSystem;
-use crate::ts::{DefaultIdType, DenseId, IntoEdgeTuple, IsEdge};
+use crate::ts::{DefaultIdType, DenseId, EdgeRef, IntoEdgeTuple};
 use crate::{Color, Void, alphabet::Alphabet};
-use std::borrow::Cow;
 use std::fmt::Debug;
 
 /// Represents an edge in a non-deterministic transition system, see [`crate::NTS`]. It stores a color, an
@@ -149,21 +148,17 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool>
     }
 }
 
-impl<'a, E, C: Clone> IsEdge<'a, E, DefaultIdType, C> for &'a LinkedListTransitionSystemEdge<E, C> {
-    fn target(&self) -> DefaultIdType {
-        self.target.try_into().unwrap()
-    }
-
-    fn color(&self) -> Cow<'_, C> {
-        Cow::Borrowed(&self.color)
-    }
-
-    fn expression(&self) -> &'a E {
-        &self.expression
-    }
-
-    fn source(&self) -> DefaultIdType {
-        self.source.try_into().unwrap()
+impl<E, C: Clone> LinkedListTransitionSystemEdge<E, C> {
+    /// Returns the edge as the reference that transition systems yield.
+    #[inline(always)]
+    pub(super) fn as_edge_ref(&self) -> EdgeRef<'_, DefaultIdType, E, C> {
+        // the indices were converted from `DefaultIdType` when the edge was created
+        EdgeRef::borrowed(
+            self.source as DefaultIdType,
+            &self.expression,
+            &self.color,
+            self.target as DefaultIdType,
+        )
     }
 }
 

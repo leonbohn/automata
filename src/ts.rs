@@ -17,7 +17,7 @@ mod id_collections;
 pub use id_collections::{CompactIdMap, StateMap, StateSet, StateSetIter};
 
 mod edge;
-pub use edge::{Edge, EdgeReference, IsEdge};
+pub use edge::EdgeRef;
 
 mod transitions_from;
 pub use transitions_from::{DeterministicEdgesFrom, TransitionsFrom};
@@ -95,13 +95,8 @@ pub trait TransitionSystem: Sized {
     /// The type of the colors of the edges of the transition system.
     type EdgeColor: Color;
 
-    /// The type of the references to the transitions of the transition system.
-    type EdgeRef<'this>: IsEdge<'this, EdgeExpression<Self>, Self::StateIndex, EdgeColor<Self>>
-    where
-        Self: 'this;
-
     /// The type of the iterator over the transitions that start in a given state.
-    type EdgesFromIter<'this>: Iterator<Item = Self::EdgeRef<'this>>
+    type EdgesFromIter<'this>: Iterator<Item = EdgeOf<'this, Self>>
     where
         Self: 'this;
 
@@ -239,14 +234,20 @@ pub trait TransitionSystem: Sized {
     /// [`Self::map_edge_colors()`] but allows for a more fine-grained control over the
     /// recoloring process, by giving access not only to the color itself, but also to
     /// the origin, target and expression of the respective edge.
+    ///
+    /// Like the adapters of [`Iterator`], this is **lazy**: `f` runs whenever a color is
+    /// accessed and nothing is cached. Use `collect` to materialize the result.
     #[inline(always)]
-    fn map_edge_colors_full<D, F>(self, f: F) -> operations::MapEdges<Self, F>
+    fn map_edge_colors_full<D, F>(
+        self,
+        f: F,
+    ) -> operations::Recolor<Self, operations::Keep, operations::EdgeFn<F>>
     where
         F: Fn(Self::StateIndex, &EdgeExpression<Self>, Self::EdgeColor, Self::StateIndex) -> D,
-        D: Clone,
+        D: Color,
         Self: Sized,
     {
-        operations::MapEdges::new(self, f)
+        operations::Recolor::new(self, operations::Keep, operations::EdgeFn(f))
     }
 
     /// Removes all coloring from `self`, giving a transition system that has edges and states
@@ -256,12 +257,16 @@ pub trait TransitionSystem: Sized {
     where
         Self: Sized,
     {
-        self.erase_state_colors().erase_edge_colors()
+        operations::Recolor::new(
+            self,
+            operations::StateColorFn((|_| Void) as fn(Self::StateColor) -> Void),
+            operations::ColorFn((|_| Void) as fn(Self::EdgeColor) -> Void),
+        )
     }
 
     /// Completely removes the edge coloring.
     #[inline(always)]
-    fn erase_edge_colors(self) -> operations::MapEdgeColor<Self, fn(Self::EdgeColor) -> Void>
+    fn erase_edge_colors(self) -> operations::EraseEdgeColors<Self>
     where
         Self: Sized,
     {
@@ -270,23 +275,30 @@ pub trait TransitionSystem: Sized {
 
     /// Completely removes the state coloring.
     #[inline(always)]
-    fn erase_state_colors(self) -> operations::MapStateColor<Self, fn(Self::StateColor) -> Void>
+    fn erase_state_colors(self) -> operations::EraseStateColors<Self>
     where
         Self: Sized,
     {
-        self.map_state_colors(|_| Void)
+        operations::Recolor::new(
+            self,
+            operations::StateColorFn((|_| Void) as fn(Self::StateColor) -> Void),
+            operations::Keep,
+        )
     }
 
     /// Map the edge colors of `self` with the given function `f`.
+    ///
+    /// Like [`Iterator::map`], this is **lazy**: `f` runs whenever a color is accessed and
+    /// nothing is cached. Use `collect` to materialize the result.
     #[inline(always)]
-    fn map_edge_colors<D: Clone, F: Fn(Self::EdgeColor) -> D>(
+    fn map_edge_colors<D: Color, F: Fn(Self::EdgeColor) -> D>(
         self,
         f: F,
-    ) -> operations::MapEdgeColor<Self, F>
+    ) -> operations::Recolor<Self, operations::Keep, operations::ColorFn<F>>
     where
         Self: Sized,
     {
-        operations::MapEdgeColor::new(self, f)
+        operations::Recolor::new(self, operations::Keep, operations::ColorFn(f))
     }
 
     /// Consumes and recolors `self` with the colors as given by `provider`.
@@ -307,20 +319,26 @@ pub trait TransitionSystem: Sized {
     fn with_state_color<P: ProvidesStateColor<Self::StateIndex>>(
         self,
         provider: P,
-    ) -> WithStateColor<Self, P> {
-        WithStateColor::new(self, provider)
-    }
-
-    /// Map the state colors of `self` with the given function.
-    #[inline(always)]
-    fn map_state_colors<D: Clone, F: Fn(Self::StateColor) -> D>(
-        self,
-        f: F,
-    ) -> operations::MapStateColor<Self, F>
+    ) -> operations::Recolor<Self, operations::Provided<P>, operations::Keep>
     where
         Self: Sized,
     {
-        operations::MapStateColor::new(self, f)
+        operations::Recolor::new(self, operations::Provided(provider), operations::Keep)
+    }
+
+    /// Map the state colors of `self` with the given function.
+    ///
+    /// Like [`Iterator::map`], this is **lazy**: `f` runs whenever a color is accessed and
+    /// nothing is cached. Use `collect` to materialize the result.
+    #[inline(always)]
+    fn map_state_colors<D: Color, F: Fn(Self::StateColor) -> D>(
+        self,
+        f: F,
+    ) -> operations::Recolor<Self, operations::StateColorFn<F>, operations::Keep>
+    where
+        Self: Sized,
+    {
+        operations::Recolor::new(self, operations::StateColorFn(f), operations::Keep)
     }
 
     /// Computes the [`connected_components::SccDecomposition`] of self, restricted
@@ -451,7 +469,7 @@ pub trait States: TransitionSystem {
     }
 
     /// Gives an iterator over all transitions of `self`.
-    fn transitions(&self) -> impl Iterator<Item = Self::EdgeRef<'_>> {
+    fn transitions(&self) -> impl Iterator<Item = EdgeOf<'_, Self>> {
         self.states().flat_map(move |q| {
             self.edges_from(q)
                 .expect("should return iterator for state that exists")
@@ -485,7 +503,7 @@ pub trait States: TransitionSystem {
                 self.edges_from(q)
                     .expect("should return iterator for state that exists")
             })
-            .map(|t| t.color().into_owned())
+            .map(|t| t.color().clone())
     }
 
     /// Returns an iterator giving all **unique** colors that are used by the edges of `self`.
@@ -618,11 +636,6 @@ impl<Ts: TransitionSystem> TransitionSystem for &Ts {
 
     type EdgeColor = Ts::EdgeColor;
 
-    type EdgeRef<'this>
-        = Ts::EdgeRef<'this>
-    where
-        Self: 'this;
-
     type EdgesFromIter<'this>
         = Ts::EdgesFromIter<'this>
     where
@@ -653,11 +666,6 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
     type StateColor = Ts::StateColor;
 
     type EdgeColor = Ts::EdgeColor;
-
-    type EdgeRef<'this>
-        = Ts::EdgeRef<'this>
-    where
-        Self: 'this;
 
     type EdgesFromIter<'this>
         = Ts::EdgesFromIter<'this>
@@ -772,8 +780,10 @@ pub type EdgeTuple<Ts> = (
     EdgeColor<Ts>,
     StateIndex<Ts>,
 );
-/// Type alias to obtain the type of a reference to an edge in a given [`TransitionSystem`].
-pub type EdgeRef<'a, T> = <T as TransitionSystem>::EdgeRef<'a>;
+/// Type alias for the reference to an edge of a given [`TransitionSystem`], which is what its
+/// [`TransitionSystem::edges_from`] yields.
+pub type EdgeOf<'a, T> =
+    EdgeRef<'a, StateIndex<T>, EdgeExpression<T>, <T as TransitionSystem>::EdgeColor>;
 
 /// Implementors of this trait have a distinguished (initial) state.
 pub trait Pointed: TransitionSystem {
@@ -808,7 +818,7 @@ impl<P: Pointed> Pointed for &mut P {
     }
 }
 
-use self::operations::{ProvidesStateColor, WithStateColor};
+use self::operations::ProvidesStateColor;
 
 #[cfg(test)]
 mod tests {
