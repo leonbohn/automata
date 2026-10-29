@@ -63,8 +63,10 @@ mod word_as_ts;
 pub use crate::ts::predecessors::PredecessorIterable;
 pub use word_as_ts::WordTs;
 
-/// Encapsulates the transition function δ of a (finite) transition system. This is the main trait that
-/// is used to query a transition system. Transitions are labeled with a [`Alphabet::Expression`], which
+/// Encapsulates the transition function δ of a transition system. This is the main trait that
+/// is used to query a transition system. It only requires that the outgoing edges and the color of
+/// a given state can be computed, so lazily explored systems (subset constructions, products) can
+/// implement it. Everything that needs to see all states is in the subtrait [`States`]. Transitions are labeled with a [`Alphabet::Expression`], which
 /// determines on which [`Alphabet::Symbol`]s the transition can be taken. Additionally, every transition
 /// is labeled with a [`crate::Color`], which can be used to store additional information about it, like an
 /// associated priority.
@@ -73,7 +75,7 @@ pub use word_as_ts::WordTs;
 /// Internally, a transition system is represented as a graph, where the states are the nodes and the
 /// transitions are the edges. However, the transitions are not the same as the edges.
 /// Both store the source and target vertex as well as the color, however an edge is labelled
-/// with an expression, while a transition is labelled with an actual symbol (that [`Matcher::matches`]
+/// with an expression, while a transition is labelled with an actual symbol (that [`crate::alphabet::Matcher::matches`]
 /// the expression). So a transition is a concrete edge that is taken (usually by the run on a word), while
 /// an edge may represent any different number of transitions.
 pub trait TransitionSystem: Sized {
