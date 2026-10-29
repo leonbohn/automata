@@ -12,6 +12,9 @@ pub use restricted::*;
 mod subset;
 pub use subset::SubsetConstruction;
 
+mod reachable;
+pub use reachable::ReachablePart;
+
 mod reverse;
 pub use reverse::Reversed;
 
@@ -30,11 +33,11 @@ pub type EraseColors<Ts> =
 
 #[cfg(test)]
 mod tests {
-    use crate::TransitionSystem;
     use crate::automaton::DFA;
     use crate::representation::IntoTs;
     use crate::ts::Deterministic;
     use crate::ts::operations::{Product, ProductIndex};
+    use crate::{Pointed, TransitionSystem};
 
     #[test]
     fn product() {
@@ -52,7 +55,11 @@ mod tests {
         assert_eq!(xxx.reached_state_index("abb"), Some(ProductIndex(0, 0)));
         assert_eq!(xxx.reached_state_color("aa"), Some((false, true)));
 
-        let yyy = xxx.clone().map_state_colors(|(a, b)| a || b).into_dfa();
+        let yyy = xxx
+            .clone()
+            .reachable_part()
+            .map_state_colors(|(a, b)| a || b)
+            .into_dfa();
         assert_eq!(yyy.reached_state_color("aa"), Some(true));
     }
 }

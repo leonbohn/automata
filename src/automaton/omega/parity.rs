@@ -1,3 +1,4 @@
+use crate::ts::States;
 use rustc_hash::FxHashMap;
 use std::{
     collections::{BTreeSet, VecDeque},
@@ -89,7 +90,7 @@ parity_semantics!(MaxOddParityCondition, true, false);
 
 impl<D> DPA<D>
 where
-    D: Deterministic<EdgeColor = Int>,
+    D: Deterministic<EdgeColor = Int> + States,
 {
     /// Verifies whether or not the unerlying transition system represents an
     /// informative right congruence or not. Specifically, this means that
@@ -127,7 +128,7 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::ts::{Deterministic, Builder, TransitionSystem};
+    /// use automata::ts::{Deterministic, Builder, States, TransitionSystem};
     ///
     /// let dpa = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
@@ -144,7 +145,9 @@ where
     /// assert_eq!(streamlined.size(), 1);
     /// assert_eq!(streamlined.last_edge_color("ab"), Some(1))
     /// ```
-    pub fn streamlined(&self) -> DPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
+    pub fn streamlined(
+        &self,
+    ) -> DPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
         D: Clone + IntoTs,
@@ -394,7 +397,7 @@ where
     /// during the run of `self` on `w` is equal to `k` and the least color seen infinitely often
     /// during the run of `other` on `w` is equal to `l`. If no such word exists, `None` is returned.
     /// Main use of this is to witness the fact that `self` and `other` are not language-equivalent.
-    pub fn witness_colors<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
+    pub fn witness_colors<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States>(
         &self,
         k: Int,
         other: &DPA<O>,
@@ -403,7 +406,7 @@ where
         trace!("attempting to witness colors {k} and {l}");
         let t1 = self.edge_color_restricted(k, Int::MAX);
         let t2 = other.edge_color_restricted(l, Int::MAX);
-        let prod = t1.ts_product(t2);
+        let prod = t1.ts_product(t2).reachable_part();
         let sccs = prod.sccs();
         for (_, scc) in sccs.iter() {
             if scc.is_transient() {
@@ -437,7 +440,9 @@ where
     /// Attempts to find an omega-word that witnesses the fact that `self` and `other` are not
     /// language-equivalent. If no such word exists, `None` is returned. Internally, this uses
     /// [`Self::witness_not_subset_of`] in both directions.
-    pub fn witness_inequivalence<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
+    pub fn witness_inequivalence<
+        O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States,
+    >(
         &self,
         other: &DPA<O>,
     ) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
@@ -447,7 +452,9 @@ where
 
     /// Returns true if `self` is language-equivalent to `other`, i.e. if and only if the Two
     /// DPAs accept the same language.
-    pub fn language_equivalent<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
+    pub fn language_equivalent<
+        O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States,
+    >(
         &self,
         other: &DPA<O>,
     ) -> bool {
@@ -456,7 +463,7 @@ where
 
     /// Returns true if and only if `self` is included in `other`, i.e. if and only if the language
     /// accepted by `self` is a subset of the language accepted by `other`.
-    pub fn included_in<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
+    pub fn included_in<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States>(
         &self,
         other: &DPA<O>,
     ) -> bool {
@@ -465,7 +472,7 @@ where
 
     /// Returns true if and only if `self` includes `other`, i.e. if and only if the language
     /// accepted by `self` is a superset of the language accepted by `other`.
-    pub fn includes<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
+    pub fn includes<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States>(
         &self,
         other: &DPA<O>,
     ) -> bool {
@@ -474,7 +481,9 @@ where
 
     /// Attempts to find an omega-word that witnesses the fact that `self` is not included in `other`.
     /// If no such word exists, `None` is returned.
-    pub fn witness_not_subset_of<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>(
+    pub fn witness_not_subset_of<
+        O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States,
+    >(
         &self,
         other: &DPA<O>,
     ) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
@@ -499,7 +508,9 @@ where
     /// "Computing the rabin index of a finite automaton". The procedure that this implementation actually uses
     /// is outlined by Schewe and Ehlers in [Natural Colors of Infinite Words](https://arxiv.org/pdf/2207.11000.pdf)
     /// in Section 4.1, Definition 2.
-    pub fn normalized(&self) -> DPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>>
+    pub fn normalized(
+        &self,
+    ) -> DPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
         D: Clone + IntoTs,
@@ -631,6 +642,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::DPA;
+    use crate::States;
     use crate::Void;
     use crate::representation::{CollectTs, IntoTs};
     use crate::ts::operations::Product;
@@ -773,7 +785,7 @@ mod tests {
 
         let l = &good[0];
         let r = &bad[2];
-        let prod = l.ts_product(r);
+        let prod = l.ts_product(r).reachable_part();
         let _sccs = prod.sccs();
         assert!(!good[0].language_equivalent(&bad[2]));
 

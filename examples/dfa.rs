@@ -2,7 +2,8 @@
 //!
 //! Run with `cargo run --example dfa`.
 
-use automata::{TransitionSystem, automaton::DFA, ts::Builder};
+use automata::States;
+use automata::{automaton::DFA, ts::Builder};
 
 /// The DFA over `{a, b}` that accepts the words in which the number of `a`s leaves the given
 /// remainder when divided by three.

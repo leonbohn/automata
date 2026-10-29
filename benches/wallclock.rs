@@ -5,6 +5,7 @@
 //! service lists them in the detail view of a run only). Same inputs as the other targets,
 //! just fewer of them.
 
+use automata::{Pointed, States};
 mod common;
 
 use automata::TransitionSystem;
@@ -47,6 +48,7 @@ fn operations(c: &mut Criterion) {
                 nts.clone()
                     .with_initial(0)
                     .subset_construction()
+                    .reachable_part()
                     .collect_dts()
                     .size(),
             )

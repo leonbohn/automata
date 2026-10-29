@@ -1,4 +1,5 @@
 use crate::alphabet::{Alphabet, CharAlphabet};
+use crate::ts::States;
 use crate::{Pointed, TransitionSystem};
 use bimap::BiBTreeMap;
 use fixedbitset::FixedBitSet;
@@ -67,7 +68,7 @@ impl IndexedAlphabet for CharAlphabet {
 }
 
 /// Trait for transition systems that allow insertion of states and transitions.
-pub trait Sproutable: TransitionSystem {
+pub trait Sproutable: States {
     /// Adds a new state with the given color. The method returns the index of the newly created
     /// state.
     ///
@@ -75,7 +76,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet, Void,
-    ///     ts::{Deterministic, ForAlphabet, Builder, Shrinkable, Sproutable, TransitionSystem},
+    ///     ts::{Deterministic, ForAlphabet, Builder, Shrinkable, Sproutable, States, TransitionSystem},
     ///     DTS,
     /// };
     ///     
@@ -134,7 +135,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet,
-    ///     ts::{Deterministic, ForAlphabet, Builder, TransitionSystem, Shrinkable, Sproutable},
+    ///     ts::{Deterministic, ForAlphabet, Builder, States, TransitionSystem, Shrinkable, Sproutable},
     ///     DTS,
     /// };
     ///
@@ -152,7 +153,7 @@ pub trait Sproutable: TransitionSystem {
     ) -> (Self, BiBTreeMap<Ts::StateIndex, StateIndex<Self>>)
     where
         Self: ForAlphabet<Ts::Alphabet>,
-        Ts: TransitionSystem<
+        Ts: States<
                 Alphabet = Self::Alphabet,
                 StateColor = StateColor<Self>,
                 EdgeColor = EdgeColor<Self>,
@@ -196,7 +197,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet,
-    ///     ts::{Deterministic, TransitionSystem, ForAlphabet, Builder, Shrinkable, Sproutable},
+    ///     ts::{Deterministic, States, TransitionSystem, ForAlphabet, Builder, Shrinkable, Sproutable},
     ///     DTS,
     /// };
     ///
@@ -211,7 +212,7 @@ pub trait Sproutable: TransitionSystem {
     fn sprout_from_ts<Ts>(ts: Ts) -> Self
     where
         Self: ForAlphabet<Ts::Alphabet>,
-        Ts: TransitionSystem<
+        Ts: States<
                 Alphabet = Self::Alphabet,
                 StateColor = StateColor<Self>,
                 EdgeColor = EdgeColor<Self>,
@@ -233,7 +234,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet, Void,
-    ///     ts::{Deterministic, ForAlphabet, Builder, Shrinkable, TransitionSystem, Sproutable},
+    ///     ts::{Deterministic, ForAlphabet, Builder, Shrinkable, States, TransitionSystem, Sproutable},
     ///     DTS,
     /// };
     ///
@@ -253,7 +254,7 @@ pub trait Sproutable: TransitionSystem {
     /// ```
     /// use automata::{
     ///     alphabet::CharAlphabet, Void,
-    ///     ts::{Deterministic, ForAlphabet, Builder, TransitionSystem, Shrinkable, Sproutable},
+    ///     ts::{Deterministic, ForAlphabet, Builder, States, TransitionSystem, Shrinkable, Sproutable},
     ///     DTS,
     /// };
     /// let mut ts = Builder::without_colors()
@@ -341,6 +342,7 @@ pub trait Sproutable: TransitionSystem {
 
 #[cfg(test)]
 mod tests {
+    use crate::States;
     use crate::alphabet::{Alphabet, CharAlphabet};
     use crate::ts::{Deterministic, ForAlphabet, Sproutable};
     use crate::{DTS, TransitionSystem};

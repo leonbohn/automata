@@ -1,6 +1,7 @@
 use crate::alphabet::{Alphabet, CharAlphabet};
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
 use crate::representation::IntoTs;
+use crate::ts::States;
 use crate::ts::{DefaultIdType, ForAlphabet, Shrinkable, Sproutable, StateIndex};
 use crate::word::ReducedOmegaWord;
 use crate::{DTS, TransitionSystem};
@@ -256,7 +257,8 @@ mod tests {
         generate_random_dba, generate_random_dpa, generate_random_omega_words,
         generate_random_ts_sized, generate_random_words,
     };
-    use crate::{TransitionSystem, random::CharAlphabet};
+    use crate::States;
+    use crate::random::CharAlphabet;
 
     #[test]
     fn random_ts_sized() {

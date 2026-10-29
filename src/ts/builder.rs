@@ -506,6 +506,7 @@ impl Builder<Int, Void, true> {
 mod tests {
     use super::{Builder, BuilderError};
     use crate::TransitionSystem;
+    use crate::ts::States;
 
     #[test]
     fn non_contiguous_state_ids_with_default_color() {

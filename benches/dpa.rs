@@ -23,6 +23,7 @@ fn chain(n: usize) -> DPA {
 
 // ---- normalization -----------------------------------------------------------------------------
 
+use automata::States;
 #[library_benchmark]
 #[bench::scrambled_1000(args = (1_000), setup = scrambled)]
 #[bench::scrambled_4000(args = (4_000), setup = scrambled)]

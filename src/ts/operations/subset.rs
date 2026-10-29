@@ -171,18 +171,10 @@ impl<Ts: TransitionSystem> TransitionSystem for SubsetConstruction<Ts> {
     where
         Self: 'this;
 
-    type StateIndices<'this>
-        = crate::ts::Bfs<'this, Self>
-    where
-        Self: 'this;
-
     type Alphabet = Ts::Alphabet;
 
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts.alphabet()
-    }
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.reachable_state_indices_from(self.initial())
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -209,6 +201,7 @@ where
             f,
             "Subset construction\n{}",
             self.build_transition_table(
+                self.reachable_state_indices_from(0),
                 |idx, _| format!(
                     "{{{}}}",
                     self.states
@@ -251,6 +244,7 @@ impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
 mod tests {
     use crate::representation::CollectTs;
     use crate::{NTS, TransitionSystem};
+    use crate::{Pointed, States};
 
     #[test]
     fn subset_construction() {
@@ -268,7 +262,8 @@ mod tests {
         let dts = nts.subset_construction();
 
         assert_eq!(dts.reachable_state_indices().count(), 3);
-        assert_eq!(dts.state_indices().count(), 3);
-        assert_eq!(dts.trim_collect_pointed().0.size(), 3);
+        let finite = dts.reachable_part();
+        assert_eq!(finite.state_indices().count(), 3);
+        assert_eq!(finite.collect_dts().size(), 3);
     }
 }

@@ -8,8 +8,8 @@
 //!
 //! Both can hand images to the viewer of the system (`open_in_viewer`).
 
-use crate::TransitionSystem;
 use crate::ts::IsEdge;
+use crate::ts::States;
 use itertools::Itertools;
 
 mod attributes;
@@ -29,7 +29,7 @@ pub use render::{RenderError, open_in_viewer, svg_to_data_url};
 /// Transition systems that can be written in the [DOT](https://graphviz.org/doc/info/lang.html)
 /// format. [`Self::dot_representation`] is always available; rendering to images is experimental
 /// and needs the features `render` or `graphviz`.
-pub trait Dottable: TransitionSystem {
+pub trait Dottable: States {
     /// Renders the DOT representation to an SVG document (experimental, feature `render`).
     #[cfg(feature = "render")]
     fn try_svg(&self) -> Result<String, RenderError> {

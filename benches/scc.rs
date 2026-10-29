@@ -2,7 +2,6 @@
 
 mod common;
 
-use automata::TransitionSystem;
 use common::Dts;
 use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
@@ -55,6 +54,7 @@ fn tarjan(ts: Dts) -> usize {
 }
 
 // The recursive variant, only on shapes where it does not overflow the stack (#23).
+use automata::States;
 #[library_benchmark]
 #[bench::ring_1000(args = (1_000), setup = ring)]
 #[bench::small_cycles_1000(args = (1_000), setup = small_cycles)]

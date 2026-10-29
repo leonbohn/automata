@@ -3,7 +3,8 @@
 
 #![cfg(feature = "hoa")]
 
-use automata::{TransitionSystem, hoa::HoaString};
+use automata::States;
+use automata::hoa::HoaString;
 use std::path::{Path, PathBuf};
 
 fn fixtures(dir: &Path, out: &mut Vec<PathBuf>) {

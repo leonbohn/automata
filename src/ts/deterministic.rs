@@ -23,7 +23,7 @@ use crate::{
     word,
     word::{FiniteWord, OmegaWord},
 };
-use crate::{Pointed, TransitionSystem};
+use crate::{Pointed, States, TransitionSystem};
 use itertools::Itertools;
 
 /// A marker tait indicating that a [`TransitionSystem`] is deterministic, meaning for every state and
@@ -106,7 +106,6 @@ pub trait Deterministic: TransitionSystem {
         state: StateIndex<Self>,
         word: W,
     ) -> bool {
-        assert!(self.contains_state_index(state));
         Some(state) == self.reached_state_index_from(state, word)
     }
 
@@ -134,9 +133,6 @@ pub trait Deterministic: TransitionSystem {
         state: StateIndex<Self>,
         symbol: SymbolOf<Self>,
     ) -> Option<Self::StateIndex> {
-        if !self.contains_state_index(state) {
-            return None;
-        }
         self.edge(state, symbol).map(|t| t.target())
     }
 
@@ -147,9 +143,6 @@ pub trait Deterministic: TransitionSystem {
         state: StateIndex<Self>,
         expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
-        if !self.contains_state_index(state) {
-            return None;
-        }
         let mut symbols = expression.symbols();
         let sym = symbols.next().unwrap();
         assert_eq!(
@@ -445,9 +438,11 @@ pub trait Deterministic: TransitionSystem {
         self.last_edge_color_from(self.initial(), word)
     }
 
-    /// Returns a string representation of the transition table of the transition system.
+    /// Returns a string representation of the transition table of the transition system, with
+    /// one row for each of the given `states` (in ascending order).
     fn build_transition_table<'a, SD, ED>(
         &'a self,
+        states: impl IntoIterator<Item = Self::StateIndex>,
         state_decorator: SD,
         edge_decorator: ED,
     ) -> String
@@ -460,7 +455,7 @@ pub trait Deterministic: TransitionSystem {
             std::iter::once("State".to_string())
                 .chain(self.alphabet().universe().map(|s| format!("{:?}", s))),
         );
-        for id in self.state_indices().sorted() {
+        for id in states.into_iter().sorted() {
             let mut row = vec![
                 state_decorator(
                     id,
@@ -545,7 +540,7 @@ pub trait Deterministic: TransitionSystem {
     /// This is done by counting whether the number of minimal representatives matches the number of states.
     fn is_accessible(&self) -> bool
     where
-        Self: Pointed,
+        Self: Pointed + States,
     {
         self.size() == self.reachable_state_indices().count()
     }

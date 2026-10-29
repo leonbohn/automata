@@ -1,3 +1,4 @@
+use crate::ts::States;
 use itertools::Itertools;
 use tracing::{trace, warn};
 
@@ -164,13 +165,11 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
 
 #[cfg(test)]
 mod tests {
+    use crate::States;
     use crate::alphabet::CharAlphabet;
     use crate::automaton::DFA;
+    use crate::families::{FDFA, FWPM};
     use crate::ts::Builder;
-    use crate::{
-        TransitionSystem,
-        families::{FDFA, FWPM},
-    };
 
     #[test_log::test]
     fn fdfa_to_fwpm() {

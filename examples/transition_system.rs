@@ -2,6 +2,7 @@
 //!
 //! Run with `cargo run --example transition_system`.
 
+use automata::States;
 use automata::{
     math,
     representation::CollectTs,

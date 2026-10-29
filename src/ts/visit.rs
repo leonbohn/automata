@@ -345,6 +345,7 @@ mod tests {
     use crate::alphabet::Expression;
     use crate::automaton::DFA;
     use crate::congruence::MinimalRepresentative;
+    use crate::ts::States;
     use crate::ts::{Builder, Deterministic, IsEdge};
     use itertools::Itertools;
     use std::collections::{BTreeMap, BTreeSet};

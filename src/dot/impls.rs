@@ -2,6 +2,7 @@ use super::{DotStateAttribute, DotTransitionAttribute, Dottable};
 use crate::DTS;
 use crate::Void;
 use crate::automaton::{DFA, DPA, MealyMachine, MooreMachine};
+use crate::ts::States;
 use crate::ts::{Deterministic, IsEdge, StateColor, StateIndex};
 use crate::{Color, Int, Pointed, Show, TransitionSystem, alphabet::Alphabet};
 
@@ -88,7 +89,7 @@ where
 
 impl<M> Dottable for MooreMachine<M>
 where
-    M: Deterministic,
+    M: Deterministic + States,
 {
     fn dot_name(&self) -> Option<String> {
         Some("DPA".into())
@@ -126,7 +127,7 @@ where
 
 impl<M> Dottable for MealyMachine<M>
 where
-    M: Deterministic,
+    M: Deterministic + States,
 {
     fn dot_name(&self) -> Option<String> {
         Some("DPA".into())
@@ -168,7 +169,7 @@ where
 
 impl<D> Dottable for DPA<D>
 where
-    D: Deterministic<EdgeColor = Int>,
+    D: Deterministic<EdgeColor = Int> + States,
 {
     fn dot_name(&self) -> Option<String> {
         Some("DPA".into())

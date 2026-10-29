@@ -1,5 +1,6 @@
 //! Building, traversing, transforming and shrinking transition systems.
 
+use automata::{Pointed, States};
 mod common;
 
 use automata::alphabet::CharAlphabet;
@@ -273,6 +274,7 @@ fn subset_construction(nts: automata::NTS<CharAlphabet, bool, Void>) -> usize {
     black_box(
         nts.with_initial(0)
             .subset_construction()
+            .reachable_part()
             .collect_dts()
             .size(),
     )

@@ -1,3 +1,4 @@
+use crate::States;
 use std::borrow::Cow;
 use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
@@ -243,9 +244,7 @@ impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
     }
 
     /// The profile of the empty word on the transition system `ts`.
-    pub fn empty<Ts: TransitionSystem<StateIndex = Idx, StateColor = Q, EdgeColor = C>>(
-        ts: Ts,
-    ) -> Self {
+    pub fn empty<Ts: States<StateIndex = Idx, StateColor = Q, EdgeColor = C>>(ts: Ts) -> Self {
         Self::empty_for_states(ts.state_indices().collect())
     }
 
@@ -342,7 +341,7 @@ where
 
 impl<Ts> TransitionMonoid<Ts>
 where
-    Ts: Deterministic + Pointed,
+    Ts: Deterministic + Pointed + States,
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
@@ -440,12 +439,18 @@ where
         self.tps.iter().position(|(tp, _)| *tp == profile)
     }
 
-    fn build(ts: Ts) -> TransitionMonoid<Ts> {
+    fn build(ts: Ts) -> TransitionMonoid<Ts>
+    where
+        Ts: States,
+    {
         let indices = ts.state_indices().collect();
         Self::build_for_states(ts, indices)
     }
 
-    fn build_for_states(ts: Ts, states: Vec<Ts::StateIndex>) -> TransitionMonoid<Ts> {
+    fn build_for_states(ts: Ts, states: Vec<Ts::StateIndex>) -> TransitionMonoid<Ts>
+    where
+        Ts: States,
+    {
         let eps_profile = RunProfile::empty_for_states(states);
         let mut tps = vec![(eps_profile.clone(), 0)];
         let mut strings = vec![(vec![], ProfileEntry::Profile(0))];

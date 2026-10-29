@@ -1,4 +1,5 @@
 use crate::TransitionSystem;
+use crate::ts::States;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{IsEdge, StateIndex};
 use std::borrow::Cow;
@@ -50,21 +51,8 @@ where
     where
         Self: 'this;
 
-    type StateIndices<'this>
-        = Ts::StateIndices<'this>
-    where
-        Self: 'this;
-
     fn alphabet(&self) -> &Self::Alphabet {
         self.0.alphabet()
-    }
-
-    fn state_bound(&self) -> Option<usize> {
-        self.0.state_bound()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.0.state_indices()
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -73,6 +61,24 @@ where
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.0.state_color(state)
+    }
+
+    fn state_bound(&self) -> Option<usize> {
+        self.0.state_bound()
+    }
+}
+
+impl<Ts> States for Reversed<Ts>
+where
+    Ts: PredecessorIterable + States,
+{
+    type StateIndices<'this>
+        = Ts::StateIndices<'this>
+    where
+        Self: 'this;
+
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        self.0.state_indices()
     }
 }
 

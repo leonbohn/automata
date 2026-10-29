@@ -1,3 +1,4 @@
+use crate::ts::States;
 use rustc_hash::FxHashMap;
 use std::hash::Hash;
 
@@ -96,7 +97,10 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
 
     /// Returns an iterator over all transient edges in the transition system. An edge is transient
     /// if its source and target are in different SCCs.
-    pub fn transient_edges(&self) -> impl Iterator<Item = Ts::EdgeRef<'a>> + '_ {
+    pub fn transient_edges(&self) -> impl Iterator<Item = Ts::EdgeRef<'a>> + '_
+    where
+        Ts: States,
+    {
         self.ts.transitions().filter(move |t| {
             let source = t.source();
             let target = t.target();
@@ -279,13 +283,14 @@ impl<Ts: TransitionSystem> PartialEq for SccDecomposition<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
+    use crate::States;
     use crate::Void;
 
     use crate::math::FxIndexSet;
 
     use crate::ts::Builder;
     use crate::{
-        RightCongruence, TransitionSystem,
+        RightCongruence,
         ts::connected_components::{Scc, SccDecomposition},
     };
 

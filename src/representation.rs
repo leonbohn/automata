@@ -1,3 +1,4 @@
+use crate::ts::States;
 use crate::{Color, Int, Void};
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -25,7 +26,7 @@ impl<T: TransitionSystem> EdgeColored<EdgeColor<T>> for T {}
 /// component of its color. Methods that need an initial state are only available for
 /// [`Pointed`] transition systems.
 #[allow(clippy::type_complexity)]
-pub trait CollectTs: TransitionSystem {
+pub trait CollectTs: States {
     /// Collects into a deterministic transition system; the state indices may change.
     fn collect_dts(&self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
         self.collect_dts_preserving().unzip_state_color()
@@ -151,11 +152,11 @@ pub trait CollectTs: TransitionSystem {
         RightCongruence::from_parts(ts, initial)
     }
 }
-impl<Ts: TransitionSystem> CollectTs for Ts {}
+impl<Ts: States> CollectTs for Ts {}
 
 /// Like [`CollectTs`], but consumes the transition system.
 #[allow(clippy::type_complexity)]
-pub trait IntoTs: TransitionSystem {
+pub trait IntoTs: States {
     /// Turns `self` into a deterministic transition system; the state indices may change.
     fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
         self.into_dts_preserving().unzip_state_color()
@@ -325,7 +326,7 @@ mod impl_into_ts {
     use crate::alphabet::Alphabet;
     use crate::automaton::Automaton;
     use crate::ts::operations::MapStateColor;
-    use crate::ts::{EdgeColor, EdgeExpression, StateIndex, SymbolOf, operations};
+    use crate::ts::{EdgeColor, EdgeExpression, StateIndex, operations};
     use crate::{DTS, TransitionSystem};
 
     impl<A: Alphabet, Q: Color, C: Color> IntoTs for DTS<A, Q, C> {
@@ -385,23 +386,16 @@ mod impl_into_ts {
     {
     }
 
-    impl<L, R> IntoTs for operations::MatchingProduct<L, R>
-    where
-        L: IntoTs,
-        R: IntoTs,
-        R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = EdgeExpression<L>>,
-        L::StateColor: Clone,
-        R::StateColor: Clone,
-    {
-    }
+    impl<Ts: TransitionSystem> IntoTs for operations::ReachablePart<Ts> {}
     impl<Sem, D> IntoTs for Automaton<D, Sem> where D: IntoTs {}
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::Pointed;
+    use crate::States;
     use crate::representation::IntoTs;
     use crate::ts::Builder;
-    use crate::{Pointed, TransitionSystem};
 
     #[test]
     fn representation() {

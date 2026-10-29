@@ -18,6 +18,7 @@ use crate::Int;
 use crate::Void;
 use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
 use crate::representation::IntoTs;
+use crate::ts::States;
 use crate::ts::{Builder, DefaultIdType, DenseId, ForAlphabet, IsEdge, Sproutable};
 use crate::{DTS, Pointed, TS, TransitionSystem};
 pub use acceptance_mask::{AcceptanceError, AcceptanceMask};

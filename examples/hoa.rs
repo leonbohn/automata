@@ -3,10 +3,8 @@
 //! Run with `cargo run --example hoa` to use a built-in automaton, or pass the path of a file
 //! that contains deterministic parity or Büchi automata: `cargo run --example hoa -- file.hoa`.
 
-use automata::{
-    TransitionSystem,
-    hoa::{HoaString, WriteHoa},
-};
+use automata::States;
+use automata::hoa::{HoaString, WriteHoa};
 
 const EXAMPLE: &str = r#"HOA: v1
 States: 2

@@ -7,6 +7,7 @@
 //! transition systems which have outputs on both the states and the transitions.
 use crate::DTS;
 use crate::Void;
+use crate::ts::States;
 use std::{collections::BTreeSet, time::Instant};
 
 use crate::automaton::{MealyMachine, MooreMachine};
@@ -151,11 +152,11 @@ fn collect_partition<I: crate::ts::IdType>(states: &[I], block_of: &[usize]) -> 
 /// the same sequence of outputs.
 pub fn mealy_greatest_bisimulation<D>(mm: D) -> Partition<D::StateIndex>
 where
-    D: Deterministic,
+    D: Deterministic + States,
     EdgeColor<D>: Color + Eq + std::hash::Hash,
 {
     let start = Instant::now();
-    let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), mm.hint_size().0);
+    let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), 0);
     for q in mm.state_indices() {
         ids.get_or_insert(q);
     }
@@ -199,7 +200,7 @@ pub(crate) type MinimizedMealy<D> = MealyMachine<
 /// minimal automaton that is bisimilar to the input.
 pub fn mealy_partition_refinement<D>(mm: D) -> MinimizedMealy<D>
 where
-    D: Congruence,
+    D: Congruence + States,
     EdgeColor<D>: Color + Eq + std::hash::Hash,
 {
     let partition = mealy_greatest_bisimulation(&mm);
@@ -235,11 +236,11 @@ where
 /// same class of the returned partition are pairwise bisimilar.
 pub fn moore_greatest_bisimulation<D>(mm: D) -> Partition<D::StateIndex>
 where
-    D: Deterministic,
+    D: Deterministic + States,
     StateColor<D>: Color + Eq + std::hash::Hash,
 {
     let start = Instant::now();
-    let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), mm.hint_size().0);
+    let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), 0);
     for q in mm.state_indices() {
         ids.get_or_insert(q);
     }
@@ -285,7 +286,7 @@ where
 /// automaton.
 pub fn moore_partition_refinement<D>(mm: D) -> MooreMachine<DTS<D::Alphabet, D::StateColor, Void>>
 where
-    D: Congruence,
+    D: Congruence + States,
     StateColor<D>: Color + Eq + std::hash::Hash,
 {
     let partition = moore_greatest_bisimulation(&mm);
@@ -323,6 +324,7 @@ mod tests {
     use super::{
         mealy_greatest_bisimulation, moore_greatest_bisimulation, moore_partition_refinement,
     };
+    use crate::States;
     use crate::alphabet::CharAlphabet;
     use crate::representation::IntoTs;
     use crate::ts::{Deterministic, ForAlphabet, IsEdge, Sproutable};

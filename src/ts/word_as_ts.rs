@@ -1,3 +1,4 @@
+use crate::ts::States;
 use crate::{
     alphabet::SimpleAlphabet,
     word::{FiniteWord, OmegaWord, Word},
@@ -121,11 +122,6 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
     where
         Self: 'this;
 
-    type StateIndices<'this>
-        = std::ops::Range<u32>
-    where
-        Self: 'this;
-
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         if state as usize >= self.word.len() {
             return None;
@@ -143,16 +139,23 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
         &self.alphabet
     }
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        0..(self.word.len().try_into().unwrap())
-    }
-
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         if state as usize >= self.word.len() {
             None
         } else {
             Some(Cow::Owned(state))
         }
+    }
+}
+
+impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> States for WordTs<A, W, false> {
+    type StateIndices<'this>
+        = std::ops::Range<u32>
+    where
+        Self: 'this;
+
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        0..(self.word.len().try_into().unwrap())
     }
 }
 
@@ -172,11 +175,6 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for W
 
     type EdgesFromIter<'this>
         = std::iter::Once<Self::EdgeRef<'this>>
-    where
-        Self: 'this;
-
-    type StateIndices<'this>
-        = std::ops::Range<u32>
     where
         Self: 'this;
 
@@ -204,16 +202,23 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for W
         &self.alphabet
     }
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        0..(self.word.combined_len().try_into().unwrap())
-    }
-
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         if state as usize >= self.word.combined_len() {
             None
         } else {
             Some(Cow::Owned(state))
         }
+    }
+}
+
+impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> States for WordTs<A, W, true> {
+    type StateIndices<'this>
+        = std::ops::Range<u32>
+    where
+        Self: 'this;
+
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        0..(self.word.combined_len().try_into().unwrap())
     }
 }
 

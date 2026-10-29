@@ -1,4 +1,5 @@
 mod acceptance_type;
+use crate::ts::States;
 use crate::{
     Color,
     alphabet::{Alphabet, CharAlphabet, Matcher},
@@ -92,7 +93,7 @@ impl<T: TransitionSystem, Sem> Automaton<T, Sem> {
     /// use automata::{
     ///     automaton::{Automaton, DFA},
     ///     alphabet::CharAlphabet,
-    ///     ts::{Sproutable, TransitionSystem},
+    ///     ts::{Sproutable, States, TransitionSystem},
     /// };
     ///
     /// let mut dfa: DFA = Automaton::new_with_initial_color(CharAlphabet::of_size(2), false);
@@ -330,21 +331,8 @@ impl<T: TransitionSystem, Sem> TransitionSystem for Automaton<T, Sem> {
     where
         Self: 'this;
 
-    type StateIndices<'this>
-        = T::StateIndices<'this>
-    where
-        Self: 'this;
-
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts.alphabet()
-    }
-
-    fn state_bound(&self) -> Option<usize> {
-        self.ts.state_bound()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts.state_indices()
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -353,6 +341,21 @@ impl<T: TransitionSystem, Sem> TransitionSystem for Automaton<T, Sem> {
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.ts.state_color(state)
+    }
+
+    fn state_bound(&self) -> Option<usize> {
+        self.ts.state_bound()
+    }
+}
+
+impl<T: States, Sem> States for Automaton<T, Sem> {
+    type StateIndices<'this>
+        = T::StateIndices<'this>
+    where
+        Self: 'this;
+
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        self.ts.state_indices()
     }
 
     fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
@@ -369,13 +372,13 @@ impl<T: TransitionSystem + std::fmt::Debug, Sem: std::fmt::Debug> std::fmt::Debu
 }
 
 /// Iterator over the accepting states of a [`TransitionSystem`] that have a certain coloring.
-pub struct StatesWithColor<'a, Ts: TransitionSystem> {
+pub struct StatesWithColor<'a, Ts: States> {
     ts: &'a Ts,
     iter: Ts::StateIndices<'a>,
     color: Ts::StateColor,
 }
 
-impl<'a, Ts: TransitionSystem> StatesWithColor<'a, Ts> {
+impl<'a, Ts: States> StatesWithColor<'a, Ts> {
     /// Creates a new instance for the given transition system and color.
     pub fn new(ts: &'a Ts, color: Ts::StateColor) -> Self {
         Self {
@@ -386,7 +389,7 @@ impl<'a, Ts: TransitionSystem> StatesWithColor<'a, Ts> {
     }
 }
 
-impl<Ts: TransitionSystem> Clone for StatesWithColor<'_, Ts> {
+impl<Ts: States> Clone for StatesWithColor<'_, Ts> {
     fn clone(&self) -> Self {
         Self {
             ts: self.ts,
@@ -396,7 +399,7 @@ impl<Ts: TransitionSystem> Clone for StatesWithColor<'_, Ts> {
     }
 }
 
-impl<Ts: TransitionSystem<StateColor = bool>> Iterator for StatesWithColor<'_, Ts> {
+impl<Ts: States<StateColor = bool>> Iterator for StatesWithColor<'_, Ts> {
     type Item = Ts::StateIndex;
 
     fn next(&mut self) -> Option<Self::Item> {

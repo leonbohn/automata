@@ -439,6 +439,7 @@ impl<Ts: TransitionSystem> Debug for Scc<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
+    use crate::States;
     use crate::math::FxIndexSet;
     use crate::{DTS, TransitionSystem};
 

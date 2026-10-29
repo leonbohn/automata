@@ -68,6 +68,7 @@ fn moore_with_edge_colors(n: usize) -> MooreMachine<DTS<CharAlphabet, bool, u32>
     MooreMachine::from_parts(ts, 0)
 }
 
+use automata::States;
 #[library_benchmark]
 #[bench::scrambled_1000(args = (1_000), setup = moore_with_edge_colors)]
 #[bench::scrambled_4000(args = (4_000), setup = moore_with_edge_colors)]

@@ -1,3 +1,4 @@
+use crate::ts::States;
 use std::borrow::Cow;
 use std::{fmt::Debug, hash::Hash};
 
@@ -637,23 +638,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     where
         Self: 'this;
 
-    type StateIndices<'this>
-        = LinkedStateIndices<'this, Q>
-    where
-        Self: 'this;
-
     type Alphabet = A;
 
     fn alphabet(&self) -> &Self::Alphabet {
         &self.alphabet
-    }
-
-    fn state_bound(&self) -> Option<usize> {
-        Some(self.states.len())
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        LinkedStateIndices(&self.states, 0)
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -671,6 +659,23 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
             .get(state.into_usize())?
             .color()
             .map(Cow::Borrowed)
+    }
+
+    fn state_bound(&self) -> Option<usize> {
+        Some(self.states.len())
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> States
+    for LinkedListTransitionSystem<A, Q, C, DET>
+{
+    type StateIndices<'this>
+        = LinkedStateIndices<'this, Q>
+    where
+        Self: 'this;
+
+    fn state_indices(&self) -> Self::StateIndices<'_> {
+        LinkedStateIndices(&self.states, 0)
     }
 
     fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
@@ -828,6 +833,7 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
 
 #[cfg(test)]
 mod tests {
+    use crate::States;
     use crate::TransitionSystem;
     use crate::alphabet::CharAlphabet;
     use crate::ts::{Builder, Deterministic, ForAlphabet, Shrinkable, Sproutable};

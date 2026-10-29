@@ -2,6 +2,7 @@ pub(crate) mod partition_refinement;
 
 use crate::Color;
 use crate::DTS;
+use crate::States;
 use crate::Void;
 use crate::automaton::{DFA, MealyMachine, MooreMachine};
 use crate::representation::IntoTs;
@@ -9,7 +10,7 @@ use crate::ts::{Deterministic, EdgeColor, StateColor};
 
 impl<D> MooreMachine<D>
 where
-    D: Deterministic,
+    D: Deterministic + States,
     StateColor<D>: Color + Eq + std::hash::Hash,
 {
     /// Returns the unique minimal moore machine that is bisimilar to `self`. This means
@@ -23,7 +24,7 @@ where
 
 impl<D> MealyMachine<D>
 where
-    D: Deterministic,
+    D: Deterministic + States,
     EdgeColor<D>: Color + Eq + std::hash::Hash,
 {
     /// Minimizes `self` using Hopcroft's partition refinement algorithm.
@@ -34,7 +35,7 @@ where
 
 impl<D> DFA<D>
 where
-    D: Deterministic<StateColor = bool>,
+    D: Deterministic<StateColor = bool> + States,
 {
     /// Minimizes `self` using Hopcroft's partition refinement algorithm.
     pub fn minimize(self) -> DFA<DTS<D::Alphabet, bool, Void>> {

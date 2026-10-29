@@ -6,7 +6,7 @@
 //! propositions (a [`PropAlphabet`]).
 //!
 //! ```
-//! use automata::{TransitionSystem, hoa::{HoaString, WriteHoa}};
+//! use automata::{States, TransitionSystem, hoa::{HoaString, WriteHoa}};
 //!
 //! let text = r#"HOA: v1
 //! States: 2
@@ -139,6 +139,7 @@ impl From<HoaString> for String {
 
 #[cfg(test)]
 mod tests {
+    use crate::ts::States;
     #[test]
     fn pop_removes_the_automata_one_after_the_other() {
         use crate::hoa::HoaString;
@@ -155,7 +156,7 @@ mod tests {
         assert!(hoa.is_empty());
     }
 
-    use crate::{TransitionSystem, hoa::input::hoa_to_ts};
+    use crate::hoa::input::hoa_to_ts;
 
     #[test]
     fn parse_generated_hoa() {

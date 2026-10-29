@@ -2,6 +2,7 @@ use super::semantics::observe_finite;
 use super::{Automaton, Semantics, StatesWithColor};
 use crate::alphabet::CharAlphabet;
 use crate::representation::CollectTs;
+use crate::ts::States;
 use crate::ts::operations::{DefaultIfMissing, Product, ProductIndex};
 use crate::ts::run::ReachedStateColor;
 use crate::ts::{Deterministic, StateIndex, SymbolOf, operations};
@@ -79,7 +80,7 @@ where
 
 impl<D> DFA<D>
 where
-    D: Deterministic<StateColor = bool>,
+    D: Deterministic<StateColor = bool> + States,
 {
     /// Returns true if and only if the given state is accepting, i.e.
     /// colored with `true`. Panics if no state with the given index exists.
@@ -197,7 +198,7 @@ where
     pub fn union<'a, E>(
         &'a self,
         other: E,
-    ) -> DFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + 'a>
+    ) -> DFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + States + 'a>
     where
         E: Congruence<Alphabet = D::Alphabet, StateColor = bool> + 'a,
     {
@@ -205,6 +206,7 @@ where
         self.ts_product(other)
             .map_state_colors(|(a, b)| a || b)
             .with_initial(ProductIndex(self.initial, other_initial))
+            .reachable_part()
             .collect_dfa()
     }
 
@@ -213,7 +215,7 @@ where
     pub fn intersection<'a, E>(
         &'a self,
         other: E,
-    ) -> DFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + 'a>
+    ) -> DFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + States + 'a>
     where
         E: Congruence<Alphabet = D::Alphabet, StateColor = bool> + 'a,
     {
@@ -221,13 +223,14 @@ where
         self.ts_product(other)
             .map_state_colors(|(a, b)| a && b)
             .with_initial(ProductIndex(self.initial, other_initial))
+            .reachable_part()
             .collect_dfa()
     }
 
     /// Computes the negation of `self` by swapping accepting and non-accepting states.
     pub fn negation(
         &self,
-    ) -> DFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + '_> {
+    ) -> DFA<impl Deterministic<Alphabet = D::Alphabet, StateColor = bool> + States + '_> {
         self.map_state_colors(|x| !x)
             .with_initial(self.initial)
             .collect_dfa()

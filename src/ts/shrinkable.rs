@@ -1,10 +1,11 @@
 use crate::alphabet::Matcher;
+use crate::ts::States;
 use crate::{Pointed, TransitionSystem};
 
 use super::{EdgeExpression, EdgeTuple, StateColor, StateIndex};
 
 /// Encapsulates the ability to remove states, edges, and transitions from a transition system.
-pub trait Shrinkable: TransitionSystem {
+pub trait Shrinkable: States {
     /// Removes a state from the transition system and returns the color associated with the removed state.
     /// Returns `None` if the state does not exist.
     ///
@@ -219,6 +220,7 @@ pub trait Shrinkable: TransitionSystem {
 
 #[cfg(test)]
 mod tests {
+    use crate::States;
     use crate::Void;
     use crate::alphabet::CharAlphabet;
     use crate::representation::CollectTs;
