@@ -1,3 +1,4 @@
+use crate::ts::States;
 use crate::{Color, Int, Void};
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -25,7 +26,7 @@ impl<T: TransitionSystem> EdgeColored<EdgeColor<T>> for T {}
 /// component of its color. Methods that need an initial state are only available for
 /// [`Pointed`] transition systems.
 #[allow(clippy::type_complexity)]
-pub trait CollectTs: TransitionSystem {
+pub trait CollectTs: States {
     /// Collects into a deterministic transition system; the state indices may change.
     fn collect_dts(&self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
         self.collect_dts_preserving().unzip_state_color()
@@ -44,7 +45,7 @@ pub trait CollectTs: TransitionSystem {
         let old_initial = self.initial();
         let preserving = self.collect_dts_preserving();
         let new_initial = preserving
-            .state_indices_with_color()
+            .states_with_color()
             .find_map(|(new_idx, (old_idx, _))| {
                 if old_idx == old_initial {
                     Some(new_idx)
@@ -60,13 +61,13 @@ pub trait CollectTs: TransitionSystem {
     fn collect_dts_preserving(
         &self,
     ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
-        let mut out = DTS::for_alphabet_size_hint(self.alphabet().clone(), self.size());
+        let mut out = DTS::for_alphabet_size_hint(self.alphabet().clone(), self.state_count());
         let mut map = BTreeMap::default();
 
-        for (q, c) in self.state_indices_with_color() {
+        for (q, c) in self.states_with_color() {
             map.insert(q, out.add_state((q, c)));
         }
-        for q in self.state_indices() {
+        for q in self.states() {
             for e in self.edges_from(q).unwrap() {
                 out.add_edge((
                     *map.get(&e.source()).unwrap(),
@@ -77,7 +78,7 @@ pub trait CollectTs: TransitionSystem {
             }
         }
 
-        debug_assert_eq!(self.size(), out.size());
+        debug_assert_eq!(self.state_count(), out.state_count());
         out.verify_state();
 
         out
@@ -151,11 +152,11 @@ pub trait CollectTs: TransitionSystem {
         RightCongruence::from_parts(ts, initial)
     }
 }
-impl<Ts: TransitionSystem> CollectTs for Ts {}
+impl<Ts: States> CollectTs for Ts {}
 
 /// Like [`CollectTs`], but consumes the transition system.
 #[allow(clippy::type_complexity)]
-pub trait IntoTs: TransitionSystem {
+pub trait IntoTs: States {
     /// Turns `self` into a deterministic transition system; the state indices may change.
     fn into_dts(self) -> DTS<Self::Alphabet, StateColor<Self>, EdgeColor<Self>> {
         self.into_dts_preserving().unzip_state_color()
@@ -174,7 +175,7 @@ pub trait IntoTs: TransitionSystem {
         let old_initial = self.initial();
         let preserving = self.into_dts_preserving();
         let new_initial = preserving
-            .state_indices_with_color()
+            .states_with_color()
             .find_map(|(new_idx, (old_idx, _))| {
                 if old_idx == old_initial {
                     Some(new_idx)
@@ -223,7 +224,7 @@ pub trait IntoTs: TransitionSystem {
         state: StateIndex<Self>,
     ) -> MooreMachine<DTS<Self::Alphabet, StateColor<Self>, Void>> {
         let (ts, initial) = self.with_initial(state).into_dts_and_initial();
-        assert!(ts.size() > 0);
+        assert!(ts.state_count() > 0);
         MooreMachine::from_parts(ts.linked_map_edges(|_, e, _, _| (e, Void)), initial)
     }
     /// Turns `self` into a [`MealyMachine`] with state `0` as initial state. State colors are dropped.
@@ -233,7 +234,7 @@ pub trait IntoTs: TransitionSystem {
     /// Panics if `self` has no states.
     fn into_mealy(self) -> MealyMachine<DTS<Self::Alphabet, Void, EdgeColor<Self>>> {
         let ts = self.into_dts().linked_map_states(|_, _| Void);
-        assert!(ts.size() > 0);
+        assert!(ts.state_count() > 0);
         MealyMachine::from_parts(ts, 0)
     }
 
@@ -325,7 +326,7 @@ mod impl_into_ts {
     use crate::alphabet::Alphabet;
     use crate::automaton::Automaton;
     use crate::ts::operations::MapStateColor;
-    use crate::ts::{EdgeColor, EdgeExpression, StateIndex, SymbolOf, operations};
+    use crate::ts::{EdgeColor, EdgeExpression, StateIndex, operations};
     use crate::{DTS, TransitionSystem};
 
     impl<A: Alphabet, Q: Color, C: Color> IntoTs for DTS<A, Q, C> {
@@ -385,23 +386,16 @@ mod impl_into_ts {
     {
     }
 
-    impl<L, R> IntoTs for operations::MatchingProduct<L, R>
-    where
-        L: IntoTs,
-        R: IntoTs,
-        R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = EdgeExpression<L>>,
-        L::StateColor: Clone,
-        R::StateColor: Clone,
-    {
-    }
+    impl<Ts: TransitionSystem> IntoTs for operations::ReachablePart<Ts> {}
     impl<Sem, D> IntoTs for Automaton<D, Sem> where D: IntoTs {}
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::Pointed;
+    use crate::States;
     use crate::representation::IntoTs;
     use crate::ts::Builder;
-    use crate::{Pointed, TransitionSystem};
 
     #[test]
     fn representation() {
@@ -424,7 +418,7 @@ mod tests {
             .into_dts();
         let moore = ts.clone().into_moore_with_initial(0);
         let mealy = ts.into_mealy();
-        assert_eq!(moore.size(), mealy.size());
+        assert_eq!(moore.state_count(), mealy.state_count());
         assert_eq!(moore.initial(), mealy.initial());
     }
 }

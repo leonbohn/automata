@@ -18,6 +18,7 @@ use crate::Int;
 use crate::Void;
 use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
 use crate::representation::IntoTs;
+use crate::ts::States;
 use crate::ts::{Builder, DefaultIdType, DenseId, ForAlphabet, IsEdge, Sproutable};
 use crate::{DTS, Pointed, TS, TransitionSystem};
 pub use acceptance_mask::{AcceptanceError, AcceptanceMask};
@@ -163,7 +164,7 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
     /// Verifies that every edge has exactly one acceptance set and that the corresponding
     /// priority lies within `low..=high`.
     fn check_priorities(&self, low: Int, high: Int) -> Result<(), AcceptanceError> {
-        for q in self.ts.state_indices() {
+        for q in self.ts.states() {
             for edge in self.ts.edges_from(q).into_iter().flatten() {
                 let priority = edge.color().try_as_priority()?;
                 if priority < low || priority > high {
@@ -240,10 +241,10 @@ impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
 
 impl From<DeterministicOmegaAutomaton<PropAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
     fn from(value: DeterministicOmegaAutomaton<PropAlphabet>) -> Self {
-        let size = value.size().into_id();
+        let size = value.state_count().into_id();
         let ts = Builder::default()
             .with_state_colors((0..size).map(|i| value.state_color(i).unwrap().into_owned()))
-            .with_transitions(value.state_indices().flat_map(|q| {
+            .with_transitions(value.states().flat_map(|q| {
                 assert!(q < size);
                 value.edges_from(q).unwrap().flat_map(|edge| {
                     edge.expression().chars_iter().map(move |sym| {
@@ -268,10 +269,10 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
     /// is not a power of 2 and cannot be mapped immediately into AP combinations.
     type Error = PropAlphabetError;
     fn try_from(value: DeterministicOmegaAutomaton<CharAlphabet>) -> Result<Self, Self::Error> {
-        let size = value.size();
+        let size = value.state_count();
         let mut ts = DTS::for_alphabet(PropAlphabet::try_from_char_alphabet(value.alphabet())?);
 
-        for q in value.state_indices() {
+        for q in value.states() {
             assert!(
                 q.into_usize() < size,
                 "The state indices must be contiguous for this!"
@@ -279,7 +280,7 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
             ts.add_state(value.state_color(q).unwrap().into_owned());
         }
 
-        for q in value.state_indices() {
+        for q in value.states() {
             for edge in value.edges_from(q).unwrap() {
                 ts.add_edge((
                     edge.source(),

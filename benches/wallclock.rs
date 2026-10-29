@@ -7,7 +7,7 @@
 
 mod common;
 
-use automata::TransitionSystem;
+use automata::{Pointed, States, TransitionSystem};
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
 
@@ -22,15 +22,15 @@ fn operations(c: &mut Criterion) {
 
     let dpa = common::scrambled_dpa(4_000, 2, 8);
     group.bench_function("dpa/normalized/scrambled_4000", |b| {
-        b.iter(|| black_box(dpa.normalized().size()))
+        b.iter(|| black_box(dpa.normalized().state_count()))
     });
     group.bench_function("dpa/complement/scrambled_4000", |b| {
-        b.iter(|| black_box(dpa.clone().complement().size()))
+        b.iter(|| black_box(dpa.clone().complement().state_count()))
     });
 
     let dfa = common::redundant_dfa(4_000, 2);
     group.bench_function("dfa/minimize/redundant_4000", |b| {
-        b.iter(|| black_box(dfa.clone().minimize().size()))
+        b.iter(|| black_box(dfa.clone().minimize().state_count()))
     });
 
     let word: Vec<char> = common::word(100_000, 2).chars().collect();
@@ -47,8 +47,9 @@ fn operations(c: &mut Criterion) {
                 nts.clone()
                     .with_initial(0)
                     .subset_construction()
+                    .reachable_part()
                     .collect_dts()
-                    .size(),
+                    .state_count(),
             )
         })
     });
@@ -59,7 +60,7 @@ fn operations(c: &mut Criterion) {
             black_box(
                 texts
                     .iter()
-                    .map(|t| common::parse_dpa(t).size())
+                    .map(|t| common::parse_dpa(t).state_count())
                     .sum::<usize>(),
             )
         })

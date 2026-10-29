@@ -345,6 +345,7 @@ mod tests {
     use crate::alphabet::Expression;
     use crate::automaton::DFA;
     use crate::congruence::MinimalRepresentative;
+    use crate::ts::States;
     use crate::ts::{Builder, Deterministic, IsEdge};
     use itertools::Itertools;
     use std::collections::{BTreeMap, BTreeSet};
@@ -496,7 +497,7 @@ mod tests {
                 .with_transitions(edges)
                 .into_dts_with_initial(0);
             // states without edges may be missing from the builder; only test existing origins
-            if dts.contains_state_index(0) {
+            if dts.contains_state(0) {
                 check_against_reference(&dts, 0);
             }
         }

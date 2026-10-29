@@ -1,5 +1,6 @@
 mod class;
 
+use crate::ts::States;
 use crate::{
     Void,
     alphabet::{Alphabet, CharAlphabet},
@@ -207,32 +208,25 @@ impl<T: PredecessorIterable> PredecessorIterable for RightCongruence<T> {
 
 impl<T: TransitionSystem> TransitionSystem for RightCongruence<T> {
     type Alphabet = T::Alphabet;
+
     type StateIndex = T::StateIndex;
+
     type StateColor = T::StateColor;
+
     type EdgeColor = T::EdgeColor;
+
     type EdgeRef<'this>
         = T::EdgeRef<'this>
     where
         Self: 'this;
+
     type EdgesFromIter<'this>
         = T::EdgesFromIter<'this>
-    where
-        Self: 'this;
-    type StateIndices<'this>
-        = T::StateIndices<'this>
     where
         Self: 'this;
 
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts.alphabet()
-    }
-
-    fn state_bound(&self) -> Option<usize> {
-        self.ts.state_bound()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts.state_indices()
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -243,8 +237,27 @@ impl<T: TransitionSystem> TransitionSystem for RightCongruence<T> {
         self.ts.state_color(state)
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
-        self.ts.contains_state_index(index)
+    fn state_bound(&self) -> Option<usize> {
+        self.ts.state_bound()
+    }
+}
+
+impl<T: States> States for RightCongruence<T> {
+    type StatesIter<'this>
+        = T::StatesIter<'this>
+    where
+        Self: 'this;
+
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts.states()
+    }
+
+    fn state_count(&self) -> usize {
+        self.ts.state_count()
+    }
+
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts.contains_state(index)
     }
 }
 

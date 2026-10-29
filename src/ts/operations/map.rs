@@ -1,4 +1,5 @@
 use crate::Color;
+use crate::ts::States;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{EdgeExpression, IdType, IsEdge, StateIndex};
 use crate::{Pointed, TransitionSystem};
@@ -55,28 +56,16 @@ where
     where
         Self: 'this;
 
-    type StateIndices<'this>
-        = Ts::StateIndices<'this>
-    where
-        Self: 'this;
-
     type Alphabet = Ts::Alphabet;
 
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts().alphabet()
     }
 
-    fn state_bound(&self) -> Option<usize> {
-        self.ts().state_bound()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts().state_indices()
-    }
-
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.ts().state_color(state)
     }
+
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         Some(MapEdgesSuccessorsIter {
             it: self.ts().edges_from(state)?,
@@ -84,6 +73,34 @@ where
             f: self.f(),
             _old_color: PhantomData,
         })
+    }
+
+    fn state_bound(&self) -> Option<usize> {
+        self.ts().state_bound()
+    }
+}
+
+impl<Ts, D, F> States for MapEdges<Ts, F>
+where
+    Ts: States,
+    D: Color,
+    F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
+{
+    type StatesIter<'this>
+        = Ts::StatesIter<'this>
+    where
+        Self: 'this;
+
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts().states()
+    }
+
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state(index)
+    }
+
+    fn state_count(&self) -> usize {
+        self.ts().state_count()
     }
 }
 impl<D, Ts, F> Pointed for MapEdges<Ts, F>
@@ -308,19 +325,18 @@ where
     F: Fn(Ts::EdgeColor) -> D,
 {
     type StateIndex = Ts::StateIndex;
+
     type EdgeColor = D;
+
     type StateColor = Ts::StateColor;
+
     type EdgeRef<'this>
         = MappedTransition<Ts::EdgeRef<'this>, &'this F, Ts::EdgeColor>
     where
         Self: 'this;
+
     type EdgesFromIter<'this>
         = MappedEdgesFromIter<'this, Ts::EdgesFromIter<'this>, F, Ts::EdgeColor>
-    where
-        Self: 'this;
-
-    type StateIndices<'this>
-        = Ts::StateIndices<'this>
     where
         Self: 'this;
 
@@ -328,13 +344,6 @@ where
 
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts().alphabet()
-    }
-    fn state_bound(&self) -> Option<usize> {
-        self.ts().state_bound()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts().state_indices()
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
@@ -348,8 +357,32 @@ where
         ))
     }
 
-    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
-        self.ts().maybe_initial_state()
+    fn state_bound(&self) -> Option<usize> {
+        self.ts().state_bound()
+    }
+}
+
+impl<D, Ts, F> States for MapEdgeColor<Ts, F>
+where
+    D: Color,
+    Ts: States,
+    F: Fn(Ts::EdgeColor) -> D,
+{
+    type StatesIter<'this>
+        = Ts::StatesIter<'this>
+    where
+        Self: 'this;
+
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts().states()
+    }
+
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state(index)
+    }
+
+    fn state_count(&self) -> usize {
+        self.ts().state_count()
     }
 }
 
@@ -541,18 +574,18 @@ where
     F: Fn(Ts::StateColor) -> D,
 {
     type StateIndex = Ts::StateIndex;
+
     type EdgeColor = Ts::EdgeColor;
+
     type StateColor = D;
+
     type EdgeRef<'this>
         = Ts::EdgeRef<'this>
     where
         Self: 'this;
+
     type EdgesFromIter<'this>
         = Ts::EdgesFromIter<'this>
-    where
-        Self: 'this;
-    type StateIndices<'this>
-        = Ts::StateIndices<'this>
     where
         Self: 'this;
 
@@ -560,13 +593,6 @@ where
 
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts().alphabet()
-    }
-    fn state_bound(&self) -> Option<usize> {
-        self.ts().state_bound()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts().state_indices()
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
@@ -578,8 +604,32 @@ where
         self.ts().edges_from(state)
     }
 
-    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
-        self.ts().maybe_initial_state()
+    fn state_bound(&self) -> Option<usize> {
+        self.ts().state_bound()
+    }
+}
+
+impl<D, Ts, F> States for MapStateColor<Ts, F>
+where
+    D: Color,
+    Ts: States,
+    F: Fn(Ts::StateColor) -> D,
+{
+    type StatesIter<'this>
+        = Ts::StatesIter<'this>
+    where
+        Self: 'this;
+
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts().states()
+    }
+
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state(index)
+    }
+
+    fn state_count(&self) -> usize {
+        self.ts().state_count()
     }
 }
 

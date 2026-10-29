@@ -1,4 +1,5 @@
 use crate::alphabet::Matcher;
+use crate::ts::States;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{Deterministic, EdgeColor, EdgeExpression, IdType, IsEdge, StateIndex};
 use crate::{Congruence, Pointed, TransitionSystem};
@@ -68,18 +69,18 @@ where
     F: StateIndexFilter<Ts::StateIndex>,
 {
     type StateIndex = Ts::StateIndex;
+
     type EdgeColor = Ts::EdgeColor;
+
     type StateColor = Ts::StateColor;
+
     type EdgeRef<'this>
         = Ts::EdgeRef<'this>
     where
         Self: 'this;
+
     type EdgesFromIter<'this>
         = RestrictedEdgesFromIter<'this, Ts, F>
-    where
-        Self: 'this;
-    type StateIndices<'this>
-        = RestrictedStateIndices<'this, Ts, F>
     where
         Self: 'this;
 
@@ -87,16 +88,6 @@ where
 
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts().alphabet()
-    }
-    fn state_bound(&self) -> Option<usize> {
-        self.ts().state_bound()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        RestrictedStateIndices {
-            it: self.ts().state_indices(),
-            filter: &self.filter,
-        }
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
@@ -115,25 +106,41 @@ where
             .map(|iter| RestrictedEdgesFromIter::new(iter, self.filter()))
     }
 
-    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
-        let initial = self.ts().maybe_initial_state()?;
-        if self.filter().is_unmasked(initial) {
-            Some(initial)
-        } else {
-            None
+    fn state_bound(&self) -> Option<usize> {
+        self.ts().state_bound()
+    }
+}
+
+impl<Ts: States, F> States for RestrictByStateIndex<Ts, F>
+where
+    F: StateIndexFilter<Ts::StateIndex>,
+{
+    type StatesIter<'this>
+        = RestrictedStateIndices<'this, Ts, F>
+    where
+        Self: 'this;
+
+    fn states(&self) -> Self::StatesIter<'_> {
+        RestrictedStateIndices {
+            it: self.ts().states(),
+            filter: &self.filter,
         }
+    }
+
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.filter.is_unmasked(index) && self.ts().contains_state(index)
     }
 }
 
 /// Iterator over the state indices of a transition system that are restricted by a filter function.
-pub struct RestrictByStateIndexIter<'a, Ts: TransitionSystem + 'a, F> {
+pub struct RestrictByStateIndexIter<'a, Ts: States + 'a, F> {
     filter: &'a F,
-    it: Ts::StateIndices<'a>,
+    it: Ts::StatesIter<'a>,
 }
 
 impl<Ts, F> Iterator for RestrictByStateIndexIter<'_, Ts, F>
 where
-    Ts: TransitionSystem,
+    Ts: States,
     F: StateIndexFilter<Ts::StateIndex>,
 {
     type Item = Ts::StateIndex;
@@ -142,10 +149,10 @@ where
     }
 }
 
-impl<'a, Ts: TransitionSystem, F> RestrictByStateIndexIter<'a, Ts, F> {
+impl<'a, Ts: States, F> RestrictByStateIndexIter<'a, Ts, F> {
     /// Creates a new iterator over the state indices of a transition system that are restricted by a
     /// filter function.
-    pub fn new(filter: &'a F, it: Ts::StateIndices<'a>) -> Self {
+    pub fn new(filter: &'a F, it: Ts::StatesIter<'a>) -> Self {
         Self { filter, it }
     }
 }
@@ -188,12 +195,12 @@ impl<Ts: TransitionSystem, F> RestrictByStateIndex<Ts, F> {
 /// Adapts an iterator of state indices to filter out those that are masked
 /// by a filter.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RestrictedStateIndices<'a, Ts: TransitionSystem + 'a, F> {
+pub struct RestrictedStateIndices<'a, Ts: States + 'a, F> {
     filter: &'a F,
-    it: Ts::StateIndices<'a>,
+    it: Ts::StatesIter<'a>,
 }
 
-impl<'a, Ts: TransitionSystem + 'a, F> Iterator for RestrictedStateIndices<'a, Ts, F>
+impl<'a, Ts: States + 'a, F> Iterator for RestrictedStateIndices<'a, Ts, F>
 where
     F: StateIndexFilter<Ts::StateIndex>,
 {
@@ -293,22 +300,10 @@ where
     where
         Self: 'this;
 
-    type StateIndices<'this>
-        = D::StateIndices<'this>
-    where
-        Self: 'this;
-
     type Alphabet = D::Alphabet;
 
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts().alphabet()
-    }
-    fn state_bound(&self) -> Option<usize> {
-        self.ts().state_bound()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts().state_indices()
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -324,6 +319,32 @@ where
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.ts().state_color(state)
+    }
+
+    fn state_bound(&self) -> Option<usize> {
+        self.ts().state_bound()
+    }
+}
+
+impl<D: States> States for EdgeColorRestricted<D>
+where
+    EdgeColor<D>: Ord,
+{
+    type StatesIter<'this>
+        = D::StatesIter<'this>
+    where
+        Self: 'this;
+
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts().states()
+    }
+
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state(index)
+    }
+
+    fn state_count(&self) -> usize {
+        self.ts().state_count()
     }
 }
 

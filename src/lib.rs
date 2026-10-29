@@ -59,7 +59,7 @@ pub mod families;
 /// This module defines transition systems and successor functions and such.
 #[macro_use]
 pub mod ts;
-pub use ts::{Deterministic, Pointed, TransitionSystem};
+pub use ts::{Deterministic, Pointed, States, TransitionSystem};
 
 /// Defines automata and common types of combinations of transition system with acceptance condition.
 #[allow(clippy::upper_case_acronyms)]

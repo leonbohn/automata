@@ -1,5 +1,6 @@
 use crate::DTS;
 use crate::Void;
+use crate::ts::States;
 use crate::{
     RightCongruence,
     partition::Partition,
@@ -198,18 +199,11 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
         = QuotientEdgesFrom<'this, Ts, <Self::Alphabet as Alphabet>::Universe<'this>>
     where
         Self: 'this;
-    type StateIndices<'this>
-        = std::ops::Range<usize>
-    where
-        Self: 'this;
 
     type Alphabet = Ts::Alphabet;
 
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts.alphabet()
-    }
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        0..self.partition.len()
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
@@ -229,6 +223,25 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
                 state,
             ))
         }
+    }
+}
+
+impl<Ts: Deterministic> States for Quotient<Ts> {
+    type StatesIter<'this>
+        = std::ops::Range<usize>
+    where
+        Self: 'this;
+
+    fn states(&self) -> Self::StatesIter<'_> {
+        0..self.partition.len()
+    }
+
+    fn state_count(&self) -> usize {
+        self.partition.len()
+    }
+
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        index < self.partition.len()
     }
 }
 impl<D: Deterministic> Deterministic for Quotient<D> {
@@ -291,9 +304,10 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
 
 #[cfg(test)]
 mod tests {
+    use crate::States;
     use crate::partition::Partition;
+    use crate::tests::wiki_dfa;
     use crate::ts::Deterministic;
-    use crate::{TransitionSystem, tests::wiki_dfa};
 
     #[test]
     fn quotient_test() {

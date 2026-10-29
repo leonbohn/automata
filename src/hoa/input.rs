@@ -1,9 +1,10 @@
+use crate::ts::States;
 use std::{io::BufRead, ops::Deref};
 
 use crate::automaton::{
     AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
 };
-use crate::ts::{ForAlphabet, Sproutable, TransitionSystem};
+use crate::ts::{ForAlphabet, Sproutable};
 use crate::{
     Int,
     alphabet::{PropAlphabet, PropAlphabetError, PropExpression},
@@ -333,9 +334,10 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
 
 #[cfg(test)]
 mod tests {
+    use crate::States;
     use tracing::debug;
 
-    use crate::{TransitionSystem, hoa::HoaString};
+    use crate::hoa::HoaString;
 
     #[test]
     fn hoa_tdba_with_abort_and_nondeterministic() {
@@ -383,7 +385,7 @@ mod tests {
         let first = super::pop_deterministic_omega_automaton(hoa);
         assert!(first.is_some());
         let (first, hoa) = first.unwrap();
-        assert_eq!(first.size(), 1);
+        assert_eq!(first.state_count(), 1);
         assert!(hoa.0.is_empty());
     }
 

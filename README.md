@@ -143,7 +143,7 @@ More runnable programs are in the [`examples/`](https://github.com/leonbohn/auto
 A DFA is a *transition system* (states connected by colored edges) together with an initial state and an acceptance condition. The transition system alone is available through the `TransitionSystem` trait, which also provides combinators that transform it **without copying**: each of them returns a new object that computes its result on demand.
 
 ```rust
-use automata::{math, ts::{Builder, TransitionSystem}, representation::CollectTs};
+use automata::{math, ts::{Builder, States, TransitionSystem}, representation::CollectTs};
 
 let aut = Builder::without_edge_colors()
     .with_state_colors([true, false, true, false])
@@ -173,7 +173,7 @@ assert_eq!(aut.sccs().size(), 2);
 let restricted = (&aut).restrict_state_indices(|q| q < 3);
 // ... until we collect the result into a concrete transition system
 let collected = restricted.collect_dts();
-assert_eq!(collected.size(), 3);
+assert_eq!(collected.state_count(), 3);
 ```
 
 ## Reading and writing HOA

@@ -2,7 +2,8 @@
 //!
 //! Run with `cargo run --example dfa`.
 
-use automata::{TransitionSystem, automaton::DFA, ts::Builder};
+use automata::States;
+use automata::{automaton::DFA, ts::Builder};
 
 /// The DFA over `{a, b}` that accepts the words in which the number of `a`s leaves the given
 /// remainder when divided by three.
@@ -59,9 +60,9 @@ fn main() {
     let minimized = redundant.clone().minimize();
     println!(
         "minimization: {} states -> {} states",
-        redundant.size(),
-        minimized.size()
+        redundant.state_count(),
+        minimized.state_count()
     );
     assert!(redundant.equivalent(&minimized));
-    assert_eq!(minimized.size(), 2);
+    assert_eq!(minimized.state_count(), 2);
 }

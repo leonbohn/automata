@@ -1,6 +1,7 @@
 use crate::alphabet::{Alphabet, CharAlphabet};
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
 use crate::representation::IntoTs;
+use crate::ts::States;
 use crate::ts::{DefaultIdType, ForAlphabet, Shrinkable, Sproutable, StateIndex};
 use crate::word::ReducedOmegaWord;
 use crate::{DTS, TransitionSystem};
@@ -26,7 +27,7 @@ pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, StateIndex<
     let mut rng = rand::rng();
 
     'outer: loop {
-        if current >= (dts.size() as DefaultIdType) {
+        if current >= (dts.state_count() as DefaultIdType) {
             // we have treated all states, we can exit
             break 'outer;
         }
@@ -114,14 +115,14 @@ pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, StateIndex
     }
     // add edges
     let mut rng = rand::rng();
-    for q in dts.state_indices_vec() {
+    for q in dts.states().collect::<Vec<_>>() {
         for sym in alphabet.universe() {
-            let target = rng.random_range(0..(dts.size() as DefaultIdType));
+            let target = rng.random_range(0..(dts.state_count() as DefaultIdType));
             dts.add_edge((q, sym, target));
         }
     }
 
-    assert!(dts.contains_state_index(0));
+    assert!(dts.contains_state(0));
     (dts, 0)
 }
 
@@ -256,24 +257,25 @@ mod tests {
         generate_random_dba, generate_random_dpa, generate_random_omega_words,
         generate_random_ts_sized, generate_random_words,
     };
-    use crate::{TransitionSystem, random::CharAlphabet};
+    use crate::States;
+    use crate::random::CharAlphabet;
 
     #[test]
     fn random_ts_sized() {
         let (dts, _initial) = generate_random_ts_sized(2, 4);
-        assert_eq!(dts.size(), 4);
+        assert_eq!(dts.state_count(), 4);
     }
 
     #[test]
     fn random_dba_sized() {
         let dba = generate_random_dba(2, 10, 0.99);
-        assert!(dba.size() <= 10);
+        assert!(dba.state_count() <= 10);
     }
 
     #[test]
     fn random_dpa_sized() {
         let dpa = generate_random_dpa(2, 10, 3, 0.5);
-        assert!(dpa.size() <= 10);
+        assert!(dpa.state_count() <= 10);
     }
 
     #[test]

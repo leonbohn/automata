@@ -7,6 +7,7 @@
 //! transition systems which have outputs on both the states and the transitions.
 use crate::DTS;
 use crate::Void;
+use crate::ts::States;
 use std::{collections::BTreeSet, time::Instant};
 
 use crate::automaton::{MealyMachine, MooreMachine};
@@ -151,12 +152,12 @@ fn collect_partition<I: crate::ts::IdType>(states: &[I], block_of: &[usize]) -> 
 /// the same sequence of outputs.
 pub fn mealy_greatest_bisimulation<D>(mm: D) -> Partition<D::StateIndex>
 where
-    D: Deterministic,
+    D: Deterministic + States,
     EdgeColor<D>: Color + Eq + std::hash::Hash,
 {
     let start = Instant::now();
-    let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), mm.hint_size().0);
-    for q in mm.state_indices() {
+    let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), 0);
+    for q in mm.states() {
         ids.get_or_insert(q);
     }
     let states = ids.states().to_vec();
@@ -199,7 +200,7 @@ pub(crate) type MinimizedMealy<D> = MealyMachine<
 /// minimal automaton that is bisimilar to the input.
 pub fn mealy_partition_refinement<D>(mm: D) -> MinimizedMealy<D>
 where
-    D: Congruence,
+    D: Congruence + States,
     EdgeColor<D>: Color + Eq + std::hash::Hash,
 {
     let partition = mealy_greatest_bisimulation(&mm);
@@ -235,12 +236,12 @@ where
 /// same class of the returned partition are pairwise bisimilar.
 pub fn moore_greatest_bisimulation<D>(mm: D) -> Partition<D::StateIndex>
 where
-    D: Deterministic,
+    D: Deterministic + States,
     StateColor<D>: Color + Eq + std::hash::Hash,
 {
     let start = Instant::now();
-    let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), mm.hint_size().0);
-    for q in mm.state_indices() {
+    let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), 0);
+    for q in mm.states() {
         ids.get_or_insert(q);
     }
     let states = ids.states().to_vec();
@@ -248,7 +249,7 @@ where
 
     let mut classes: math::FxIndexMap<StateColor<D>, usize> = math::FxIndexMap::default();
     let initial = mm
-        .state_indices_with_color()
+        .states_with_color()
         .map(|(_, c)| {
             let next = classes.len();
             *classes.entry(c).or_insert(next)
@@ -285,7 +286,7 @@ where
 /// automaton.
 pub fn moore_partition_refinement<D>(mm: D) -> MooreMachine<DTS<D::Alphabet, D::StateColor, Void>>
 where
-    D: Congruence,
+    D: Congruence + States,
     StateColor<D>: Color + Eq + std::hash::Hash,
 {
     let partition = moore_greatest_bisimulation(&mm);
@@ -323,6 +324,7 @@ mod tests {
     use super::{
         mealy_greatest_bisimulation, moore_greatest_bisimulation, moore_partition_refinement,
     };
+    use crate::States;
     use crate::alphabet::CharAlphabet;
     use crate::representation::IntoTs;
     use crate::ts::{Deterministic, ForAlphabet, IsEdge, Sproutable};
@@ -333,7 +335,7 @@ mod tests {
         let dfa = wiki_dfa();
 
         let p = moore_partition_refinement(&dfa);
-        assert_eq!(p.size(), 3);
+        assert_eq!(p.state_count(), 3);
         assert!(p.bisimilar(dfa));
     }
 
@@ -348,7 +350,7 @@ mod tests {
             ])
             .into_dpa(0);
         let minimized = mm.into_mealy().minimize();
-        assert_eq!(minimized.size(), 1)
+        assert_eq!(minimized.state_count(), 1)
     }
 
     /// Deterministic pseudo random machines; edges are missing with some probability.
@@ -379,7 +381,7 @@ mod tests {
         ts: &DTS<CharAlphabet, u8, u8>,
         use_edge_colors: bool,
     ) -> std::collections::BTreeSet<std::collections::BTreeSet<u32>> {
-        let n = ts.size();
+        let n = ts.state_count();
         let mut class: Vec<usize> = (0..n)
             .map(|q| {
                 if use_edge_colors {

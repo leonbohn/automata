@@ -25,9 +25,9 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
   - `src/alphabet.rs` (+ `alphabet/`): `Symbol`, `Expression`/`Matcher`, `Alphabet`; `CharAlphabet`, `Fixed<S, N>`, `Directional`, and propositional (`PropAlphabet`, BDD-backed, used for HOA).
   - `src/word.rs` (+ `word/`): `Word`, `FiniteWord`, `OmegaWord`; `PeriodicOmegaWord`, `ReducedOmegaWord`, `NormalizedOmegaWord`; adapters (`Concat`, `Repeat`, `Skip`, `Infix`, `Rotate`). The `upw!` macro is exported at the crate root.
   - `src/math.rs`, `src/dag.rs`, `src/color.rs` (`Int`, `Void`, `Color`, `Lattice`), `src/show.rs` (`Show`).
-- `src/ts.rs` and `src/ts/`: the `TransitionSystem` trait and everything around it.
+- `src/ts.rs` and `src/ts/`: the `TransitionSystem` trait and everything around it. `TransitionSystem` only needs `edges_from` and `state_color` (algorithms that follow successors are bounded on it); `States` adds enumeration of the states (`states`, `state_count`, `contains_state`, SCCs of the whole system, `quotient`, ...). Implicit systems (`SubsetConstruction`, `MatchingProduct`) do not implement `States`; `Pointed::reachable_part` explores them into a `ReachablePart`, which does.
   - `impls/`: `LinkedListTransitionSystem` (the only implementation; aliases `TS`, `DTS`, `NTS`).
-  - `operations/`: lazy adapters (`map`, `product`, `quotient`, `restricted`, `reverse`, `subset`, `with_state_color`).
+  - `operations/`: lazy adapters (`map`, `product`, `quotient`, `reachable`, `restricted`, `reverse`, `subset`, `with_state_color`).
   - `run.rs`/`path.rs`: runs with `Observer`s, `Path`, `Lasso`.
   - `connected_components/`: Tarjan SCCs, `SccDecomposition`. `reachable.rs`: reachability, minimal representatives. `builder.rs`: `Builder`.
   - Capability traits: `Deterministic`, `Pointed`, `Sproutable`, `Shrinkable`, `PredecessorIterable`; conversions in `representation.rs` (`CollectTs`, `IntoTs`).

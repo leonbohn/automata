@@ -1,3 +1,4 @@
+use crate::States;
 use std::borrow::Cow;
 use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
@@ -243,10 +244,8 @@ impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
     }
 
     /// The profile of the empty word on the transition system `ts`.
-    pub fn empty<Ts: TransitionSystem<StateIndex = Idx, StateColor = Q, EdgeColor = C>>(
-        ts: Ts,
-    ) -> Self {
-        Self::empty_for_states(ts.state_indices().collect())
+    pub fn empty<Ts: States<StateIndex = Idx, StateColor = Q, EdgeColor = C>>(ts: Ts) -> Self {
+        Self::empty_for_states(ts.states().collect())
     }
 
     /// The profile of the empty word for the given states.
@@ -342,7 +341,7 @@ where
 
 impl<Ts> TransitionMonoid<Ts>
 where
-    Ts: Deterministic + Pointed,
+    Ts: Deterministic + Pointed + States,
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
@@ -440,12 +439,18 @@ where
         self.tps.iter().position(|(tp, _)| *tp == profile)
     }
 
-    fn build(ts: Ts) -> TransitionMonoid<Ts> {
-        let indices = ts.state_indices().collect();
+    fn build(ts: Ts) -> TransitionMonoid<Ts>
+    where
+        Ts: States,
+    {
+        let indices = ts.states().collect();
         Self::build_for_states(ts, indices)
     }
 
-    fn build_for_states(ts: Ts, states: Vec<Ts::StateIndex>) -> TransitionMonoid<Ts> {
+    fn build_for_states(ts: Ts, states: Vec<Ts::StateIndex>) -> TransitionMonoid<Ts>
+    where
+        Ts: States,
+    {
         let eps_profile = RunProfile::empty_for_states(states);
         let mut tps = vec![(eps_profile.clone(), 0)];
         let mut strings = vec![(vec![], ProfileEntry::Profile(0))];
@@ -455,13 +460,13 @@ where
         while let Some((word, profile, profile_idx)) = queue.pop_front() {
             for (profile_extension, sym) in profile.all_extensions(&ts) {
                 assert!(
-                    word.len() < ts.size() * 2,
+                    word.len() < ts.state_count() * 2,
                     "This looks dangerously like an infinite loop..."
                 );
                 assert!(
                     profile_extension
                         .iter()
-                        .all(|tp| ts.contains_state_index(tp.state()))
+                        .all(|tp| ts.contains_state(tp.state()))
                 );
                 let mut word_extension = word.clone();
                 word_extension.push(sym);

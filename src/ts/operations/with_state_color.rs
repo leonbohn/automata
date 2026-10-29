@@ -1,3 +1,4 @@
+use crate::ts::States;
 use crate::ts::{Deterministic, StateIndex};
 use crate::{Color, math};
 use crate::{Pointed, TransitionSystem};
@@ -129,21 +130,8 @@ impl<Ts: TransitionSystem, P: ProvidesStateColor<Ts::StateIndex>> TransitionSyst
     where
         Self: 'this;
 
-    type StateIndices<'this>
-        = Ts::StateIndices<'this>
-    where
-        Self: 'this;
-
     fn alphabet(&self) -> &Self::Alphabet {
         self.ts.alphabet()
-    }
-
-    fn state_bound(&self) -> Option<usize> {
-        self.ts.state_bound()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts.state_indices()
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -153,6 +141,29 @@ impl<Ts: TransitionSystem, P: ProvidesStateColor<Ts::StateIndex>> TransitionSyst
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         let idx = state;
         Some(Cow::Owned(self.provider.state_color(idx)))
+    }
+
+    fn state_bound(&self) -> Option<usize> {
+        self.ts.state_bound()
+    }
+}
+
+impl<Ts: States, P: ProvidesStateColor<Ts::StateIndex>> States for WithStateColor<Ts, P> {
+    type StatesIter<'this>
+        = Ts::StatesIter<'this>
+    where
+        Self: 'this;
+
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts.states()
+    }
+
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts.contains_state(index)
+    }
+
+    fn state_count(&self) -> usize {
+        self.ts.state_count()
     }
 }
 

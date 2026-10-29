@@ -1,10 +1,11 @@
 use crate::alphabet::Matcher;
+use crate::ts::States;
 use crate::{Pointed, TransitionSystem};
 
 use super::{EdgeExpression, EdgeTuple, StateColor, StateIndex};
 
 /// Encapsulates the ability to remove states, edges, and transitions from a transition system.
-pub trait Shrinkable: TransitionSystem {
+pub trait Shrinkable: States {
     /// Removes a state from the transition system and returns the color associated with the removed state.
     /// Returns `None` if the state does not exist.
     ///
@@ -193,12 +194,12 @@ pub trait Shrinkable: TransitionSystem {
     /// assert_eq!(ts.trim_from(q0), vec![(q2, false)]);
     /// ```
     fn trim_from(&mut self, source: StateIndex<Self>) -> Vec<(StateIndex<Self>, StateColor<Self>)> {
-        assert!(self.contains_state_index(source));
+        assert!(self.contains_state(source));
         let reachable = self
             .reachable_state_indices_from(source)
             .collect::<Vec<_>>();
         let mut out = Vec::new();
-        for q in self.state_indices_vec() {
+        for q in self.states().collect::<Vec<_>>() {
             if !reachable.contains(&q) {
                 let c = self.remove_state(q).expect("We know this exists");
                 out.push((q, c));
@@ -219,6 +220,7 @@ pub trait Shrinkable: TransitionSystem {
 
 #[cfg(test)]
 mod tests {
+    use crate::States;
     use crate::Void;
     use crate::alphabet::CharAlphabet;
     use crate::representation::CollectTs;
@@ -244,6 +246,6 @@ mod tests {
 
         let mut mm = ts.with_initial(q0).collect_mealy();
         mm.trim_from(q0);
-        assert_eq!(mm.size(), 5);
+        assert_eq!(mm.state_count(), 5);
     }
 }

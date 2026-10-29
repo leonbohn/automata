@@ -5,7 +5,7 @@ mod common;
 use automata::alphabet::CharAlphabet;
 use automata::automaton::{DFA, MooreMachine};
 use automata::representation::CollectTs;
-use automata::{DTS, TransitionSystem};
+use automata::{DTS, States, TransitionSystem};
 use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
 
@@ -57,7 +57,7 @@ fn with_empty(n: usize) -> (DFA, DFA) {
 #[bench::scrambled_1000(args = (1_000), setup = scrambled)]
 #[bench::scrambled_4000(args = (4_000), setup = scrambled)]
 fn minimize(dfa: DFA) -> usize {
-    black_box(dfa.minimize().size())
+    black_box(dfa.minimize().state_count())
 }
 
 // A Moore machine whose edges carry colors that are irrelevant for the result (#14).
@@ -72,7 +72,7 @@ fn moore_with_edge_colors(n: usize) -> MooreMachine<DTS<CharAlphabet, bool, u32>
 #[bench::scrambled_1000(args = (1_000), setup = moore_with_edge_colors)]
 #[bench::scrambled_4000(args = (4_000), setup = moore_with_edge_colors)]
 fn minimize_moore_with_edge_colors(mm: MooreMachine<DTS<CharAlphabet, bool, u32>>) -> usize {
-    black_box(mm.minimize().size())
+    black_box(mm.minimize().state_count())
 }
 
 // ---- boolean operations ------------------------------------------------------------------------
@@ -81,14 +81,14 @@ fn minimize_moore_with_edge_colors(mm: MooreMachine<DTS<CharAlphabet, bool, u32>
 #[bench::scrambled_100(args = (100), setup = two_scrambled)]
 #[bench::scrambled_200(args = (200), setup = two_scrambled)]
 fn union((a, b): (DFA, DFA)) -> usize {
-    black_box(a.union(&b).size())
+    black_box(a.union(&b).state_count())
 }
 
 #[library_benchmark]
 #[bench::scrambled_100(args = (100), setup = two_scrambled)]
 #[bench::scrambled_200(args = (200), setup = two_scrambled)]
 fn intersection((a, b): (DFA, DFA)) -> usize {
-    black_box(a.intersection(&b).size())
+    black_box(a.intersection(&b).state_count())
 }
 
 #[library_benchmark]
@@ -102,7 +102,7 @@ fn intersection_is_empty((a, b): (DFA, DFA)) -> bool {
 #[bench::scrambled_1000(args = (1_000), setup = scrambled)]
 #[bench::scrambled_4000(args = (4_000), setup = scrambled)]
 fn complement(dfa: DFA) -> usize {
-    black_box(dfa.map_state_colors(|c| !c).collect_dfa().size())
+    black_box(dfa.map_state_colors(|c| !c).collect_dfa().state_count())
 }
 
 // ---- emptiness and equivalence -----------------------------------------------------------------

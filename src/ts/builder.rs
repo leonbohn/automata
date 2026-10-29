@@ -506,6 +506,7 @@ impl Builder<Int, Void, true> {
 mod tests {
     use super::{Builder, BuilderError};
     use crate::TransitionSystem;
+    use crate::ts::States;
 
     #[test]
     fn non_contiguous_state_ids_with_default_color() {
@@ -515,7 +516,7 @@ mod tests {
             .with_transitions([(0, 'a', 5)])
             .try_into_nts()
             .unwrap();
-        assert_eq!(ts.state_indices().count(), 6);
+        assert_eq!(ts.states().count(), 6);
         assert_eq!(ts.state_color(5).as_deref(), Some(&true));
         assert_eq!(ts.state_color(3).as_deref(), Some(&false));
     }

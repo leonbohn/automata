@@ -3,7 +3,8 @@
 
 #![cfg(feature = "hoa")]
 
-use automata::{TransitionSystem, hoa::HoaString};
+use automata::States;
+use automata::hoa::HoaString;
 use std::path::{Path, PathBuf};
 
 fn fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -32,6 +33,6 @@ fn all_fixtures_are_deterministic_parity_automata() {
             .unwrap_or_else(|| panic!("{} cannot be parsed", file.display()))
             .into_dpa()
             .unwrap_or_else(|e| panic!("{} is not a parity automaton: {e}", file.display()));
-        assert!(automaton.size() > 0, "{} is empty", file.display());
+        assert!(automaton.state_count() > 0, "{} is empty", file.display());
     }
 }

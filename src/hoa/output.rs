@@ -1,5 +1,6 @@
 use crate::DTS;
 use crate::Void;
+use crate::ts::States;
 use itertools::Itertools;
 use tracing::trace;
 
@@ -14,14 +15,14 @@ use crate::{
 };
 
 /// Automata that can be written in the [HOA format](https://adl.github.io/hoaf/).
-pub trait WriteHoa: TransitionSystem + Pointed {
+pub trait WriteHoa: States + Pointed {
     /// Writes the automaton in the HOA format to the given writer.
     fn write_hoa<W: Write>(&self, w: &mut W) -> Result {
         w.write_str("HOA: v1\n")?;
 
         self.write_alphabet_description(w)?;
 
-        w.write_fmt(format_args!("States: {}\n", self.size()))?;
+        w.write_fmt(format_args!("States: {}\n", self.state_count()))?;
 
         w.write_str("Start: ")?;
         self.write_state_id(w, self.initial())?;
@@ -31,7 +32,7 @@ pub trait WriteHoa: TransitionSystem + Pointed {
 
         w.write_str("--BODY--")?;
 
-        for state in self.state_indices() {
+        for state in self.states() {
             w.write_str("\nState: ")?;
             self.write_state_id(w, state)?;
             for edge in self.edges_from(state).expect("We know this state exists") {

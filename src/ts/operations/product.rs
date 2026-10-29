@@ -74,8 +74,11 @@ where
     R::StateColor: Clone,
 {
     type StateIndex = ProductIndex<L::StateIndex, R::StateIndex>;
+
     type EdgeColor = (L::EdgeColor, R::EdgeColor);
+
     type StateColor = (L::StateColor, R::StateColor);
+
     type EdgeRef<'this>
         = ProductTransition<
         'this,
@@ -87,21 +90,16 @@ where
     >
     where
         Self: 'this;
+
     type EdgesFromIter<'this>
         = ProductEdgesFrom<'this, L, R>
     where
         Self: 'this;
-    type StateIndices<'this>
-        = ProductStatesIter<'this, L, R>
-    where
-        Self: 'this;
+
     type Alphabet = L::Alphabet;
+
     fn alphabet(&self) -> &Self::Alphabet {
         self.0.alphabet()
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        ProductStatesIter::new(&self.0, &self.1)
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
@@ -114,13 +112,6 @@ where
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         ProductEdgesFrom::new(&self.0, &self.1, state)
     }
-
-    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
-        Some(ProductIndex(
-            self.0.maybe_initial_state()?,
-            self.1.maybe_initial_state()?,
-        ))
-    }
 }
 
 impl<L, R> Pointed for MatchingProduct<L, R>
@@ -130,48 +121,6 @@ where
 {
     fn initial(&self) -> Self::StateIndex {
         ProductIndex(self.0.initial(), self.1.initial())
-    }
-}
-
-/// Iterator over the state indices of a product transition system.
-pub struct ProductStatesIter<'a, L: TransitionSystem, R: TransitionSystem> {
-    left: L::StateIndices<'a>,
-    right: R::StateIndices<'a>,
-    left_state: Option<L::StateIndex>,
-    _lts: &'a L,
-    rts: &'a R,
-}
-
-impl<L: TransitionSystem, R: TransitionSystem> Iterator for ProductStatesIter<'_, L, R> {
-    type Item = ProductIndex<L::StateIndex, R::StateIndex>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.left_state {
-            None => None,
-            Some(p) => {
-                if let Some(q) = self.right.next() {
-                    Some(ProductIndex(p, q))
-                } else {
-                    self.left_state = self.left.next();
-                    self.right = self.rts.state_indices();
-                    self.next()
-                }
-            }
-        }
-    }
-}
-
-impl<'a, L: TransitionSystem, R: TransitionSystem> ProductStatesIter<'a, L, R> {
-    /// Create a new iterator over the state indices of a product transition system.
-    pub fn new(lts: &'a L, rts: &'a R) -> Self {
-        let mut lit = lts.state_indices();
-        Self {
-            left_state: lit.next(),
-            left: lit,
-            right: rts.state_indices(),
-            rts,
-            _lts: lts,
-        }
     }
 }
 

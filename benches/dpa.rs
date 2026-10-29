@@ -6,7 +6,7 @@ mod common;
 use automata::automaton::DPA;
 use automata::hoa::WriteHoa;
 use automata::representation::CollectTs;
-use automata::{Int, TransitionSystem};
+use automata::{Int, States, TransitionSystem};
 use common::FixtureDpa;
 use gungraun::prelude::*;
 use std::hint::black_box;
@@ -30,14 +30,14 @@ fn chain(n: usize) -> DPA {
 #[bench::chain_1000(args = (1_000), setup = chain)]
 #[bench::chain_4000(args = (4_000), setup = chain)]
 fn normalized(dpa: DPA) -> usize {
-    black_box(dpa.normalized().size())
+    black_box(dpa.normalized().state_count())
 }
 
 #[library_benchmark]
 #[bench::ltl(setup = common::ltl_dpas)]
 #[bench::synthetic(setup = common::synthetic_dpas)]
 fn normalized_fixtures(dpas: Vec<FixtureDpa>) -> usize {
-    black_box(dpas.iter().map(|dpa| dpa.normalized().size()).sum())
+    black_box(dpas.iter().map(|dpa| dpa.normalized().state_count()).sum())
 }
 
 // ---- complement --------------------------------------------------------------------------------
@@ -48,14 +48,17 @@ fn normalized_fixtures(dpas: Vec<FixtureDpa>) -> usize {
 #[bench::chain_1000(args = (1_000), setup = chain)]
 #[bench::chain_4000(args = (4_000), setup = chain)]
 fn complement(dpa: DPA) -> usize {
-    black_box(dpa.complement().size())
+    black_box(dpa.complement().state_count())
 }
 
 #[library_benchmark]
 #[bench::scrambled_1000(args = (1_000), setup = scrambled)]
 #[bench::scrambled_4000(args = (4_000), setup = scrambled)]
 fn complement_without_normalizing(dpa: DPA) -> Option<usize> {
-    black_box(dpa.complement_without_normalizing().map(|d| d.size()))
+    black_box(
+        dpa.complement_without_normalizing()
+            .map(|d| d.state_count()),
+    )
 }
 
 #[library_benchmark]
@@ -64,7 +67,7 @@ fn complement_without_normalizing(dpa: DPA) -> Option<usize> {
 fn complement_fixtures(dpas: Vec<FixtureDpa>) -> usize {
     let mut size = 0;
     for dpa in dpas {
-        size += dpa.complement().size();
+        size += dpa.complement().state_count();
     }
     black_box(size)
 }
@@ -208,7 +211,11 @@ fn collect_dpa(dpa: DPA) -> DPA {
 #[bench::scrambled_1000(args = (1_000), setup = scrambled)]
 #[bench::scrambled_4000(args = (4_000), setup = scrambled)]
 fn map_edge_colors_collect(dpa: DPA) -> usize {
-    black_box(dpa.map_edge_colors(|c| c / 2 as Int).collect_dts().size())
+    black_box(
+        dpa.map_edge_colors(|c| c / 2 as Int)
+            .collect_dts()
+            .state_count(),
+    )
 }
 
 // ---- HOA ---------------------------------------------------------------------------------------
@@ -227,7 +234,7 @@ fn hoa_parse(texts: Vec<String>) -> usize {
     black_box(
         texts
             .iter()
-            .map(|text| common::parse_dpa(text).size())
+            .map(|text| common::parse_dpa(text).state_count())
             .sum(),
     )
 }

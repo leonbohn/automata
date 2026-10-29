@@ -1,9 +1,9 @@
 use super::SccDecomposition;
-use crate::TransitionSystem;
 use crate::alphabet::Expression;
 use crate::ts::connected_components::Scc;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{CompactIdMap, IdType, IsEdge, StateIndex, StateMap};
+use crate::{States, TransitionSystem};
 
 #[derive(Debug, Clone)]
 struct TarjanData {
@@ -102,12 +102,12 @@ impl<Idx: IdType> Tarjan<Idx> {
 
     pub(crate) fn execute<Ts, F>(&mut self, ts: &Ts, mut f: F)
     where
-        Ts: TransitionSystem<StateIndex = Idx>,
+        Ts: States<StateIndex = Idx>,
         F: FnMut(&[Idx]),
     {
         self.data = StateMap::new(ts.state_bound());
 
-        for q in ts.state_indices() {
+        for q in ts.states() {
             if let Some(TarjanData { rootindex: None }) | None = self.data.get(&q) {
                 self.visit(ts, q, &mut f);
             }
@@ -119,7 +119,7 @@ impl<Idx: IdType> Tarjan<Idx> {
 /// Recursive application of Tarjan's algorithm form computing the SCC decomposition.
 pub fn tarjan_scc_recursive<Ts>(ts: &Ts) -> SccDecomposition<'_, Ts>
 where
-    Ts: TransitionSystem,
+    Ts: States,
 {
     let mut sccs = Vec::new();
     {
@@ -141,7 +141,7 @@ where
     Ts: TransitionSystem + PredecessorIterable,
 {
     // first pass: dfs on the forward graph, recording states in order of finishing
-    let mut ids = CompactIdMap::new(ts.state_bound(), ts.hint_size().0);
+    let mut ids = CompactIdMap::new(ts.state_bound(), 0);
     ids.get_or_insert(start);
     let mut finished = Vec::new();
     let mut queue = vec![(start, ts.edges_from(start).unwrap())];
@@ -194,9 +194,9 @@ where
 /// Calls [`tarjan_scc_iterative_from`] for the set of all states.
 pub fn tarjan_scc_iterative<Ts>(ts: &Ts) -> SccDecomposition<'_, Ts>
 where
-    Ts: TransitionSystem,
+    Ts: States,
 {
-    tarjan_scc_iterative_from(ts, ts.state_indices())
+    tarjan_scc_iterative_from(ts, ts.states())
 }
 
 /// Iterative application of Tarjan's algorithm form computing the SCC decomposition.

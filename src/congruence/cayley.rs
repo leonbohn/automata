@@ -1,4 +1,5 @@
 use crate::alphabet::{Alphabet, CharAlphabet, Directional, InvertibleChar, Matcher};
+use crate::ts::States;
 use crate::ts::{
     Deterministic, DeterministicEdgesFrom, EdgeColor, EdgeExpression, EdgeReference, StateColor,
     StateIndex, SymbolOf,
@@ -72,11 +73,6 @@ where
     where
         Self: 'this;
 
-    type StateIndices<'this>
-        = std::ops::Range<usize>
-    where
-        Self: 'this;
-
     type EdgesFromIter<'this>
         = DeterministicEdgesFrom<'this, Self>
     where
@@ -88,16 +84,36 @@ where
         &self.alphabet
     }
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.monoid().profile_indices()
-    }
-
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         Some(DeterministicEdgesFrom::new(self, state))
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.monoid().get_profile(state).map(|p| Cow::Borrowed(p.0))
+    }
+}
+
+impl<Ts> States for Cayley<Ts>
+where
+    Ts: Deterministic<Alphabet = CharAlphabet> + Pointed,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
+{
+    type StatesIter<'this>
+        = std::ops::Range<usize>
+    where
+        Self: 'this;
+
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.monoid().profile_indices()
+    }
+
+    fn state_count(&self) -> usize {
+        self.monoid().elements()
+    }
+
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        index < self.monoid().elements()
     }
 }
 
@@ -124,7 +140,7 @@ where
 
 impl<Ts> Cayley<Ts>
 where
-    Ts: Deterministic<Alphabet = CharAlphabet> + Pointed,
+    Ts: Deterministic<Alphabet = CharAlphabet> + Pointed + States,
     Ts::EdgeColor: Accumulates,
     Ts::StateColor: Accumulates,
 {
@@ -192,11 +208,6 @@ where
     where
         Self: 'this;
 
-    type StateIndices<'this>
-        = std::ops::Range<usize>
-    where
-        Self: 'this;
-
     type EdgesFromIter<'this>
         = DeterministicEdgesFrom<'this, Self>
     where
@@ -208,15 +219,36 @@ where
         self.ts().alphabet()
     }
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.monoid().profile_indices()
-    }
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         Some(DeterministicEdgesFrom::new(self, state))
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
         self.monoid().get_profile(state).map(|p| Cow::Borrowed(p.0))
+    }
+}
+
+impl<Ts> States for RightCayley<Ts>
+where
+    Ts: Deterministic + Pointed,
+    StateColor<Ts>: Accumulates,
+    EdgeColor<Ts>: Accumulates,
+{
+    type StatesIter<'this>
+        = std::ops::Range<usize>
+    where
+        Self: 'this;
+
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.monoid().profile_indices()
+    }
+
+    fn state_count(&self) -> usize {
+        self.monoid().elements()
+    }
+
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        index < self.monoid().elements()
     }
 }
 
@@ -264,10 +296,10 @@ mod tests {
     #[test]
     fn right_cayley_edges() {
         let rc = RightCayley::from(TransitionMonoid::new(parity_dfa()));
-        assert_eq!(rc.state_indices().count(), 5);
+        assert_eq!(rc.states().count(), 5);
         assert_eq!(rc.edges_from(0).unwrap().count(), 2);
-        assert_eq!(rc.size(), 5);
-        for q in rc.state_indices() {
+        assert_eq!(rc.state_count(), 5);
+        for q in rc.states() {
             for sym in ['a', 'b'] {
                 let e = rc.edge(q, sym).unwrap();
                 assert_eq!(e.target(), rc.monoid().right_successor(q, sym).unwrap());
@@ -282,9 +314,9 @@ mod tests {
     #[test]
     fn cayley_edges() {
         let c = Cayley::new(parity_dfa());
-        assert_eq!(c.state_indices().count(), 5);
+        assert_eq!(c.states().count(), 5);
         assert_eq!(c.edges_from(0).unwrap().count(), 4);
-        assert_eq!(c.size(), 5);
+        assert_eq!(c.state_count(), 5);
         let a = c.monoid().profile_for("a").unwrap();
         let right_a = c
             .alphabet()

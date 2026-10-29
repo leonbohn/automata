@@ -3,10 +3,8 @@
 //! Run with `cargo run --example hoa` to use a built-in automaton, or pass the path of a file
 //! that contains deterministic parity or Büchi automata: `cargo run --example hoa -- file.hoa`.
 
-use automata::{
-    TransitionSystem,
-    hoa::{HoaString, WriteHoa},
-};
+use automata::States;
+use automata::hoa::{HoaString, WriteHoa};
 
 const EXAMPLE: &str = r#"HOA: v1
 States: 2
@@ -33,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // a string can contain several automata, `pop` returns them one after the other
     let mut hoa = HoaString::from(text);
     while let Some(automaton) = hoa.pop::<true>() {
-        println!("read an automaton with {} states", automaton.size());
+        println!("read an automaton with {} states", automaton.state_count());
 
         // the automaton has a generic acceptance condition, make it a parity automaton
         let dpa = automaton.into_dpa()?;

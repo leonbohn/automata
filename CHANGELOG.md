@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `States`, a subtrait of `TransitionSystem` for finite systems whose states can be enumerated, and `Pointed::reachable_part` / `operations::ReachablePart`, which explores everything reachable from the initial state of an implicit system once and provides `States` (with constant time `contains_state`) for it (#44).
 - Rendering with an installed graphviz, mirroring the native backend: `Dottable::try_svg_graphviz`, `try_data_url_graphviz` and `render_graphviz` (PNG), next to the existing `try_svg`, `try_data_url` and `render` (features `graphviz` and `render`).
 - `dot::open_in_viewer` and `dot::svg_to_data_url` as public helpers.
 - `Dottable::dot_initial_state`: the initial state is marked in the DOT output by an arrow without source (an `init` node with an edge into the initial state). Implemented for DFAs, right congruences, Moore and Mealy machines and DPAs.
@@ -40,9 +41,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `src/dot.rs` was split into the module `dot` (`attributes`, `impls`, `native`, `graphviz`, `render`); the public paths are unchanged.
 
 - Dependencies: `rand` 0.8 to 0.10 (the `random` module uses `rand::rng()` and `RngExt`) and `tabled` 0.16 to 0.22. No public signatures change; the output of the transition tables is unchanged.
+- **Breaking:** `TransitionSystem` is split into a small core and the new subtrait `States` (#44). The core needs `edges_from`, `state_color` and `alphabet` (plus the associated types and the optional `state_bound`); algorithms that only follow successors (runs, `Bfs`/`Dfs`/`AccessWords`, `reachable_*`, `word_from_to`, `minimal_representatives_iter*`, `canonical_naming*`, `is_reachable_from`, `sccs_kosaraju`, `reachable_sccs_from`) and all adapters (`map_*`, `erase_*`, `restrict_state_indices`, `edge_color_restricted`, `with_state_color`, `with_initial`, `subset_construction*`) stay on it. Everything that needs all states moved to `States`, which you have to import (`automata::States`), and some methods were renamed:
+  - `state_indices` -> `States::states`, `StateIndices` -> `StatesIter`, `state_indices_with_color` -> `states_with_color`, `size` -> `state_count`, `contains_state_index` -> `contains_state`, `is_stateless` and `is_empty` -> `has_no_states` (the old `is_empty` clashed with language emptiness such as `DBA::is_empty`), `state_indices_vec` -> `states().collect()`.
+  - Moved unchanged: `transitions`, `is_edgeless`, `edge_colors`, `edge_colors_unique`, `is_deterministic`, `is_complete`, `find_by_color`, `contains_state_color`, `quotient`, `sccs`, `sccs_recursive`. `state_bound` stays on `TransitionSystem` since traversals use it to pick dense containers.
+  - `SubsetConstruction` and `MatchingProduct` are implicit and no longer implement `States` (nor `IntoTs`/`CollectTs`/`Dottable`). Call `reachable_part()` first, e.g. `a.ts_product(b).reachable_part().collect_dfa()` (this also leaves out unreachable pairs, which `collect_*` used to include). `Cayley`, `RightCayley` and `WordTs` are finite and implement `States`.
+  - `Sproutable`, `Shrinkable`, `Dottable`, `CollectTs`, `IntoTs` and `WriteHoa` require `States`; the finite-state algorithms (SCCs of a whole system, minimization, `Family`, `TransitionMonoid`, `Cayley::new`, `DPA`/`DBA`/`DFA` methods that enumerate states) carry a `States` bound.
+  - `Deterministic::build_transition_table` takes the states to print as first argument so that it works for implicit systems.
+  - `contains_state` is constant time for the linked list, `Automaton`, `RightCongruence`, `ReachablePart`, `Quotient`, `Cayley`, `RightCayley`, `WordTs` and all adapters (they forward to the wrapped system; `RestrictByStateIndex` also checks its filter).
+  - `Deterministic::successor_index`, `edge_color` and `is_loop_on` no longer check `contains_state_index` (`edges_from` already returns `None` for unknown states); `is_loop_on` and `is_reachable_from` no longer panic on unknown states.
 
 ### Removed
 
+- **Breaking:** `TransitionSystem::maybe_initial_state` (use `Dottable::dot_initial_state`), `hint_size` (it was never overridden; use `state_bound`), `make_expression` (use `alphabet().make_expression`), `edges_matching`, `all_accepting_dfa` (use `map_state_colors(|_| true)`), `is_reachable`, `reachable_states`, `reachable_states_from` and `reachable_state_colors` (use `reachable_state_indices*`, which return the same `Bfs`), and `IntoTs for MatchingProduct` (#44).
 - **Breaking:** `Dottable::try_open_svg_in_firefox`, use `display_rendered` or `display_rendered_graphviz`.
 
 [Unreleased]: https://github.com/leonbohn/automata/compare/v0.1.0...HEAD

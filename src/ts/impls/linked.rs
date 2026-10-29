@@ -1,3 +1,4 @@
+use crate::ts::States;
 use std::borrow::Cow;
 use std::{fmt::Debug, hash::Hash};
 
@@ -410,7 +411,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color + PartialEq>
 
     /// Returns the index of the first state whose color has `left` as its first component.
     pub fn old_to_new(&self, left: X) -> Option<StateIndex<Self>> {
-        self.state_indices_with_color()
+        self.states_with_color()
             .find_map(|(i, c)| if c.0.eq(&left) { Some(i) } else { None })
     }
 
@@ -637,23 +638,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     where
         Self: 'this;
 
-    type StateIndices<'this>
-        = LinkedStateIndices<'this, Q>
-    where
-        Self: 'this;
-
     type Alphabet = A;
 
     fn alphabet(&self) -> &Self::Alphabet {
         &self.alphabet
-    }
-
-    fn state_bound(&self) -> Option<usize> {
-        Some(self.states.len())
-    }
-
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        LinkedStateIndices(&self.states, 0)
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -673,7 +661,24 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
             .map(Cow::Borrowed)
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+    fn state_bound(&self) -> Option<usize> {
+        Some(self.states.len())
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, const DET: bool> States
+    for LinkedListTransitionSystem<A, Q, C, DET>
+{
+    type StatesIter<'this>
+        = LinkedStateIndices<'this, Q>
+    where
+        Self: 'this;
+
+    fn states(&self) -> Self::StatesIter<'_> {
+        LinkedStateIndices(&self.states, 0)
+    }
+
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
         self.states
             .get(index.into_usize())
             .is_some_and(|s| s.is_occupied())
@@ -788,7 +793,7 @@ impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color, const DET: bool> std::fm
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for q in self.state_indices() {
+        for q in self.states() {
             write!(f, "{q} : {:?} |", self.state_color(q).unwrap())?;
             let Some(it) = self.edges_from(q) else {
                 continue;
@@ -828,6 +833,7 @@ fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>
 
 #[cfg(test)]
 mod tests {
+    use crate::States;
     use crate::TransitionSystem;
     use crate::alphabet::CharAlphabet;
     use crate::ts::{Builder, Deterministic, ForAlphabet, Shrinkable, Sproutable};
@@ -930,7 +936,7 @@ mod tests {
                 let b = slow.filter_swap_remove_edges(|s, _, _, t| s == q && t == p);
                 assert_eq!(sorted(a), sorted(b));
                 fast.verify_state();
-                assert_eq!(fast.size(), slow.size());
+                assert_eq!(fast.state_count(), slow.state_count());
 
                 let a = fast.remove_edges_between_matching(q, p, 'a');
                 let b = slow.filter_swap_remove_edges(|s, e, _, t| s == q && t == p && *e == 'a');

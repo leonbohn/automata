@@ -1,3 +1,4 @@
+use crate::States;
 use crate::Void;
 use crate::alphabet::CharAlphabet;
 use crate::automaton::Semantics;
@@ -50,7 +51,7 @@ pub type DBA<T = DTS<CharAlphabet, Void, bool>> = Automaton<T, BuchiCondition>;
 
 impl<C> DBA<C>
 where
-    C: Deterministic<EdgeColor = bool>,
+    C: Deterministic<EdgeColor = bool> + States,
 {
     /// Performs a streamlining operation akin to [`super::DPA::streamlined`].
     pub fn streamlined(&self) -> DBA<DTS<C::Alphabet, Void, bool>>

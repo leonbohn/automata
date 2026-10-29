@@ -2,7 +2,7 @@
 
 mod common;
 
-use automata::TransitionSystem;
+use automata::{States, TransitionSystem};
 use common::Dts;
 use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
