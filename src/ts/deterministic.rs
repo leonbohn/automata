@@ -6,6 +6,7 @@ use super::operations::ProductTransition;
 use super::operations::RestrictByStateIndex;
 use super::operations::StateIndexFilter;
 use super::operations::{MapEdgeColor, ProductIndex};
+use super::operations::{MappedEdge, MappedTransition};
 use super::run::EdgeColorSet;
 use super::run::FiniteRunOutput;
 use super::run::InfiniteObserver;
@@ -19,21 +20,23 @@ use crate::congruence::MinimalRepresentative;
 use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateColor, StateIndex, SymbolOf, run};
 use crate::{
     Color,
-    alphabet::{Alphabet, Expression, Matcher, SimpleAlphabet},
+    alphabet::{Alphabet, Expression, SimpleAlphabet},
     word,
     word::{FiniteWord, OmegaWord},
 };
 use crate::{Pointed, States, TransitionSystem};
 use itertools::Itertools;
 
-/// A marker tait indicating that a [`TransitionSystem`] is deterministic, meaning for every state and
-/// each possible input symbol from the alphabet, there is at most one transition. Under the hood, this
-/// trait simply calls [`TransitionSystem::edges_from`] and checks whether there is at most one edge
-/// for each symbol. If there is more than one edge, the methods of this trait panic.
+/// Marks a [`TransitionSystem`] as deterministic: for every state and every symbol of the alphabet there is
+/// at most one edge. This is guaranteed by construction (or by a checked wrapper), not verified at runtime.
+///
+/// The required method is [`Deterministic::edge`]. Storages implement it, together with
+/// [`TransitionSystem::edges_from`], directly. Lazy views implement `edge` and derive `edges_from`
+/// from it with [`DeterministicEdgesFrom`](crate::ts::DeterministicEdgesFrom). No provided method of this trait calls
+/// [`TransitionSystem::edges_from`], so a view cannot recurse between the two.
 pub trait Deterministic: TransitionSystem {
-    /// Attempts to find the first edge that matches the given `matcher` from the given `state`. If no
-    /// suitable transition exists, `None` is returned. If more than one edge matches the expression, the
-    /// method panics.
+    /// Returns the edge leaving `state` that is taken on `symbol`, or `None` if there is no such edge
+    /// or `state` does not exist.
     ///
     /// # Example
     /// ```
@@ -51,21 +54,15 @@ pub trait Deterministic: TransitionSystem {
     /// assert_eq!(ts.edge(0, 'b'), None);
     /// assert_eq!(ts.edge(3, 'a'), None);
     /// ```
-    fn edge(
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>>;
+
+    /// Returns the target of the edge leaving `state` on `symbol`, if it exists.
+    fn successor(
         &self,
         state: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        let mut it = self
-            .edges_from(state)?
-            .filter(|e| matcher.matches(e.expression()));
-
-        let first = it.next()?;
-        debug_assert!(
-            it.next().is_none(),
-            "There should be only one edge with the given expression"
-        );
-        Some(first)
+        symbol: SymbolOf<Self>,
+    ) -> Option<Self::StateIndex> {
+        self.edge(state, symbol).map(|t| t.target())
     }
 
     /// Folds the given finite word in `self` staring from the `source`.
@@ -91,7 +88,7 @@ pub trait Deterministic: TransitionSystem {
         let mut current_state = source;
         let mut current_x = init;
         for sym in word.as_ref() {
-            let Some(e) = self.edge(current_state, sym) else {
+            let Some(e) = self.edge(current_state, *sym) else {
                 return Err((bail)(self, current_x, current_state, *sym));
             };
             current_state = e.target();
@@ -107,33 +104,6 @@ pub trait Deterministic: TransitionSystem {
         word: W,
     ) -> bool {
         Some(state) == self.reached_state_index_from(state, word)
-    }
-
-    /// Returns just the [`TransitionSystem::StateIndex`] of the successor that is reached on the given `symbol`
-    /// from `state`. If no suitable transition exists, `None` is returned.
-    ///
-    /// # Example
-    /// ```
-    /// use automata::{
-    ///     Void,
-    ///     ts::{Deterministic, IsEdge, Builder},
-    /// };
-    ///
-    ///
-    /// let ts = Builder::without_state_colors()
-    ///     .with_transitions([(0, 'a', Void, 0), (0, 'b', Void, 1), (1, 'a', Void, 1), (1, 'b', Void, 1)])
-    ///     .into_right_congruence_bare(0);
-    /// assert_eq!(ts.successor_index(0, 'a'), Some(0));
-    /// assert_eq!(ts.successor_index(0, 'b'), Some(1));
-    /// assert_eq!(ts.successor_index(0, 'c'), None);
-    /// ```
-    #[inline(always)]
-    fn successor_index(
-        &self,
-        state: StateIndex<Self>,
-        symbol: SymbolOf<Self>,
-    ) -> Option<Self::StateIndex> {
-        self.edge(state, symbol).map(|t| t.target())
     }
 
     /// Returns the color of an edge starting in the given `state` and labeled with the given
@@ -572,23 +542,15 @@ pub trait Deterministic: TransitionSystem {
 
 impl<D: Deterministic> Deterministic for &D {
     #[inline(always)]
-    fn edge(
-        &self,
-        state: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        D::edge(self, state, matcher)
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        D::edge(self, state, symbol)
     }
 }
 
 impl<D: Deterministic> Deterministic for &mut D {
     #[inline(always)]
-    fn edge(
-        &self,
-        state: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        D::edge(self, state, matcher)
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        D::edge(self, state, symbol)
     }
 }
 
@@ -609,15 +571,11 @@ where
         let right = self.1.edge_color(r, expression)?;
         Some((left, right))
     }
-    fn edge(
-        &self,
-        state: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
         let ProductIndex(l, r) = state;
 
-        let ll = self.0.edge(l, &matcher)?;
-        let rr = self.1.edge(r, matcher)?;
+        let ll = self.0.edge(l, symbol)?;
+        let rr = self.1.edge(r, symbol)?;
         Some(ProductTransition::new(
             ProductIndex(l, r),
             ll.expression(),
@@ -633,12 +591,8 @@ where
     Ts: Deterministic,
     F: Fn(Ts::StateColor) -> D,
 {
-    fn edge(
-        &self,
-        state: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        self.ts().edge(state, matcher)
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        self.ts().edge(state, symbol)
     }
 }
 
@@ -648,11 +602,26 @@ where
     Ts: Deterministic,
     F: Fn(Ts::EdgeColor) -> D,
 {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        Some(MappedTransition::new(
+            self.ts().edge(state, symbol)?,
+            self.f(),
+        ))
+    }
 }
 
-impl<Ts: Deterministic, F> Deterministic for RestrictByStateIndex<Ts, F> where
-    F: StateIndexFilter<Ts::StateIndex>
+impl<Ts: Deterministic, F> Deterministic for RestrictByStateIndex<Ts, F>
+where
+    F: StateIndexFilter<Ts::StateIndex>,
 {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        if !self.filter().is_unmasked(state) {
+            return None;
+        }
+        self.ts()
+            .edge(state, symbol)
+            .filter(|e| self.filter().is_unmasked(e.target()))
+    }
 }
 
 impl<Ts, D, F> Deterministic for MapEdges<Ts, F>
@@ -661,6 +630,13 @@ where
     D: Color,
     F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        Some(MappedEdge::new(
+            self.ts().edge(state, symbol)?,
+            state,
+            self.f(),
+        ))
+    }
 }
 
 #[cfg(test)]

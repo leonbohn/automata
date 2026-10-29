@@ -84,7 +84,7 @@ where
                     continue 'edges;
                 };
 
-                match other.edge(r, &sym) {
+                match other.edge(r, sym) {
                     Some(e) => {
                         if *edge.color() != *e.color() {
                             rep.push(sym);

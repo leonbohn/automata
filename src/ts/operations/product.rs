@@ -391,4 +391,31 @@ mod tests {
         assert!(prod.reached_state_index("a").is_some());
         assert!(prod.reached_state_index("b").is_none());
     }
+
+    #[test]
+    fn product_iterates_edges() {
+        use crate::TransitionSystem;
+        use crate::ts::{Deterministic, IsEdge};
+        let l: MealyMachine = DTS::builder()
+            .default_color(Void)
+            .with_transitions([
+                (0, 'a', 0, 1),
+                (0, 'b', 0, 0),
+                (1, 'a', 1, 0),
+                (1, 'b', 1, 1),
+            ])
+            .into_mealy(0);
+        let r: MealyMachine = DTS::builder()
+            .default_color(Void)
+            .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
+            .into_mealy(0);
+        let prod = (&l).ts_product(&r);
+        for q in prod.reachable_state_indices().collect::<Vec<_>>() {
+            let edges = prod.edges_from(q).unwrap().collect::<Vec<_>>();
+            assert_eq!(edges.len(), 2);
+            for (e, sym) in edges.iter().zip(['a', 'b']) {
+                assert_eq!(prod.edge(q, sym).unwrap().target(), e.target());
+            }
+        }
+    }
 }

@@ -1,7 +1,8 @@
-use crate::alphabet::Matcher;
+use crate::ts::SymbolOf;
+
 use crate::ts::States;
 use crate::ts::predecessors::PredecessorIterable;
-use crate::ts::{Deterministic, EdgeColor, EdgeExpression, IdType, IsEdge, StateIndex};
+use crate::ts::{Deterministic, EdgeColor, IdType, IsEdge, StateIndex};
 use crate::{Congruence, Pointed, TransitionSystem};
 use std::borrow::Cow;
 use std::collections::BTreeSet;
@@ -373,13 +374,9 @@ where
     D: Deterministic,
     EdgeColor<D>: Ord,
 {
-    fn edge(
-        &self,
-        state: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
         self.ts()
-            .edge(state, matcher)
+            .edge(state, symbol)
             .filter(|t| *t.color() <= self.max && self.min <= *t.color())
     }
 }

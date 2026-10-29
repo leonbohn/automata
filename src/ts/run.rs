@@ -538,7 +538,7 @@ mod impls {
             state: StateIndex<T>,
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
-            ts.successor_index(state, sym)
+            ts.successor(state, sym)
         }
     }
 
@@ -567,7 +567,7 @@ mod impls {
             state: StateIndex<T>,
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
-            self.0 = ts.successor_index(state, sym)?;
+            self.0 = ts.successor(state, sym)?;
             Some(self.0)
         }
     }
@@ -592,7 +592,7 @@ mod impls {
             state: StateIndex<T>,
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
-            let succ = ts.successor_index(state, sym)?;
+            let succ = ts.successor(state, sym)?;
             self.0.clone_from(&ts.state_color(succ).unwrap());
             Some(succ)
         }
@@ -649,7 +649,7 @@ mod impls {
             state: StateIndex<T>,
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
-            let succ = ts.successor_index(state, sym)?;
+            let succ = ts.successor(state, sym)?;
             if MAX {
                 self.0.join_assign(&ts.state_color(succ).unwrap());
             } else {
@@ -751,9 +751,9 @@ mod impls {
             state: StateIndex<T>,
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
-            let successor_index = ts.successor_index(state, sym)?;
-            self.0.insert(successor_index);
-            Some(successor_index)
+            let successor = ts.successor(state, sym)?;
+            self.0.insert(successor);
+            Some(successor)
         }
     }
     impl<T: Deterministic> InfiniteObserver<T> for StateSet<T> {
@@ -788,9 +788,9 @@ mod impls {
             state: StateIndex<T>,
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
-            let successor_index = ts.successor_index(state, sym)?;
-            self.0.push(successor_index);
-            Some(successor_index)
+            let successor = ts.successor(state, sym)?;
+            self.0.push(successor);
+            Some(successor)
         }
     }
     impl<T: Deterministic> InfiniteObserver<T> for StateSequence<T> {
@@ -824,10 +824,9 @@ mod impls {
             state: StateIndex<T>,
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
-            let successor_index = ts.successor_index(state, sym)?;
-            self.0
-                .push(ts.state_color(successor_index).unwrap().into_owned());
-            Some(successor_index)
+            let successor = ts.successor(state, sym)?;
+            self.0.push(ts.state_color(successor).unwrap().into_owned());
+            Some(successor)
         }
     }
     impl<T: Deterministic> InfiniteObserver<T> for StateColorSequence<T> {
@@ -1002,7 +1001,7 @@ mod impls {
             state: StateIndex<T>,
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
-            let successor = ts.successor_index(state, sym)?;
+            let successor = ts.successor(state, sym)?;
             self.0.insert((state, sym));
             Some(successor)
         }

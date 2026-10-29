@@ -182,7 +182,11 @@ impl<T: Congruence> From<T> for RightCongruence<T> {
     }
 }
 
-impl<T: Deterministic> Deterministic for RightCongruence<T> {}
+impl<T: Deterministic> Deterministic for RightCongruence<T> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        self.ts.edge(state, symbol)
+    }
+}
 
 impl<T: TransitionSystem> Pointed for RightCongruence<T> {
     fn initial(&self) -> Self::StateIndex {
