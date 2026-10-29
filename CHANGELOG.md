@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- `DPA::normalized` keeps its recoloring in a table indexed by `EdgeId` instead of a hash map keyed by (state, expression), and removes edges by id.
 - **Breaking:** the `DET` const generic is gone. Determinism is a property of the type: `Det<T>` wraps a transition system and replaces overlapping edges when an edge is added. `DTS<A, Q, C>` is `Det<LinkedTs<A, Q, C>>` and `NTS<A, Q, C>` is `LinkedTs<A, Q, C>`; the alias `TS` is removed. `Builder` lost its `DET` parameter (`into_ts` and `try_into_ts` are gone, use `into_nts` or `into_dts`), `LinkedTs::try_into_deterministic` returns `Det<LinkedTs>`, and `into_nondeterministic` is `Det::into_inner`.
 - **Breaking:** `Sproutable::add_edge` returns the `EdgeId` of the new edge instead of the overwritten edge. A `Det` replaces all overlapping edges; `Builder::try_into_dts` still reports `OverlappingEdge`. `Sproutable` gained `edge_color_mut`, `state_color_mut` (`set_state_color` is provided on top of it) and the associated type `Storage`. `Shrinkable` gained the required `remove_edge(EdgeId)`; the `remove_edges_*` methods other than `remove_edges_to` are provided on top of `remove_edge` and `EdgeRef::id`.
 - **Breaking:** `OmegaAutomaton<A, S>`, `HoaAutomatonStream<R, S>`, `HoaString::pop::<S>()` and the functions of `hoa::input` are generic over a storage (`Det<Linked>` or `Linked`) instead of `const DET: bool`. `OmegaAutomaton::try_from(HoaRepresentation)` exists for both storages.
