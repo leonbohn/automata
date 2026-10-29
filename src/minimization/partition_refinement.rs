@@ -157,7 +157,7 @@ where
 {
     let start = Instant::now();
     let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), 0);
-    for q in mm.state_indices() {
+    for q in mm.states() {
         ids.get_or_insert(q);
     }
     let states = ids.states().to_vec();
@@ -241,7 +241,7 @@ where
 {
     let start = Instant::now();
     let mut ids = crate::ts::CompactIdMap::new(mm.state_bound(), 0);
-    for q in mm.state_indices() {
+    for q in mm.states() {
         ids.get_or_insert(q);
     }
     let states = ids.states().to_vec();
@@ -249,7 +249,7 @@ where
 
     let mut classes: math::FxIndexMap<StateColor<D>, usize> = math::FxIndexMap::default();
     let initial = mm
-        .state_indices_with_color()
+        .states_with_color()
         .map(|(_, c)| {
             let next = classes.len();
             *classes.entry(c).or_insert(next)
@@ -335,7 +335,7 @@ mod tests {
         let dfa = wiki_dfa();
 
         let p = moore_partition_refinement(&dfa);
-        assert_eq!(p.size(), 3);
+        assert_eq!(p.state_count(), 3);
         assert!(p.bisimilar(dfa));
     }
 
@@ -350,7 +350,7 @@ mod tests {
             ])
             .into_dpa(0);
         let minimized = mm.into_mealy().minimize();
-        assert_eq!(minimized.size(), 1)
+        assert_eq!(minimized.state_count(), 1)
     }
 
     /// Deterministic pseudo random machines; edges are missing with some probability.
@@ -381,7 +381,7 @@ mod tests {
         ts: &DTS<CharAlphabet, u8, u8>,
         use_edge_colors: bool,
     ) -> std::collections::BTreeSet<std::collections::BTreeSet<u32>> {
-        let n = ts.size();
+        let n = ts.state_count();
         let mut class: Vec<usize> = (0..n)
             .map(|q| {
                 if use_edge_colors {

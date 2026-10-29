@@ -22,7 +22,7 @@ pub trait WriteHoa: States + Pointed {
 
         self.write_alphabet_description(w)?;
 
-        w.write_fmt(format_args!("States: {}\n", self.size()))?;
+        w.write_fmt(format_args!("States: {}\n", self.state_count()))?;
 
         w.write_str("Start: ")?;
         self.write_state_id(w, self.initial())?;
@@ -32,7 +32,7 @@ pub trait WriteHoa: States + Pointed {
 
         w.write_str("--BODY--")?;
 
-        for state in self.state_indices() {
+        for state in self.states() {
             w.write_str("\nState: ")?;
             self.write_state_id(w, state)?;
             for edge in self.edges_from(state).expect("We know this state exists") {

@@ -86,21 +86,21 @@ where
     D: Color,
     F: Fn(Ts::StateIndex, &EdgeExpression<Ts>, Ts::EdgeColor, Ts::StateIndex) -> D,
 {
-    type StateIndices<'this>
-        = Ts::StateIndices<'this>
+    type StatesIter<'this>
+        = Ts::StatesIter<'this>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts().state_indices()
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts().states()
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
-        self.ts().contains_state_index(index)
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state(index)
     }
 
-    fn size(&self) -> usize {
-        self.ts().size()
+    fn state_count(&self) -> usize {
+        self.ts().state_count()
     }
 }
 impl<D, Ts, F> Pointed for MapEdges<Ts, F>
@@ -368,21 +368,21 @@ where
     Ts: States,
     F: Fn(Ts::EdgeColor) -> D,
 {
-    type StateIndices<'this>
-        = Ts::StateIndices<'this>
+    type StatesIter<'this>
+        = Ts::StatesIter<'this>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts().state_indices()
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts().states()
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
-        self.ts().contains_state_index(index)
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state(index)
     }
 
-    fn size(&self) -> usize {
-        self.ts().size()
+    fn state_count(&self) -> usize {
+        self.ts().state_count()
     }
 }
 
@@ -615,21 +615,21 @@ where
     Ts: States,
     F: Fn(Ts::StateColor) -> D,
 {
-    type StateIndices<'this>
-        = Ts::StateIndices<'this>
+    type StatesIter<'this>
+        = Ts::StatesIter<'this>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts().state_indices()
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts().states()
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
-        self.ts().contains_state_index(index)
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state(index)
     }
 
-    fn size(&self) -> usize {
-        self.ts().size()
+    fn state_count(&self) -> usize {
+        self.ts().state_count()
     }
 }
 

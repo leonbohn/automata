@@ -63,7 +63,7 @@ impl<T: Congruence + States, X> Family<T, X> {
         (self.leading, self.progress)
     }
     pub(crate) fn from_parts(leading: T, progress: FxIndexMap<StateIndex<T>, X>) -> Self {
-        assert_eq!(leading.size(), progress.len());
+        assert_eq!(leading.state_count(), progress.len());
         Self { leading, progress }
     }
     /// Creates a family from the leading transition system and the elements for its classes.
@@ -78,13 +78,13 @@ impl<T: Congruence + States, X> Family<T, X> {
 impl<T: Congruence + States, X> std::ops::Index<StateIndex<T>> for Family<T, X> {
     type Output = X;
     fn index(&self, index: StateIndex<T>) -> &Self::Output {
-        assert!(self.leading.contains_state_index(index));
+        assert!(self.leading.contains_state(index));
         self.progress.get(&index).unwrap()
     }
 }
 impl<T: Congruence + States, X> std::ops::IndexMut<StateIndex<T>> for Family<T, X> {
     fn index_mut(&mut self, index: StateIndex<T>) -> &mut Self::Output {
-        assert!(self.leading.contains_state_index(index));
+        assert!(self.leading.contains_state(index));
         self.progress.get_mut(&index).unwrap()
     }
 }

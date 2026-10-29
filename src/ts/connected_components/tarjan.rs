@@ -107,7 +107,7 @@ impl<Idx: IdType> Tarjan<Idx> {
     {
         self.data = StateMap::new(ts.state_bound());
 
-        for q in ts.state_indices() {
+        for q in ts.states() {
             if let Some(TarjanData { rootindex: None }) | None = self.data.get(&q) {
                 self.visit(ts, q, &mut f);
             }
@@ -196,7 +196,7 @@ pub fn tarjan_scc_iterative<Ts>(ts: &Ts) -> SccDecomposition<'_, Ts>
 where
     Ts: States,
 {
-    tarjan_scc_iterative_from(ts, ts.state_indices())
+    tarjan_scc_iterative_from(ts, ts.states())
 }
 
 /// Iterative application of Tarjan's algorithm form computing the SCC decomposition.

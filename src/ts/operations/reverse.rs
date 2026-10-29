@@ -72,21 +72,21 @@ impl<Ts> States for Reversed<Ts>
 where
     Ts: PredecessorIterable + States,
 {
-    type StateIndices<'this>
-        = Ts::StateIndices<'this>
+    type StatesIter<'this>
+        = Ts::StatesIter<'this>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.0.state_indices()
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.0.states()
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
-        self.0.contains_state_index(index)
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.0.contains_state(index)
     }
 
-    fn size(&self) -> usize {
-        self.0.size()
+    fn state_count(&self) -> usize {
+        self.0.state_count()
     }
 }
 

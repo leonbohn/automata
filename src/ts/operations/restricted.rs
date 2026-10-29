@@ -115,27 +115,27 @@ impl<Ts: States, F> States for RestrictByStateIndex<Ts, F>
 where
     F: StateIndexFilter<Ts::StateIndex>,
 {
-    type StateIndices<'this>
+    type StatesIter<'this>
         = RestrictedStateIndices<'this, Ts, F>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
+    fn states(&self) -> Self::StatesIter<'_> {
         RestrictedStateIndices {
-            it: self.ts().state_indices(),
+            it: self.ts().states(),
             filter: &self.filter,
         }
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
-        self.filter.is_unmasked(index) && self.ts().contains_state_index(index)
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.filter.is_unmasked(index) && self.ts().contains_state(index)
     }
 }
 
 /// Iterator over the state indices of a transition system that are restricted by a filter function.
 pub struct RestrictByStateIndexIter<'a, Ts: States + 'a, F> {
     filter: &'a F,
-    it: Ts::StateIndices<'a>,
+    it: Ts::StatesIter<'a>,
 }
 
 impl<Ts, F> Iterator for RestrictByStateIndexIter<'_, Ts, F>
@@ -152,7 +152,7 @@ where
 impl<'a, Ts: States, F> RestrictByStateIndexIter<'a, Ts, F> {
     /// Creates a new iterator over the state indices of a transition system that are restricted by a
     /// filter function.
-    pub fn new(filter: &'a F, it: Ts::StateIndices<'a>) -> Self {
+    pub fn new(filter: &'a F, it: Ts::StatesIter<'a>) -> Self {
         Self { filter, it }
     }
 }
@@ -197,7 +197,7 @@ impl<Ts: TransitionSystem, F> RestrictByStateIndex<Ts, F> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RestrictedStateIndices<'a, Ts: States + 'a, F> {
     filter: &'a F,
-    it: Ts::StateIndices<'a>,
+    it: Ts::StatesIter<'a>,
 }
 
 impl<'a, Ts: States + 'a, F> Iterator for RestrictedStateIndices<'a, Ts, F>
@@ -330,21 +330,21 @@ impl<D: States> States for EdgeColorRestricted<D>
 where
     EdgeColor<D>: Ord,
 {
-    type StateIndices<'this>
-        = D::StateIndices<'this>
+    type StatesIter<'this>
+        = D::StatesIter<'this>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts().state_indices()
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts().states()
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
-        self.ts().contains_state_index(index)
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state(index)
     }
 
-    fn size(&self) -> usize {
-        self.ts().size()
+    fn state_count(&self) -> usize {
+        self.ts().state_count()
     }
 }
 

@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // a string can contain several automata, `pop` returns them one after the other
     let mut hoa = HoaString::from(text);
     while let Some(automaton) = hoa.pop::<true>() {
-        println!("read an automaton with {} states", automaton.size());
+        println!("read an automaton with {} states", automaton.state_count());
 
         // the automaton has a generic acceptance condition, make it a parity automaton
         let dpa = automaton.into_dpa()?;

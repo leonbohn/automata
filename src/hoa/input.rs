@@ -385,7 +385,7 @@ mod tests {
         let first = super::pop_deterministic_omega_automaton(hoa);
         assert!(first.is_some());
         let (first, hoa) = first.unwrap();
-        assert_eq!(first.size(), 1);
+        assert_eq!(first.state_count(), 1);
         assert!(hoa.0.is_empty());
     }
 

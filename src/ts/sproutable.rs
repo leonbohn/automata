@@ -82,9 +82,9 @@ pub trait Sproutable: States {
     ///     
     /// let mut ts = DTS::<_, _, Void>::for_alphabet(CharAlphabet::of_size(3));
     /// let q0 = ts.add_state(false);
-    /// let before = ts.size();
+    /// let before = ts.state_count();
     /// let q1 = ts.add_state(true);
-    /// assert_eq!(ts.size(), before + 1);
+    /// assert_eq!(ts.state_count(), before + 1);
     /// ```
     /// We need to explicitly give the state color for the created transition system as we do not
     /// add any edges and the type can therefore not be inferred.
@@ -145,7 +145,7 @@ pub trait Sproutable: States {
     ///     .into_dts();
     ///
     /// let (dts, map) = DTS::sprout_from_ts_with_bijection(&source);
-    /// assert_eq!(source.size(), dts.size());
+    /// assert_eq!(source.state_count(), dts.state_count());
     /// assert_eq!(map.get_by_left(&0), Some(&0));
     /// ```
     fn sprout_from_ts_with_bijection<Ts>(
@@ -161,7 +161,7 @@ pub trait Sproutable: States {
     {
         let mut out: Self = Self::for_alphabet(ts.alphabet().clone());
         let mut map = BiBTreeMap::new();
-        for index in ts.state_indices() {
+        for index in ts.states() {
             map.insert(
                 index,
                 out.add_state(
@@ -171,7 +171,7 @@ pub trait Sproutable: States {
                 ),
             );
         }
-        for index in ts.state_indices() {
+        for index in ts.states() {
             let source = *map.get_by_left(&index).unwrap();
             for edge in ts.edges_from(index).expect("State exists") {
                 out.add_edge((
@@ -207,7 +207,7 @@ pub trait Sproutable: States {
     ///     .into_dts();
     ///
     /// let dts = DTS::sprout_from_ts(&source);
-    /// assert_eq!(source.size(), dts.size());
+    /// assert_eq!(source.state_count(), dts.state_count());
     /// ```
     fn sprout_from_ts<Ts>(ts: Ts) -> Self
     where
@@ -244,7 +244,7 @@ pub trait Sproutable: States {
     ///     .into_dts();
     /// assert!(!ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
-    /// assert_eq!(ts.size(), 2);
+    /// assert_eq!(ts.state_count(), 2);
     /// assert!(ts.is_complete());
     /// ```
     ///
@@ -263,7 +263,7 @@ pub trait Sproutable: States {
     ///     .into_dts();
     /// assert!(ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
-    /// assert_eq!(ts.size(), 1);
+    /// assert_eq!(ts.state_count(), 1);
     /// assert!(ts.is_complete());
     /// ```
     fn complete_with_colors(&mut self, sink_color: Self::StateColor, edge_color: Self::EdgeColor)
@@ -285,7 +285,7 @@ pub trait Sproutable: States {
             ));
         }
         let mut seen = FixedBitSet::with_capacity(self.alphabet().size());
-        for state in self.state_indices().collect_vec() {
+        for state in self.states().collect_vec() {
             seen.clear();
             for edge in self.edges_from(state).unwrap() {
                 seen.insert(self.alphabet().expression_to_index(edge.expression()));

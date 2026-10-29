@@ -149,20 +149,20 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
 }
 
 impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> States for WordTs<A, W, false> {
-    type StateIndices<'this>
+    type StatesIter<'this>
         = std::ops::Range<u32>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
+    fn states(&self) -> Self::StatesIter<'_> {
         0..(self.word.len().try_into().unwrap())
     }
 
-    fn size(&self) -> usize {
+    fn state_count(&self) -> usize {
         self.word.len()
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
         (index as usize) < self.word.len()
     }
 }
@@ -220,20 +220,20 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for W
 }
 
 impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> States for WordTs<A, W, true> {
-    type StateIndices<'this>
+    type StatesIter<'this>
         = std::ops::Range<u32>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
+    fn states(&self) -> Self::StatesIter<'_> {
         0..(self.word.combined_len().try_into().unwrap())
     }
 
-    fn size(&self) -> usize {
+    fn state_count(&self) -> usize {
         self.word.combined_len()
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
         (index as usize) < self.word.combined_len()
     }
 }
@@ -245,6 +245,6 @@ mod tests {
     #[test]
     fn word_as_ts() {
         let w = WordTs::new(CharAlphabet::of_size(2), "abba");
-        assert_eq!(w.state_indices_vec(), vec![0, 1, 2, 3]);
+        assert_eq!(w.states().collect::<Vec<_>>(), vec![0, 1, 2, 3]);
     }
 }

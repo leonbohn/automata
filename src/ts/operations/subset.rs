@@ -263,7 +263,7 @@ mod tests {
 
         assert_eq!(dts.reachable_state_indices().count(), 3);
         let finite = dts.reachable_part();
-        assert_eq!(finite.state_indices().count(), 3);
-        assert_eq!(finite.collect_dts().size(), 3);
+        assert_eq!(finite.states().count(), 3);
+        assert_eq!(finite.collect_dts().state_count(), 3);
     }
 }

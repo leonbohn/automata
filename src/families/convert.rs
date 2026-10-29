@@ -14,7 +14,7 @@ use crate::{
 impl<A: Alphabet> From<FWPM<A>> for FDFA<A> {
     fn from(value: FWPM<A>) -> Self {
         let (leading, progress) = value.into_parts();
-        assert_eq!(leading.size(), progress.len());
+        assert_eq!(leading.state_count(), progress.len());
 
         let progress = progress
             .into_iter()
@@ -71,7 +71,7 @@ impl<A: Alphabet> From<FWPM<A>> for FDFA<A> {
 impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
     fn from(value: FDFA<A>) -> Self {
         let (leading, progress) = value.into_parts();
-        assert_eq!(leading.size(), progress.len());
+        assert_eq!(leading.state_count(), progress.len());
 
         let progress = progress
             .into_iter()

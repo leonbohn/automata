@@ -78,7 +78,7 @@ pub trait Dottable: States {
             ]
         });
 
-        let states = self.state_indices().map(|q| {
+        let states = self.states().map(|q| {
             format!(
                 "{} [{}]",
                 sanitize_dot_ident(&self.dot_state_ident(q)),
@@ -89,7 +89,7 @@ pub trait Dottable: States {
             )
         });
 
-        let transitions = self.state_indices().flat_map(|q| {
+        let transitions = self.states().flat_map(|q| {
             self.edges_from(q)
                 .expect("edges_from may not return none for state that exists")
                 .map(move |t| {

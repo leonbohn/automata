@@ -45,7 +45,7 @@ pub trait CollectTs: States {
         let old_initial = self.initial();
         let preserving = self.collect_dts_preserving();
         let new_initial = preserving
-            .state_indices_with_color()
+            .states_with_color()
             .find_map(|(new_idx, (old_idx, _))| {
                 if old_idx == old_initial {
                     Some(new_idx)
@@ -61,13 +61,13 @@ pub trait CollectTs: States {
     fn collect_dts_preserving(
         &self,
     ) -> DTS<Self::Alphabet, (StateIndex<Self>, StateColor<Self>), EdgeColor<Self>> {
-        let mut out = DTS::for_alphabet_size_hint(self.alphabet().clone(), self.size());
+        let mut out = DTS::for_alphabet_size_hint(self.alphabet().clone(), self.state_count());
         let mut map = BTreeMap::default();
 
-        for (q, c) in self.state_indices_with_color() {
+        for (q, c) in self.states_with_color() {
             map.insert(q, out.add_state((q, c)));
         }
-        for q in self.state_indices() {
+        for q in self.states() {
             for e in self.edges_from(q).unwrap() {
                 out.add_edge((
                     *map.get(&e.source()).unwrap(),
@@ -78,7 +78,7 @@ pub trait CollectTs: States {
             }
         }
 
-        debug_assert_eq!(self.size(), out.size());
+        debug_assert_eq!(self.state_count(), out.state_count());
         out.verify_state();
 
         out
@@ -175,7 +175,7 @@ pub trait IntoTs: States {
         let old_initial = self.initial();
         let preserving = self.into_dts_preserving();
         let new_initial = preserving
-            .state_indices_with_color()
+            .states_with_color()
             .find_map(|(new_idx, (old_idx, _))| {
                 if old_idx == old_initial {
                     Some(new_idx)
@@ -224,7 +224,7 @@ pub trait IntoTs: States {
         state: StateIndex<Self>,
     ) -> MooreMachine<DTS<Self::Alphabet, StateColor<Self>, Void>> {
         let (ts, initial) = self.with_initial(state).into_dts_and_initial();
-        assert!(ts.size() > 0);
+        assert!(ts.state_count() > 0);
         MooreMachine::from_parts(ts.linked_map_edges(|_, e, _, _| (e, Void)), initial)
     }
     /// Turns `self` into a [`MealyMachine`] with state `0` as initial state. State colors are dropped.
@@ -234,7 +234,7 @@ pub trait IntoTs: States {
     /// Panics if `self` has no states.
     fn into_mealy(self) -> MealyMachine<DTS<Self::Alphabet, Void, EdgeColor<Self>>> {
         let ts = self.into_dts().linked_map_states(|_, _| Void);
-        assert!(ts.size() > 0);
+        assert!(ts.state_count() > 0);
         MealyMachine::from_parts(ts, 0)
     }
 
@@ -418,7 +418,7 @@ mod tests {
             .into_dts();
         let moore = ts.clone().into_moore_with_initial(0);
         let mealy = ts.into_mealy();
-        assert_eq!(moore.size(), mealy.size());
+        assert_eq!(moore.state_count(), mealy.state_count());
         assert_eq!(moore.initial(), mealy.initial());
     }
 }

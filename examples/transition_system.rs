@@ -46,6 +46,6 @@ fn main() {
     let without_sink = (&dfa).restrict_state_indices(|state| state < 3);
     // `collect_dts` evaluates everything and stores the result in a new transition system.
     let collected = without_sink.collect_dts();
-    println!("without the sink: {} states", collected.size());
-    assert_eq!(collected.size(), 3);
+    println!("without the sink: {} states", collected.state_count());
+    assert_eq!(collected.state_count(), 3);
 }

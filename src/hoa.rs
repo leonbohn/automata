@@ -27,7 +27,7 @@
 //! // a string may contain several automata, `pop` removes the first one
 //! let mut hoa = HoaString::from(text.to_string());
 //! let automaton = hoa.pop::<true>().expect("a valid deterministic automaton");
-//! assert_eq!(automaton.size(), 2);
+//! assert_eq!(automaton.state_count(), 2);
 //!
 //! // convert to a deterministic parity automaton and write it back
 //! let dpa = automaton.into_dpa().expect("a parity automaton");
@@ -150,8 +150,8 @@ mod tests {
         let invalid = "HOA: v1\nStates: 1\nStart: 0\nacc-name: Rabin 1\nAcceptance: 2 Fin(0) & Inf(1)\nAP: 1 \"a\"\n--BODY--\nState: 0\n[t] 0 {0}\n--END--\n";
         let mut hoa = HoaString::from(format!("{one}{invalid}{two}"));
 
-        assert_eq!(hoa.pop::<true>().map(|a| a.size()), Some(1));
-        assert_eq!(hoa.pop::<true>().map(|a| a.size()), Some(2));
+        assert_eq!(hoa.pop::<true>().map(|a| a.state_count()), Some(1));
+        assert_eq!(hoa.pop::<true>().map(|a| a.state_count()), Some(2));
         assert!(hoa.pop::<true>().is_none());
         assert!(hoa.is_empty());
     }
@@ -221,6 +221,6 @@ mod tests {
         let auts = hoa_to_ts::<true>(hoa);
         assert_eq!(auts.len(), 1);
         let aut = &auts[0];
-        assert_eq!(aut.size(), 10);
+        assert_eq!(aut.state_count(), 10);
     }
 }

@@ -243,21 +243,21 @@ impl<T: TransitionSystem> TransitionSystem for RightCongruence<T> {
 }
 
 impl<T: States> States for RightCongruence<T> {
-    type StateIndices<'this>
-        = T::StateIndices<'this>
+    type StatesIter<'this>
+        = T::StatesIter<'this>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts.state_indices()
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts.states()
     }
 
-    fn size(&self) -> usize {
-        self.ts.size()
+    fn state_count(&self) -> usize {
+        self.ts.state_count()
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
-        self.ts.contains_state_index(index)
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts.contains_state(index)
     }
 }
 

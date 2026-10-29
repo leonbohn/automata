@@ -455,31 +455,21 @@ pub trait TransitionSystem: Sized {
 /// stored system, ...) is bounded on this trait instead.
 pub trait States: TransitionSystem {
     /// Type of the iterator over the state indices.
-    type StateIndices<'this>: Iterator<Item = Self::StateIndex>
+    type StatesIter<'this>: Iterator<Item = Self::StateIndex>
     where
         Self: 'this;
 
     /// Returns an iterator over the state indices of `self`.
-    fn state_indices(&self) -> Self::StateIndices<'_>;
-
-    /// Returns a vector of all state indices of `self`. By default, this is simply a helper
-    /// calling to [`Self::state_indices`], but it can be overridden to provide a more
-    /// efficient implementation.
-    #[inline(always)]
-    fn state_indices_vec(&self) -> Vec<Self::StateIndex> {
-        self.state_indices().collect()
-    }
+    fn states(&self) -> Self::StatesIter<'_>;
 
     /// Returns true if the transition system has no states.
-    fn is_stateless(&self) -> bool {
-        self.state_indices().next().is_none()
+    fn has_no_states(&self) -> bool {
+        self.states().next().is_none()
     }
 
     /// Returns an iterator over pairs consisting of a state index and the corresponding state color.
-    fn state_indices_with_color(
-        &self,
-    ) -> impl Iterator<Item = (Self::StateIndex, Self::StateColor)> {
-        self.state_indices().map(|q| {
+    fn states_with_color(&self) -> impl Iterator<Item = (Self::StateIndex, Self::StateColor)> {
+        self.states().map(|q| {
             (
                 q,
                 self.state_color(q)
@@ -491,7 +481,7 @@ pub trait States: TransitionSystem {
 
     /// Gives an iterator over all transitions of `self`.
     fn transitions(&self) -> impl Iterator<Item = Self::EdgeRef<'_>> {
-        self.state_indices().flat_map(move |q| {
+        self.states().flat_map(move |q| {
             self.edges_from(q)
                 .expect("should return iterator for state that exists")
         })
@@ -501,7 +491,7 @@ pub trait States: TransitionSystem {
     /// simply iterates over all states and checks whether they have any outgoing edges.
     /// Should be overridden if a more efficient implementation is available.
     fn is_edgeless(&self) -> bool {
-        self.state_indices().all(|q| {
+        self.states().all(|q| {
             self.edges_from(q)
                 .map(|mut it| it.next().is_none())
                 .unwrap_or(true)
@@ -519,7 +509,7 @@ pub trait States: TransitionSystem {
     where
         EdgeColor<Self>: Clone,
     {
-        self.state_indices()
+        self.states()
             .flat_map(|q| {
                 self.edges_from(q)
                     .expect("should return iterator for state that exists")
@@ -541,7 +531,7 @@ pub trait States: TransitionSystem {
     /// Returns true if the transition system is deterministic, i.e. if there are no two edges leaving
     /// the same state with the same symbol.
     fn is_deterministic(&self) -> bool {
-        for state in self.state_indices() {
+        for state in self.states() {
             let edges: Vec<_> = self.edges_from(state).unwrap().collect();
             for (i, l) in edges.iter().enumerate() {
                 for r in &edges[i + 1..] {
@@ -567,7 +557,7 @@ pub trait States: TransitionSystem {
     fn is_complete(&self) -> bool {
         let universe = self.alphabet().universe().collect::<BTreeSet<_>>();
 
-        for q in self.state_indices() {
+        for q in self.states() {
             let syms = self
                 .transitions_from(q)
                 .into_iter()
@@ -586,21 +576,15 @@ pub trait States: TransitionSystem {
         true
     }
 
-    /// Gives the size of `self`, which is obtained simply by counting the number of elements yielded by [`Self::state_indices()`].
-    fn size(&self) -> usize {
-        self.state_indices().count()
-    }
-
-    /// Returns `true` if and only if there exists at least one state.
-    #[inline(always)]
-    fn is_empty(&self) -> bool {
-        self.size() == 0
+    /// Returns the number of states of `self`, obtained by counting the elements yielded by [`Self::states`].
+    fn state_count(&self) -> usize {
+        self.states().count()
     }
 
     /// Returns true if and only if the given state `index` exists.
     #[inline(always)]
-    fn contains_state_index(&self, index: Self::StateIndex) -> bool {
-        self.state_indices().contains(&index)
+    fn contains_state(&self, index: Self::StateIndex) -> bool {
+        self.states().contains(&index)
     }
 
     /// Tries to find the index of a state with the given `color`. Note that this uses `find` and thus
@@ -612,7 +596,7 @@ pub trait States: TransitionSystem {
     where
         StateColor<Self>: Eq,
     {
-        self.state_indices()
+        self.states()
             .find(|index| self.state_color(*index).as_deref() == Some(color))
     }
 
@@ -750,40 +734,40 @@ impl<Ts: TransitionSystem> TransitionSystem for &mut Ts {
 }
 
 impl<Ts: States> States for &Ts {
-    type StateIndices<'this>
-        = Ts::StateIndices<'this>
+    type StatesIter<'this>
+        = Ts::StatesIter<'this>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        Ts::state_indices(self)
+    fn states(&self) -> Self::StatesIter<'_> {
+        Ts::states(self)
     }
 
-    fn size(&self) -> usize {
-        Ts::size(self)
+    fn state_count(&self) -> usize {
+        Ts::state_count(self)
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
-        Ts::contains_state_index(self, index)
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        Ts::contains_state(self, index)
     }
 }
 
 impl<Ts: States> States for &mut Ts {
-    type StateIndices<'this>
-        = Ts::StateIndices<'this>
+    type StatesIter<'this>
+        = Ts::StatesIter<'this>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        Ts::state_indices(self)
+    fn states(&self) -> Self::StatesIter<'_> {
+        Ts::states(self)
     }
 
-    fn size(&self) -> usize {
-        Ts::size(self)
+    fn state_count(&self) -> usize {
+        Ts::state_count(self)
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
-        Ts::contains_state_index(self, index)
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        Ts::contains_state(self, index)
     }
 }
 
@@ -910,19 +894,19 @@ mod tests {
         use crate::ts::{Deterministic, Pointed};
 
         let dfa = crate::tests::wiki_dfa();
-        let n = dfa.size();
-        assert!(dfa.contains_state_index(0));
-        assert!(!dfa.contains_state_index(n as u32 + 5));
+        let n = dfa.state_count();
+        assert!(dfa.contains_state(0));
+        assert!(!dfa.contains_state(n as u32 + 5));
 
         let erased = (&dfa).erase_state_colors();
-        assert_eq!(erased.size(), n);
-        assert!(erased.contains_state_index(0));
-        assert!(!erased.contains_state_index(n as u32 + 5));
+        assert_eq!(erased.state_count(), n);
+        assert!(erased.contains_state(0));
+        assert!(!erased.contains_state(n as u32 + 5));
 
         let restricted = (&dfa).restrict_state_indices(|q| q != 0);
-        assert!(!restricted.contains_state_index(0));
-        assert!(restricted.contains_state_index(1));
-        assert_eq!(restricted.size(), n - 1);
+        assert!(!restricted.contains_state(0));
+        assert!(restricted.contains_state(1));
+        assert_eq!(restricted.state_count(), n - 1);
 
         let finite = dfa
             .ts()
@@ -930,10 +914,14 @@ mod tests {
             .with_initial(0)
             .subset_construction()
             .reachable_part();
-        assert!(finite.contains_state_index(0));
-        assert!(!finite.contains_state_index(finite.size() + 5));
+        assert!(finite.contains_state(0));
+        assert!(!finite.contains_state(finite.state_count() + 5));
         assert!(finite.successor_index(0, 'a').is_some());
-        assert!(finite.successor_index(finite.size() + 5, 'a').is_none());
+        assert!(
+            finite
+                .successor_index(finite.state_count() + 5, 'a')
+                .is_none()
+        );
         assert_eq!(finite.initial(), 0);
     }
 

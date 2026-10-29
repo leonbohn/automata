@@ -542,7 +542,7 @@ pub trait Deterministic: TransitionSystem {
     where
         Self: Pointed + States,
     {
-        self.size() == self.reachable_state_indices().count()
+        self.state_count() == self.reachable_state_indices().count()
     }
 
     /// Attempts to extract the escape prefix of running the given omega word.

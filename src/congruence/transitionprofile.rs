@@ -245,7 +245,7 @@ impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
 
     /// The profile of the empty word on the transition system `ts`.
     pub fn empty<Ts: States<StateIndex = Idx, StateColor = Q, EdgeColor = C>>(ts: Ts) -> Self {
-        Self::empty_for_states(ts.state_indices().collect())
+        Self::empty_for_states(ts.states().collect())
     }
 
     /// The profile of the empty word for the given states.
@@ -443,7 +443,7 @@ where
     where
         Ts: States,
     {
-        let indices = ts.state_indices().collect();
+        let indices = ts.states().collect();
         Self::build_for_states(ts, indices)
     }
 
@@ -460,13 +460,13 @@ where
         while let Some((word, profile, profile_idx)) = queue.pop_front() {
             for (profile_extension, sym) in profile.all_extensions(&ts) {
                 assert!(
-                    word.len() < ts.size() * 2,
+                    word.len() < ts.state_count() * 2,
                     "This looks dangerously like an infinite loop..."
                 );
                 assert!(
                     profile_extension
                         .iter()
-                        .all(|tp| ts.contains_state_index(tp.state()))
+                        .all(|tp| ts.contains_state(tp.state()))
                 );
                 let mut word_extension = word.clone();
                 word_extension.push(sym);

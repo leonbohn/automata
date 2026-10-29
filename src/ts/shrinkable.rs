@@ -194,12 +194,12 @@ pub trait Shrinkable: States {
     /// assert_eq!(ts.trim_from(q0), vec![(q2, false)]);
     /// ```
     fn trim_from(&mut self, source: StateIndex<Self>) -> Vec<(StateIndex<Self>, StateColor<Self>)> {
-        assert!(self.contains_state_index(source));
+        assert!(self.contains_state(source));
         let reachable = self
             .reachable_state_indices_from(source)
             .collect::<Vec<_>>();
         let mut out = Vec::new();
-        for q in self.state_indices_vec() {
+        for q in self.states().collect::<Vec<_>>() {
             if !reachable.contains(&q) {
                 let c = self.remove_state(q).expect("We know this exists");
                 out.push((q, c));
@@ -246,6 +246,6 @@ mod tests {
 
         let mut mm = ts.with_initial(q0).collect_mealy();
         mm.trim_from(q0);
-        assert_eq!(mm.size(), 5);
+        assert_eq!(mm.state_count(), 5);
     }
 }

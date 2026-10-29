@@ -36,7 +36,7 @@ fn nth_from_end(n: usize) -> automata::NTS<CharAlphabet, bool, Void> {
 fn edge_list(n: usize, k: usize) -> (usize, usize, Vec<(u32, char, u32)>) {
     let ts = common::scrambled(n, k);
     let edges = ts
-        .state_indices()
+        .states()
         .flat_map(|q| {
             let ts = &ts;
             common::symbols(k)
@@ -94,7 +94,7 @@ fn builder_with_edges((n, _k, edges): (usize, usize, Vec<(u32, char, u32)>)) -> 
 fn successor_index_all_pairs((ts, k): (Dts, usize)) -> u64 {
     let symbols = common::symbols(k);
     let mut sum = 0u64;
-    for q in ts.state_indices() {
+    for q in ts.states() {
         for &c in &symbols {
             sum += ts.successor_index(q, c).unwrap_or(0) as u64;
         }
@@ -107,7 +107,7 @@ fn successor_index_all_pairs((ts, k): (Dts, usize)) -> u64 {
 #[bench::scrambled_k8_2000(args = (2_000), setup = scrambled_k8)]
 fn edges_from_all_states((ts, _k): (Dts, usize)) -> usize {
     black_box(
-        ts.state_indices()
+        ts.states()
             .map(|q| ts.edges_from(q).map_or(0, |e| e.count()))
             .sum(),
     )
@@ -181,7 +181,7 @@ fn scc_minimal_representatives(ts: automata::automaton::DFA) -> usize {
 #[bench::scrambled_300(args = (300), setup = dfa)]
 fn minimal_representative_of_all_states(ts: automata::automaton::DFA) -> usize {
     black_box(
-        ts.state_indices()
+        ts.states()
             .filter(|&q| ts.minimal_representative(q).is_some())
             .count(),
     )
@@ -199,7 +199,7 @@ fn canonical_naming(ts: automata::automaton::DFA) -> usize {
 #[bench::scrambled_8000(args = (8_000), setup = scrambled)]
 fn predecessors_of_all_states(ts: Dts) -> usize {
     black_box(
-        ts.state_indices()
+        ts.states()
             .map(|q| ts.predecessors(q).map_or(0, |p| p.count()))
             .sum(),
     )
@@ -246,7 +246,7 @@ fn into_dfa(ts: Dts) -> automata::automaton::DFA {
 #[bench::scrambled_10000(args = (10_000), setup = scrambled)]
 #[bench::scrambled_40000(args = (40_000), setup = scrambled)]
 fn remove_edges_from_matching(mut ts: Dts) -> Dts {
-    let n = ts.size();
+    let n = ts.state_count();
     for i in 0..1_000 {
         black_box(ts.remove_edges_from_matching((i * (n / 1_000)) as u32, 'a'));
     }
@@ -257,7 +257,7 @@ fn remove_edges_from_matching(mut ts: Dts) -> Dts {
 #[bench::scrambled_10000(args = (10_000), setup = scrambled)]
 #[bench::scrambled_40000(args = (40_000), setup = scrambled)]
 fn remove_state(mut ts: Dts) -> Dts {
-    let n = ts.size();
+    let n = ts.state_count();
     for i in 0..1_000 {
         black_box(ts.remove_state((i * (n / 1_000)) as u32));
     }
@@ -276,7 +276,7 @@ fn subset_construction(nts: automata::NTS<CharAlphabet, bool, Void>) -> usize {
             .subset_construction()
             .reachable_part()
             .collect_dts()
-            .size(),
+            .state_count(),
     )
 }
 

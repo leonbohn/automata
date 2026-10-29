@@ -134,7 +134,7 @@ where
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
     ///     .into_dpa(0);
     /// let streamlined = dpa.streamlined();
-    /// assert_eq!(dpa.size(), streamlined.size());
+    /// assert_eq!(dpa.state_count(), streamlined.state_count());
     ///
     /// let dpa = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', 0, 1), (0, 'b', 1, 1),
@@ -142,7 +142,7 @@ where
     ///     .into_dpa(0);
     /// assert_eq!(dpa.last_edge_color("ab"), Some(3));
     /// let streamlined = dpa.streamlined();
-    /// assert_eq!(streamlined.size(), 1);
+    /// assert_eq!(streamlined.state_count(), 1);
     /// assert_eq!(streamlined.last_edge_color("ab"), Some(1))
     /// ```
     pub fn streamlined(
@@ -432,7 +432,7 @@ where
 
     /// Returns an iterator over all colors that appear on edges of `self`.
     pub fn colors(&self) -> impl Iterator<Item = Int> + '_ {
-        self.state_indices()
+        self.states()
             .flat_map(|q| self.edges_from(q).unwrap().map(|e| *e.color()))
             .unique()
     }
@@ -551,7 +551,7 @@ where
                 );
             }
 
-            if ts.size() == 0 {
+            if ts.state_count() == 0 {
                 trace!("no states left, terminating");
                 break 'outer;
             }
@@ -842,7 +842,7 @@ mod tests {
         assert!(!dpa.language_equivalent(&a));
 
         let cong = RightCongruence::from_pointed(dpa.prefix_congruence());
-        assert_eq!(cong.size(), 2);
+        assert_eq!(cong.state_count(), 2);
         assert_eq!(cong.initial(), cong.reached_state_index("aa").unwrap());
         assert!(cong.congruent("", "aa"));
         assert!(cong.congruent("ab", "baaba"));
@@ -856,7 +856,7 @@ mod tests {
             ])
             .into_dpa(0);
         let cong = dpa.prefix_congruence();
-        assert_eq!(cong.size(), 1);
+        assert_eq!(cong.state_count(), 1);
     }
 
     #[test]

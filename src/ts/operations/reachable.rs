@@ -7,7 +7,7 @@ use std::borrow::Cow;
 /// Implicit transition systems like [`super::SubsetConstruction`] or [`super::MatchingProduct`]
 /// do not implement [`States`] as they cannot cheaply enumerate their states. This adapter
 /// explores everything that is reachable once, when it is created, and from then on provides
-/// [`States`] with O(1) [`States::contains_state_index`].
+/// [`States`] with O(1) [`States::contains_state`].
 #[derive(Debug, Clone)]
 pub struct ReachablePart<Ts: TransitionSystem> {
     ts: Ts,
@@ -73,20 +73,20 @@ impl<Ts: TransitionSystem> TransitionSystem for ReachablePart<Ts> {
 }
 
 impl<Ts: TransitionSystem> States for ReachablePart<Ts> {
-    type StateIndices<'this>
+    type StatesIter<'this>
         = std::iter::Copied<std::slice::Iter<'this, Ts::StateIndex>>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
+    fn states(&self) -> Self::StatesIter<'_> {
         self.states.iter().copied()
     }
 
-    fn size(&self) -> usize {
+    fn state_count(&self) -> usize {
         self.states.len()
     }
 
-    fn contains_state_index(&self, state: Ts::StateIndex) -> bool {
+    fn contains_state(&self, state: Ts::StateIndex) -> bool {
         self.reachable.contains(&state)
     }
 }

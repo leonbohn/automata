@@ -173,7 +173,7 @@ assert_eq!(aut.sccs().size(), 2);
 let restricted = (&aut).restrict_state_indices(|q| q < 3);
 // ... until we collect the result into a concrete transition system
 let collected = restricted.collect_dts();
-assert_eq!(collected.size(), 3);
+assert_eq!(collected.state_count(), 3);
 ```
 
 ## Reading and writing HOA

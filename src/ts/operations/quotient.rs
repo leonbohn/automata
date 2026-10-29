@@ -227,20 +227,20 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
 }
 
 impl<Ts: Deterministic> States for Quotient<Ts> {
-    type StateIndices<'this>
+    type StatesIter<'this>
         = std::ops::Range<usize>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
+    fn states(&self) -> Self::StatesIter<'_> {
         0..self.partition.len()
     }
 
-    fn size(&self) -> usize {
+    fn state_count(&self) -> usize {
         self.partition.len()
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
         index < self.partition.len()
     }
 }

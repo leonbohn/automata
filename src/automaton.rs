@@ -97,7 +97,7 @@ impl<T: TransitionSystem, Sem> Automaton<T, Sem> {
     /// };
     ///
     /// let mut dfa: DFA = Automaton::new_with_initial_color(CharAlphabet::of_size(2), false);
-    /// assert_eq!(dfa.size(), 1);
+    /// assert_eq!(dfa.state_count(), 1);
     /// dfa.add_edge((0, 'a', 0));
     /// dfa.add_edge((0, 'b', 0));
     /// assert!(!dfa.accepts("bbabababbabbba"));
@@ -349,21 +349,21 @@ impl<T: TransitionSystem, Sem> TransitionSystem for Automaton<T, Sem> {
 }
 
 impl<T: States, Sem> States for Automaton<T, Sem> {
-    type StateIndices<'this>
-        = T::StateIndices<'this>
+    type StatesIter<'this>
+        = T::StatesIter<'this>
     where
         Self: 'this;
 
-    fn state_indices(&self) -> Self::StateIndices<'_> {
-        self.ts.state_indices()
+    fn states(&self) -> Self::StatesIter<'_> {
+        self.ts.states()
     }
 
-    fn size(&self) -> usize {
-        self.ts.size()
+    fn state_count(&self) -> usize {
+        self.ts.state_count()
     }
 
-    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
-        self.ts.contains_state_index(index)
+    fn contains_state(&self, index: StateIndex<Self>) -> bool {
+        self.ts.contains_state(index)
     }
 }
 
@@ -378,7 +378,7 @@ impl<T: TransitionSystem + std::fmt::Debug, Sem: std::fmt::Debug> std::fmt::Debu
 /// Iterator over the accepting states of a [`TransitionSystem`] that have a certain coloring.
 pub struct StatesWithColor<'a, Ts: States> {
     ts: &'a Ts,
-    iter: Ts::StateIndices<'a>,
+    iter: Ts::StatesIter<'a>,
     color: Ts::StateColor,
 }
 
@@ -386,7 +386,7 @@ impl<'a, Ts: States> StatesWithColor<'a, Ts> {
     /// Creates a new instance for the given transition system and color.
     pub fn new(ts: &'a Ts, color: Ts::StateColor) -> Self {
         Self {
-            iter: ts.state_indices(),
+            iter: ts.states(),
             ts,
             color,
         }
@@ -397,7 +397,7 @@ impl<Ts: States> Clone for StatesWithColor<'_, Ts> {
     fn clone(&self) -> Self {
         Self {
             ts: self.ts,
-            iter: self.ts.state_indices(),
+            iter: self.ts.states(),
             color: self.color.clone(),
         }
     }
