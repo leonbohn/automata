@@ -220,7 +220,9 @@ An **automaton** is a transition system together with an initial state and an ac
 
 **Alphabets.** Transition systems are generic over the alphabet. A *simple* alphabet (`CharAlphabet`) is a collection of `char`s that label both edges and transitions. A *propositional* alphabet (`PropAlphabet`) is given by atomic propositions: words consist of valuations of the propositions, and edges are labeled by boolean formulas over them (stored as BDDs). Propositional alphabets exist for the interaction with other tools through HOA; for experiments a `CharAlphabet` is simpler.
 
-**Edges and transitions.** As in other libraries for ($\omega$-)automata, an *edge* has a source, a target, a color and a guard (an *expression* of the alphabet), while a *transition* is a concrete step on a single symbol. For simple alphabets the two coincide; for propositional alphabets an expression matches many symbols.
+**Edges and transitions.** As in other libraries for ($\omega$-)automata, an *edge* has a source, a target, a color and a guard (an *expression* of the alphabet), while a *transition* is a concrete step on a single symbol. For simple alphabets the two coincide; for propositional alphabets an expression matches many symbols. Every storage and every adapter hands its edges out as the same `ts::EdgeRef` (`source`, `target`, `expression`, `color`), so generic code does not multiply over edge types.
+
+**Recoloring.** `map_state_colors`, `map_edge_colors`, `map_edge_colors_full`, `with_state_color` and the `erase_*` methods all return the same adapter, which computes the new colors on access and caches nothing, just like `Iterator::map`.
 
 **Capabilities are traits.** `TransitionSystem` is the central trait. `Pointed` adds an initial state, `Deterministic` guarantees at most one transition per state and symbol, `Sproutable` and `Shrinkable` allow growing and shrinking a transition system. The default implementation behind `TS`, `DTS` and `NTS` is a linked-list based transition system.
 

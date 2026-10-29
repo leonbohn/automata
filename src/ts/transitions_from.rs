@@ -1,6 +1,7 @@
 use crate::TransitionSystem;
 use crate::alphabet::{Alphabet, Expression};
-use crate::ts::{Deterministic, EdgeExpression, IsEdge, SymbolOf};
+use crate::ts::EdgeOf;
+use crate::ts::{Deterministic, EdgeExpression, SymbolOf};
 
 /// Specialized version of an iterator over the edges leaving a specific state of a **deterministic**
 /// transition system.
@@ -11,7 +12,7 @@ pub struct DeterministicEdgesFrom<'a, Ts: TransitionSystem> {
 }
 
 impl<'a, Ts: Deterministic> Iterator for DeterministicEdgesFrom<'a, Ts> {
-    type Item = Ts::EdgeRef<'a>;
+    type Item = EdgeOf<'a, Ts>;
     fn next(&mut self) -> Option<Self::Item> {
         self.symbols
             .next()
@@ -55,7 +56,7 @@ impl<'a, D: TransitionSystem + 'a> Iterator for TransitionsFrom<'a, D> {
                 let mut it = t.expression().symbols();
                 if let Some(sym) = it.next() {
                     let target = t.target();
-                    let color = t.color().into_owned();
+                    let color = t.color().clone();
                     self.symbols = Some(it);
                     self.color = Some(color.clone());
                     self.target = Some(target);

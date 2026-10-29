@@ -8,7 +8,7 @@
 //!
 //! Both can hand images to the viewer of the system (`open_in_viewer`).
 
-use crate::ts::IsEdge;
+use crate::ts::EdgeOf;
 use crate::ts::States;
 use itertools::Itertools;
 
@@ -130,7 +130,7 @@ pub trait Dottable: States {
     /// Additional attributes of the DOT edge that represents the given edge, none by default.
     fn dot_transition_attributes<'a>(
         &'a self,
-        _t: Self::EdgeRef<'a>,
+        _t: EdgeOf<'a, Self>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         []
     }

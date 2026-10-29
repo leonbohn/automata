@@ -12,7 +12,7 @@ use std::{collections::BTreeSet, time::Instant};
 
 use crate::automaton::{MealyMachine, MooreMachine};
 use crate::representation::{CollectTs, IntoTs};
-use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor};
+use crate::ts::{Deterministic, EdgeColor, StateColor};
 use crate::{Color, math, partition::Partition};
 use crate::{Congruence, TransitionSystem};
 use itertools::Itertools;
@@ -171,7 +171,7 @@ where
                 && let Some(target) = ids.id(&t.target())
             {
                 let next = labels.len();
-                let label = *labels.entry(t.color().into_owned()).or_insert(next);
+                let label = *labels.entry(t.color().clone()).or_insert(next);
                 raw[s].push((target, q, label));
             }
         }
@@ -327,7 +327,7 @@ mod tests {
     use crate::States;
     use crate::alphabet::CharAlphabet;
     use crate::representation::IntoTs;
-    use crate::ts::{Deterministic, ForAlphabet, IsEdge, Sproutable};
+    use crate::ts::{Deterministic, ForAlphabet, Sproutable};
     use crate::{DTS, TransitionSystem, tests::wiki_dfa};
 
     #[test]
@@ -399,7 +399,7 @@ mod tests {
                         ts.edge(q as u32, sym).map(|e| {
                             (
                                 class[e.target() as usize],
-                                use_edge_colors.then(|| e.color().into_owned()),
+                                use_edge_colors.then(|| *e.color()),
                             )
                         })
                     })

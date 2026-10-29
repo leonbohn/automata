@@ -13,7 +13,8 @@
 use crate::TransitionSystem;
 use crate::alphabet::Expression;
 use crate::congruence::MinimalRepresentative;
-use crate::ts::{IsEdge, StateIndex, StateMap, StateSet, SymbolOf};
+use crate::ts::EdgeOf;
+use crate::ts::{StateIndex, StateMap, StateSet, SymbolOf};
 use std::collections::VecDeque;
 
 /// Breadth-first traversal that yields the states reachable from a set of start states.
@@ -100,7 +101,7 @@ impl<'a, Ts: TransitionSystem> BfsEdges<'a, Ts> {
 }
 
 impl<'a, Ts: TransitionSystem> Iterator for BfsEdges<'a, Ts> {
-    type Item = Ts::EdgeRef<'a>;
+    type Item = EdgeOf<'a, Ts>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -346,7 +347,7 @@ mod tests {
     use crate::automaton::DFA;
     use crate::congruence::MinimalRepresentative;
     use crate::ts::States;
-    use crate::ts::{Builder, Deterministic, IsEdge};
+    use crate::ts::{Builder, Deterministic};
     use itertools::Itertools;
     use std::collections::{BTreeMap, BTreeSet};
 

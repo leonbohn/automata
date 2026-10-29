@@ -1,3 +1,4 @@
+use crate::ts::EdgeOf;
 use crate::ts::States;
 use rustc_hash::FxHashMap;
 use std::hash::Hash;
@@ -12,7 +13,7 @@ pub use scc::Scc;
 
 mod tarjan;
 use crate::TransitionSystem;
-use crate::ts::{EdgeColor, IsEdge};
+use crate::ts::EdgeColor;
 pub use tarjan::{kosaraju, tarjan_scc_iterative, tarjan_scc_iterative_from, tarjan_scc_recursive};
 
 /// Newtype wrapper for storing indices of SCCs.
@@ -97,7 +98,7 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
 
     /// Returns an iterator over all transient edges in the transition system. An edge is transient
     /// if its source and target are in different SCCs.
-    pub fn transient_edges(&self) -> impl Iterator<Item = Ts::EdgeRef<'a>> + '_
+    pub fn transient_edges(&self) -> impl Iterator<Item = EdgeOf<'a, Ts>> + '_
     where
         Ts: States,
     {

@@ -459,7 +459,7 @@ impl<W: Debug, C: Debug> Debug for RunOutput<W, C> {
 
 mod impls {
     use super::*;
-    use crate::ts::{Deterministic, EdgeColor, IsEdge, StateColor, StateIndex, SymbolOf};
+    use crate::ts::{Deterministic, EdgeColor, StateColor, StateIndex, SymbolOf};
     use crate::{Lattice, math};
 
     impl<T: Deterministic> Observer<T> for NoObserver {
@@ -558,8 +558,8 @@ mod impls {
         ) -> Option<StateIndex<T>> {
             let e = ts.edge(state, sym)?;
             match &mut self.0 {
-                Some(c) => c.clone_from(&e.color()),
-                none => *none = Some(e.color().into_owned()),
+                Some(c) => c.clone_from(e.color()),
+                none => *none = Some(e.color().clone()),
             }
             Some(e.target())
         }
@@ -636,9 +636,9 @@ mod impls {
             let e = ts.edge(state, sym)?;
             let new = e.color();
             if MAX {
-                self.0.join_assign(&new)
+                self.0.join_assign(new)
             } else {
-                self.0.meet_assign(&new)
+                self.0.meet_assign(new)
             }
             Some(e.target())
         }
@@ -696,8 +696,8 @@ mod impls {
         ) -> Option<StateIndex<T>> {
             let t = ts.edge(state, sym)?;
             let c = t.color();
-            if !self.0.contains(&*c) {
-                self.0.insert(c.into_owned());
+            if !self.0.contains(c) {
+                self.0.insert(c.clone());
             }
             Some(t.target())
         }
@@ -730,7 +730,7 @@ mod impls {
             sym: SymbolOf<T>,
         ) -> Option<StateIndex<T>> {
             let t = ts.edge(state, sym)?;
-            self.0.push(t.color().into_owned());
+            self.0.push(t.color().clone());
             Some(t.target())
         }
     }
@@ -774,7 +774,7 @@ mod impls {
 #[cfg(test)]
 mod tests {
     use crate::ts::run::EscapePrefix;
-    use crate::ts::{Builder, Deterministic, IsEdge, TransitionSystem};
+    use crate::ts::{Builder, Deterministic, TransitionSystem};
 
     #[test]
     fn run_escaping() {
@@ -876,7 +876,7 @@ mod tests {
                 .next()
                 .unwrap()
                 .color()
-                .into_owned(),
+                .clone(),
             0.5
         );
     }

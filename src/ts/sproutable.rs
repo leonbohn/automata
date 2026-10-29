@@ -5,7 +5,7 @@ use bimap::BiBTreeMap;
 use fixedbitset::FixedBitSet;
 use itertools::Itertools;
 
-use super::{EdgeColor, EdgeTuple, IntoEdgeTuple, IsEdge, StateColor, StateIndex};
+use super::{EdgeColor, EdgeTuple, IntoEdgeTuple, StateColor, StateIndex};
 
 /// Implemented by [`TransitionSystem`]s (TS) that can be created for a given [`Alphabet`],
 /// which is may be used in conjunction with [`Sproutable`] to successively grow a
@@ -177,7 +177,7 @@ pub trait Sproutable: States {
                 out.add_edge((
                     source,
                     edge.expression().clone(),
-                    edge.color().into_owned(),
+                    edge.color().clone(),
                     *map.get_by_left(&edge.target()).unwrap(),
                 ));
             }

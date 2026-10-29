@@ -1,5 +1,5 @@
 use crate::ts::predecessors::PredecessorIterable;
-use crate::ts::{EdgeExpression, IdType, IsEdge, StateIndex, SymbolOf};
+use crate::ts::{EdgeExpression, EdgeOf, EdgeRef, IdType, StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
 use crate::{Show, alphabet::Alphabet};
 use itertools::Itertools;
@@ -79,18 +79,6 @@ where
 
     type StateColor = (L::StateColor, R::StateColor);
 
-    type EdgeRef<'this>
-        = ProductTransition<
-        'this,
-        L::StateIndex,
-        R::StateIndex,
-        EdgeExpression<L>,
-        L::EdgeColor,
-        R::EdgeColor,
-    >
-    where
-        Self: 'this;
-
     type EdgesFromIter<'this>
         = ProductEdgesFrom<'this, L, R>
     where
@@ -110,7 +98,7 @@ where
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        ProductEdgesFrom::new(&self.0, &self.1, state)
+        ProductEdges::new(&self.0, &self.1, state)
     }
 }
 
@@ -124,247 +112,113 @@ where
     }
 }
 
-/// Type that encapsulates a transition in a product transition system.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ProductTransition<'a, LI, RI, E, LC, RC> {
-    expression: &'a E,
-    source: ProductIndex<LI, RI>,
-    target: ProductIndex<LI, RI>,
-    color: (LC, RC),
-}
-
-impl<'a, LI, RI, E, LC, RC> ProductTransition<'a, LI, RI, E, LC, RC> {
-    /// Creates the transition of the product from the transitions of both components.
-    pub fn new(
-        source: ProductIndex<LI, RI>,
-        expression: &'a E,
-        color: (LC, RC),
-        target: ProductIndex<LI, RI>,
-    ) -> Self {
-        Self {
-            source,
-            expression,
-            target,
-            color,
-        }
-    }
-}
-
-impl<'a, Idx, Jdx, E, C, D> IsEdge<'a, E, ProductIndex<Idx, Jdx>, (C, D)>
-    for ProductTransition<'a, Idx, Jdx, E, C, D>
-where
-    C: Clone,
-    D: Clone,
-    Idx: IdType,
-    Jdx: IdType,
-{
-    fn source(&self) -> ProductIndex<Idx, Jdx> {
-        ProductIndex(self.source.0, self.source.1)
-    }
-
-    fn target(&self) -> ProductIndex<Idx, Jdx> {
-        self.target
-    }
-
-    fn color(&self) -> Cow<'_, (C, D)> {
-        Cow::Borrowed(&self.color)
-    }
-
-    fn expression(&self) -> &'a E {
-        self.expression
-    }
-}
-
-/// Iterator over the edges of a product transition system.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProductEdgesFrom<'a, L: TransitionSystem, R: TransitionSystem> {
-    left: &'a L,
+/// Iterator over the edges of a product transition system, for successors and for predecessors.
+/// For each edge of the left system, the edges of the right system at the right state are
+/// iterated again (by asking the right system for a fresh iterator) instead of being collected
+/// into a `Vec`, so no allocation takes place.
+pub struct ProductEdges<'a, L: TransitionSystem, R: TransitionSystem, IL, IR> {
+    left_edges: IL,
+    current: Option<EdgeOf<'a, L>>,
     right: &'a R,
-    cur: Option<L::EdgeRef<'a>>,
-    it: L::EdgesFromIter<'a>,
-    right_edges: Vec<R::EdgeRef<'a>>,
-    position: usize,
+    right_state: R::StateIndex,
+    start_right: fn(&'a R, R::StateIndex) -> Option<IR>,
+    right_edges: Option<IR>,
 }
 
-impl<'a, L: TransitionSystem, R: TransitionSystem> ProductEdgesFrom<'a, L, R> {
+/// Iterator over the edges of a product transition system that start in a state.
+pub type ProductEdgesFrom<'a, L, R> = ProductEdges<
+    'a,
+    L,
+    R,
+    <L as TransitionSystem>::EdgesFromIter<'a>,
+    <R as TransitionSystem>::EdgesFromIter<'a>,
+>;
+
+/// Iterator over the predecessors of a product transition system.
+pub type ProductEdgesTo<'a, L, R> = ProductEdges<
+    'a,
+    L,
+    R,
+    <L as PredecessorIterable>::EdgesToIter<'a>,
+    <R as PredecessorIterable>::EdgesToIter<'a>,
+>;
+
+impl<'a, L: TransitionSystem, R: TransitionSystem>
+    ProductEdges<'a, L, R, L::EdgesFromIter<'a>, R::EdgesFromIter<'a>>
+{
     /// Creates an iterator over the edges of the product that start in the state `(left, right)`.
     pub fn new(
         left: &'a L,
         right: &'a R,
         index: ProductIndex<L::StateIndex, R::StateIndex>,
     ) -> Option<Self> {
-        let mut it = left.edges_from(index.0)?;
+        right.edges_from(index.1)?.next();
         Some(Self {
-            left,
-            right_edges: right.edges_from(index.1)?.collect(),
+            left_edges: left.edges_from(index.0)?,
+            current: None,
             right,
-            position: 0,
-            cur: it.next(),
-            it,
+            right_state: index.1,
+            start_right: |right, state| right.edges_from(state),
+            right_edges: None,
         })
     }
 }
 
-impl<'a, L, R> Iterator for ProductEdgesFrom<'a, L, R>
-where
-    L: TransitionSystem,
-    R: TransitionSystem,
-    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = EdgeExpression<L>>,
+impl<'a, L: PredecessorIterable, R: PredecessorIterable>
+    ProductEdges<'a, L, R, L::EdgesToIter<'a>, R::EdgesToIter<'a>>
 {
-    type Item = ProductTransition<
-        'a,
-        L::StateIndex,
-        R::StateIndex,
-        EdgeExpression<L>,
-        L::EdgeColor,
-        R::EdgeColor,
-    >;
-
-    #[allow(clippy::question_mark)]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.position >= self.right_edges.len() {
-            self.position = 0;
-            self.cur = self.it.next();
-        }
-        match &self.cur {
-            None => return None,
-            Some(l) => {
-                while let Some(r) = self.right_edges.get(self.position) {
-                    self.position += 1;
-                    if l.expression() == r.expression() {
-                        return Some(ProductTransition::new(
-                            ProductIndex(l.source(), r.source()),
-                            l.expression(),
-                            (l.color().into_owned(), r.color().into_owned()),
-                            ProductIndex(l.target(), r.target()),
-                        ));
-                    }
-                }
-            }
-        }
-        self.next()
-    }
-}
-
-/// Analogous to [`ProductTransition`]; encapsulates a pre-transition in a product transition system.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProductPreTransition<'a, LI, RI, E, LC, RC> {
-    source: ProductIndex<LI, RI>,
-    expression: &'a E,
-    color: (LC, RC),
-    target: ProductIndex<LI, RI>,
-}
-
-impl<'a, LI, RI, E, LC, RC> IsEdge<'a, E, ProductIndex<LI, RI>, (LC, RC)>
-    for ProductPreTransition<'a, LI, RI, E, LC, RC>
-where
-    LC: Clone,
-    RC: Clone,
-    LI: IdType,
-    RI: IdType,
-{
-    fn color(&self) -> Cow<'_, (LC, RC)> {
-        Cow::Borrowed(&self.color)
-    }
-
-    fn source(&self) -> ProductIndex<LI, RI> {
-        self.source
-    }
-
-    fn target(&self) -> ProductIndex<LI, RI> {
-        self.target
-    }
-
-    fn expression(&self) -> &'a E {
-        self.expression
-    }
-}
-
-impl<'a, LI, RI, E, LC, RC> ProductPreTransition<'a, LI, RI, E, LC, RC> {
-    /// Creates the pre-transition of the product from the pre-transitions of both components.
-    pub fn new(
-        source: ProductIndex<LI, RI>,
-        expression: &'a E,
-        color: (LC, RC),
-        target: ProductIndex<LI, RI>,
-    ) -> Self {
-        Self {
-            target,
-            source,
-            expression,
-            color,
-        }
-    }
-}
-
-/// Iterator over the predecessors of a product transition system.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProductEdgesTo<'a, L: PredecessorIterable, R: PredecessorIterable> {
-    left: &'a L,
-    right: &'a R,
-    cur: Option<L::PreEdgeRef<'a>>,
-    it: L::EdgesToIter<'a>,
-    right_edges: Vec<R::PreEdgeRef<'a>>,
-    position: usize,
-}
-
-impl<'a, L, R> Iterator for ProductEdgesTo<'a, L, R>
-where
-    L: PredecessorIterable,
-    R: PredecessorIterable,
-    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = EdgeExpression<L>>,
-{
-    type Item = ProductPreTransition<
-        'a,
-        L::StateIndex,
-        R::StateIndex,
-        EdgeExpression<L>,
-        L::EdgeColor,
-        R::EdgeColor,
-    >;
-
-    #[allow(clippy::question_mark)]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.position >= self.right_edges.len() {
-            self.position = 0;
-            self.cur = self.it.next();
-        }
-        match &self.cur {
-            None => return None,
-            Some(left) => {
-                while let Some(right) = self.right_edges.get(self.position) {
-                    self.position += 1;
-                    if left.expression() == right.expression() {
-                        return Some(ProductPreTransition::new(
-                            ProductIndex(left.source(), right.source()),
-                            left.expression(),
-                            (left.color().into_owned(), right.color().into_owned()),
-                            ProductIndex(left.target(), right.target()),
-                        ));
-                    }
-                }
-            }
-        }
-        self.next()
-    }
-}
-
-impl<'a, L: PredecessorIterable, R: PredecessorIterable> ProductEdgesTo<'a, L, R> {
     /// Creates an iterator over the edges of the product that lead to the state `(left, right)`.
-    pub fn new(
+    pub fn new_to(
         left: &'a L,
         right: &'a R,
         index: ProductIndex<L::StateIndex, R::StateIndex>,
     ) -> Option<Self> {
-        let mut it = left.predecessors(index.0)?;
+        right.predecessors(index.1)?.next();
         Some(Self {
-            left,
+            left_edges: left.predecessors(index.0)?,
+            current: None,
             right,
-            cur: it.next(),
-            it,
-            right_edges: right.predecessors(index.1)?.collect(),
-            position: 0,
+            right_state: index.1,
+            start_right: |right, state| right.predecessors(state),
+            right_edges: None,
         })
+    }
+}
+
+impl<'a, L, R, IL, IR> Iterator for ProductEdges<'a, L, R, IL, IR>
+where
+    L: TransitionSystem,
+    R: TransitionSystem,
+    R::Alphabet: Alphabet<Symbol = SymbolOf<L>, Expression = EdgeExpression<L>>,
+    IL: Iterator<Item = EdgeOf<'a, L>>,
+    IR: Iterator<Item = EdgeOf<'a, R>>,
+{
+    type Item = EdgeRef<
+        'a,
+        ProductIndex<L::StateIndex, R::StateIndex>,
+        EdgeExpression<L>,
+        (L::EdgeColor, R::EdgeColor),
+    >;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if self.right_edges.is_none() {
+                self.current = Some(self.left_edges.next()?);
+                self.right_edges = (self.start_right)(self.right, self.right_state);
+            }
+            let left = self.current.as_ref()?;
+            for right in self.right_edges.as_mut()?.by_ref() {
+                if left.expression() == right.expression() {
+                    return Some(EdgeRef::owned(
+                        ProductIndex(left.source(), right.source()),
+                        left.expression(),
+                        (left.color().clone(), right.color().clone()),
+                        ProductIndex(left.target(), right.target()),
+                    ));
+                }
+            }
+            self.right_edges = None;
+        }
     }
 }
 
@@ -374,7 +228,7 @@ mod tests {
     use crate::Void;
     use crate::automaton::MealyMachine;
     use crate::ts::Deterministic;
-    use crate::ts::operations::Product;
+    use crate::ts::operations::{Product, ProductIndex};
 
     #[test]
     fn product_subalphabet() {
@@ -395,7 +249,7 @@ mod tests {
     #[test]
     fn product_iterates_edges() {
         use crate::TransitionSystem;
-        use crate::ts::{Deterministic, IsEdge};
+        use crate::ts::Deterministic;
         let l: MealyMachine = DTS::builder()
             .default_color(Void)
             .with_transitions([
@@ -417,5 +271,35 @@ mod tests {
                 assert_eq!(prod.edge(q, sym).unwrap().target(), e.target());
             }
         }
+    }
+
+    #[test]
+    fn product_with_a_nondeterministic_right_side() {
+        use crate::ts::PredecessorIterable;
+        use crate::{NTS, TransitionSystem};
+        let l: MealyMachine = DTS::builder()
+            .default_color(Void)
+            .with_transitions([(0, 'a', 0, 1), (1, 'a', 1, 0)])
+            .into_mealy(0);
+        // two edges on 'a' leave state 0
+        let r = NTS::builder()
+            .default_color(Void)
+            .with_transitions([(0, 'a', 0), (0, 'a', 1), (1, 'a', 0)])
+            .into_nts();
+        let prod = (&l).ts_product(&r);
+        let mut targets: Vec<_> = prod
+            .edges_from(ProductIndex(0, 0))
+            .unwrap()
+            .map(|e| e.target())
+            .collect();
+        targets.sort();
+        assert_eq!(targets, vec![ProductIndex(1, 0), ProductIndex(1, 1)]);
+        let mut sources: Vec<_> = prod
+            .predecessors(ProductIndex(0, 0))
+            .unwrap()
+            .map(|e| e.source())
+            .collect();
+        sources.sort();
+        assert_eq!(sources, vec![ProductIndex(1, 0), ProductIndex(1, 1)]);
     }
 }

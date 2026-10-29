@@ -2,8 +2,9 @@ use super::{DotStateAttribute, DotTransitionAttribute, Dottable};
 use crate::DTS;
 use crate::Void;
 use crate::automaton::{DFA, DPA, MealyMachine, MooreMachine};
+use crate::ts::EdgeOf;
 use crate::ts::States;
-use crate::ts::{Deterministic, IsEdge, StateColor, StateIndex};
+use crate::ts::{Deterministic, StateColor, StateIndex};
 use crate::{Color, Int, Pointed, Show, TransitionSystem, alphabet::Alphabet};
 
 impl<A: Alphabet> Dottable for DFA<DTS<A, bool, Void>>
@@ -24,7 +25,7 @@ where
 
     fn dot_transition_attributes<'a>(
         &'a self,
-        t: Self::EdgeRef<'a>,
+        t: EdgeOf<'a, Self>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         [DotTransitionAttribute::Label(t.expression().show())].into_iter()
     }
@@ -65,12 +66,12 @@ where
 
     fn dot_transition_attributes<'a>(
         &'a self,
-        t: Self::EdgeRef<'a>,
+        t: EdgeOf<'a, Self>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         [DotTransitionAttribute::Label(format!(
             "{:?}|{:?}",
             t.expression(),
-            IsEdge::color(&t)
+            t.color()
         ))]
         .into_iter()
     }
@@ -115,7 +116,7 @@ where
 
     fn dot_transition_attributes<'a>(
         &'a self,
-        t: Self::EdgeRef<'a>,
+        t: EdgeOf<'a, Self>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         vec![DotTransitionAttribute::Label(t.expression().show())]
     }
@@ -153,12 +154,12 @@ where
 
     fn dot_transition_attributes<'a>(
         &'a self,
-        t: Self::EdgeRef<'a>,
+        t: EdgeOf<'a, Self>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         vec![DotTransitionAttribute::Label(format!(
             "{}|{:?}",
             t.expression().show(),
-            IsEdge::color(&t)
+            t.color()
         ))]
     }
 
@@ -188,12 +189,12 @@ where
 
     fn dot_transition_attributes<'a>(
         &'a self,
-        t: Self::EdgeRef<'a>,
+        t: EdgeOf<'a, Self>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute> {
         vec![DotTransitionAttribute::Label(format!(
             "{}|{}",
             t.expression().show(),
-            IsEdge::color(&t).show()
+            t.color().show()
         ))]
     }
 

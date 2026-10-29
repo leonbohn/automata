@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use super::LinkedListTransitionSystemEdge;
 use crate::Color;
+use crate::ts::{DefaultIdType, EdgeRef};
 
 /// Stores information characterizing a state in a non-deterministic transition system, see [`crate::NTS`].
 /// It stores a color and a pointer to the index of the first edge leaving the state.
@@ -136,14 +137,14 @@ pub struct NTSEdgesFromIter<'a, E, C> {
     current: Option<usize>,
 }
 
-impl<'a, E, C> Iterator for NTSEdgesFromIter<'a, E, C> {
-    type Item = &'a LinkedListTransitionSystemEdge<E, C>;
+impl<'a, E, C: Clone> Iterator for NTSEdgesFromIter<'a, E, C> {
+    type Item = EdgeRef<'a, DefaultIdType, E, C>;
     fn next(&mut self) -> Option<Self::Item> {
         let idx = self.current?;
         assert!(idx < self.edges.len());
         let e = &self.edges[idx];
         self.current = e.out_next;
-        Some(e)
+        Some(e.as_edge_ref())
     }
 }
 
@@ -160,12 +161,14 @@ pub struct LinkedListTransitionSystemEdgesToIter<'a, E, C, const DET: bool> {
     current: Option<usize>,
 }
 
-impl<'a, E, C, const DET: bool> Iterator for LinkedListTransitionSystemEdgesToIter<'a, E, C, DET> {
-    type Item = &'a LinkedListTransitionSystemEdge<E, C>;
+impl<'a, E, C: Clone, const DET: bool> Iterator
+    for LinkedListTransitionSystemEdgesToIter<'a, E, C, DET>
+{
+    type Item = EdgeRef<'a, DefaultIdType, E, C>;
     fn next(&mut self) -> Option<Self::Item> {
         let e = &self.edges[self.current?];
         self.current = e.in_next;
-        Some(e)
+        Some(e.as_edge_ref())
     }
 }
 

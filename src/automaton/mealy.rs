@@ -3,7 +3,7 @@ use std::{fmt::Debug, hash::Hash};
 
 use super::Automaton;
 use crate::ts::operations::{Product, ProductIndex};
-use crate::ts::{Deterministic, EdgeColor, IsEdge, SymbolOf};
+use crate::ts::{Deterministic, EdgeColor, SymbolOf};
 use crate::{
     Color, Int, Lattice, Void,
     alphabet::{CharAlphabet, Expression},
@@ -52,11 +52,7 @@ where
         EdgeColor<Self>: Clone + Hash + Eq,
     {
         self.reachable_state_indices_from(self.initial)
-            .flat_map(|o| {
-                self.edges_from(o)
-                    .unwrap()
-                    .map(|e| IsEdge::color(&e).into_owned())
-            })
+            .flat_map(|o| self.edges_from(o).unwrap().map(|e| e.color().clone()))
             .unique()
     }
 

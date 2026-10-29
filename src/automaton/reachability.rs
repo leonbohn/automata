@@ -48,7 +48,13 @@ where
 /// A deterministic finite automaton (DFA) is a deterministic automaton with a simple acceptance condition. It accepts a finite word if it reaches an accepting state.
 pub type DFA<T = DTS<CharAlphabet, bool, Void>> = Automaton<T, ReachabilityCondition>;
 
-impl<D> DFA<operations::WithStateColor<D, operations::DefaultIfMissing<D::StateIndex, bool>>>
+impl<D>
+    DFA<
+        operations::Recolor<
+            D,
+            operations::Provided<operations::DefaultIfMissing<D::StateIndex, bool>>,
+        >,
+    >
 where
     D: Deterministic,
 {

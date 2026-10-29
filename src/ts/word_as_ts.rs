@@ -1,3 +1,4 @@
+use crate::ts::EdgeOf;
 use crate::ts::States;
 use crate::{
     alphabet::SimpleAlphabet,
@@ -8,7 +9,7 @@ use std::borrow::Cow;
 use crate::TransitionSystem;
 use crate::ts::{StateIndex, predecessors::PredecessorIterable};
 
-use super::{EdgeColor, edge::TransitionOwnedColor};
+use super::EdgeRef;
 
 /// Treats a word as if it was a transition system.
 ///
@@ -25,13 +26,8 @@ pub struct WordTs<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>, const FINITE: 
 impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> PredecessorIterable
     for WordTs<A, W, false>
 {
-    type PreEdgeRef<'this>
-        = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
-    where
-        Self: 'this;
-
     type EdgesToIter<'this>
-        = std::iter::Once<Self::PreEdgeRef<'this>>
+        = std::iter::Once<EdgeOf<'this, Self>>
     where
         Self: 'this;
 
@@ -40,7 +36,7 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> PredecessorIterable
             return None;
         }
         let sym = self.word.nth((state - 1) as usize).unwrap();
-        Some(std::iter::once(TransitionOwnedColor::new(
+        Some(std::iter::once(EdgeRef::owned(
             state - 1,
             self.alphabet.express(sym),
             sym,
@@ -51,17 +47,12 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> PredecessorIterable
 impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> PredecessorIterable
     for WordTs<A, W, true>
 {
-    type PreEdgeRef<'this>
-        = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
-    where
-        Self: 'this;
-
     type EdgesToIter<'this>
         = itertools::Either<
-        std::iter::Once<Self::PreEdgeRef<'this>>,
+        std::iter::Once<EdgeOf<'this, Self>>,
         std::iter::Chain<
-            std::iter::Once<Self::PreEdgeRef<'this>>,
-            std::iter::Once<Self::PreEdgeRef<'this>>,
+            std::iter::Once<EdgeOf<'this, Self>>,
+            std::iter::Once<EdgeOf<'this, Self>>,
         >,
     >
     where
@@ -73,7 +64,7 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> PredecessorIterable
         }
         let sym = self.word.nth((state - 1) as usize).unwrap();
 
-        let direct_pred = std::iter::once(TransitionOwnedColor::new(
+        let direct_pred = std::iter::once(EdgeRef::owned(
             state - 1,
             self.alphabet.express(sym),
             sym,
@@ -83,7 +74,7 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> PredecessorIterable
             Some(itertools::Either::Left(direct_pred))
         } else {
             Some(itertools::Either::Right(direct_pred.chain(
-                std::iter::once(TransitionOwnedColor::new(
+                std::iter::once(EdgeRef::owned(
                     (self.word.combined_len() - 1) as u32,
                     self.alphabet.express(sym),
                     sym,
@@ -112,13 +103,8 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
 
     type EdgeColor = A::Symbol;
 
-    type EdgeRef<'this>
-        = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
-    where
-        Self: 'this;
-
     type EdgesFromIter<'this>
-        = std::iter::Once<Self::EdgeRef<'this>>
+        = std::iter::Once<EdgeOf<'this, Self>>
     where
         Self: 'this;
 
@@ -127,7 +113,7 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
             return None;
         }
         let sym = self.word.nth(state as usize).unwrap();
-        Some(std::iter::once(TransitionOwnedColor::new(
+        Some(std::iter::once(EdgeRef::owned(
             state,
             self.alphabet.express(sym),
             sym,
@@ -176,13 +162,8 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for W
 
     type EdgeColor = A::Symbol;
 
-    type EdgeRef<'this>
-        = TransitionOwnedColor<'this, A::Expression, u32, EdgeColor<Self>>
-    where
-        Self: 'this;
-
     type EdgesFromIter<'this>
-        = std::iter::Once<Self::EdgeRef<'this>>
+        = std::iter::Once<EdgeOf<'this, Self>>
     where
         Self: 'this;
 
@@ -198,7 +179,7 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for W
             state + 1
         };
 
-        Some(std::iter::once(TransitionOwnedColor::new(
+        Some(std::iter::once(EdgeRef::owned(
             state,
             self.alphabet.express(sym),
             sym,

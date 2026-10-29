@@ -11,7 +11,7 @@ use crate::{
     Int, Pointed, TransitionSystem,
     alphabet::{Alphabet, CharAlphabet, PropAlphabet},
     automaton::{DBA, DPA, OmegaAcceptanceCondition},
-    ts::{EdgeColor, EdgeExpression, IsEdge},
+    ts::{EdgeColor, EdgeExpression},
 };
 
 /// Automata that can be written in the [HOA format](https://adl.github.io/hoaf/).
@@ -45,7 +45,7 @@ pub trait WriteHoa: States + Pointed {
                 self.write_state_id(w, edge.target())?;
 
                 w.write_char(' ')?;
-                self.write_edge_color(w, edge.color().into_owned())?;
+                self.write_edge_color(w, edge.color().clone())?;
             }
         }
 

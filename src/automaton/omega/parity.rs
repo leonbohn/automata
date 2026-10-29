@@ -10,7 +10,7 @@ use crate::automaton::semantics::observe_omega;
 use crate::automaton::{Automaton, Semantics};
 use crate::representation::{CollectTs, IntoTs};
 use crate::ts::operations::Product;
-use crate::ts::{Deterministic, EdgeColor, IsEdge, Shrinkable, StateIndex, SymbolOf, operations};
+use crate::ts::{Deterministic, EdgeColor, Shrinkable, StateIndex, SymbolOf, operations};
 use crate::word::OmegaWord;
 use crate::{DTS, Pointed, TransitionSystem, ts::run};
 use crate::{

@@ -4,8 +4,8 @@ use std::borrow::Cow;
 use std::{fmt::Debug, hash::Hash};
 
 use crate::ts::{
-    Builder, DefaultIdType, DenseId, Deterministic, EdgeColor, EdgeExpression, EdgeTuple,
-    ForAlphabet, IntoEdgeTuple, IsEdge, Shrinkable, Sproutable, StateColor, StateIndex,
+    Builder, DefaultIdType, DenseId, Deterministic, EdgeColor, EdgeExpression, EdgeOf, EdgeTuple,
+    ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable, StateColor, StateIndex,
 };
 
 mod linked_state;
@@ -291,7 +291,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedListTransitionSyste
     ) -> Option<usize> {
         let mut idx = self.states.get(from)?.first_out_edge()?;
         loop {
-            if matcher.matches((&self.edges[idx]).expression()) {
+            if matcher.matches(&self.edges[idx].expression) {
                 return Some(idx);
             }
             idx = self.edges[idx].out_next?;
@@ -435,9 +435,10 @@ pub type LinkedListNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
 
 impl<A: Alphabet, Q: Color, C: Color> Deterministic for LinkedListTransitionSystem<A, Q, C> {
     /// Scans the out-list of `state` for an edge matching `symbol`; there is no constant-time lookup yet.
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
-        self.edges_from(state)?
-            .find(|e| symbol.matches(e.expression()))
+    #[inline]
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
+        let position = self.out_edge_position(state.into_usize(), symbol)?;
+        Some(self.edges[position].as_edge_ref())
     }
 }
 
@@ -525,7 +526,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
             trace!("cannot remove edges from state that does not exist");
             return None;
         }
-        let ids = self.out_edge_ids(id, |e| matcher.matches((&self.edges[e]).expression()));
+        let ids = self.out_edge_ids(id, |e| matcher.matches(&self.edges[e].expression));
         Some(self.remove_edge_ids(ids))
     }
     fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor> {
@@ -549,7 +550,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable
             return None;
         }
         let ids = self.out_edge_ids(source.into_usize(), |e| {
-            self.edges[e].target == id && matcher.matches((&self.edges[e]).expression())
+            self.edges[e].target == id && matcher.matches(&self.edges[e].expression)
         });
         Some(self.remove_edge_ids(ids))
     }
@@ -634,11 +635,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem
     type StateColor = Q;
 
     type EdgeColor = C;
-
-    type EdgeRef<'this>
-        = &'this LinkedListTransitionSystemEdge<A::Expression, C>
-    where
-        Self: 'this;
 
     type EdgesFromIter<'this>
         = NTSEdgesFromIter<'this, A::Expression, C>
@@ -730,11 +726,6 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A>
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
     for LinkedListTransitionSystem<A, Q, C, DET>
 {
-    type PreEdgeRef<'this>
-        = &'this LinkedListTransitionSystemEdge<A::Expression, C>
-    where
-        Self: 'this;
-
     type EdgesToIter<'this>
         = LinkedListTransitionSystemEdgesToIter<'this, A::Expression, C, DET>
     where
@@ -754,8 +745,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
 /// state has the same color and the same set of edges in both. Note that this compares state
 /// indices, so it is not an isomorphism check: systems that differ only by a renaming of the
 /// states are not equal.
-impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const DET: bool> PartialEq
-    for LinkedListTransitionSystem<A, Q, C, DET>
+impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Clone + Hash + Debug + Eq, const DET: bool>
+    PartialEq for LinkedListTransitionSystem<A, Q, C, DET>
 {
     fn eq(&self, other: &Self) -> bool {
         if self.alphabet != other.alphabet {
@@ -777,13 +768,19 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const 
             let edges = x
                 .edges_from_iter(&self.edges)
                 .expect("the state exists")
-                .map(|e| (&e.expression, &e.color, e.target))
+                .map(|e| {
+                    let (expression, target) = (e.expression(), e.target());
+                    (expression, e.into_color(), target)
+                })
                 .collect::<math::FxIndexSet<_>>();
 
             let other_edges = y
                 .edges_from_iter(&other.edges)
                 .expect("state exists")
-                .map(|e| (&e.expression, &e.color, e.target))
+                .map(|e| {
+                    let (expression, target) = (e.expression(), e.target());
+                    (expression, e.into_color(), target)
+                })
                 .collect::<math::FxIndexSet<_>>();
 
             edges == other_edges
@@ -791,8 +788,8 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const 
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Hash + Debug + Eq, const DET: bool> Eq
-    for LinkedListTransitionSystem<A, Q, C, DET>
+impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Clone + Hash + Debug + Eq, const DET: bool>
+    Eq for LinkedListTransitionSystem<A, Q, C, DET>
 {
 }
 
@@ -810,7 +807,7 @@ impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color, const DET: bool> std::fm
                     f,
                     " {}/{:?}->{}",
                     e.expression().show(),
-                    IsEdge::color(&e),
+                    e.color(),
                     e.target()
                 )?;
             }

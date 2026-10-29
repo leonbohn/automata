@@ -1,30 +1,13 @@
 use crate::TransitionSystem;
+use crate::ts::StateIndex;
 use crate::ts::States;
 use crate::ts::predecessors::PredecessorIterable;
-use crate::ts::{IsEdge, StateIndex};
+use crate::ts::{EdgeOf, EdgeRef};
 use std::borrow::Cow;
 
 /// Reverses the direction of all transitions in a given [`TransitionSystem`].
 #[derive(Clone, Debug)]
 pub struct Reversed<Ts>(pub Ts);
-
-impl<'ts, E, Idx, C: Clone, T: IsEdge<'ts, E, Idx, C>> IsEdge<'ts, E, Idx, C> for Reversed<T> {
-    fn source(&self) -> Idx {
-        self.0.target()
-    }
-
-    fn target(&self) -> Idx {
-        self.0.source()
-    }
-
-    fn color(&self) -> Cow<'_, C> {
-        self.0.color()
-    }
-
-    fn expression(&self) -> &'ts E {
-        self.0.expression()
-    }
-}
 
 impl<Ts> TransitionSystem for Reversed<Ts>
 where
@@ -38,16 +21,8 @@ where
 
     type EdgeColor = Ts::EdgeColor;
 
-    type EdgeRef<'this>
-        = Reversed<Ts::PreEdgeRef<'this>>
-    where
-        Self: 'this;
-
     type EdgesFromIter<'this>
-        = std::iter::Map<
-        Ts::EdgesToIter<'this>,
-        fn(Ts::PreEdgeRef<'this>) -> Reversed<Ts::PreEdgeRef<'this>>,
-    >
+        = std::iter::Map<Ts::EdgesToIter<'this>, fn(EdgeOf<'this, Ts>) -> EdgeOf<'this, Ts>>
     where
         Self: 'this;
 
@@ -56,7 +31,11 @@ where
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        Some(self.0.predecessors(state)?.map(Reversed))
+        Some(
+            self.0
+                .predecessors(state)?
+                .map(EdgeRef::reversed as fn(_) -> _),
+        )
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
@@ -94,20 +73,16 @@ impl<Ts> PredecessorIterable for Reversed<Ts>
 where
     Ts: TransitionSystem + PredecessorIterable,
 {
-    type PreEdgeRef<'this>
-        = Reversed<Ts::EdgeRef<'this>>
-    where
-        Self: 'this;
-
     type EdgesToIter<'this>
-        = std::iter::Map<
-        Ts::EdgesFromIter<'this>,
-        fn(Ts::EdgeRef<'this>) -> Reversed<Ts::EdgeRef<'this>>,
-    >
+        = std::iter::Map<Ts::EdgesFromIter<'this>, fn(EdgeOf<'this, Ts>) -> EdgeOf<'this, Ts>>
     where
         Self: 'this;
 
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
-        Some(self.0.edges_from(state)?.map(Reversed))
+        Some(
+            self.0
+                .edges_from(state)?
+                .map(EdgeRef::reversed as fn(_) -> _),
+        )
     }
 }

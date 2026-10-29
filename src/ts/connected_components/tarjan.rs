@@ -2,7 +2,7 @@ use super::SccDecomposition;
 use crate::alphabet::Expression;
 use crate::ts::connected_components::Scc;
 use crate::ts::predecessors::PredecessorIterable;
-use crate::ts::{CompactIdMap, IdType, IsEdge, StateIndex, StateMap};
+use crate::ts::{CompactIdMap, IdType, StateIndex, StateMap};
 use crate::{States, TransitionSystem};
 
 #[derive(Debug, Clone)]
