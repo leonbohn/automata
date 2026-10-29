@@ -394,7 +394,7 @@ mod impl_into_ts {
         R::StateColor: Clone,
     {
     }
-    impl<Z, D> IntoTs for Automaton<D, Z> where D: IntoTs {}
+    impl<Sem, D> IntoTs for Automaton<D, Sem> where D: IntoTs {}
 }
 
 #[cfg(test)]

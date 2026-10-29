@@ -3,7 +3,7 @@ use crate::word::FiniteWord;
 use crate::automaton::Automaton;
 use crate::ts::{Deterministic, SymbolOf};
 
-impl<T: Deterministic, Z> Automaton<T, Z> {
+impl<T: Deterministic, Sem> Automaton<T, Sem> {
     /// Checks if two finite words are congruent in the automaton, meaning they reach the same state
     /// when starting from the initial state.
     pub fn congruent<W, V>(&self, word: W, other: V) -> bool

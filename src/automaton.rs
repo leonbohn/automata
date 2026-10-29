@@ -44,12 +44,12 @@ use crate::{Congruence, DTS, Pointed, TransitionSystem};
 pub use priority_mapping::{StateBasedWeakPriorityMapping, WeakPriorityMapping};
 
 /// An automaton consists of a transition system `T`, a designated initial state and an
-/// acceptance condition `Z`.
+/// acceptance condition `Sem`.
 ///
-/// There are many different types of automata, which are obtained by choosing `Z`
+/// There are many different types of automata, which are obtained by choosing `Sem`
 /// accordingly, see for example [`DFA`], [`MooreMachine`], [`DBA`] or [`DPA`]. Whether
 /// the automaton reads finite or infinite words is not part of its type. Instead, it is
-/// determined by the word type `W` for which `Z` implements [`Semantics<T, W>`]: a
+/// determined by the word type `W` for which `Sem` implements [`Semantics<T, W>`]: a
 /// [`ReachabilityCondition`] evaluates finite words, a [`BuchiCondition`] infinite ones.
 /// A single [`Automaton::accepts`] then serves both cases, `W` is inferred from the argument.
 ///
@@ -68,20 +68,20 @@ pub use priority_mapping::{StateBasedWeakPriorityMapping, WeakPriorityMapping};
 /// assert!(dba.accepts(upw!("a")));
 /// ```
 #[derive(Clone, Eq, PartialEq)]
-pub struct Automaton<T: TransitionSystem, Z> {
+pub struct Automaton<T: TransitionSystem, Sem> {
     pub(crate) ts: T,
     initial: T::StateIndex,
-    acceptance: Z,
+    acceptance: Sem,
 }
 
-impl<Q: Color, C: Color + std::hash::Hash + Eq, Z> Automaton<DTS<CharAlphabet, Q, C>, Z> {
+impl<Q: Color, C: Color + std::hash::Hash + Eq, Sem> Automaton<DTS<CharAlphabet, Q, C>, Sem> {
     /// Instantiates a new [`Builder`] for the edge and state color of `self`.
     pub fn builder() -> Builder<Q, C> {
         Builder::default()
     }
 }
 
-impl<T: TransitionSystem, Z> Automaton<T, Z> {
+impl<T: TransitionSystem, Sem> Automaton<T, Sem> {
     /// Creates a new instance of `Self` for the given [`Alphabet`]. Also
     /// takes the colour of the initial state as parameter as this method
     /// simply creates a new transition system and adds a state with the
@@ -104,7 +104,7 @@ impl<T: TransitionSystem, Z> Automaton<T, Z> {
     pub fn new_with_initial_color(alphabet: T::Alphabet, initial_color: T::StateColor) -> Self
     where
         T: ForAlphabet<T::Alphabet> + Sproutable,
-        Z: Default,
+        Sem: Default,
     {
         let mut ts = T::for_alphabet(alphabet);
         let initial = ts.add_state(initial_color);
@@ -121,7 +121,7 @@ impl<T: TransitionSystem, Z> Automaton<T, Z> {
     ) -> Self
     where
         T: ForAlphabet<T::Alphabet> + Sproutable,
-        Z: Default,
+        Sem: Default,
     {
         let alph = alphabet.clone();
         let mut out = Self::new_with_initial_color(alphabet, initial_color);
@@ -139,7 +139,7 @@ impl<T: TransitionSystem, Z> Automaton<T, Z> {
     }
 
     /// Creates a new automaton from the given transition system and acceptance condition.
-    pub fn from_parts_with_acceptance(ts: T, initial: T::StateIndex, acceptance: Z) -> Self {
+    pub fn from_parts_with_acceptance(ts: T, initial: T::StateIndex, acceptance: Sem) -> Self {
         Self {
             initial,
             ts,
@@ -151,14 +151,14 @@ impl<T: TransitionSystem, Z> Automaton<T, Z> {
     /// a designated `initial` state. Assumes the acceptance type implements `Default`.
     pub fn from_parts(ts: T, initial: T::StateIndex) -> Self
     where
-        Z: Default,
+        Sem: Default,
     {
-        Self::from_parts_with_acceptance(ts, initial, Z::default())
+        Self::from_parts_with_acceptance(ts, initial, Sem::default())
     }
 
     /// Builds a new instance of `Self` from a given congruence (transition system with designated
     /// initial state) as well as an acceptance condition.
-    pub fn from_pointed_with_acceptance(cong: T, acceptance: Z) -> Self
+    pub fn from_pointed_with_acceptance(cong: T, acceptance: Sem) -> Self
     where
         T: Pointed,
     {
@@ -170,7 +170,7 @@ impl<T: TransitionSystem, Z> Automaton<T, Z> {
     pub fn from_pointed(cong: T) -> Self
     where
         T: Pointed,
-        Z: Default,
+        Sem: Default,
     {
         let initial = cong.initial();
         Self::from_parts(cong, initial)
@@ -178,7 +178,7 @@ impl<T: TransitionSystem, Z> Automaton<T, Z> {
 
     /// Decomposes the automaton into its parts: the transition system, the initial state and
     /// the acceptance condition.
-    pub fn into_parts(self) -> (T, StateIndex<T>, Z) {
+    pub fn into_parts(self) -> (T, StateIndex<T>, Sem) {
         (self.ts, self.initial, self.acceptance)
     }
 
@@ -193,17 +193,17 @@ impl<T: TransitionSystem, Z> Automaton<T, Z> {
     }
 
     /// Returns a reference to the acceptance condition.
-    pub fn acceptance(&self) -> &Z {
+    pub fn acceptance(&self) -> &Sem {
         &self.acceptance
     }
 }
 
-impl<T: Deterministic, Z> Automaton<T, Z> {
+impl<T: Deterministic, Sem> Automaton<T, Sem> {
     /// Returns whether the automaton accepts the given word. The word can be finite or
-    /// infinite, depending on which of the two the acceptance condition `Z` supports.
+    /// infinite, depending on which of the two the acceptance condition `Sem` supports.
     pub fn accepts<W>(&self, word: W) -> bool
     where
-        Z: Semantics<T, W, Output = bool>,
+        Sem: Semantics<T, W, Output = bool>,
     {
         self.transform(word).unwrap_or(false)
     }
@@ -211,24 +211,24 @@ impl<T: Deterministic, Z> Automaton<T, Z> {
     /// Transforms the given word using the automaton, that means it returns the output of
     /// the acceptance condition on the run of the word, or `None` if the run is not
     /// defined because it leaves the transition system.
-    pub fn transform<W>(&self, word: W) -> Option<Z::Output>
+    pub fn transform<W>(&self, word: W) -> Option<Sem::Output>
     where
-        Z: Semantics<T, W>,
+        Sem: Semantics<T, W>,
     {
         let observed = self.acceptance.observe(&self.ts, self.initial, word)?;
         Some(self.acceptance.evaluate(observed))
     }
 }
 
-impl<T: TransitionSystem, Z> AsRef<Automaton<T, Z>> for Automaton<T, Z> {
-    fn as_ref(&self) -> &Automaton<T, Z> {
+impl<T: TransitionSystem, Sem> AsRef<Automaton<T, Sem>> for Automaton<T, Sem> {
+    fn as_ref(&self) -> &Automaton<T, Sem> {
         self
     }
 }
 
-impl<T: Deterministic, Z> Deterministic for Automaton<T, Z> {}
+impl<T: Deterministic, Sem> Deterministic for Automaton<T, Sem> {}
 
-impl<T: PredecessorIterable, Z> PredecessorIterable for Automaton<T, Z> {
+impl<T: PredecessorIterable, Sem> PredecessorIterable for Automaton<T, Sem> {
     type PreEdgeRef<'this>
         = T::PreEdgeRef<'this>
     where
@@ -244,13 +244,13 @@ impl<T: PredecessorIterable, Z> PredecessorIterable for Automaton<T, Z> {
     }
 }
 
-impl<T: TransitionSystem, Z> Pointed for Automaton<T, Z> {
+impl<T: TransitionSystem, Sem> Pointed for Automaton<T, Sem> {
     fn initial(&self) -> Self::StateIndex {
         self.initial
     }
 }
 
-impl<T: Sproutable, Z> Sproutable for Automaton<T, Z> {
+impl<T: Sproutable, Sem> Sproutable for Automaton<T, Sem> {
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         self.ts.add_state(color)
     }
@@ -265,7 +265,7 @@ impl<T: Sproutable, Z> Sproutable for Automaton<T, Z> {
     }
 }
 
-impl<T: Shrinkable, Z> Shrinkable for Automaton<T, Z> {
+impl<T: Shrinkable, Sem> Shrinkable for Automaton<T, Sem> {
     fn remove_state(&mut self, q: StateIndex<Self>) -> Option<Self::StateColor> {
         self.ts.remove_state(q)
     }
@@ -311,7 +311,7 @@ impl<T: Shrinkable, Z> Shrinkable for Automaton<T, Z> {
     }
 }
 
-impl<T: TransitionSystem, Z> TransitionSystem for Automaton<T, Z> {
+impl<T: TransitionSystem, Sem> TransitionSystem for Automaton<T, Sem> {
     type Alphabet = T::Alphabet;
 
     type StateIndex = T::StateIndex;
@@ -360,8 +360,8 @@ impl<T: TransitionSystem, Z> TransitionSystem for Automaton<T, Z> {
     }
 }
 
-impl<T: TransitionSystem + std::fmt::Debug, Z: std::fmt::Debug> std::fmt::Debug
-    for Automaton<T, Z>
+impl<T: TransitionSystem + std::fmt::Debug, Sem: std::fmt::Debug> std::fmt::Debug
+    for Automaton<T, Sem>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}\n{:?}", self.acceptance, self.ts)
@@ -405,14 +405,14 @@ impl<Ts: TransitionSystem<StateColor = bool>> Iterator for StatesWithColor<'_, T
     }
 }
 
-impl<T: Congruence, Z: Default> From<T> for Automaton<T, Z> {
+impl<T: Congruence, Sem: Default> From<T> for Automaton<T, Sem> {
     fn from(value: T) -> Self {
         let initial = value.initial();
         Self::from_parts(value, initial)
     }
 }
 
-impl<T: Deterministic, Z: Default> From<(T, StateIndex<T>)> for Automaton<T, Z> {
+impl<T: Deterministic, Sem: Default> From<(T, StateIndex<T>)> for Automaton<T, Sem> {
     fn from((ts, initial): (T, StateIndex<T>)) -> Self {
         Self::from_parts(ts, initial)
     }
