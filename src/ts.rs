@@ -64,12 +64,16 @@ pub use crate::ts::predecessors::PredecessorIterable;
 pub use word_as_ts::WordTs;
 
 /// Encapsulates the transition function δ of a transition system. This is the main trait that
-/// is used to query a transition system. It only requires that the outgoing edges and the color of
-/// a given state can be computed, so lazily explored systems (subset constructions, products) can
-/// implement it. Everything that needs to see all states is in the subtrait [`States`]. Transitions are labeled with a [`Alphabet::Expression`], which
-/// determines on which [`Alphabet::Symbol`]s the transition can be taken. Additionally, every transition
-/// is labeled with a [`crate::Color`], which can be used to store additional information about it, like an
-/// associated priority.
+/// is used to query a transition system.
+///
+/// It only requires that the outgoing edges of a state and that state's color can be computed,
+/// so systems that are explored lazily (subset constructions, products) can implement it.
+/// Everything that needs to enumerate all states lives in the subtrait [`States`] instead.
+///
+/// Transitions are labeled with an [`Alphabet::Expression`], which determines on which
+/// [`Alphabet::Symbol`]s the transition can be taken. Additionally, every transition
+/// is labeled with a [`crate::Color`], which can be used to store additional information about it,
+/// like an associated priority.
 ///
 /// # The difference between transitions and edges
 /// Internally, a transition system is represented as a graph, where the states are the nodes and the
@@ -185,6 +189,12 @@ pub trait TransitionSystem: Sized {
     /// with `q.to_dense() == Some(n)` satisfies `n < bound`. Returns `None` if there is no such
     /// bound, e.g. for lazily explored systems. Algorithms use it to choose between dense
     /// (bitsets, vectors) and sparse (hash based) containers, see [`StateSet`] and [`StateMap`].
+    ///
+    /// A bound must be *tight*: consumers eagerly allocate dense containers sized by it
+    /// ([`StateSet::new`] reserves `bound` bits up front), so a bound that is sound but huge,
+    /// such as `2^n` for a subset construction over `n` states, is worse than returning `None`.
+    /// Only report a bound that is of the order of the number of states that will actually be
+    /// visited.
     fn state_bound(&self) -> Option<usize> {
         None
     }
