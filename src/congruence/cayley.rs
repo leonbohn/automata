@@ -123,12 +123,8 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
-    fn edge(
-        &self,
-        state: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        let expression = self.expressions.iter().find(|e| matcher.matches(e))?;
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        let expression = self.expressions.iter().find(|e| symbol.matches(*e))?;
         let target = if expression.is_inverted() {
             self.m.left_successor(state, expression.symbol())?
         } else {
@@ -258,12 +254,8 @@ where
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
 {
-    fn edge(
-        &self,
-        state: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
-        let (symbol, expression) = self.expressions.iter().find(|(_, e)| matcher.matches(e))?;
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        let (symbol, expression) = self.expressions.iter().find(|(_, e)| symbol.matches(*e))?;
         let target = self.m.right_successor(state, *symbol)?;
         Some(EdgeReference::new(state, expression, &(), target))
     }

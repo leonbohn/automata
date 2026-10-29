@@ -245,15 +245,11 @@ impl<Ts: Deterministic> States for Quotient<Ts> {
     }
 }
 impl<D: Deterministic> Deterministic for Quotient<D> {
-    fn edge(
-        &self,
-        origin: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, origin: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
         let (states, colors): (BTreeSet<_>, Vec<_>) = self
             .class_iter_by_id(origin)?
             .filter_map(|q| {
-                self.ts.edge(q, &matcher).map(|tt| {
+                self.ts.edge(q, symbol).map(|tt| {
                     (
                         self.find_id_by_state(tt.target()).expect("Unknown state"),
                         tt.color().into_owned(),
@@ -269,7 +265,7 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
                     .expressions
                     .iter()
                     .find_map(|(_, expr)| {
-                        if matcher.matches(expr) {
+                        if symbol.matches(expr) {
                             Some(expr)
                         } else {
                             None
@@ -289,12 +285,12 @@ impl<D: Deterministic> Deterministic for Quotient<D> {
                     states.iter().map(|idx| idx.to_string()).join(", ")
                 );
                 panic!(
-                    "From {origin}|{} with matcher {:?}, we reach {} while precisely one state should be reached!",
+                    "From {origin}|{} on symbol {:?}, we reach {} while precisely one state should be reached!",
                     self.class_iter_by_id(origin)
                         .unwrap()
                         .map(|c| format!("{c:?}"))
                         .join(", "),
-                    matcher,
+                    symbol,
                     string
                 )
             }
@@ -318,7 +314,22 @@ mod tests {
         for (i, p) in [0, 2, 1, 1, 2, 1].into_iter().enumerate() {
             let q = i / 2;
             let sym = ['a', 'b'][i % 2];
-            assert_eq!(a.successor_index(q, sym), Some(p));
+            assert_eq!(a.successor(q, sym), Some(p));
+        }
+    }
+
+    #[test]
+    fn quotient_iterates_edges() {
+        use crate::TransitionSystem;
+        use crate::ts::{Deterministic, IsEdge};
+        let dfa = wiki_dfa();
+        let a = dfa.quotient(Partition::new([vec![0, 1], vec![5], vec![2, 3, 4]]));
+        for q in a.states() {
+            let edges = a.edges_from(q).unwrap().collect::<Vec<_>>();
+            assert_eq!(edges.len(), 2);
+            for (e, sym) in edges.iter().zip(['a', 'b']) {
+                assert_eq!(a.edge(q, sym).unwrap().target(), e.target());
+            }
         }
     }
 }

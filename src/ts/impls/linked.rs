@@ -1,4 +1,5 @@
 use crate::ts::States;
+use crate::ts::SymbolOf;
 use std::borrow::Cow;
 use std::{fmt::Debug, hash::Hash};
 
@@ -432,7 +433,13 @@ pub type IntoLinkedListNondeterministic<D> = (
 pub type LinkedListNondeterministic<A = CharAlphabet, Q = Void, C = Void> =
     LinkedListTransitionSystem<A, Q, C, false>;
 
-impl<A: Alphabet, Q: Color, C: Color> Deterministic for LinkedListTransitionSystem<A, Q, C> {}
+impl<A: Alphabet, Q: Color, C: Color> Deterministic for LinkedListTransitionSystem<A, Q, C> {
+    /// Scans the out-list of `state` for an edge matching `symbol`; there is no constant-time lookup yet.
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        self.edges_from(state)?
+            .find(|e| symbol.matches(e.expression()))
+    }
+}
 
 impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable
     for LinkedListTransitionSystem<A, Q, C, DET>
@@ -981,7 +988,7 @@ mod tests {
         ts.add_edge((1, 'b', 1));
 
         assert!(ts.swap_remove_edge(0).is_some());
-        assert_eq!(ts.successor_index(0, 'a'), None);
+        assert_eq!(ts.successor(0, 'a'), None);
 
         assert_eq!(ts.add_edge((0, 'a', 0)), None);
         assert_eq!(

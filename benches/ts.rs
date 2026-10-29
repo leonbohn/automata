@@ -40,7 +40,7 @@ fn edge_list(n: usize, k: usize) -> (usize, usize, Vec<(u32, char, u32)>) {
             let ts = &ts;
             common::symbols(k)
                 .into_iter()
-                .filter_map(move |c| ts.successor_index(q, c).map(|p| (q, c, p)))
+                .filter_map(move |c| ts.successor(q, c).map(|p| (q, c, p)))
         })
         .collect();
     (n, k, edges)
@@ -95,7 +95,7 @@ fn successor_index_all_pairs((ts, k): (Dts, usize)) -> u64 {
     let mut sum = 0u64;
     for q in ts.states() {
         for &c in &symbols {
-            sum += ts.successor_index(q, c).unwrap_or(0) as u64;
+            sum += ts.successor(q, c).unwrap_or(0) as u64;
         }
     }
     black_box(sum)
@@ -134,7 +134,7 @@ fn matching_product_successor_index((l, r, queries): ProductQueries) -> usize {
     black_box(
         queries
             .iter()
-            .filter(|&&(q, c)| product.successor_index(q, c).is_some())
+            .filter(|&&(q, c)| product.successor(q, c).is_some())
             .count(),
     )
 }

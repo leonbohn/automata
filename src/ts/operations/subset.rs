@@ -1,3 +1,4 @@
+use crate::ts::SymbolOf;
 use std::borrow::Cow;
 use std::{cell::RefCell, fmt::Debug};
 
@@ -109,11 +110,7 @@ pub struct SubsetConstruction<Ts: TransitionSystem> {
 }
 
 impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
-    fn edge(
-        &self,
-        source: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Self::EdgeRef<'_>> {
+    fn edge(&self, source: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
         let (colorset, mut stateset): (Vec<Ts::EdgeColor>, StateSet<Ts>) = self
             .states
             .borrow()
@@ -121,7 +118,7 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
             .iter()
             .flat_map(|q| {
                 self.ts.edges_from(*q).unwrap().filter_map(|tt| {
-                    if matcher.matches(tt.expression()) {
+                    if symbol.matches(tt.expression()) {
                         Some((tt.color().into_owned(), tt.target()))
                     } else {
                         None
@@ -133,7 +130,7 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
         let expression = self
             .expressions
             .iter()
-            .find(|e| matcher.matches(e))
+            .find(|e| symbol.matches(*e))
             .unwrap();
 
         if let Some(&id) = self.ids.borrow().get(&stateset) {
@@ -265,5 +262,29 @@ mod tests {
         let finite = dts.reachable_part();
         assert_eq!(finite.states().count(), 3);
         assert_eq!(finite.collect_dts().state_count(), 3);
+    }
+
+    #[test]
+    fn subset_construction_iterates_edges() {
+        use crate::TransitionSystem;
+        use crate::ts::{Deterministic, IsEdge};
+        let nts = NTS::builder()
+            .default_color(false)
+            .with_transitions([
+                (0, 'a', 0),
+                (0, 'a', 1),
+                (0, 'b', 1),
+                (1, 'b', 1),
+                (1, 'a', 0),
+            ])
+            .into_nts_with_initial(0);
+        let dts = nts.subset_construction();
+        for q in dts.reachable_state_indices().collect::<Vec<_>>() {
+            let edges = dts.edges_from(q).unwrap().collect::<Vec<_>>();
+            assert_eq!(edges.len(), 2);
+            for (e, sym) in edges.iter().zip(['a', 'b']) {
+                assert_eq!(dts.edge(q, sym).unwrap().target(), e.target());
+            }
+        }
     }
 }

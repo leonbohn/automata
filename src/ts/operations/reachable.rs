@@ -1,3 +1,4 @@
+use crate::ts::SymbolOf;
 use crate::ts::{Bfs, Deterministic, Pointed, StateIndex, StateSet, States, TransitionSystem};
 use std::borrow::Cow;
 
@@ -97,4 +98,12 @@ impl<Ts: TransitionSystem> Pointed for ReachablePart<Ts> {
     }
 }
 
-impl<Ts: Deterministic> Deterministic for ReachablePart<Ts> {}
+impl<Ts: Deterministic> Deterministic for ReachablePart<Ts> {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        if self.reachable.contains(&state) {
+            self.ts.edge(state, symbol)
+        } else {
+            None
+        }
+    }
+}

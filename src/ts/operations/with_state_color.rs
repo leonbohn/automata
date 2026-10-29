@@ -1,4 +1,5 @@
 use crate::ts::States;
+use crate::ts::SymbolOf;
 use crate::ts::{Deterministic, StateIndex};
 use crate::{Color, math};
 use crate::{Pointed, TransitionSystem};
@@ -107,6 +108,9 @@ impl<Ts: Pointed, P: ProvidesStateColor<Ts::StateIndex>> Pointed for WithStateCo
 impl<Ts: Deterministic, P: ProvidesStateColor<Ts::StateIndex>> Deterministic
     for WithStateColor<Ts, P>
 {
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<Self::EdgeRef<'_>> {
+        self.ts.edge(state, symbol)
+    }
 }
 
 impl<Ts: TransitionSystem, P: ProvidesStateColor<Ts::StateIndex>> TransitionSystem

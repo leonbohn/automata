@@ -864,12 +864,8 @@ mod tests {
             .reachable_part();
         assert!(finite.contains_state(0));
         assert!(!finite.contains_state(finite.state_count() + 5));
-        assert!(finite.successor_index(0, 'a').is_some());
-        assert!(
-            finite
-                .successor_index(finite.state_count() + 5, 'a')
-                .is_none()
-        );
+        assert!(finite.successor(0, 'a').is_some());
+        assert!(finite.successor(finite.state_count() + 5, 'a').is_none());
         assert_eq!(finite.initial(), 0);
     }
 
