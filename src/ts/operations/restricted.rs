@@ -106,15 +106,6 @@ where
             .map(|iter| RestrictedEdgesFromIter::new(iter, self.filter()))
     }
 
-    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
-        let initial = self.ts().maybe_initial_state()?;
-        if self.filter().is_unmasked(initial) {
-            Some(initial)
-        } else {
-            None
-        }
-    }
-
     fn state_bound(&self) -> Option<usize> {
         self.ts().state_bound()
     }

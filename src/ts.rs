@@ -443,17 +443,6 @@ pub trait TransitionSystem: Sized {
     {
         BfsEdges::new(self, state)
     }
-
-    /// Returns an option containing the index of the initial state, if it exists.
-    /// This is a somewhat hacky way of dealing with the fact that we cannot express
-    /// negative trait bounds. In particular, we cannot express that a transition system
-    /// is not pointed, which prevents us from correctly implementing e.g. the `ToDot`
-    /// trait for non-pointed transition systems. This function is a workaround for this
-    /// problem, as it allows us to check whether a transition system is pointed or not,
-    /// since the provided default implementation assumes that the no initial state exists.
-    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
-        None
-    }
 }
 
 /// Finite transition systems whose states can be enumerated.

@@ -112,13 +112,6 @@ where
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         ProductEdgesFrom::new(&self.0, &self.1, state)
     }
-
-    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
-        Some(ProductIndex(
-            self.0.maybe_initial_state()?,
-            self.1.maybe_initial_state()?,
-        ))
-    }
 }
 
 impl<L, R> Pointed for MatchingProduct<L, R>

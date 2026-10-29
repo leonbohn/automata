@@ -357,10 +357,6 @@ where
         ))
     }
 
-    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
-        self.ts().maybe_initial_state()
-    }
-
     fn state_bound(&self) -> Option<usize> {
         self.ts().state_bound()
     }
@@ -606,10 +602,6 @@ where
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
         self.ts().edges_from(state)
-    }
-
-    fn maybe_initial_state(&self) -> Option<Self::StateIndex> {
-        self.ts().maybe_initial_state()
     }
 
     fn state_bound(&self) -> Option<usize> {
