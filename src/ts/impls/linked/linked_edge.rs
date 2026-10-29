@@ -1,180 +1,102 @@
-use super::LinkedListTransitionSystem;
-use crate::ts::{DefaultIdType, DenseId, EdgeRef, IntoEdgeTuple};
-use crate::{Color, Void, alphabet::Alphabet};
+use crate::ts::{DefaultIdType, EdgeRef};
 use std::fmt::Debug;
 
-/// Represents an edge in a non-deterministic transition system, see [`crate::NTS`]. It stores a color, an
-/// expression, as well as a source and target state index. Moreover, it stores the indices of the
-/// next and previous edge in the list of edges leaving the source state.
+/// The sentinel that stands for "no edge" in the list links of the linked storage and for "no state"
+/// in the endpoints of a removed edge.
+pub(super) const NONE: u32 = u32::MAX;
+
+/// An edge of the linked storage. The four links and the two endpoints are `u32`s with [`NONE`] as
+/// the sentinel, which is 24 bytes of bookkeeping per edge.
+///
+/// A removed edge stays in the edge vector as a tombstone (`source == NONE`) so that the ids of all
+/// other edges stay valid. A tombstone is not part of any list.
 #[derive(Clone, Eq, PartialEq, Hash)]
-pub struct LinkedListTransitionSystemEdge<E, C> {
-    pub(super) out_prev: Option<usize>,
-    pub(super) in_prev: Option<usize>,
-    pub(super) source: usize,
-    pub(super) target: usize,
-    pub(super) color: C,
+pub(super) struct LinkedEdge<E, C> {
+    pub(super) source: u32,
+    pub(super) target: u32,
+    pub(super) out_prev: u32,
+    pub(super) out_next: u32,
+    pub(super) in_prev: u32,
+    pub(super) in_next: u32,
     pub(super) expression: E,
-    pub(super) out_next: Option<usize>,
-    pub(super) in_next: Option<usize>,
+    pub(super) color: C,
 }
 
-impl<E, C> LinkedListTransitionSystemEdge<E, C> {
-    pub fn map<CC: Color, F>(self, f: F) -> LinkedListTransitionSystemEdge<E, CC>
-    where
-        F: FnOnce(usize, E, C, usize) -> (E, CC),
-    {
-        let (expression, color) = f(self.source, self.expression, self.color, self.target);
-        LinkedListTransitionSystemEdge {
-            out_prev: self.out_prev,
-            source: self.source,
-            target: self.target,
-            color,
-            expression,
-            out_next: self.out_next,
-            in_prev: self.in_prev,
-            in_next: self.in_next,
-        }
-    }
-
-    pub fn borrowed_tuple<Idx: DenseId>(&self) -> (Idx, &E, &C, Idx) {
-        (
-            Idx::from_usize(self.source),
-            &self.expression,
-            &self.color,
-            Idx::from_usize(self.target),
-        )
-    }
-
-    pub fn into_tuple<Idx: DenseId>(self) -> (Idx, E, C, Idx) {
-        (
-            Idx::from_usize(self.source),
-            self.expression,
-            self.color,
-            Idx::from_usize(self.target),
-        )
-    }
-
-    /// Creates a new edge with the given source, expression, color and target. The pointers
-    /// to the next and previous edge are set to `None`.
-    pub fn new(source: DefaultIdType, expression: E, color: C, target: DefaultIdType) -> Self {
+impl<E, C> LinkedEdge<E, C> {
+    /// Creates an edge that is not linked into any list yet.
+    pub(super) fn new(source: u32, expression: E, color: C, target: u32) -> Self {
         Self {
-            out_prev: None,
-            in_next: None,
-            source: source.try_into().unwrap(),
-            target: target.try_into().unwrap(),
-            color,
+            source,
+            target,
+            out_prev: NONE,
+            out_next: NONE,
+            in_prev: NONE,
+            in_next: NONE,
             expression,
-            out_next: None,
-            in_prev: None,
+            color,
         }
     }
 
-    /// Consumes `self` and applies the given function `f` to obtain a new color which is then
-    /// combined with the remaining fields to form a recolored edge.
-    pub fn recolor<D, F: Fn(C) -> D>(self, f: F) -> LinkedListTransitionSystemEdge<E, D> {
-        LinkedListTransitionSystemEdge {
-            out_prev: self.out_prev,
+    #[inline(always)]
+    pub(super) fn is_live(&self) -> bool {
+        self.source != NONE
+    }
+
+    /// Turns the edge into a tombstone. The expression and color stay in place until the storage is
+    /// compacted.
+    pub(super) fn tombstone(&mut self) {
+        self.source = NONE;
+        self.target = NONE;
+        self.out_prev = NONE;
+        self.out_next = NONE;
+        self.in_prev = NONE;
+        self.in_next = NONE;
+    }
+
+    /// Replaces expression and color, keeping the endpoints and links.
+    pub(super) fn map<EE, CC>(
+        self,
+        f: impl FnOnce(u32, E, C, u32) -> (EE, CC),
+    ) -> LinkedEdge<EE, CC> {
+        let (expression, color) = f(self.source, self.expression, self.color, self.target);
+        LinkedEdge {
             source: self.source,
             target: self.target,
-            color: f(self.color),
-            expression: self.expression,
+            out_prev: self.out_prev,
             out_next: self.out_next,
-            in_next: self.in_next,
             in_prev: self.in_prev,
+            in_next: self.in_next,
+            expression,
+            color,
         }
     }
 }
 
-impl<E, C, I> PartialEq<(I, E, C, I)> for LinkedListTransitionSystemEdge<E, C>
-where
-    I: DenseId,
-    E: PartialEq,
-    C: PartialEq,
-{
-    fn eq(&self, other: &(I, E, C, I)) -> bool {
-        self.source == other.0.into_usize()
-            && self.expression == other.1
-            && self.color == other.2
-            && self.target == other.3.into_usize()
-    }
-}
-impl<E, C, I> PartialEq<(I, E, C, I)> for &LinkedListTransitionSystemEdge<E, C>
-where
-    I: DenseId,
-    E: PartialEq,
-    C: PartialEq,
-{
-    fn eq(&self, other: &(I, E, C, I)) -> bool {
-        self.source == other.0.into_usize()
-            && self.expression == other.1
-            && self.color == other.2
-            && self.target == other.3.into_usize()
-    }
-}
-impl<E, I, C> PartialEq<(I, E, I)> for LinkedListTransitionSystemEdge<E, C>
-where
-    I: DenseId,
-    E: PartialEq,
-{
-    fn eq(&self, other: &(I, E, I)) -> bool {
-        self.source == other.0.into_usize()
-            && self.expression == other.1
-            && self.target == other.2.into_usize()
-    }
-}
-impl<E, I> PartialEq<(I, E, I)> for &LinkedListTransitionSystemEdge<E, Void>
-where
-    I: DenseId,
-    E: PartialEq,
-{
-    fn eq(&self, other: &(I, E, I)) -> bool {
-        self.source == other.0.into_usize()
-            && self.expression == other.1
-            && self.target == other.2.into_usize()
-    }
-}
-
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool>
-    IntoEdgeTuple<LinkedListTransitionSystem<A, Q, C, DET>>
-    for LinkedListTransitionSystemEdge<A::Expression, C>
-{
-    fn into_edge_tuple(self) -> crate::ts::EdgeTuple<LinkedListTransitionSystem<A, Q, C, DET>> {
-        (
-            self.source.try_into().unwrap(),
-            self.expression.clone(),
-            self.color.clone(),
-            self.target.try_into().unwrap(),
-        )
-    }
-}
-
-impl<E, C: Clone> LinkedListTransitionSystemEdge<E, C> {
+impl<E, C: Clone> LinkedEdge<E, C> {
     /// Returns the edge as the reference that transition systems yield.
     #[inline(always)]
     pub(super) fn as_edge_ref(&self) -> EdgeRef<'_, DefaultIdType, E, C> {
-        // the indices were converted from `DefaultIdType` when the edge was created
-        EdgeRef::borrowed(
-            self.source as DefaultIdType,
-            &self.expression,
-            &self.color,
-            self.target as DefaultIdType,
-        )
+        EdgeRef::borrowed(self.source, &self.expression, &self.color, self.target)
     }
 }
 
-impl<E: Debug, C: Debug> Debug for LinkedListTransitionSystemEdge<E, C> {
+impl<E: Debug, C: Debug> Debug for LinkedEdge<E, C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if !self.is_live() {
+            return write!(f, "LinkedEdge {{ removed }}");
+        }
+        let show = |x: u32| if x == NONE { -1 } else { x as i64 };
         write!(
             f,
-            "LinkedEdge {{ {} --{:?}|{:?}--> {}   out[{:?}|{:?}], in[{:?}|{:?}] }}",
+            "LinkedEdge {{ {} --{:?}|{:?}--> {}   out[{}|{}], in[{}|{}] }}",
             self.source,
             self.expression,
             self.color,
             self.target,
-            self.out_prev,
-            self.out_next,
-            self.in_prev,
-            self.in_next
+            show(self.out_prev),
+            show(self.out_next),
+            show(self.in_prev),
+            show(self.in_next),
         )
     }
 }

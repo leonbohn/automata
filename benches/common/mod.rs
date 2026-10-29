@@ -405,7 +405,7 @@ pub fn fixture_texts(names: &[&str]) -> Vec<String> {
 /// Parses a fixture into a parity automaton.
 pub fn parse_dpa(text: &str) -> FixtureDpa {
     HoaString::from(text.to_string())
-        .pop::<true>()
+        .pop::<automata::ts::Det<automata::ts::Linked>>()
         .expect("fixture contains an automaton")
         .into_dpa()
         .expect("fixture is a parity automaton")

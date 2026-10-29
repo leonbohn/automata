@@ -257,23 +257,35 @@ impl<T: States> States for RightCongruence<T> {
 }
 
 impl<T: Sproutable> Sproutable for RightCongruence<T> {
+    type Storage = T::Storage;
+
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         self.invalidate();
         self.ts.add_state(color)
     }
-    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
-        self.ts.set_state_color(index, color)
-    }
-    fn add_edge<E>(&mut self, t: E) -> Option<EdgeTuple<Self>>
+    fn add_edge<E>(&mut self, t: E) -> crate::ts::EdgeId
     where
         E: IntoEdgeTuple<Self>,
     {
         self.invalidate();
         self.ts.add_edge(t.into_edge_tuple())
     }
+    fn edge_color_mut(&mut self, id: crate::ts::EdgeId) -> Option<&mut crate::ts::EdgeColor<Self>> {
+        self.invalidate();
+        self.ts.edge_color_mut(id)
+    }
+    fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>> {
+        self.invalidate();
+        self.ts.state_color_mut(state)
+    }
 }
 
 impl<T: Shrinkable> Shrinkable for RightCongruence<T> {
+    fn remove_edge(&mut self, id: crate::ts::EdgeId) -> Option<EdgeTuple<Self>> {
+        self.invalidate();
+        self.ts.remove_edge(id)
+    }
+
     fn remove_state(&mut self, q: StateIndex<Self>) -> Option<Self::StateColor> {
         self.invalidate();
         self.ts.remove_state(q)

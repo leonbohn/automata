@@ -20,23 +20,27 @@ use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
 use crate::representation::IntoTs;
 use crate::ts::States;
 use crate::ts::{Builder, DefaultIdType, DenseId, ForAlphabet, Sproutable};
-use crate::{DTS, Pointed, TS, TransitionSystem};
+use crate::ts::{Det, Linked, Storage};
+use crate::{DTS, NTS, Pointed, TransitionSystem};
 pub use acceptance_mask::{AcceptanceError, AcceptanceMask};
 use std::collections::BTreeSet;
 
 /// Type alias for an omega automaton (i.e. an automaton over infinite words) that is guaranteed to be
 /// [`crate::Deterministic`].
-pub type DeterministicOmegaAutomaton<A> = OmegaAutomaton<A, true>;
+pub type DeterministicOmegaAutomaton<A> = OmegaAutomaton<A, Det<Linked>>;
 /// Type alias for an omega automaton (i.e. an automaton over infinite words) that is not necessarily
 /// [`crate::Deterministic`].
-pub type NondeterministicOmegaAutomaton<A> = OmegaAutomaton<A, false>;
+pub type NondeterministicOmegaAutomaton<A> = OmegaAutomaton<A, Linked>;
 
 /// Represents a generic omega automaton, i.e. an automaton over infinite words.
 /// This type is mainly used when the exact type of automaton is not known beforehand
 /// such as when parsing automata. One should prefer using specific types such as
 /// [`DPA`] whenever possible.
-pub type OmegaAutomaton<A, const DET: bool = true> =
-    Automaton<TS<A, Int, AcceptanceMask, DET>, OmegaAcceptanceCondition>;
+///
+/// The storage `S` decides how the transition system is represented and whether it is
+/// deterministic: [`Det<Linked>`] (the default) or [`Linked`].
+pub type OmegaAutomaton<A, S = Det<Linked>> =
+    Automaton<<S as Storage<A>>::Ts<Int, AcceptanceMask>, OmegaAcceptanceCondition>;
 
 /// Disambiguates between the different types of acceptance conditions. This is only
 /// used in conjunction with [`OmegaAutomaton`]/[`DeterministicOmegaAutomaton`] when
@@ -126,25 +130,26 @@ impl OmegaAcceptanceCondition {
     }
 }
 
-impl<A: Alphabet, const DET: bool> OmegaAutomaton<A, DET> {
+impl<A: Alphabet> Automaton<NTS<A, Int, AcceptanceMask>, OmegaAcceptanceCondition> {
     /// Creates a new instance from the given transition system, initial state and
     /// acceptance condition.
     pub fn new(
-        ts: TS<A, Int, AcceptanceMask, DET>,
+        ts: NTS<A, Int, AcceptanceMask>,
         initial: DefaultIdType,
         acceptance: OmegaAcceptanceCondition,
-    ) -> OmegaAutomaton<A, DET> {
-        OmegaAutomaton {
+    ) -> Self {
+        Automaton {
             ts,
             initial,
             acceptance,
         }
     }
+
     /// Attempts to convert `self` into a [`DeterministicOmegaAutomaton`]. Returns
     /// `self` unchanged as the error if this is not possible because the transition system
     /// underlying `self` is not deterministic.
     pub fn try_into_deterministic(self) -> Result<DeterministicOmegaAutomaton<A>, Self> {
-        let OmegaAutomaton {
+        let Automaton {
             ts,
             initial,
             acceptance,
@@ -160,7 +165,21 @@ impl<A: Alphabet, const DET: bool> OmegaAutomaton<A, DET> {
     }
 }
 
-impl<A: Alphabet> DeterministicOmegaAutomaton<A> {
+impl<A: Alphabet> Automaton<DTS<A, Int, AcceptanceMask>, OmegaAcceptanceCondition> {
+    /// Creates a new instance from the given transition system, initial state and
+    /// acceptance condition.
+    pub fn new(
+        ts: DTS<A, Int, AcceptanceMask>,
+        initial: DefaultIdType,
+        acceptance: OmegaAcceptanceCondition,
+    ) -> Self {
+        Automaton {
+            ts,
+            initial,
+            acceptance,
+        }
+    }
+
     /// Verifies that every edge has exactly one acceptance set and that the corresponding
     /// priority lies within `low..=high`.
     fn check_priorities(&self, low: Int, high: Int) -> Result<(), AcceptanceError> {

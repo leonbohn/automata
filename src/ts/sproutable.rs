@@ -5,7 +5,7 @@ use bimap::BiBTreeMap;
 use fixedbitset::FixedBitSet;
 use itertools::Itertools;
 
-use super::{EdgeColor, EdgeTuple, IntoEdgeTuple, StateColor, StateIndex};
+use super::{EdgeColor, EdgeId, IntoEdgeTuple, StateColor, StateIndex, Storage};
 
 /// Implemented by [`TransitionSystem`]s (TS) that can be created for a given [`Alphabet`],
 /// which is may be used in conjunction with [`Sproutable`] to successively grow a
@@ -69,6 +69,10 @@ impl IndexedAlphabet for CharAlphabet {
 
 /// Trait for transition systems that allow insertion of states and transitions.
 pub trait Sproutable: States {
+    /// The family of storages that `Self` belongs to, so that generic code can name a system of the
+    /// same representation with other colors, see [`Storage::Ts`].
+    type Storage: Storage<Self::Alphabet>;
+
     /// Adds a new state with the given color. The method returns the index of the newly created
     /// state.
     ///
@@ -90,8 +94,9 @@ pub trait Sproutable: States {
     /// add any edges and the type can therefore not be inferred.
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex;
 
-    /// Adds a new edge to the transition system. Returns an [`EdgeTuple`] consisting of the overwritten
-    /// edge if it existed, or `None` otherwise.
+    /// Adds a new edge to the transition system and returns its [`EdgeId`], which stays valid until
+    /// the edge is removed. If the system is deterministic, edges that overlap with the new one are
+    /// replaced.
     ///
     /// The details of the edge are given as a type that implements [`IntoEdgeTuple`]. This allows
     /// for a more flexible way of adding edges, as the method can be called with a tuple, a struct
@@ -112,14 +117,25 @@ pub trait Sproutable: States {
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
     /// assert!(ts.edge(q0, 'a').is_none());
-    /// assert!(ts.add_edge((q0, 'a', q1)).is_none());
-    /// assert!(ts.edge(q0, 'a').is_some());
+    /// let first = ts.add_edge((q0, 'a', q1));
+    /// assert_eq!(ts.successor(q0, 'a'), Some(q1));
     ///
-    /// assert!(ts.add_edge((q0, 'a', q0)).is_some(), "Cannot add overlapping edges as ts is deterministic");
+    /// // the system is deterministic, so the new edge replaces the overlapping one
+    /// let second = ts.add_edge((q0, 'a', q0));
+    /// assert_ne!(first, second);
+    /// assert_eq!(ts.successor(q0, 'a'), Some(q0));
+    /// assert!(ts.remove_edge(first).is_none());
     /// ```
-    fn add_edge<E>(&mut self, t: E) -> Option<EdgeTuple<Self>>
+    fn add_edge<E>(&mut self, t: E) -> EdgeId
     where
         E: IntoEdgeTuple<Self>;
+
+    /// A mutable reference to the color of the edge with the given id, or `None` if there is no such
+    /// edge.
+    fn edge_color_mut(&mut self, id: EdgeId) -> Option<&mut EdgeColor<Self>>;
+
+    /// A mutable reference to the color of the given state, or `None` if there is no such state.
+    fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>>;
 
     /// Builds a new transition system by collecting all states and transitions present in another.
     /// The method returns the new transition system and a [bijective mapping](`BiBTreeMap`) between the old and new
@@ -326,9 +342,14 @@ pub trait Sproutable: States {
     }
 
     /// Sets the color of the state with the given index. If the state does not exist, the method
-    /// should panic. Usually, we would like to avoid recoloring states individually, and instead
+    /// panics. Usually, we would like to avoid recoloring states individually, and instead
     /// use the [`TransitionSystem::map_state_colors`] method.
-    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>);
+    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
+        match self.state_color_mut(index) {
+            Some(slot) => *slot = color,
+            None => panic!("cannot color state {index:?}, it does not exist"),
+        }
+    }
 
     /// Sets the state color of the initial state. This method is only available for a ts if it
     /// is [`Pointed`] and it simply obtains the initial state and subsequetly [sets its color](`Self::set_state_color`).

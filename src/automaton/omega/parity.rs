@@ -1,5 +1,5 @@
 use crate::ts::States;
-use rustc_hash::FxHashMap;
+use crate::ts::{DenseId, EdgeId, Sproutable};
 use std::{
     collections::{BTreeSet, VecDeque},
     fmt::Debug,
@@ -523,17 +523,22 @@ where
             .clone()
             .with_initial(self.initial)
             .into_dts_and_initial();
+        // `ts` is shrunk while we work, `out` keeps all edges. Both use the same edge ids, so the new
+        // priority of an edge is stored in a table that is indexed by its id.
         let mut ts = out.clone();
+        let mut recoloring: Vec<Option<Int>> = vec![None; out.edge_bound()];
+        let id_of = |e: &crate::ts::EdgeRef<'_, _, _, _>| -> usize {
+            e.id().expect("edges of a storage have an id").into_usize()
+        };
 
-        let mut recoloring: FxHashMap<_, Int> = Default::default();
         let mut remove_states = Vec::new();
-        let mut remove_edges = Vec::new();
+        let mut remove_edges: Vec<EdgeId> = Vec::new();
 
         let mut priority = 0;
         'outer: loop {
-            for (source, expression) in remove_edges.drain(..) {
+            for id in remove_edges.drain(..) {
                 assert!(
-                    ts.remove_edges_from_matching(source, expression).is_some(),
+                    ts.remove_edge(id).is_some(),
                     "We must be able to actually remove these edges"
                 );
             }
@@ -542,7 +547,7 @@ where
                 debug_assert!(
                     ts.edges_from(state)
                         .unwrap()
-                        .all(|e| recoloring.contains_key(&(e.source(), e.expression().clone()))),
+                        .all(|e| recoloring[id_of(&e)].is_some()),
                     "every edge of a removed state must have been recolored"
                 );
                 assert!(
@@ -571,26 +576,35 @@ where
                                 edge.target(),
                                 priority
                             );
-                            recoloring.insert((*state, edge.expression().clone()), priority);
-                            remove_edges.push((edge.source(), edge.expression().clone()));
+                            recoloring[id_of(&edge)] = Some(priority);
+                            remove_edges.push(edge.id().expect("edges of a storage have an id"));
                         }
                         remove_states.push(*state);
                     }
                     continue 'inner;
                 }
-                let minimal_interior_edge_color = scc
-                    .interior_edge_colors()
-                    .iter()
-                    .min()
-                    .expect("We know this is not transient");
 
-                for (q, e, _c, p) in scc.border_edges() {
-                    trace!(
-                        "recoloring border edge {q} --{}--> {p} with prio {priority}",
-                        e.show()
-                    );
-                    recoloring.insert((*q, e.clone()), priority);
+                // the edges leaving the scc get the current priority, the others are interior
+                let mut minimal_interior_edge_color = None;
+                for q in scc.iter() {
+                    for edge in ts.edges_from(*q).unwrap() {
+                        if scc.contains(&edge.target()) {
+                            let color = *edge.color();
+                            minimal_interior_edge_color = Some(
+                                minimal_interior_edge_color.map_or(color, |m: Int| m.min(color)),
+                            );
+                        } else {
+                            trace!(
+                                "recoloring border edge {q} --{}--> {} with prio {priority}",
+                                edge.expression().show(),
+                                edge.target()
+                            );
+                            recoloring[id_of(&edge)] = Some(priority);
+                        }
+                    }
                 }
+                let minimal_interior_edge_color =
+                    minimal_interior_edge_color.expect("We know this is not transient");
 
                 if priority % 2 != minimal_interior_edge_color % 2 {
                     trace!("minimal interior priority: {minimal_interior_edge_color}, skipping");
@@ -600,19 +614,22 @@ where
                 trace!(
                     "minimal interior priority: {minimal_interior_edge_color}, recoloring edges"
                 );
-                for (q, a, c, p) in scc
-                    .interior_edges()
-                    .iter()
-                    .filter(|(_q, _a, c, _p)| c == minimal_interior_edge_color)
-                {
-                    trace!(
-                        "recolouring and removing {q:?} --{}|{}--> {p:?} with priority {}",
-                        a.show(),
-                        c.show(),
-                        priority
-                    );
-                    recoloring.insert((*q, a.clone()), priority);
-                    remove_edges.push((*q, a.clone()));
+                for q in scc.iter() {
+                    for edge in ts.edges_from(*q).unwrap() {
+                        if scc.contains(&edge.target())
+                            && *edge.color() == minimal_interior_edge_color
+                        {
+                            trace!(
+                                "recolouring and removing {q:?} --{}|{}--> {:?} with priority {}",
+                                edge.expression().show(),
+                                edge.color().show(),
+                                edge.target(),
+                                priority
+                            );
+                            recoloring[id_of(&edge)] = Some(priority);
+                            remove_edges.push(edge.id().expect("edges of a storage have an id"));
+                        }
+                    }
                 }
             }
 
@@ -622,15 +639,16 @@ where
         }
 
         trace!("computation done, building output automaton");
-        let ret = out
-            .map_edge_colors_full(|q, e, _, _| {
-                let Some(c) = recoloring.get(&(q, e.clone())).copied() else {
-                    panic!("Could not find recoloring for edge ({}, {:?})", q, e);
-                };
-                c
-            })
-            .with_initial(out_initial)
-            .into_dpa();
+        let mut out = out.linked_map_edge_colors(|_, _, _, _| 0 as Int);
+        for id in 0..out.edge_bound() {
+            let id = EdgeId::from_usize(id);
+            let Some(slot) = out.edge_color_mut(id) else {
+                continue;
+            };
+            *slot = recoloring[id.into_usize()]
+                .unwrap_or_else(|| panic!("Could not find recoloring for edge {id}"));
+        }
+        let ret = out.with_initial(out_initial).into_dpa();
 
         tracing::debug!("normalizing DPA took {} μs", start.elapsed().as_micros());
 

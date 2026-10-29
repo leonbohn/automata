@@ -1,10 +1,9 @@
-use crate::ts::States;
 use std::{io::BufRead, ops::Deref};
 
 use crate::automaton::{
     AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
 };
-use crate::ts::{ForAlphabet, Sproutable};
+use crate::ts::{Det, ForAlphabet, Linked, LinkedTs, Sproutable, Storage};
 use crate::{
     Int,
     alphabet::{PropAlphabet, PropAlphabetError, PropExpression},
@@ -18,7 +17,7 @@ use super::{HoaError, HoaString};
 /// invalid automata are skipped with a warning.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct IntoDeterministicHoaAutomatonStream<R> {
-    base: HoaAutomatonStream<R, false>,
+    base: HoaAutomatonStream<R, Linked>,
 }
 
 impl<R> IntoDeterministicHoaAutomatonStream<R> {
@@ -48,19 +47,20 @@ impl<R: BufRead> Iterator for IntoDeterministicHoaAutomatonStream<R> {
 }
 
 /// A stream of HOA automata that are not necessarily deterministic.
-pub type NondeterministicHoaAutomatonStream<R> = HoaAutomatonStream<R, false>;
+pub type NondeterministicHoaAutomatonStream<R> = HoaAutomatonStream<R, Linked>;
 
-/// Reads HOA automata from a stream. If `DET` is true, automata that are not deterministic
-/// are rejected.
+/// Reads HOA automata from a stream. The storage `S` decides the representation of the automata: for
+/// [`Det<Linked>`] (the default), automata that are not deterministic are rejected.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct HoaAutomatonStream<R, const DET: bool = true> {
+pub struct HoaAutomatonStream<R, S = Det<Linked>> {
     read: R,
     buf: String,
     pos: usize,
+    storage: std::marker::PhantomData<fn() -> S>,
 }
 
-impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
-    type Item = OmegaAutomaton<PropAlphabet, DET>;
+impl<R: BufRead, S: HoaStorage> Iterator for HoaAutomatonStream<R, S> {
+    type Item = OmegaAutomaton<PropAlphabet, S>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -80,8 +80,8 @@ impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
                             "encountered --END-- in stream, attempting to parse automaton \n{}",
                             &self.buf[..end]
                         );
-                        let aut: Result<OmegaAutomaton<PropAlphabet, DET>, _> =
-                            parse_omega_automaton_range(&self.buf, 0, end);
+                        let aut: Result<OmegaAutomaton<PropAlphabet, S>, _> =
+                            parse_omega_automaton_range::<S>(&self.buf, 0, end);
                         self.buf.clear();
                         self.pos = 0;
 
@@ -92,10 +92,7 @@ impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
                                     e
                                 );
                             }
-                            Ok(aut) => {
-                                assert!(!DET || aut.ts().is_deterministic(), "type error");
-                                return Some(aut);
-                            }
+                            Ok(aut) => return Some(aut),
                         }
                     }
 
@@ -107,13 +104,14 @@ impl<R: BufRead, const DET: bool> Iterator for HoaAutomatonStream<R, DET> {
     }
 }
 
-impl<R, const DET: bool> HoaAutomatonStream<R, DET> {
+impl<R, S> HoaAutomatonStream<R, S> {
     /// Creates a new stream from the given reader.
     pub fn new(read: R) -> Self {
         Self {
             read,
             pos: 0,
             buf: String::new(),
+            storage: std::marker::PhantomData,
         }
     }
 }
@@ -124,18 +122,18 @@ impl<R, const DET: bool> HoaAutomatonStream<R, DET> {
 ///
 /// Returns a [`HoaError`] if the part is not a valid HOA automaton, if it uses an unsupported
 /// feature, or (for `DET`) if it is not deterministic. The error contains the range.
-pub fn parse_omega_automaton_range<const DET: bool>(
+pub fn parse_omega_automaton_range<S: HoaStorage>(
     hoa: &str,
     start: usize,
     end: usize,
-) -> Result<OmegaAutomaton<PropAlphabet, DET>, HoaError> {
+) -> Result<OmegaAutomaton<PropAlphabet, S>, HoaError> {
     let in_range = |source: HoaError| HoaError::InRange {
         start,
         end,
         source: Box::new(source),
     };
     let aut = HoaRepresentation::try_from(&hoa[start..end]).map_err(|e| in_range(e.into()))?;
-    OmegaAutomaton::try_from(aut).map_err(in_range)
+    S::from_hoa(aut).map_err(in_range)
 }
 
 /// Removes the first valid deterministic automaton from `hoa`. Returns it together with the
@@ -143,15 +141,15 @@ pub fn parse_omega_automaton_range<const DET: bool>(
 pub fn pop_deterministic_omega_automaton(
     hoa: HoaString,
 ) -> Option<(DeterministicOmegaAutomaton<PropAlphabet>, HoaString)> {
-    pop_omega_automaton(hoa)
+    pop_omega_automaton::<Det<Linked>>(hoa)
 }
 
 /// Tries to `pop` the foremost valid HOA automaton from the given [`HoaString`].
 /// If no valid automaton is found before the end of the stream is reached, the
 /// function returns `None`.
-pub fn pop_omega_automaton<const DET: bool>(
+pub fn pop_omega_automaton<S: HoaStorage>(
     hoa: HoaString,
-) -> Option<(OmegaAutomaton<PropAlphabet, DET>, HoaString)> {
+) -> Option<(OmegaAutomaton<PropAlphabet, S>, HoaString)> {
     let mut hoa = hoa;
     const END_LEN: usize = "--END--".len();
     const ABORT_LEN: usize = "--ABORT--".len();
@@ -160,7 +158,7 @@ pub fn pop_omega_automaton<const DET: bool>(
         match (hoa.0.find("--ABORT--"), hoa.0.find("--END--")) {
             (None, Some(pos)) => {
                 trace!("Returnting first automaton, going up to position {pos}");
-                match parse_omega_automaton_range(&hoa.0, 0, pos + END_LEN) {
+                match parse_omega_automaton_range::<S>(&hoa.0, 0, pos + END_LEN) {
                     Ok(aut) => {
                         return Some((
                             aut,
@@ -184,7 +182,8 @@ pub fn pop_omega_automaton<const DET: bool>(
                     trace!(
                         "Found --ABORT-- before --END--, returning first automaton from {abort} to {end}"
                     );
-                    match parse_omega_automaton_range(&hoa.0, abort + ABORT_LEN, end + END_LEN) {
+                    match parse_omega_automaton_range::<S>(&hoa.0, abort + ABORT_LEN, end + END_LEN)
+                    {
                         Ok(aut) => {
                             return Some((
                                 aut,
@@ -198,7 +197,7 @@ pub fn pop_omega_automaton<const DET: bool>(
                     }
                 } else {
                     trace!("Found --END--, returning first automaton up to {end}");
-                    match parse_omega_automaton_range(&hoa.0, 0, end + END_LEN) {
+                    match parse_omega_automaton_range::<S>(&hoa.0, 0, end + END_LEN) {
                         Ok(aut) => {
                             return Some((
                                 aut,
@@ -222,10 +221,10 @@ pub fn pop_omega_automaton<const DET: bool>(
 
 /// Considers the given HOA string as a single automaton and tries to parse it into an
 /// [`OmegaAutomaton`].
-pub fn hoa_to_ts<const DET: bool>(hoa: &str) -> Vec<OmegaAutomaton<PropAlphabet, DET>> {
+pub fn hoa_to_ts<S: HoaStorage>(hoa: &str) -> Vec<OmegaAutomaton<PropAlphabet, S>> {
     let mut out = vec![];
     for hoa_aut in hoars::parse_hoa_automata(hoa) {
-        match hoa_aut.try_into() {
+        match S::from_hoa(hoa_aut) {
             Ok(aut) => out.push(aut),
             Err(e) => tracing::warn!("Encountered parsing error {}", e),
         }
@@ -253,18 +252,67 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
     }
 }
 
-impl<const DET: bool> TryFrom<HoaRepresentation> for OmegaAutomaton<PropAlphabet, DET> {
-    type Error = HoaError;
-    fn try_from(value: HoaRepresentation) -> Result<Self, Self::Error> {
-        hoa_automaton_to_ts(value)
+/// The storages that automata can be read into: [`Linked`] for automata that are not necessarily
+/// deterministic and [`Det<Linked>`] for deterministic ones.
+pub trait HoaStorage: Storage<PropAlphabet> {
+    /// Converts the representation of an automaton in the HOA format into an omega automaton stored
+    /// in `Self`.
+    ///
+    /// # Errors
+    /// Returns a [`HoaError`] if the automaton uses an unsupported feature or cannot be stored in
+    /// `Self` because it is not deterministic.
+    fn from_hoa(aut: HoaRepresentation) -> Result<OmegaAutomaton<PropAlphabet, Self>, HoaError>
+    where
+        Self: Sized;
+}
+
+impl HoaStorage for Linked {
+    fn from_hoa(aut: HoaRepresentation) -> Result<OmegaAutomaton<PropAlphabet, Self>, HoaError> {
+        let (ts, initial, acceptance) = hoa_automaton_parts(aut)?;
+        Ok(crate::Automaton::from_parts_with_acceptance(
+            ts, initial, acceptance,
+        ))
     }
 }
 
-/// Converts a [`HoaRepresentation`] into a [`crate::NTS`] with the same semantics. This creates the appropriate
+impl HoaStorage for Det<Linked> {
+    fn from_hoa(aut: HoaRepresentation) -> Result<OmegaAutomaton<PropAlphabet, Self>, HoaError> {
+        let (ts, initial, acceptance) = hoa_automaton_parts(aut)?;
+        let ts = ts.try_into_deterministic().map_err(|_| {
+            warn!("rejecting nondeterministic automaton");
+            HoaError::NotDeterministic
+        })?;
+        Ok(crate::Automaton::from_parts_with_acceptance(
+            ts, initial, acceptance,
+        ))
+    }
+}
+
+impl TryFrom<HoaRepresentation> for OmegaAutomaton<PropAlphabet, Linked> {
+    type Error = HoaError;
+    fn try_from(value: HoaRepresentation) -> Result<Self, Self::Error> {
+        Linked::from_hoa(value)
+    }
+}
+
+impl TryFrom<HoaRepresentation> for OmegaAutomaton<PropAlphabet, Det<Linked>> {
+    type Error = HoaError;
+    fn try_from(value: HoaRepresentation) -> Result<Self, Self::Error> {
+        <Det<Linked>>::from_hoa(value)
+    }
+}
+
+/// The parts of an omega automaton: transition system, initial state and acceptance condition.
+type HoaParts = (
+    LinkedTs<PropAlphabet, Int, AcceptanceMask>,
+    crate::ts::DefaultIdType,
+    OmegaAcceptanceCondition,
+);
+
+/// Converts a [`HoaRepresentation`] into the parts of an omega automaton: a [`crate::NTS`] with the same
+/// semantics, the initial state and the acceptance condition. This creates the appropriate
 /// number of states and inserts transitions with the appropriate labels and colors.
-pub fn hoa_automaton_to_ts<const DET: bool>(
-    aut: HoaRepresentation,
-) -> Result<OmegaAutomaton<PropAlphabet, DET>, HoaError> {
+fn hoa_automaton_parts(aut: HoaRepresentation) -> Result<HoaParts, HoaError> {
     let aps = aut.num_aps();
     if aps > crate::hoa::MAX_APS {
         return Err(PropAlphabetError::TooManyAtomicPropositions {
@@ -275,8 +323,7 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
     }
 
     let alphabet = PropAlphabet::try_from_apnames(aut.aps().iter())?;
-    let mut ts: crate::TS<PropAlphabet, Int, AcceptanceMask, DET> =
-        crate::TS::for_alphabet(alphabet);
+    let mut ts: LinkedTs<PropAlphabet, Int, AcceptanceMask> = LinkedTs::for_alphabet(alphabet);
 
     for (position, state) in aut.body().iter().enumerate() {
         if state.id() as usize != position {
@@ -302,20 +349,9 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
                 .map_err(HoaError::InvalidLabel)?;
             let color: AcceptanceMask = edge.acceptance_signature().into();
 
-            if ts
-                .add_edge((state.id(), PropExpression::from_bdd(expr), color, target))
-                .is_some()
-            {
-                // this thing is not deterministic, so we return
-                if DET {
-                    warn!("rejecting nondeterministic automaton");
-                    return Err(HoaError::NotDeterministic);
-                }
-            }
+            ts.add_edge((state.id(), PropExpression::from_bdd(expr), color, target));
         }
     }
-
-    debug_assert!(!DET || ts.is_deterministic());
 
     let start = aut.start();
     if start.len() != 1 {
@@ -327,14 +363,13 @@ pub fn hoa_automaton_to_ts<const DET: bool>(
 
     let acceptance: OmegaAcceptanceCondition = aut.header().try_into()?;
 
-    Ok(OmegaAutomaton::from_parts_with_acceptance(
-        ts, initial, acceptance,
-    ))
+    Ok((ts, initial, acceptance))
 }
 
 #[cfg(test)]
 mod tests {
     use crate::States;
+    use crate::ts::{Det, Linked};
     use tracing::debug;
 
     use crate::hoa::HoaString;
@@ -431,8 +466,8 @@ State: 1
         use super::{HoaError, parse_omega_automaton_range};
 
         let end = NONDETERMINISTIC.len();
-        assert!(parse_omega_automaton_range::<false>(NONDETERMINISTIC, 0, end).is_ok());
-        match parse_omega_automaton_range::<true>(NONDETERMINISTIC, 0, end) {
+        assert!(parse_omega_automaton_range::<Linked>(NONDETERMINISTIC, 0, end).is_ok());
+        match parse_omega_automaton_range::<Det<Linked>>(NONDETERMINISTIC, 0, end) {
             Err(HoaError::InRange {
                 start: 0,
                 end: e,
@@ -450,7 +485,7 @@ State: 1
         use super::{HoaError, parse_omega_automaton_range};
 
         let garbage = "HOA: v1\nthis is not an automaton\n--END--";
-        match parse_omega_automaton_range::<true>(garbage, 0, garbage.len()) {
+        match parse_omega_automaton_range::<Det<Linked>>(garbage, 0, garbage.len()) {
             Err(HoaError::InRange { source, .. }) => {
                 assert!(matches!(*source, HoaError::Parse(_)));
             }
@@ -460,7 +495,7 @@ State: 1
 
     /// Parses `hoa` and returns the error that caused the failure, without the range information.
     fn failure(hoa: &str) -> super::HoaError {
-        match super::parse_omega_automaton_range::<false>(hoa, 0, hoa.len()) {
+        match super::parse_omega_automaton_range::<Linked>(hoa, 0, hoa.len()) {
             Err(super::HoaError::InRange { source, .. }) => *source,
             Err(other) => other,
             Ok(_) => panic!("expected the input to be rejected"),

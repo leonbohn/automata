@@ -224,7 +224,7 @@ An **automaton** is a transition system together with an initial state and an ac
 
 **Recoloring.** `map_state_colors`, `map_edge_colors`, `map_edge_colors_full`, `with_state_color` and the `erase_*` methods all return the same adapter, which computes the new colors on access and caches nothing, just like `Iterator::map`.
 
-**Capabilities are traits.** `TransitionSystem` is the central trait. `Pointed` adds an initial state, `Deterministic` guarantees at most one transition per state and symbol, `Sproutable` and `Shrinkable` allow growing and shrinking a transition system. The default implementation behind `TS`, `DTS` and `NTS` is a linked-list based transition system.
+**Capabilities are traits.** `TransitionSystem` is the central trait. `Pointed` adds an initial state, `Deterministic` guarantees at most one transition per state and symbol, `Sproutable` and `Shrinkable` allow growing and shrinking a transition system. The default implementation is `LinkedTs`, a linked-list based transition system with stable edge ids; `NTS` is `LinkedTs` and `DTS` is `Det<LinkedTs>`, where `Det` makes determinism part of the type.
 
 For the theory behind all of this, see the chapters on finite automata and $\omega$-automata in the *Handbook of Automata Theory* (Pin, ed.), the open-access [thesis](https://theses.hal.science/tel-04314678v1/document) on which the design is based, or the semantics description at the bottom of the [HOA page](https://adl.github.io/hoaf/).
 
