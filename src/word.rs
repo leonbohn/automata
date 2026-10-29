@@ -27,6 +27,13 @@ pub use rotate::Rotate;
 
 pub use self::skip::Infix;
 
+/// Marker for finite words, see [`Word::Kind`].
+#[derive(Debug, Clone, Copy)]
+pub struct Finite;
+/// Marker for infinite words, see [`Word::Kind`].
+#[derive(Debug, Clone, Copy)]
+pub struct Omega;
+
 /// A linear word is a word that can be indexed by a `usize`. This is the case for both finite and
 /// infinite words.
 pub trait Word: Hash + Eq {
@@ -35,6 +42,11 @@ pub trait Word: Hash + Eq {
 
     /// Constant that indicates whether the word is finite or not.
     const FINITE: bool;
+
+    /// Marker type that says whether the word is finite ([`Finite`]) or infinite ([`Omega`]). It
+    /// lets APIs such as [`crate::ts::Deterministic::run`] pick the finite or the infinite
+    /// behaviour from the type of the word.
+    type Kind;
 
     /// Returns the symbol at the given `position` in `self`, if it exists.
     fn nth(&self, position: usize) -> Option<Self::Symbol>;
@@ -91,6 +103,7 @@ pub trait Word: Hash + Eq {
 impl<W: Word + ?Sized> Word for &W {
     type Symbol = W::Symbol;
     const FINITE: bool = W::FINITE;
+    type Kind = W::Kind;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
         W::nth(self, position)
     }
@@ -111,6 +124,7 @@ pub struct ConsumingInfixIterator<'a, W: Word> {
 impl<W: Word> Word for ConsumingInfixIterator<'_, W> {
     type Symbol = W::Symbol;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
         self.word.nth(self.start + position)
     }

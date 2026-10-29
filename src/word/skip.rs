@@ -19,6 +19,7 @@ impl<'a, W: Word> Skip<'a, W> {
 impl<W: Word> Word for Skip<'_, W> {
     type Symbol = W::Symbol;
     const FINITE: bool = W::FINITE;
+    type Kind = W::Kind;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
         self.sequence.nth(self.offset + position)
     }
@@ -125,6 +126,7 @@ impl<'a, W: Word + ?Sized> Infix<'a, W> {
 impl<W: Word> Word for Infix<'_, W> {
     type Symbol = W::Symbol;
     const FINITE: bool = true;
+    type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
         if position < self.length {
             self.sequence.nth(self.offset + position)

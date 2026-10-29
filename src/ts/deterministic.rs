@@ -7,22 +7,14 @@ use super::operations::RestrictByStateIndex;
 use super::operations::StateIndexFilter;
 use super::operations::{MapEdgeColor, ProductIndex};
 use super::operations::{MappedEdge, MappedTransition};
-use super::run::EdgeColorSet;
-use super::run::FiniteRunOutput;
-use super::run::InfiniteObserver;
-use super::run::InfiniteRunOutput;
-use super::run::Observer;
 use super::run::Run;
-use super::run::StateColorSet;
-use super::run::StateSequence;
-use super::run::StateSet;
 use crate::congruence::MinimalRepresentative;
-use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateColor, StateIndex, SymbolOf, run};
+use crate::ts::{EdgeColor, EdgeExpression, IsEdge, StateColor, StateIndex, SymbolOf};
 use crate::{
     Color,
-    alphabet::{Alphabet, Expression, SimpleAlphabet},
+    alphabet::{Alphabet, Expression},
     word,
-    word::{FiniteWord, OmegaWord},
+    word::{FiniteWord, Word},
 };
 use crate::{Pointed, States, TransitionSystem};
 use itertools::Itertools;
@@ -103,7 +95,7 @@ pub trait Deterministic: TransitionSystem {
         state: StateIndex<Self>,
         word: W,
     ) -> bool {
-        Some(state) == self.reached_state_index_from(state, word)
+        Some(state) == self.reached_state_from(state, word)
     }
 
     /// Returns the color of an edge starting in the given `state` and labeled with the given
@@ -148,264 +140,51 @@ pub trait Deterministic: TransitionSystem {
             .unique()
     }
 
-    /// Runs the given `word` on the transition system, starting from the initial state. The result is
-    /// - [`Ok`] if the run is successful (i.e. for all symbols of `word` a suitable transition
-    ///   can be taken),
-    /// - [`Err`] if the run is unsuccessful, meaning a symbol is encountered for which no
-    ///   transition exists.
-    ///
-    /// It returns a [`crate::ts::path::PathIn`] in either case, which is a path in the transition system. So it is possible
-    /// to inspect the path, e.g. to find out which state was reached or which transitions were taken.
-    /// For more information, see [`crate::ts::path::Path`].
-    #[allow(clippy::type_complexity)]
+    /// Creates the [`Run`] of `word` on the transition system, starting in the initial state. Call
+    /// one of its methods to execute it, e.g. [`Run::reached_state`] or [`Run::observe`]. For finite
+    /// and for infinite words alike, a run that takes a symbol for which there is no transition
+    /// escapes the transition system.
     #[inline(always)]
-    fn finite_run<W, O>(&self, word: W) -> FiniteRunOutput<Self, W, O>
+    fn run<W: Word<Symbol = SymbolOf<Self>>>(&self, word: W) -> Run<'_, Self, W>
     where
-        Self: Pointed,
-        O: Observer<Self>,
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
+        Self: Pointed + Sized,
     {
-        self.finite_run_from(self.initial(), word)
+        Run::new(self, self.initial(), word)
     }
 
-    /// Runs the given `word` on the transition system, starting from `state`. The result is
-    /// - [`Ok`] if the run is successful (i.e. for all symbols of `word` a suitable transition
-    ///   can be taken),
-    /// - [`Err`] if the run is unsuccessful, meaning a symbol is encountered for which no
-    ///   transition exists.
-    #[allow(clippy::type_complexity)]
+    /// Creates the [`Run`] of `word` on the transition system, starting in the state `start`.
     #[inline(always)]
-    fn finite_run_from<W, O>(
+    fn run_from<W: Word<Symbol = SymbolOf<Self>>>(
         &self,
-        origin: StateIndex<Self>,
+        start: StateIndex<Self>,
         word: W,
-    ) -> FiniteRunOutput<Self, W, O>
+    ) -> Run<'_, Self, W>
+    where
+        Self: Sized,
+    {
+        Run::new(self, start, word)
+    }
+
+    /// Returns the state that is reached by running the finite `word`, starting from the initial
+    /// state. If the run escapes the transition system, `None` is returned.
+    #[inline(always)]
+    fn reached_state<W>(&self, word: W) -> Option<StateIndex<Self>>
+    where
+        Self: Pointed + Sized,
+        W: FiniteWord<Symbol = SymbolOf<Self>>,
+    {
+        self.run(word).reached_state()
+    }
+
+    /// Returns the state that is reached by running the finite `word`, starting from `origin`. If
+    /// the run escapes the transition system, `None` is returned.
+    #[inline(always)]
+    fn reached_state_from<W>(&self, origin: StateIndex<Self>, word: W) -> Option<StateIndex<Self>>
     where
         Self: Sized,
         W: FiniteWord<Symbol = SymbolOf<Self>>,
-        O: Observer<Self>,
     {
-        Run::<_, _, true, O>::new_finite(self, origin, word).evaluate()
-    }
-
-    /// Runs the given `word` on the transition system, starting in the initial state.
-    #[allow(clippy::type_complexity)]
-    #[inline(always)]
-    fn omega_run<W, O>(&self, word: W) -> InfiniteRunOutput<Self, W, O>
-    where
-        W: OmegaWord<Symbol = SymbolOf<Self>>,
-        Self: Pointed,
-        O: InfiniteObserver<Self>,
-    {
-        self.omega_run_from(self.initial(), word)
-    }
-
-    /// Runs the given `word` on the transition system, starting from `state`.
-    #[allow(clippy::type_complexity)]
-    #[inline(always)]
-    fn omega_run_from<W, O>(
-        &self,
-        origin: StateIndex<Self>,
-        word: W,
-    ) -> InfiniteRunOutput<Self, W, O>
-    where
-        W: OmegaWord<Symbol = SymbolOf<Self>>,
-        O: InfiniteObserver<Self>,
-    {
-        assert!(!word.cycle().is_empty(), "word must be infinite");
-        Run::<Self, W, false, O>::new_infinite(self, origin, word).evaluate()
-    }
-
-    /// Runs the given `word` from the `origin` state. If the run is successful, the function returns the indices
-    /// of all states which appear infinitely often. For unsuccessful runs, `None` is returned.
-    #[inline(always)]
-    fn recurrent_state_indices_from<W: OmegaWord<Symbol = SymbolOf<Self>>>(
-        &self,
-        origin: StateIndex<Self>,
-        word: W,
-    ) -> Option<StateSet<Self>>
-    where
-        Self::Alphabet: SimpleAlphabet,
-    {
-        self.omega_run_from::<_, StateSet<Self>>(origin, word)
-            .into_output()
-    }
-
-    /// Returns an iterator over the state indices that are visited infinitely often when running the given `word`
-    /// on the transition system, starting from the initial state. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn recurrent_state_indices<W: OmegaWord<Symbol = SymbolOf<Self>>>(
-        &self,
-        word: W,
-    ) -> Option<StateSet<Self>>
-    where
-        Self: Pointed,
-        Self::Alphabet: SimpleAlphabet,
-    {
-        self.recurrent_state_indices_from(self.initial(), word)
-    }
-
-    /// Returns an iterator yielding the colors of states which are visited infinitely often when running the given `word`
-    /// on the transition system, starting from the initial state. If the run is unsuccessful, `None` is returned.  
-    #[inline(always)]
-    fn recurrent_state_colors_from<W: OmegaWord<Symbol = SymbolOf<Self>>>(
-        &self,
-        origin: StateIndex<Self>,
-        word: W,
-    ) -> Option<StateColorSet<Self>>
-    where
-        StateColor<Self>: Eq + std::hash::Hash,
-    {
-        self.omega_run_from::<W, StateColorSet<_>>(origin, word)
-            .into_output()
-    }
-
-    /// Returns an iterator yielding the colors of states which are visited infinitely often when running the given `word`
-    /// on the transition system, starting from the initial state. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn recurrent_state_colors<W: OmegaWord<Symbol = SymbolOf<Self>>>(
-        &self,
-        word: W,
-    ) -> Option<StateColorSet<Self>>
-    where
-        Self: Pointed,
-        StateColor<Self>: Eq + std::hash::Hash,
-    {
-        self.recurrent_state_colors_from(self.initial(), word)
-    }
-
-    /// Gives an iterator that emits the colors of edges which are taken infinitely often when running the given `word`
-    /// on the transition system, starting from the initial state. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn recurrent_edge_colors_from<W>(
-        &self,
-        origin: StateIndex<Self>,
-        word: W,
-    ) -> Option<EdgeColorSet<Self>>
-    where
-        W: OmegaWord<Symbol = SymbolOf<Self>>,
-        EdgeColor<Self>: Eq + std::hash::Hash,
-    {
-        self.omega_run_from::<W, EdgeColorSet<_>>(origin, word)
-            .into_output()
-    }
-
-    /// Gives an iterator that emits the colors of edges which are taken infinitely often when running the given `word`
-    /// on the transition system, starting from the initial state. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn recurrent_edge_colors<W>(&self, word: W) -> Option<EdgeColorSet<Self>>
-    where
-        W: OmegaWord<Symbol = SymbolOf<Self>>,
-        Self: Pointed,
-        EdgeColor<Self>: Eq + std::hash::Hash,
-    {
-        self.recurrent_edge_colors_from(self.initial(), word)
-    }
-
-    /// Returns a [`Vec`] containing the state indices that are visited when running the given `word`
-    /// on the transition system, starting from the initial state. This may include states that are
-    /// visited only finitely often. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn visited_state_sequence_from<W>(
-        &self,
-        origin: StateIndex<Self>,
-        word: W,
-    ) -> Option<Vec<Self::StateIndex>>
-    where
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-    {
-        self.finite_run_from::<W, StateSequence<_>>(origin, word)
-            .into_output()
-    }
-
-    /// Returns a [`Vec`] containing the state indices that are visited when running the given `word`
-    /// on the transition system, starting from the initial state. This may include states that are
-    /// visited only finitely often. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn visited_state_sequence<W>(&self, word: W) -> Option<Vec<Self::StateIndex>>
-    where
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-        Self: Pointed,
-    {
-        self.visited_state_sequence_from(self.initial(), word)
-    }
-
-    /// Returns a [`Vec`] containing the state colors that are visited when running the given `word`
-    /// on the transition system, starting from the initial state. This may include states that are
-    /// visited only finitely often. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn visited_state_colors_from<W>(
-        &self,
-        origin: StateIndex<Self>,
-        word: W,
-    ) -> Option<Vec<Self::StateColor>>
-    where
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-    {
-        self.finite_run_from::<W, run::StateColorSequence<_>>(origin, word)
-            .into_output()
-    }
-
-    /// Returns a [`Vec`] containing the state colors that are visited when running the given `word`
-    /// on the transition system, starting from the initial state. This may include states that are
-    /// visited only finitely often. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn visited_state_colors<W>(&self, word: W) -> Option<Vec<Self::StateColor>>
-    where
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-        Self: Pointed,
-    {
-        self.visited_state_colors_from(self.initial(), word)
-    }
-
-    /// Returns a [`Vec`] containing the edge colors that are visited when running the given `word`
-    /// on the transition system, starting from the initial state. This may include edges that are
-    /// visited only finitely often. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn visited_edge_colors_from<W>(
-        &self,
-        origin: StateIndex<Self>,
-        word: W,
-    ) -> Option<Vec<Self::EdgeColor>>
-    where
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-    {
-        self.finite_run_from::<W, run::EdgeColorSequence<_>>(origin, word)
-            .into_output()
-    }
-
-    /// Returns a [`Vec`] containing the edge colors that are visited when running the given `word`
-    /// on the transition system, starting from the initial state. This may include edges that are
-    /// visited only finitely often. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn visited_edge_colors<W>(&self, word: W) -> Option<Vec<Self::EdgeColor>>
-    where
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-        Self: Pointed,
-    {
-        self.visited_edge_colors_from(self.initial(), word)
-    }
-
-    /// Returns the color of the last edge that is taken when running the given `word` on the transition system,
-    /// starting from the state indexed by `origin`. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn last_edge_color_from<W>(&self, origin: StateIndex<Self>, word: W) -> Option<Self::EdgeColor>
-    where
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-    {
-        self.finite_run_from::<W, run::ReachedEdgeColor<_>>(origin, word)
-            .into_output()
-    }
-
-    /// Returns the color of the last edge that is taken when running the given `word` on the transition system,
-    /// starting from the initial state. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn last_edge_color<W>(&self, word: W) -> Option<Self::EdgeColor>
-    where
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-        Self: Pointed,
-    {
-        self.last_edge_color_from(self.initial(), word)
+        self.run_from(origin, word).reached_state()
     }
 
     /// Returns a string representation of the transition table of the transition system, with
@@ -451,61 +230,6 @@ pub trait Deterministic: TransitionSystem {
             .to_string()
     }
 
-    /// Returns the color of the state that is reached when running `word` from the state indexed by `from`.
-    /// If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn reached_state_color_from<W>(
-        &self,
-        from: StateIndex<Self>,
-        word: W,
-    ) -> Option<Self::StateColor>
-    where
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-    {
-        self.finite_run_from::<W, run::ReachedStateColor<_>>(from, word)
-            .into_output()
-    }
-
-    /// Returns the color of the state that is reached when running `word` from the initial state. If the run
-    /// is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn reached_state_color<W>(&self, word: W) -> Option<Self::StateColor>
-    where
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-        Self: Pointed,
-    {
-        self.reached_state_color_from(self.initial(), word)
-    }
-
-    /// Returns the state that is reached by running the given `word` on the transition system,
-    /// starting from the initial state. If the run is unsuccessful, `None` is returned.
-    #[inline(always)]
-    fn reached_state_index<W>(&self, word: W) -> Option<Self::StateIndex>
-    where
-        Self: Pointed,
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-    {
-        self.reached_state_index_from(self.initial(), word)
-    }
-
-    /// Tries to run the given `word` starting in the state indexed by `origin`. If
-    /// no state is indexed, then `None` is immediately returned. Otherwise, the
-    /// word is run and the index of the reached state is returned. If the run is
-    /// unsuccessful, the function returns `None`.
-    #[inline(always)]
-    fn reached_state_index_from<W>(
-        &self,
-        origin: StateIndex<Self>,
-        word: W,
-    ) -> Option<Self::StateIndex>
-    where
-        Self: Sized,
-        W: FiniteWord<Symbol = SymbolOf<Self>>,
-    {
-        self.finite_run_from::<W, run::ReachedState<_>>(origin, word)
-            .into_output()
-    }
-
     /// Returns true if `self` is accessible, meaning every state is reachable from the initial state.
     /// This is done by counting whether the number of minimal representatives matches the number of states.
     fn is_accessible(&self) -> bool
@@ -513,30 +237,6 @@ pub trait Deterministic: TransitionSystem {
         Self: Pointed + States,
     {
         self.state_count() == self.reachable_state_indices().count()
-    }
-
-    /// Attempts to extract the escape prefix of running the given omega word.
-    #[inline(always)]
-    fn omega_escape_prefix<W>(&self, word: W) -> Option<run::EscapePrefix<W>>
-    where
-        W: OmegaWord<Symbol = SymbolOf<Self>>,
-        Self: Pointed,
-    {
-        self.omega_run::<W, run::NoObserver>(word)
-            .into_escape_prefix()
-    }
-
-    /// Compute the escape prefixes of a set of omega words on a transition system.
-    #[inline(always)]
-    fn omega_escape_prefixes<W>(
-        &self,
-        words: impl Iterator<Item = W>,
-    ) -> impl Iterator<Item = run::EscapePrefix<W>>
-    where
-        W: OmegaWord<Symbol = SymbolOf<Self>> + Clone,
-        Self: Pointed,
-    {
-        words.filter_map(|w| self.omega_escape_prefix(w)).unique()
     }
 }
 
@@ -656,11 +356,15 @@ mod tests {
             .default_color(Void)
             .into_dts_with_initial(0);
 
-        assert!(ts.omega_escape_prefix(upw!("b")).is_some());
-        assert!(ts.omega_escape_prefix(upw!("b", "a")).is_some());
-        assert!(ts.omega_escape_prefix(upw!("a", "b")).is_none());
+        assert!(ts.run(upw!("b")).escape_prefix().is_some());
+        assert!(ts.run(upw!("b", "a")).escape_prefix().is_some());
+        assert!(ts.run(upw!("a", "b")).escape_prefix().is_none());
         // a^ω and aab^ω both escape after the prefix `aa`, which counts only once
-        assert_eq!(ts.omega_escape_prefixes(words.iter()).count(), 2);
+        let distinct: std::collections::HashSet<_> = words
+            .iter()
+            .filter_map(|w| ts.run(w).escape_prefix())
+            .collect();
+        assert_eq!(distinct.len(), 2);
     }
 
     #[test]
@@ -671,8 +375,8 @@ mod tests {
             .with_transitions([(0, 'a', Void, 1), (1, 'b', Void, 1)])
             .default_color(Void)
             .into_dts_with_initial(0);
-        let first = ts.omega_escape_prefix(upw!("a")).unwrap();
-        let second = ts.omega_escape_prefix(upw!("aa", "b")).unwrap();
+        let first = ts.run(upw!("a")).escape_prefix().unwrap();
+        let second = ts.run(upw!("aa", "b")).escape_prefix().unwrap();
         assert_eq!(first, second);
         let hash = |p: &crate::ts::run::EscapePrefix<_>| {
             let mut hasher = DefaultHasher::new();

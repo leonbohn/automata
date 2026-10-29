@@ -11,6 +11,6 @@ impl<T: Deterministic, Sem> Automaton<T, Sem> {
         W: FiniteWord<Symbol = SymbolOf<T>>,
         V: FiniteWord<Symbol = SymbolOf<T>>,
     {
-        self.reached_state_index(word).unwrap() == self.reached_state_index(other).unwrap()
+        self.reached_state(word).unwrap() == self.reached_state(other).unwrap()
     }
 }

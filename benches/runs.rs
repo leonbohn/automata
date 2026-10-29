@@ -3,6 +3,7 @@
 mod common;
 
 use automata::automaton::{DFA, DPA};
+use automata::ts::run::{EdgeColorSequence, EdgeColorSet, StateSet};
 use automata::{Deterministic, TransitionSystem, upw};
 use common::FixtureDpa;
 use gungraun::{Dhat, prelude::*};
@@ -44,7 +45,7 @@ fn dfa_reached_state((dfa, words): (DFA, Vec<String>)) -> u64 {
     black_box(
         words
             .iter()
-            .map(|w| dfa.reached_state_index(w.as_str()).unwrap_or(0) as u64)
+            .map(|w| dfa.reached_state(w.as_str()).unwrap_or(0) as u64)
             .sum(),
     )
 }
@@ -78,7 +79,10 @@ fn dpa_recurrent_edge_colors((dpa, lassos): (DPA, Vec<(String, String)>)) -> usi
     black_box(
         lassos
             .iter()
-            .filter_map(|(u, v)| dpa.recurrent_edge_colors(upw!(u.as_str(), v.as_str())))
+            .filter_map(|(u, v)| {
+                dpa.run(upw!(u.as_str(), v.as_str()))
+                    .observe::<EdgeColorSet<_>>()
+            })
             .map(|colors| colors.len())
             .sum(),
     )
@@ -91,13 +95,16 @@ fn dpa_recurrent_states((dpa, lassos): (DPA, Vec<(String, String)>)) -> usize {
     black_box(
         lassos
             .iter()
-            .filter_map(|(u, v)| dpa.recurrent_state_indices(upw!(u.as_str(), v.as_str())))
+            .filter_map(|(u, v)| {
+                dpa.run(upw!(u.as_str(), v.as_str()))
+                    .observe::<StateSet<_>>()
+            })
             .map(|states| states.len())
             .sum(),
     )
 }
 
-// The whole sequence of visited states and of edge colors along the prefix `u v v v`.
+// The whole sequence of edge colors along the prefix `u v v v`.
 #[library_benchmark(config = LibraryBenchmarkConfig::default().tool(Dhat::default()))]
 #[bench::short(args = (5, 10), setup = dpa_with_lassos)]
 #[bench::long(args = (500, 1_000), setup = dpa_with_lassos)]
@@ -107,9 +114,9 @@ fn dpa_visited_sequences((dpa, lassos): (DPA, Vec<(String, String)>)) -> usize {
             .iter()
             .map(|(u, v)| {
                 let w: Vec<char> = format!("{u}{v}{v}{v}").chars().collect();
-                dpa.visited_state_sequence(w.as_slice())
+                dpa.run(w.as_slice())
+                    .observe::<EdgeColorSequence<_>>()
                     .map_or(0, |s| s.len())
-                    + dpa.visited_edge_colors(w.as_slice()).map_or(0, |s| s.len())
             })
             .sum(),
     )

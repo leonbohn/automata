@@ -65,14 +65,14 @@ pub trait Congruence: Deterministic + Pointed {
     where
         Self: Pointed,
     {
-        let mut cur = self.reached_state_index(word.spoke())?;
+        let mut cur = self.reached_state(word.spoke())?;
         let mut count = 0;
         let mut map = BTreeMap::default();
         loop {
             match map.insert(cur, count) {
                 None => {
                     count += 1;
-                    cur = self.reached_state_index_from(cur, word.cycle())?;
+                    cur = self.reached_state_from(cur, word.cycle())?;
                 }
                 Some(i) => {
                     // the spoke is the spoke of self plus `i` times the cycle, while the
@@ -336,7 +336,7 @@ impl<D: Deterministic> RightCongruence<D> {
         W: word::FiniteWord<Symbol = SymbolOf<D>>,
         V: word::FiniteWord<Symbol = SymbolOf<D>>,
     {
-        self.reached_state_index(word).unwrap() == self.reached_state_index(other).unwrap()
+        self.reached_state(word).unwrap() == self.reached_state(other).unwrap()
     }
 
     /// Computes a DFA that accepts precisely those finite words which loop on the given `class`. Formally,
@@ -382,7 +382,7 @@ impl<D: Deterministic> RightCongruence<D> {
     /// exist or is not labeled with a minimal representative.
     pub fn is_idempotent(&self, idx: StateIndex<Self>) -> Option<bool> {
         let mr = self.state_to_mr(idx)?;
-        Some(self.reached_state_index_from(idx, mr) == Some(idx))
+        Some(self.reached_state_from(idx, mr) == Some(idx))
     }
 
     /// Returns the [`Class`] that is referenced by `index`.

@@ -356,7 +356,7 @@ mod tests {
         let q1 = ts.add_state(true);
         assert_eq!(ts.edge(q0, 'a'), None);
         ts.add_edge((q0, 'a', q1));
-        assert_eq!(ts.reached_state_index_from(q0, "a"), Some(q1));
+        assert_eq!(ts.reached_state_from(q0, "a"), Some(q1));
     }
 
     #[test]
@@ -366,7 +366,7 @@ mod tests {
         let q1 = ts.add_state(true);
         assert_eq!(ts.edge(q0, 'a'), None);
         ts.add_edge((q0, 'a', q1));
-        assert_eq!(ts.reached_state_index_from(q0, "a"), Some(q1));
+        assert_eq!(ts.reached_state_from(q0, "a"), Some(q1));
     }
 
     #[test]
@@ -380,12 +380,12 @@ mod tests {
                 (1, 'a', 0, 0),
             ])
             .into_dts();
-        assert_eq!(partial.reached_state_index_from(0, "aaacb"), None);
+        assert_eq!(partial.reached_state_from(0, "aaacb"), None);
         assert!(!partial.is_complete());
 
         partial.complete_with_colors((), 2);
         for w in ["abbaccababcab", "bbcca", "cc", "aababbabbabbccbabba"] {
-            if partial.reached_state_index_from(0, w).unwrap() < 1 {
+            if partial.reached_state_from(0, w).unwrap() < 1 {
                 panic!("Word {} misclassified", w);
             }
         }

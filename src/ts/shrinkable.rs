@@ -21,9 +21,9 @@ pub trait Shrinkable: States {
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
     /// let _edge = ts.add_edge((q0, 'a', q1));
-    /// assert_eq!(ts.reached_state_index_from(q0, "a"), Some(q1));
+    /// assert_eq!(ts.reached_state_from(q0, "a"), Some(q1));
     /// assert_eq!(ts.remove_state(q1), Some(true));
-    /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
+    /// assert_eq!(ts.reached_state_from(q0, "a"), None);
     /// ```
     fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor>;
 
@@ -42,10 +42,10 @@ pub trait Shrinkable: States {
     /// let q0 = ts.add_state(false);
     /// let q1 = ts.add_state(true);
     /// let _edge = ts.add_edge((q0, 'a', q1));
-    /// assert_eq!(ts.reached_state_index_from(q0, "a"), Some(q1));
+    /// assert_eq!(ts.reached_state_from(q0, "a"), Some(q1));
     /// assert_eq!(ts.remove_edges_from_matching(q0, 'a').unwrap().len(), 1);
     /// assert_eq!(ts.remove_edges_from_matching(2, 'b'), None);
-    /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
+    /// assert_eq!(ts.reached_state_from(q0, "a"), None);
     /// ```
     fn remove_edges_from_matching(
         &mut self,
@@ -80,8 +80,8 @@ pub trait Shrinkable: States {
     ///     0
     /// );
     /// assert_eq!(ts.remove_edges_between_matching(2, q0, 'a'), None);
-    /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
-    /// assert_eq!(ts.reached_state_index_from(q0, "b"), Some(q1));
+    /// assert_eq!(ts.reached_state_from(q0, "a"), None);
+    /// assert_eq!(ts.reached_state_from(q0, "b"), Some(q1));
     /// ```
     fn remove_edges_between_matching(
         &mut self,
@@ -109,9 +109,9 @@ pub trait Shrinkable: States {
     /// let _e2 = ts.add_edge((q0, 'c', q0));
     ///
     /// assert_eq!(ts.remove_edges_between(q0, q1).unwrap().len(), 2);
-    /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
-    /// assert_eq!(ts.reached_state_index_from(q0, "b"), None);
-    /// assert_eq!(ts.reached_state_index_from(q0, "c"), Some(q0));
+    /// assert_eq!(ts.reached_state_from(q0, "a"), None);
+    /// assert_eq!(ts.reached_state_from(q0, "b"), None);
+    /// assert_eq!(ts.reached_state_from(q0, "c"), Some(q0));
     /// ```
     fn remove_edges_between(
         &mut self,
@@ -140,9 +140,9 @@ pub trait Shrinkable: States {
     /// ts.add_edge((q1, 'a', q0));
     ///
     /// assert_eq!(ts.remove_edges_from(q0).unwrap().len(), 2);
-    /// assert_eq!(ts.reached_state_index_from(q0, "a"), None);
-    /// assert_eq!(ts.reached_state_index_from(q0, "b"), None);
-    /// assert_eq!(ts.reached_state_index_from(q1, "a"), Some(q0));
+    /// assert_eq!(ts.reached_state_from(q0, "a"), None);
+    /// assert_eq!(ts.reached_state_from(q0, "b"), None);
+    /// assert_eq!(ts.reached_state_from(q1, "a"), Some(q0));
     /// ```
     fn remove_edges_from(&mut self, source: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>>;
 

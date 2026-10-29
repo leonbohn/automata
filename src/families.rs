@@ -39,7 +39,7 @@ impl<T: Congruence + States, X> Family<T, X> {
     where
         W: FiniteWord<Symbol = SymbolOf<T>>,
     {
-        self.progress.get(&self.leading.reached_state_index(word)?)
+        self.progress.get(&self.leading.reached_state(word)?)
     }
     /// Replaces the element belonging to the class that is reached by reading `word` and returns the
     /// old one. Returns `None` if there is no such class.
@@ -48,7 +48,7 @@ impl<T: Congruence + States, X> Family<T, X> {
         W: FiniteWord<Symbol = SymbolOf<T>>,
     {
         self.progress
-            .insert(self.leading.reached_state_index(word)?, new_x)
+            .insert(self.leading.reached_state(word)?, new_x)
     }
     /// Returns a mutable reference to the element belonging to the class that is reached by reading
     /// `word`, or `None` if there is no such class.
@@ -56,8 +56,7 @@ impl<T: Congruence + States, X> Family<T, X> {
     where
         W: FiniteWord<Symbol = SymbolOf<T>>,
     {
-        self.progress
-            .get_mut(&self.leading.reached_state_index(word)?)
+        self.progress.get_mut(&self.leading.reached_state(word)?)
     }
     pub(crate) fn into_parts(self) -> (T, FxIndexMap<StateIndex<T>, X>) {
         (self.leading, self.progress)

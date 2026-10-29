@@ -1,6 +1,6 @@
 use crate::TransitionSystem;
 use crate::automaton::{MealySemantics, MooreSemantics};
-use crate::ts::run::{InfiniteObserver, Observer, ReachedEdgeColor, ReachedStateColor};
+use crate::ts::run::{Observer, ReachedEdgeColor, ReachedStateColor};
 use crate::ts::{Deterministic, EdgeColor, StateColor, StateIndex, SymbolOf};
 use crate::word::{FiniteWord, OmegaWord};
 
@@ -48,9 +48,8 @@ pub trait Semantics<T: TransitionSystem, W> {
 
     /// Runs `word` in `ts` starting from `initial` and returns what the
     /// [`Self::Observer`] has collected. This is `None` if the run is not defined, i.e.
-    /// if it leaves the transition system. Implementations for finite words use
-    /// [`Deterministic::finite_run_from`], those for omega words use
-    /// [`Deterministic::omega_run_from`].
+    /// if it leaves the transition system. This is what [`Deterministic::run_from`] and
+    /// [`crate::ts::run::Run::observe`] compute.
     fn observe(
         &self,
         ts: &T,
@@ -69,7 +68,7 @@ where
     W: FiniteWord<Symbol = SymbolOf<T>>,
     O: Observer<T>,
 {
-    ts.finite_run_from::<W, O>(initial, word).into_output()
+    ts.run_from(initial, word).observe::<O>()
 }
 
 /// Runs an omega word and returns what the observer `O` has collected.
@@ -77,9 +76,9 @@ pub(crate) fn observe_omega<T, W, O>(ts: &T, initial: StateIndex<T>, word: W) ->
 where
     T: Deterministic,
     W: OmegaWord<Symbol = SymbolOf<T>>,
-    O: InfiniteObserver<T>,
+    O: Observer<T>,
 {
-    ts.omega_run_from::<W, O>(initial, word).into_output()
+    ts.run_from(initial, word).observe::<O>()
 }
 
 impl<T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>> Semantics<T, W> for MealySemantics {
