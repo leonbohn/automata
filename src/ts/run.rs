@@ -19,11 +19,15 @@ use crate::ts::{Deterministic, EdgeColor, StateColor, StateIndex, SymbolOf};
 pub trait Observer<T: TransitionSystem>: Sized {
     /// The information that the observer collects.
     type Current;
-    /// Whether the observer looks at the transitions at all. A run on an infinite word has to go
-    /// around its cycle once more for an observer that does, which is skipped otherwise.
+    /// Whether the observer looks at the transitions at all. Passes through the cycle of an
+    /// infinite word are only kept for an observer that does.
     const OBSERVES: bool = true;
     /// Consumes the observer and returns the collected information.
     fn into_current(self) -> Self::Current;
+    /// Adds what `later` has observed to `self`, where `later` observed the part of the run that
+    /// directly follows the part observed by `self`. A run on an infinite word observes each pass
+    /// through the cycle of the word with its own observer and merges those of the loop.
+    fn merge(&mut self, later: Self);
     /// Creates an observer for a run that starts in `state`.
     fn begin(ts: &T, state: StateIndex<T>) -> Self;
     /// Observes a transition on `sym` taken from `state` and returns the state that is reached, or
@@ -168,35 +172,34 @@ impl<T: Deterministic, W: OmegaWord<Symbol = SymbolOf<T>>> RunKind<T, W> for Ome
             current = ts.successor(current, sym).ok_or(taken)?;
         }
 
-        // The states at the ends of the passes through the cycle of the word, to find the pass
-        // after which the run repeats.
+        // Each pass through the cycle of the word has its own observer. The states at the ends of
+        // the passes tell which of them form the loop of the run, those are merged.
         let mut seen = crate::ts::StateMap::new(None);
-        let mut passes = 0usize;
-        seen.insert(current, passes);
-        let (entry, period) = loop {
+        let mut passes = Vec::new();
+        let mut count = 0usize;
+        seen.insert(current, count);
+        loop {
+            let mut observer = O::begin(ts, current);
             for sym in cycle.symbols() {
                 taken += 1;
-                current = ts.successor(current, sym).ok_or(taken)?;
+                current = observer.observe_one(ts, current, sym).ok_or(taken)?;
             }
-            passes += 1;
+            count += 1;
+            if O::OBSERVES {
+                passes.push(observer);
+            }
             if let Some(&first) = seen.get(&current) {
-                break (current, passes - first);
+                let mut loop_passes = passes.drain(first.min(passes.len())..);
+                return Ok(match loop_passes.next() {
+                    Some(mut merged) => {
+                        loop_passes.for_each(|pass| merged.merge(pass));
+                        merged.into_current()
+                    }
+                    None => O::begin(ts, current).into_current(),
+                });
             }
-            seen.insert(current, passes);
-        };
-
-        let mut observer = O::begin(ts, entry);
-        if O::OBSERVES {
-            let mut current = entry;
-            for _ in 0..period {
-                for sym in cycle.symbols() {
-                    current = observer
-                        .observe_one(ts, current, sym)
-                        .expect("this part of the run was already taken");
-                }
-            }
+            seen.insert(current, count);
         }
-        Ok(observer.into_current())
     }
 }
 
@@ -460,6 +463,8 @@ mod impls {
     use crate::{Lattice, math};
 
     impl<T: Deterministic> Observer<T> for NoObserver {
+        #[inline(always)]
+        fn merge(&mut self, _later: Self) {}
         type Current = ();
         const OBSERVES: bool = false;
         #[inline(always)]
@@ -480,6 +485,10 @@ mod impls {
     }
 
     impl<T: Deterministic> Observer<T> for ReachedState<StateIndex<T>> {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            self.0 = later.0;
+        }
         type Current = StateIndex<T>;
         #[inline(always)]
         fn begin(_ts: &T, state: StateIndex<T>) -> Self {
@@ -501,6 +510,10 @@ mod impls {
         }
     }
     impl<T: Deterministic> Observer<T> for ReachedStateColor<T> {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            self.0 = later.0;
+        }
         type Current = StateColor<T>;
         #[inline(always)]
         fn into_current(self) -> Self::Current {
@@ -523,6 +536,10 @@ mod impls {
         }
     }
     impl<T: Deterministic> Observer<T> for ReachedEdgeColor<T> {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            self.0 = later.0.or(self.0.take());
+        }
         type Current = EdgeColor<T>;
         #[inline(always)]
         fn into_current(self) -> Self::Current {
@@ -550,6 +567,14 @@ mod impls {
     impl<T: Deterministic<StateColor: Lattice>, const MAX: bool> Observer<T>
         for StateColorLimit<T, MAX>
     {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            if MAX {
+                self.0.join_assign(&later.0)
+            } else {
+                self.0.meet_assign(&later.0)
+            }
+        }
         type Current = StateColor<T>;
         #[inline(always)]
         fn into_current(self) -> Self::Current {
@@ -580,6 +605,14 @@ mod impls {
     where
         EdgeColor<T>: Lattice,
     {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            if MAX {
+                self.0.join_assign(&later.0)
+            } else {
+                self.0.meet_assign(&later.0)
+            }
+        }
         type Current = EdgeColor<T>;
         #[inline(always)]
         fn into_current(self) -> Self::Current {
@@ -612,6 +645,10 @@ mod impls {
     }
 
     impl<T: Deterministic> Observer<T> for StateSet<T> {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            self.0.extend(later.0.iter());
+        }
         type Current = Self;
         #[inline(always)]
         fn begin(ts: &T, state: StateIndex<T>) -> Self {
@@ -637,6 +674,10 @@ mod impls {
     }
 
     impl<T: Deterministic<EdgeColor: Eq + std::hash::Hash>> Observer<T> for EdgeColorSet<T> {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            self.0.extend(later.0);
+        }
         type Current = Self;
         #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
@@ -668,6 +709,10 @@ mod impls {
     }
 
     impl<T: Deterministic> Observer<T> for EdgeColorSequence<T> {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            self.0.extend(later.0);
+        }
         type Current = Vec<EdgeColor<T>>;
         #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {
@@ -696,6 +741,10 @@ mod impls {
     }
 
     impl<T: Deterministic> Observer<T> for Triggers<T> {
+        #[inline(always)]
+        fn merge(&mut self, later: Self) {
+            self.0.extend(later.0);
+        }
         type Current = BTreeSet<(StateIndex<T>, SymbolOf<T>)>;
 
         #[inline(always)]
