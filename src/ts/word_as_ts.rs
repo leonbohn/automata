@@ -157,6 +157,14 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> States for WordTs<A, 
     fn state_indices(&self) -> Self::StateIndices<'_> {
         0..(self.word.len().try_into().unwrap())
     }
+
+    fn size(&self) -> usize {
+        self.word.len()
+    }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        (index as usize) < self.word.len()
+    }
 }
 
 impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for WordTs<A, W, true> {
@@ -219,6 +227,14 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> States for WordTs<A, W
 
     fn state_indices(&self) -> Self::StateIndices<'_> {
         0..(self.word.combined_len().try_into().unwrap())
+    }
+
+    fn size(&self) -> usize {
+        self.word.combined_len()
+    }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        (index as usize) < self.word.combined_len()
     }
 }
 

@@ -157,6 +157,14 @@ impl<Ts: States, P: ProvidesStateColor<Ts::StateIndex>> States for WithStateColo
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.ts.state_indices()
     }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        self.ts.contains_state_index(index)
+    }
+
+    fn size(&self) -> usize {
+        self.ts.size()
+    }
 }
 
 impl<Ts: TransitionSystem, P: ProvidesStateColor<Ts::StateIndex>> WithStateColor<Ts, P> {

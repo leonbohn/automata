@@ -769,6 +769,14 @@ impl<Ts: States> States for &Ts {
     fn state_indices(&self) -> Self::StateIndices<'_> {
         Ts::state_indices(self)
     }
+
+    fn size(&self) -> usize {
+        Ts::size(self)
+    }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        Ts::contains_state_index(self, index)
+    }
 }
 
 impl<Ts: States> States for &mut Ts {
@@ -779,6 +787,14 @@ impl<Ts: States> States for &mut Ts {
 
     fn state_indices(&self) -> Self::StateIndices<'_> {
         Ts::state_indices(self)
+    }
+
+    fn size(&self) -> usize {
+        Ts::size(self)
+    }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        Ts::contains_state_index(self, index)
     }
 }
 
@@ -897,6 +913,39 @@ mod tests {
         assert!(ts.edges_from(p).is_none());
         assert_eq!(ts.state_color(p), None);
         assert!(ts.edges_from(q).is_some());
+    }
+
+    #[test]
+    fn adapters_forward_state_membership() {
+        use crate::States;
+        use crate::ts::{Deterministic, Pointed};
+
+        let dfa = crate::tests::wiki_dfa();
+        let n = dfa.size();
+        assert!(dfa.contains_state_index(0));
+        assert!(!dfa.contains_state_index(n as u32 + 5));
+
+        let erased = (&dfa).erase_state_colors();
+        assert_eq!(erased.size(), n);
+        assert!(erased.contains_state_index(0));
+        assert!(!erased.contains_state_index(n as u32 + 5));
+
+        let restricted = (&dfa).restrict_state_indices(|q| q != 0);
+        assert!(!restricted.contains_state_index(0));
+        assert!(restricted.contains_state_index(1));
+        assert_eq!(restricted.size(), n - 1);
+
+        let finite = dfa
+            .ts()
+            .clone()
+            .with_initial(0)
+            .subset_construction()
+            .reachable_part();
+        assert!(finite.contains_state_index(0));
+        assert!(!finite.contains_state_index(finite.size() + 5));
+        assert!(finite.successor_index(0, 'a').is_some());
+        assert!(finite.successor_index(finite.size() + 5, 'a').is_none());
+        assert_eq!(finite.initial(), 0);
     }
 
     #[test]

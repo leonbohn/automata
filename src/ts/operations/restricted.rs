@@ -135,6 +135,10 @@ where
             filter: &self.filter,
         }
     }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        self.filter.is_unmasked(index) && self.ts().contains_state_index(index)
+    }
 }
 
 /// Iterator over the state indices of a transition system that are restricted by a filter function.
@@ -342,6 +346,14 @@ where
 
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.ts().state_indices()
+    }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state_index(index)
+    }
+
+    fn size(&self) -> usize {
+        self.ts().size()
     }
 }
 

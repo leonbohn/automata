@@ -235,6 +235,14 @@ impl<Ts: Deterministic> States for Quotient<Ts> {
     fn state_indices(&self) -> Self::StateIndices<'_> {
         0..self.partition.len()
     }
+
+    fn size(&self) -> usize {
+        self.partition.len()
+    }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        index < self.partition.len()
+    }
 }
 impl<D: Deterministic> Deterministic for Quotient<D> {
     fn edge(

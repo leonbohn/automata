@@ -107,6 +107,14 @@ where
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.monoid().profile_indices()
     }
+
+    fn size(&self) -> usize {
+        self.monoid().elements()
+    }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        index < self.monoid().elements()
+    }
 }
 
 impl<Ts> Deterministic for Cayley<Ts>
@@ -233,6 +241,14 @@ where
 
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.monoid().profile_indices()
+    }
+
+    fn size(&self) -> usize {
+        self.monoid().elements()
+    }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        index < self.monoid().elements()
     }
 }
 

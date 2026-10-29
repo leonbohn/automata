@@ -358,6 +358,10 @@ impl<T: States, Sem> States for Automaton<T, Sem> {
         self.ts.state_indices()
     }
 
+    fn size(&self) -> usize {
+        self.ts.size()
+    }
+
     fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
         self.ts.contains_state_index(index)
     }

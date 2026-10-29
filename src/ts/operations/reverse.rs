@@ -80,6 +80,14 @@ where
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.0.state_indices()
     }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        self.0.contains_state_index(index)
+    }
+
+    fn size(&self) -> usize {
+        self.0.size()
+    }
 }
 
 impl<Ts> PredecessorIterable for Reversed<Ts>

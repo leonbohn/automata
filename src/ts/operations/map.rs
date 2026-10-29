@@ -94,6 +94,14 @@ where
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.ts().state_indices()
     }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state_index(index)
+    }
+
+    fn size(&self) -> usize {
+        self.ts().size()
+    }
 }
 impl<D, Ts, F> Pointed for MapEdges<Ts, F>
 where
@@ -372,6 +380,14 @@ where
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.ts().state_indices()
     }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state_index(index)
+    }
+
+    fn size(&self) -> usize {
+        self.ts().size()
+    }
 }
 
 impl<D: Color, Ts: TransitionSystem + Pointed, F: Fn(Ts::EdgeColor) -> D> Pointed
@@ -614,6 +630,14 @@ where
 
     fn state_indices(&self) -> Self::StateIndices<'_> {
         self.ts().state_indices()
+    }
+
+    fn contains_state_index(&self, index: StateIndex<Self>) -> bool {
+        self.ts().contains_state_index(index)
+    }
+
+    fn size(&self) -> usize {
+        self.ts().size()
     }
 }
 
