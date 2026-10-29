@@ -38,6 +38,7 @@ impl<Q> LinkedState<Q> {
         }
     }
 
+    #[inline]
     pub(super) fn is_occupied(&self) -> bool {
         matches!(self, Occupied(..))
     }
@@ -47,6 +48,7 @@ impl<Q> LinkedState<Q> {
     }
 
     /// The head of the out-list, [`NONE`] if it is empty or the state is vacant.
+    #[inline]
     pub(super) fn first_out_edge(&self) -> u32 {
         match self {
             Occupied(_, out, _) => *out,
@@ -55,6 +57,7 @@ impl<Q> LinkedState<Q> {
     }
 
     /// The head of the in-list, [`NONE`] if it is empty or the state is vacant.
+    #[inline]
     pub(super) fn first_in_edge(&self) -> u32 {
         match self {
             Occupied(_, _, inn) => *inn,
@@ -62,6 +65,7 @@ impl<Q> LinkedState<Q> {
         }
     }
 
+    #[inline]
     pub(super) fn set_first_out_edge(&mut self, edge: u32) {
         match self {
             Occupied(_, out, _) => *out = edge,
@@ -69,6 +73,7 @@ impl<Q> LinkedState<Q> {
         }
     }
 
+    #[inline]
     pub(super) fn set_first_in_edge(&mut self, edge: u32) {
         match self {
             Occupied(_, _, inn) => *inn = edge,

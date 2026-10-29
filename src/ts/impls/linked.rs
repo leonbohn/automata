@@ -166,6 +166,7 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
     ///
     /// # Panics
     /// Panics if `source` or `target` is not a state of `self`.
+    #[inline]
     pub fn insert_edge(
         &mut self,
         source: StateIndex<Self>,
@@ -181,10 +182,9 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
             self.contains_state(target),
             "cannot add edge to non-existent state {target:?}"
         );
-        let id = u32::try_from(self.edges.len())
-            .ok()
-            .filter(|id| *id != NONE)
-            .expect("too many edges for 32 bit ids");
+        let id = self.edges.len();
+        assert!(id < NONE as usize, "too many edges for 32 bit ids");
+        let id = id as u32;
 
         let mut edge = LinkedEdge::new(source, expression, color, target);
 
@@ -622,12 +622,11 @@ impl<A: Alphabet, Q: Color, C: Color> Sproutable for Det<LinkedTs<A, Q, C>> {
         E: IntoEdgeTuple<Self>,
     {
         let (q, a, c, p) = t.into_edge_tuple();
-        let overlapping = self
-            .0
-            .out_edge_ids(q, |e| a.matches(&self.0.edges[e].expression));
-        for id in overlapping {
-            trace!("replacing overlapping edge {id} in deterministic system");
-            self.0.remove_edge(id);
+        // a deterministic system has at most one edge per symbol, but an expression may overlap
+        // with several, so remove until none is left. Usually there is nothing to remove.
+        while let Some(position) = self.0.out_edge_position(q, &a) {
+            trace!("replacing overlapping edge {position} in deterministic system");
+            self.0.remove_edge(EdgeId(position as u32));
         }
         self.0.insert_edge(q, a, c, p)
     }
@@ -651,6 +650,16 @@ impl<A: Alphabet, Q: Color, C: Color> Deterministic for Det<LinkedTs<A, Q, C>> {
                 .as_edge_ref()
                 .with_id(EdgeId::from_usize(position)),
         )
+    }
+
+    #[inline]
+    fn successor(
+        &self,
+        state: StateIndex<Self>,
+        symbol: SymbolOf<Self>,
+    ) -> Option<StateIndex<Self>> {
+        let position = self.0.out_edge_position(state, symbol)?;
+        Some(self.0.edges[position].target)
     }
 }
 
@@ -738,11 +747,10 @@ impl<A: Alphabet, Q: Color, C: Color> TransitionSystem for LinkedTs<A, Q, C> {
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        let state = self.states.get(state.into_usize())?;
-        if state.is_vacant() {
-            return None;
+        match self.states.get(state.into_usize())? {
+            LinkedState::Occupied(_, out, _) => Some(LinkedEdgesFrom::new(&self.edges, *out)),
+            LinkedState::Vacant => None,
         }
-        Some(LinkedEdgesFrom::new(&self.edges, state.first_out_edge()))
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
