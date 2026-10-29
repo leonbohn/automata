@@ -15,6 +15,7 @@ pub use linked_state::{LinkedEdgesFrom, LinkedEdgesTo};
 mod linked_edge;
 use crate::TransitionSystem;
 use crate::ts::predecessors::PredecessorIterable;
+use crate::ts::{Det, Linked, Storage};
 use crate::{
     Color, Show, Void,
     alphabet::{Alphabet, CharAlphabet, Matcher},
@@ -38,9 +39,9 @@ use tracing::{trace, warn};
 /// a [`Compaction`] to translate old ids into new ones. Collecting a transition system into a new one
 /// compacts as well.
 ///
-/// The `DET` parameter only decides whether adding an edge replaces an overlapping one.
+/// Use [`Det<LinkedTs>`](crate::ts::Det) for a deterministic system that replaces overlapping edges.
 #[derive(Clone)]
-pub struct LinkedTs<A: Alphabet = CharAlphabet, Q = Void, C = Void, const DET: bool = true> {
+pub struct LinkedTs<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
     alphabet: A,
     states: Vec<LinkedState<Q>>,
     edges: Vec<LinkedEdge<A::Expression, C>>,
@@ -68,7 +69,7 @@ impl Compaction {
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedTs<A, Q, C, DET> {
+impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
     /// Builds a new empty transition system for the given alphabet with room for `cap` states and
     /// edges.
     pub fn with_capacity(alphabet: A, cap: usize) -> Self {
@@ -82,7 +83,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedTs<A, Q, C, DET> {
 
     /// Pairs the color of every state with its index, so that afterwards the original indices
     /// can be recovered even if states are removed or renumbered.
-    pub fn zip_state_indices(self) -> LinkedTs<A, (DefaultIdType, Q), C, DET> {
+    pub fn zip_state_indices(self) -> LinkedTs<A, (DefaultIdType, Q), C> {
         LinkedTs {
             alphabet: self.alphabet,
             edges: self.edges,
@@ -99,7 +100,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedTs<A, Q, C, DET> {
     /// Maps the colors of the states with `state_f`, which also gets the index of the state. Compacts
     /// first, so the indices passed to `state_f` and the ids of the result are the ones after
     /// compaction.
-    pub fn linked_map_states<QQ: Color, StateF>(self, state_f: StateF) -> LinkedTs<A, QQ, C, DET>
+    pub fn linked_map_states<QQ: Color, StateF>(self, state_f: StateF) -> LinkedTs<A, QQ, C>
     where
         StateF: Fn(StateIndex<Self>, Q) -> QQ,
     {
@@ -108,7 +109,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedTs<A, Q, C, DET> {
 
     /// Maps the edges with `edge_f`, which gets source, expression, color and target of an edge and
     /// returns its new expression and color. Compacts first.
-    pub fn linked_map_edges<CC: Color, EdgeF>(self, edge_f: EdgeF) -> LinkedTs<A, Q, CC, DET>
+    pub fn linked_map_edges<CC: Color, EdgeF>(self, edge_f: EdgeF) -> LinkedTs<A, Q, CC>
     where
         EdgeF: Fn(
             StateIndex<Self>,
@@ -125,7 +126,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedTs<A, Q, C, DET> {
         mut self,
         state_f: StateF,
         edge_f: EdgeF,
-    ) -> LinkedTs<A, QQ, CC, DET>
+    ) -> LinkedTs<A, QQ, CC>
     where
         StateF: Fn(StateIndex<Self>, Q) -> QQ,
         EdgeF: Fn(
@@ -145,11 +146,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedTs<A, Q, C, DET> {
                 .enumerate()
                 .map(|(i, s)| s.map_occupied(|c| state_f(DenseId::from_usize(i), c)))
                 .collect(),
-            edges: self
-                .edges
-                .into_iter()
-                .map(|e| e.map(&edge_f))
-                .collect(),
+            edges: self.edges.into_iter().map(|e| e.map(&edge_f)).collect(),
         }
     }
 
@@ -255,7 +252,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedTs<A, Q, C, DET> {
     /// The edge with the given id, if it exists.
     pub fn edge_by_id(&self, id: EdgeId) -> Option<EdgeOf<'_, Self>> {
         let edge = self.edges.get(id.into_usize())?;
-        edge.is_live().then(|| edge.as_edge_ref())
+        edge.is_live().then(|| edge.as_edge_ref().with_id(id))
     }
 
     /// A mutable reference to the color of the edge with the given id, if it exists.
@@ -420,17 +417,8 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedTs<A, Q, C, DET> {
 
     /// Turns `self` into a deterministic transition system. If `self` is not deterministic,
     /// it is returned unchanged as the error.
-    pub fn try_into_deterministic(self) -> Result<LinkedTs<A, Q, C, true>, Self> {
-        if self.is_deterministic() {
-            Ok(recast(self))
-        } else {
-            Err(self)
-        }
-    }
-
-    /// Forgets that `self` is deterministic.
-    pub fn into_nondeterministic(self) -> LinkedNondeterministic<A, Q, C> {
-        recast(self)
+    pub fn try_into_deterministic(self) -> Result<Det<Self>, Self> {
+        Det::try_new(self)
     }
 
     /// Checks the invariants of the data structure and panics if one is violated:
@@ -494,12 +482,10 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> LinkedTs<A, Q, C, DET> {
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color + PartialEq>
-    LinkedTs<A, (X, Q), C, DET>
-{
+impl<A: Alphabet, Q: Color, C: Color, X: Color + PartialEq> LinkedTs<A, (X, Q), C> {
     /// Drops the first component of the state colors, the inverse of pairing them (see
     /// [`Self::zip_state_indices`]).
-    pub fn unzip_state_color(self) -> LinkedTs<A, Q, C, DET> {
+    pub fn unzip_state_color(self) -> LinkedTs<A, Q, C> {
         LinkedTs {
             alphabet: self.alphabet,
             edges: self.edges,
@@ -524,19 +510,9 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool, X: Color + PartialEq>
     }
 }
 
-/// The non-deterministic linked transition system.
-pub type LinkedNondeterministic<A = CharAlphabet, Q = Void, C = Void> = LinkedTs<A, Q, C, false>;
+impl<A: Alphabet, Q: Color, C: Color> Sproutable for LinkedTs<A, Q, C> {
+    type Storage = Linked;
 
-impl<A: Alphabet, Q: Color, C: Color> Deterministic for LinkedTs<A, Q, C> {
-    /// Scans the out-list of `state` for an edge matching `symbol`; there is no constant-time lookup yet.
-    #[inline]
-    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
-        let position = self.out_edge_position(state, symbol)?;
-        Some(self.edges[position].as_edge_ref())
-    }
-}
-
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for LinkedTs<A, Q, C, DET> {
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         let id = u32::try_from(self.states.len())
             .ok()
@@ -545,85 +521,156 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Sproutable for LinkedTs<A
         self.states.push(LinkedState::new(color));
         id
     }
-    fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
-        match self.state_color_mut(index) {
-            Some(slot) => *slot = color,
-            None => panic!("cannot color state {index}, it does not exist"),
-        }
-    }
-
-    fn add_edge<E>(&mut self, t: E) -> Option<crate::ts::EdgeTuple<Self>>
+    fn add_edge<E>(&mut self, t: E) -> EdgeId
     where
         E: IntoEdgeTuple<Self>,
     {
         let (q, a, c, p) = t.into_edge_tuple();
+        self.insert_edge(q, a, c, p)
+    }
 
-        let mut out = None;
-        if DET && let Some(pos) = self.out_edge_position(q, &a) {
-            trace!("found previously existing edge {pos} in deterministic automaton");
-            out = self.remove_edge(EdgeId::from_usize(pos));
-        }
-        self.insert_edge(q, a, c, p);
-        out
+    fn edge_color_mut(&mut self, id: EdgeId) -> Option<&mut EdgeColor<Self>> {
+        LinkedTs::edge_color_mut(self, id)
+    }
+
+    fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>> {
+        LinkedTs::state_color_mut(self, state)
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for LinkedTs<A, Q, C, DET> {
-    fn remove_edges_from_matching(
-        &mut self,
-        source: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
-        if !self.contains_state(source) {
-            trace!("cannot remove edges from state that does not exist");
-            return None;
-        }
-        let ids = self.out_edge_ids(source, |e| matcher.matches(&self.edges[e].expression));
-        Some(self.remove_edge_ids(ids))
+impl<A: Alphabet, Q: Color, C: Color> Det<LinkedTs<A, Q, C>> {
+    /// The number of edges, tombstones not counted.
+    pub fn edge_count(&self) -> usize {
+        self.0.edge_count()
     }
+
+    /// One more than the largest [`EdgeId`] that was handed out so far.
+    pub fn edge_bound(&self) -> usize {
+        self.0.edge_bound()
+    }
+
+    /// The edge with the given id, if it exists.
+    pub fn edge_by_id(&self, id: EdgeId) -> Option<EdgeOf<'_, Self>> {
+        self.0.edge_by_id(id)
+    }
+
+    /// Gives back the memory of removed states and edges, see [`LinkedTs::compact`]. All previously
+    /// handed out indices and edge ids are invalidated.
+    pub fn compact(&mut self) -> Compaction {
+        self.0.compact()
+    }
+
+    /// Checks the invariants of the data structure and that the system is deterministic, and
+    /// panics if one is violated, see [`LinkedTs::check_consistency`].
+    pub fn check_consistency(&self) {
+        self.0.check_consistency();
+        assert!(
+            self.0.is_deterministic(),
+            "deterministic system is not deterministic"
+        );
+    }
+
+    /// Pairs the color of every state with its index, see [`LinkedTs::zip_state_indices`].
+    pub fn zip_state_indices(self) -> Det<LinkedTs<A, (DefaultIdType, Q), C>> {
+        Det(self.0.zip_state_indices())
+    }
+
+    /// Maps the colors of the states with `state_f`, which also gets the index of the state. Compacts
+    /// first, see [`LinkedTs::linked_map_states`].
+    pub fn linked_map_states<QQ: Color>(
+        self,
+        state_f: impl Fn(StateIndex<Self>, Q) -> QQ,
+    ) -> Det<LinkedTs<A, QQ, C>> {
+        Det(self.0.linked_map_states(state_f))
+    }
+
+    /// Maps the colors of the edges with `color_f`, which gets source, expression, color and target
+    /// of an edge. Compacts first.
+    pub fn linked_map_edge_colors<CC: Color>(
+        self,
+        color_f: impl Fn(
+            StateIndex<Self>,
+            &EdgeExpression<Self>,
+            EdgeColor<Self>,
+            StateIndex<Self>,
+        ) -> CC,
+    ) -> Det<LinkedTs<A, Q, CC>> {
+        Det(self.0.linked_map_edges(|q, e, c, p| {
+            let color = color_f(q, &e, c, p);
+            (e, color)
+        }))
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, X: Color + PartialEq> Det<LinkedTs<A, (X, Q), C>> {
+    /// Drops the first component of the state colors, see [`LinkedTs::unzip_state_color`].
+    pub fn unzip_state_color(self) -> Det<LinkedTs<A, Q, C>> {
+        Det(self.0.unzip_state_color())
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color> Sproutable for Det<LinkedTs<A, Q, C>> {
+    type Storage = Det<Linked>;
+
+    fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
+        self.0.add_state(color)
+    }
+
+    /// Adds the edge and replaces all edges that overlap with it.
+    fn add_edge<E>(&mut self, t: E) -> EdgeId
+    where
+        E: IntoEdgeTuple<Self>,
+    {
+        let (q, a, c, p) = t.into_edge_tuple();
+        let overlapping = self
+            .0
+            .out_edge_ids(q, |e| a.matches(&self.0.edges[e].expression));
+        for id in overlapping {
+            trace!("replacing overlapping edge {id} in deterministic system");
+            self.0.remove_edge(id);
+        }
+        self.0.insert_edge(q, a, c, p)
+    }
+
+    fn edge_color_mut(&mut self, id: EdgeId) -> Option<&mut EdgeColor<Self>> {
+        self.0.edge_color_mut(id)
+    }
+
+    fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>> {
+        self.0.state_color_mut(state)
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color> Deterministic for Det<LinkedTs<A, Q, C>> {
+    /// Scans the out-list of `state` for an edge matching `symbol`; there is no constant-time lookup yet.
+    #[inline]
+    fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
+        let position = self.0.out_edge_position(state, symbol)?;
+        Some(
+            self.0.edges[position]
+                .as_edge_ref()
+                .with_id(EdgeId::from_usize(position)),
+        )
+    }
+}
+
+impl<A: Alphabet> Storage<A> for Det<Linked> {
+    type Ts<QQ: Color, CC: Color> = Det<LinkedTs<A, QQ, CC>>;
+
+    fn try_from_linked<QQ: Color, CC: Color>(
+        ts: LinkedTs<A, QQ, CC>,
+    ) -> Result<Self::Ts<QQ, CC>, LinkedTs<A, QQ, CC>> {
+        Det::try_new(ts)
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color> Shrinkable for LinkedTs<A, Q, C> {
+    fn remove_edge(&mut self, id: EdgeId) -> Option<EdgeTuple<Self>> {
+        LinkedTs::remove_edge(self, id)
+    }
+
     fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor> {
         self.linked_remove_state(state)
-    }
-
-    fn remove_edges_between_matching(
-        &mut self,
-        source: StateIndex<Self>,
-        target: StateIndex<Self>,
-        matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
-        if !self.contains_state(source) || !self.contains_state(target) {
-            trace!("cannot remove edges between states that do not exist");
-            return None;
-        }
-        let ids = self.out_edge_ids(source, |e| {
-            self.edges[e].target == target && matcher.matches(&self.edges[e].expression)
-        });
-        Some(self.remove_edge_ids(ids))
-    }
-
-    fn remove_edges_between(
-        &mut self,
-        source: StateIndex<Self>,
-        target: StateIndex<Self>,
-    ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
-        if !self.contains_state(source) || !self.contains_state(target) {
-            trace!("cannot remove edges between states that do not exist");
-            return None;
-        }
-        let ids = self.out_edge_ids(source, |e| self.edges[e].target == target);
-        Some(self.remove_edge_ids(ids))
-    }
-
-    fn remove_edges_from(
-        &mut self,
-        source: StateIndex<Self>,
-    ) -> Option<Vec<crate::ts::EdgeTuple<Self>>> {
-        if !self.contains_state(source) {
-            trace!("cannot remove edges from state that does not exist");
-            return None;
-        }
-        let ids = self.out_edge_ids(source, |_| true);
-        Some(self.remove_edge_ids(ids))
     }
 
     fn remove_edges_to(
@@ -639,7 +686,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> Shrinkable for LinkedTs<A
     }
 }
 
-impl<Q, C, const DET: bool> LinkedTs<CharAlphabet, Q, C, DET> {
+impl<Q, C> LinkedTs<CharAlphabet, Q, C> {
     /// Returns a transition system builder for a non-deterministic transition system. This should be the main method for the
     /// construction of non-deterministic transition systems on the fly.
     ///
@@ -665,7 +712,14 @@ impl<Q, C, const DET: bool> LinkedTs<CharAlphabet, Q, C, DET> {
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for LinkedTs<A, Q, C, DET> {
+impl<Q, C> Det<LinkedTs<CharAlphabet, Q, C>> {
+    /// Returns a transition system builder, see [`LinkedTs::builder`].
+    pub fn builder() -> Builder<Q, C> {
+        Builder::default()
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color> TransitionSystem for LinkedTs<A, Q, C> {
     type StateIndex = DefaultIdType;
 
     type StateColor = Q;
@@ -703,7 +757,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> TransitionSystem for Link
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> States for LinkedTs<A, Q, C, DET> {
+impl<A: Alphabet, Q: Color, C: Color> States for LinkedTs<A, Q, C> {
     type StatesIter<'this>
         = LinkedStateIndices<'this, Q>
     where
@@ -736,7 +790,7 @@ impl<Q: Color> Iterator for LinkedStateIndices<'_, Q> {
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A> for LinkedTs<A, Q, C, DET> {
+impl<A: Alphabet, Q: Color, C: Color> ForAlphabet<A> for LinkedTs<A, Q, C> {
     fn for_alphabet(alphabet: A) -> Self {
         Self::with_capacity(alphabet, 0)
     }
@@ -751,9 +805,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> ForAlphabet<A> for Linked
     }
 }
 
-impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
-    for LinkedTs<A, Q, C, DET>
-{
+impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for LinkedTs<A, Q, C> {
     type EdgesToIter<'this>
         = LinkedEdgesTo<'this, A::Expression, C>
     where
@@ -768,7 +820,7 @@ impl<A: Alphabet, Q: Color, C: Color, const DET: bool> PredecessorIterable
     }
 }
 
-impl<A: Alphabet, Q, C: Clone + Hash + Eq, const DET: bool> LinkedTs<A, Q, C, DET> {
+impl<A: Alphabet, Q, C: Clone + Hash + Eq> LinkedTs<A, Q, C> {
     /// The edges leaving `q` as a set, to compare systems regardless of the order of their edges.
     fn edge_set(&self, q: u32) -> math::FxIndexSet<(&A::Expression, Cow<'_, C>, u32)>
     where
@@ -787,8 +839,8 @@ impl<A: Alphabet, Q, C: Clone + Hash + Eq, const DET: bool> LinkedTs<A, Q, C, DE
 /// state has the same color and the same set of edges in both. Note that this compares state
 /// indices, so it is not an isomorphism check: systems that differ only by a renaming of the
 /// states are not equal. Removed states and edges are not compared.
-impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Clone + Hash + Debug + Eq, const DET: bool>
-    PartialEq for LinkedTs<A, Q, C, DET>
+impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Clone + Hash + Debug + Eq> PartialEq
+    for LinkedTs<A, Q, C>
 {
     fn eq(&self, other: &Self) -> bool {
         if self.alphabet != other.alphabet {
@@ -813,14 +865,12 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Clone + Hash + Debug + Eq
     }
 }
 
-impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Clone + Hash + Debug + Eq, const DET: bool>
-    Eq for LinkedTs<A, Q, C, DET>
+impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Clone + Hash + Debug + Eq> Eq
+    for LinkedTs<A, Q, C>
 {
 }
 
-impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color, const DET: bool> std::fmt::Debug
-    for LinkedTs<A, Q, C, DET>
-{
+impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color> std::fmt::Debug for LinkedTs<A, Q, C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for q in self.states() {
             write!(f, "{q} : {:?} |", self.state_color(q).unwrap())?;
@@ -842,26 +892,6 @@ impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color, const DET: bool> std::fm
     }
 }
 
-fn recast<A: Alphabet, Q: Color, C: Color, const DET: bool, const OUT_DET: bool>(
-    ts: LinkedTs<A, Q, C, DET>,
-) -> LinkedTs<A, Q, C, OUT_DET> {
-    if !DET && OUT_DET && !ts.is_deterministic() {
-        panic!("cannot convert non-deterministic transition system to deterministic");
-    }
-    let LinkedTs {
-        alphabet,
-        states,
-        edges,
-        live_edges,
-    } = ts;
-    LinkedTs {
-        alphabet,
-        states,
-        edges,
-        live_edges,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::States;
@@ -873,14 +903,14 @@ mod tests {
     #[test]
     fn is_deterministic_compares_all_edge_pairs() {
         // the two edges on 'a' are not adjacent in this edge list
-        let nts = Builder::<_, _, false>::default()
+        let nts = Builder::default()
             .with_state_colors([0, 0, 0])
             .with_edges([(0, 'a', 0u32, 1), (0, 'b', 0, 1), (0, 'a', 0, 2)])
             .into_nts();
         assert!(!nts.is_deterministic());
         assert!(nts.try_into_deterministic().is_err());
 
-        let nts = Builder::<_, _, false>::default()
+        let nts = Builder::default()
             .with_state_colors([0, 0, 0])
             .with_edges([(0, 'a', 0u32, 1), (0, 'b', 0, 1), (1, 'a', 0, 2)])
             .into_nts();
@@ -1016,7 +1046,8 @@ mod tests {
         assert!(ts.remove_edge(crate::ts::EdgeId(0)).is_none());
         assert_eq!(ts.successor(0, 'a'), None);
 
-        assert_eq!(ts.add_edge((0, 'a', 0)), None);
+        ts.add_edge((0, 'a', 0));
+        assert_eq!(ts.successor(0, 'a'), Some(0));
         assert_eq!(
             ts.reachable_state_indices_from(0).collect::<Vec<_>>(),
             vec![0]
@@ -1123,5 +1154,60 @@ mod tests {
             assert_eq!(preds, expected);
         }
         assert!(ts.predecessors(3).is_none());
+    }
+
+    #[test]
+    fn det_replaces_overlapping_edges() {
+        use crate::ts::{Det, Linked, Storage};
+        let mut ts = crate::DTS::for_alphabet(CharAlphabet::of_size(2));
+        ts.add_state(0);
+        ts.add_state(1);
+        let first = ts.add_edge((0, 'a', 7u32, 1));
+        let second = ts.add_edge((0, 'a', 8u32, 0));
+        assert_ne!(first, second);
+        assert_eq!(ts.edge_count(), 1);
+        assert!(ts.edge_by_id(first).is_none());
+        assert_eq!(ts.edge(0, 'a').unwrap().id(), Some(second));
+        assert_eq!(ts.successor(0, 'a'), Some(0));
+        ts.check_consistency();
+
+        // the storage family decides determinism
+        let mut nts = crate::NTS::<CharAlphabet, u32, u32>::for_alphabet(CharAlphabet::of_size(2));
+        nts.add_state(0);
+        nts.add_edge((0, 'a', 1, 0));
+        nts.add_edge((0, 'a', 2, 0));
+        assert_eq!(nts.edge_count(), 2);
+        assert!(<Linked as Storage<CharAlphabet>>::try_from_linked(nts.clone()).is_ok());
+        assert!(<Det<Linked> as Storage<CharAlphabet>>::try_from_linked(nts).is_err());
+    }
+
+    #[test]
+    fn det_shrinks_like_linked() {
+        use crate::ts::EdgeId;
+        let mut ts = tangle(6).try_into_deterministic().unwrap_or_else(|nts| {
+            // the tangle is nondeterministic, keep the first edge per state and symbol
+            let mut det =
+                crate::DTS::<CharAlphabet, u32, u32>::for_alphabet(CharAlphabet::of_size(2));
+            for q in nts.states() {
+                det.add_state(*nts.state_color(q).unwrap());
+            }
+            for q in nts.states() {
+                for e in nts.edges_from(q).unwrap() {
+                    det.add_edge((e.source(), *e.expression(), *e.color(), e.target()));
+                }
+            }
+            det
+        });
+        ts.check_consistency();
+        let total = ts.edge_count();
+        let removed = ts.remove_edges_to(2).unwrap();
+        ts.check_consistency();
+        assert_eq!(ts.edge_count(), total - removed.len());
+        let removed = ts.remove_edges_from_matching(0, 'a');
+        ts.check_consistency();
+        assert!(removed.unwrap().len() <= 1);
+        assert!(ts.remove_state(1).is_some());
+        ts.check_consistency();
+        assert!(ts.remove_edge(EdgeId(1_000_000)).is_none());
     }
 }

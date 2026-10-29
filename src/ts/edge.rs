@@ -1,4 +1,11 @@
 use std::borrow::Cow;
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
+
+use super::EdgeId;
+
+/// The value of the id field of an edge reference that has no [`EdgeId`].
+const NO_ID: u32 = u32::MAX;
 
 /// A reference to an edge of a transition system. This is the single edge type that
 /// [`crate::TransitionSystem::edges_from`] and [`crate::ts::PredecessorIterable::predecessors`] yield, for
@@ -8,12 +15,55 @@ use std::borrow::Cow;
 ///
 /// For predecessors, `source` is the state the edge comes from and `target` the state that was
 /// asked for, so the fields always describe the direction of the edge itself.
-#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+///
+/// Edges of a storage also carry their [`EdgeId`] (see [`EdgeRef::id`]). It is not part of the
+/// identity of the reference: equality, ordering and hashing only look at source, target, expression
+/// and color.
+#[derive(Clone, Debug)]
 pub struct EdgeRef<'a, I, E, C: Clone> {
     source: I,
     target: I,
     expression: &'a E,
     color: Cow<'a, C>,
+    id: u32,
+}
+
+impl<I: PartialEq, E: PartialEq, C: Clone + PartialEq> PartialEq for EdgeRef<'_, I, E, C> {
+    fn eq(&self, other: &Self) -> bool {
+        self.source == other.source
+            && self.target == other.target
+            && self.expression == other.expression
+            && self.color == other.color
+    }
+}
+impl<I: Eq, E: Eq, C: Clone + Eq> Eq for EdgeRef<'_, I, E, C> {}
+impl<I: Hash, E: Hash, C: Clone + Hash> Hash for EdgeRef<'_, I, E, C> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.source.hash(state);
+        self.target.hash(state);
+        self.expression.hash(state);
+        self.color.hash(state);
+    }
+}
+impl<I: PartialOrd, E: PartialOrd, C: Clone + PartialOrd> PartialOrd for EdgeRef<'_, I, E, C> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        (&self.source, &self.target, self.expression, &self.color).partial_cmp(&(
+            &other.source,
+            &other.target,
+            other.expression,
+            &other.color,
+        ))
+    }
+}
+impl<I: Ord, E: Ord, C: Clone + Ord> Ord for EdgeRef<'_, I, E, C> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (&self.source, &self.target, self.expression, &self.color).cmp(&(
+            &other.source,
+            &other.target,
+            other.expression,
+            &other.color,
+        ))
+    }
 }
 
 impl<'a, I, E, C: Clone> EdgeRef<'a, I, E, C> {
@@ -25,7 +75,22 @@ impl<'a, I, E, C: Clone> EdgeRef<'a, I, E, C> {
             target,
             expression,
             color,
+            id: NO_ID,
         }
+    }
+
+    /// Returns the edge with the given id. Storages use this for the edges they hand out.
+    #[inline(always)]
+    pub fn with_id(mut self, id: EdgeId) -> Self {
+        self.id = id.0;
+        self
+    }
+
+    /// The id of the edge in the storage it comes from, or `None` if it does not stand for a stored
+    /// edge (for example because it is an edge of a product).
+    #[inline(always)]
+    pub fn id(&self) -> Option<EdgeId> {
+        (self.id != NO_ID).then_some(EdgeId(self.id))
     }
 
     /// Creates an edge reference that borrows its color.
@@ -94,6 +159,7 @@ impl<'a, I, E, C: Clone> EdgeRef<'a, I, E, C> {
             target: self.target,
             expression: self.expression,
             color,
+            id: self.id,
         }
     }
 
@@ -105,6 +171,7 @@ impl<'a, I, E, C: Clone> EdgeRef<'a, I, E, C> {
             target: f(self.target),
             expression: self.expression,
             color: self.color,
+            id: self.id,
         }
     }
 

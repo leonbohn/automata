@@ -6,7 +6,7 @@
 //! propositions (a [`PropAlphabet`]).
 //!
 //! ```
-//! use automata::{States, TransitionSystem, hoa::{HoaString, WriteHoa}};
+//! use automata::{States, TransitionSystem, hoa::{HoaString, WriteHoa}, ts::{Det, Linked}};
 //!
 //! let text = r#"HOA: v1
 //! States: 2
@@ -26,7 +26,7 @@
 //!
 //! // a string may contain several automata, `pop` removes the first one
 //! let mut hoa = HoaString::from(text.to_string());
-//! let automaton = hoa.pop::<true>().expect("a valid deterministic automaton");
+//! let automaton = hoa.pop::<Det<Linked>>().expect("a valid deterministic automaton");
 //! assert_eq!(automaton.state_count(), 2);
 //!
 //! // convert to a deterministic parity automaton and write it back
@@ -59,8 +59,9 @@ pub use hoars::*;
 use crate::alphabet::PropAlphabet;
 
 /// An omega automaton over a propositional alphabet, as it is obtained from the HOA format. The
-/// constant `DET` indicates whether it is known to be deterministic.
-pub type HoaAutomaton<const DET: bool> = crate::automaton::OmegaAutomaton<PropAlphabet, DET>;
+/// storage `S` decides how it is represented, and with it whether it is known to be deterministic,
+/// see [`input::HoaStorage`].
+pub type HoaAutomaton<S> = crate::automaton::OmegaAutomaton<PropAlphabet, S>;
 
 /// A string that contains HOA automata, one after the other.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -73,8 +74,8 @@ impl HoaString {
     }
 
     /// Removes the first valid automaton from the string and returns it. Parts of the string that
-    /// cannot be parsed as an automaton (or are not deterministic, if `DET` is true) are skipped.
-    pub fn pop<const DET: bool>(&mut self) -> Option<HoaAutomaton<DET>> {
+    /// cannot be parsed as an automaton (or are not deterministic, if `S` is `Det<Linked>`) are skipped.
+    pub fn pop<S: input::HoaStorage>(&mut self) -> Option<HoaAutomaton<S>> {
         const END_LEN: usize = "--END--".len();
         const ABORT_LEN: usize = "--ABORT--".len();
 
@@ -99,7 +100,7 @@ impl HoaString {
                 }
             };
 
-            let parsed = input::parse_omega_automaton_range(&self.0, start, end);
+            let parsed = input::parse_omega_automaton_range::<S>(&self.0, start, end);
             self.0 = self.0[end..].trim_start().to_string();
             match parsed {
                 Ok(automaton) => return Some(automaton),
@@ -150,9 +151,17 @@ mod tests {
         let invalid = "HOA: v1\nStates: 1\nStart: 0\nacc-name: Rabin 1\nAcceptance: 2 Fin(0) & Inf(1)\nAP: 1 \"a\"\n--BODY--\nState: 0\n[t] 0 {0}\n--END--\n";
         let mut hoa = HoaString::from(format!("{one}{invalid}{two}"));
 
-        assert_eq!(hoa.pop::<true>().map(|a| a.state_count()), Some(1));
-        assert_eq!(hoa.pop::<true>().map(|a| a.state_count()), Some(2));
-        assert!(hoa.pop::<true>().is_none());
+        assert_eq!(
+            hoa.pop::<crate::ts::Det<crate::ts::Linked>>()
+                .map(|a| a.state_count()),
+            Some(1)
+        );
+        assert_eq!(
+            hoa.pop::<crate::ts::Det<crate::ts::Linked>>()
+                .map(|a| a.state_count()),
+            Some(2)
+        );
+        assert!(hoa.pop::<crate::ts::Det<crate::ts::Linked>>().is_none());
         assert!(hoa.is_empty());
     }
 
@@ -218,7 +227,7 @@ mod tests {
         [!0] 3
         --END--
         "#;
-        let auts = hoa_to_ts::<true>(hoa);
+        let auts = hoa_to_ts::<crate::ts::Det<crate::ts::Linked>>(hoa);
         assert_eq!(auts.len(), 1);
         let aut = &auts[0];
         assert_eq!(aut.state_count(), 10);

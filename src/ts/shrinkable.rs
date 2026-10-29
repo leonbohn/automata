@@ -2,10 +2,33 @@ use crate::alphabet::Matcher;
 use crate::ts::States;
 use crate::{Pointed, TransitionSystem};
 
-use super::{EdgeExpression, EdgeTuple, StateColor, StateIndex};
+use super::{EdgeExpression, EdgeId, EdgeTuple, StateColor, StateIndex};
 
 /// Encapsulates the ability to remove states, edges, and transitions from a transition system.
 pub trait Shrinkable: States {
+    /// Removes the edge with the given id and returns it, or `None` if there is no such edge
+    /// (because it was removed already or never existed). The ids of all other edges stay valid.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::{
+    ///     alphabet::CharAlphabet,
+    ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
+    ///     DTS,
+    /// };
+    ///
+    /// let mut ts = DTS::for_alphabet(CharAlphabet::of_size(2));
+    /// let q0 = ts.add_state(false);
+    /// let q1 = ts.add_state(true);
+    /// let a = ts.add_edge((q0, 'a', q1));
+    /// let b = ts.add_edge((q0, 'b', q0));
+    /// assert_eq!(ts.remove_edge(a), Some((q0, 'a', automata::Void, q1)));
+    /// assert_eq!(ts.remove_edge(a), None);
+    /// // the id of the other edge is still valid
+    /// assert!(ts.remove_edge(b).is_some());
+    /// ```
+    fn remove_edge(&mut self, id: EdgeId) -> Option<EdgeTuple<Self>>;
+
     /// Removes a state from the transition system and returns the color associated with the removed state.
     /// Returns `None` if the state does not exist.
     ///
@@ -51,7 +74,18 @@ pub trait Shrinkable: States {
         &mut self,
         source: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Vec<EdgeTuple<Self>>>;
+    ) -> Option<Vec<EdgeTuple<Self>>> {
+        let ids: Vec<EdgeId> = self
+            .edges_from(source)?
+            .filter(|e| matcher.matches(e.expression()))
+            .filter_map(|e| e.id())
+            .collect();
+        Some(
+            ids.into_iter()
+                .filter_map(|id| self.remove_edge(id))
+                .collect(),
+        )
+    }
 
     /// Removes all edges between two states whose expression is matched by the given [`Matcher`].
     /// Returns a [`Vec`] of [`EdgeTuple`]s that were removed, if the states exist and `None` otherwise.
@@ -88,7 +122,21 @@ pub trait Shrinkable: States {
         source: StateIndex<Self>,
         target: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
-    ) -> Option<Vec<EdgeTuple<Self>>>;
+    ) -> Option<Vec<EdgeTuple<Self>>> {
+        if !self.contains_state(target) {
+            return None;
+        }
+        let ids: Vec<EdgeId> = self
+            .edges_from(source)?
+            .filter(|e| e.target() == target && matcher.matches(e.expression()))
+            .filter_map(|e| e.id())
+            .collect();
+        Some(
+            ids.into_iter()
+                .filter_map(|id| self.remove_edge(id))
+                .collect(),
+        )
+    }
 
     /// Removes all edges between two states. Returns a [`Vec`] of [`EdgeTuple`]s that were removed, if the states exist and `None` otherwise.
     ///
@@ -117,7 +165,21 @@ pub trait Shrinkable: States {
         &mut self,
         source: StateIndex<Self>,
         target: StateIndex<Self>,
-    ) -> Option<Vec<EdgeTuple<Self>>>;
+    ) -> Option<Vec<EdgeTuple<Self>>> {
+        if !self.contains_state(target) {
+            return None;
+        }
+        let ids: Vec<EdgeId> = self
+            .edges_from(source)?
+            .filter(|e| e.target() == target)
+            .filter_map(|e| e.id())
+            .collect();
+        Some(
+            ids.into_iter()
+                .filter_map(|id| self.remove_edge(id))
+                .collect(),
+        )
+    }
 
     /// Removes all edges originating in a given state. Returns a [`Vec`] of [`EdgeTuple`]s that were removed,
     /// if the state exists and `None` otherwise.
@@ -144,7 +206,14 @@ pub trait Shrinkable: States {
     /// assert_eq!(ts.reached_state_from(q0, "b"), None);
     /// assert_eq!(ts.reached_state_from(q1, "a"), Some(q0));
     /// ```
-    fn remove_edges_from(&mut self, source: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>>;
+    fn remove_edges_from(&mut self, source: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>> {
+        let ids: Vec<EdgeId> = self.edges_from(source)?.filter_map(|e| e.id()).collect();
+        Some(
+            ids.into_iter()
+                .filter_map(|id| self.remove_edge(id))
+                .collect(),
+        )
+    }
 
     /// Removes all edges going into a state. Returns a [`Vec`] of [`EdgeTuple`]s that were removed,
     /// if the state exists and `None` otherwise.

@@ -224,7 +224,7 @@ pub trait IntoTs: States {
     ) -> MooreMachine<DTS<Self::Alphabet, StateColor<Self>, Void>> {
         let (ts, initial) = self.with_initial(state).into_dts_and_initial();
         assert!(ts.state_count() > 0);
-        MooreMachine::from_parts(ts.linked_map_edges(|_, e, _, _| (e, Void)), initial)
+        MooreMachine::from_parts(ts.linked_map_edge_colors(|_, _, _, _| Void), initial)
     }
     /// Turns `self` into a [`MealyMachine`] with state `0` as initial state. State colors are dropped.
     ///

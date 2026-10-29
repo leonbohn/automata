@@ -29,7 +29,7 @@ fn all_fixtures_are_deterministic_parity_automata() {
     for file in files {
         let text = std::fs::read_to_string(&file).expect("readable fixture");
         let automaton = HoaString::from(text)
-            .pop::<true>()
+            .pop::<automata::ts::Det<automata::ts::Linked>>()
             .unwrap_or_else(|| panic!("{} cannot be parsed", file.display()))
             .into_dpa()
             .unwrap_or_else(|e| panic!("{} is not a parity automaton: {e}", file.display()));

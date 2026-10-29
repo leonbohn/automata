@@ -300,7 +300,7 @@ State: 1
 "#;
         let parse = |text: &str| {
             HoaString::from(text.to_string())
-                .pop::<true>()
+                .pop::<crate::ts::Det<crate::ts::Linked>>()
                 .expect("valid HOA")
                 .into_dpa()
                 .expect("a parity automaton")
