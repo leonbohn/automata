@@ -249,10 +249,29 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
         Some(removed)
     }
 
+    /// The edges leaving `state` together with their ids, or `None` if the state does not exist.
+    pub fn edges_with_id_from(
+        &self,
+        state: StateIndex<Self>,
+    ) -> Option<impl Iterator<Item = (EdgeId, EdgeOf<'_, Self>)>> {
+        let first = match self.states.get(state.into_usize())? {
+            LinkedState::Occupied(_, out, _) => *out,
+            LinkedState::Vacant => return None,
+        };
+        let edges = &self.edges;
+        Some(
+            std::iter::successors((first != NONE).then_some(first), move |&id| {
+                let next = edges[id as usize].out_next;
+                (next != NONE).then_some(next)
+            })
+            .map(move |id| (EdgeId(id), edges[id as usize].as_edge_ref())),
+        )
+    }
+
     /// The edge with the given id, if it exists.
     pub fn edge_by_id(&self, id: EdgeId) -> Option<EdgeOf<'_, Self>> {
         let edge = self.edges.get(id.into_usize())?;
-        edge.is_live().then(|| edge.as_edge_ref().with_id(id))
+        edge.is_live().then(|| edge.as_edge_ref())
     }
 
     /// A mutable reference to the color of the edge with the given id, if it exists.
@@ -342,16 +361,28 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
             .collect()
     }
 
-    fn out_edge_position(&self, from: u32, matcher: impl Matcher<A::Expression>) -> Option<usize> {
+    /// The first edge in the out-list of `from` whose expression is matched, with its position.
+    #[inline]
+    fn out_edge_matching(
+        &self,
+        from: u32,
+        matcher: impl Matcher<A::Expression>,
+    ) -> Option<(u32, &LinkedEdge<A::Expression, C>)> {
         let mut idx = self.states.get(from as usize)?.first_out_edge();
         while idx != NONE {
             let edge = &self.edges[idx as usize];
             if matcher.matches(&edge.expression) {
-                return Some(idx as usize);
+                return Some((idx, edge));
             }
             idx = edge.out_next;
         }
         None
+    }
+
+    #[inline]
+    fn out_edge_position(&self, from: u32, matcher: impl Matcher<A::Expression>) -> Option<usize> {
+        self.out_edge_matching(from, matcher)
+            .map(|(idx, _)| idx as usize)
     }
 
     /// Gives back the memory of removed states and edges. States and edges are renumbered
@@ -549,6 +580,14 @@ impl<A: Alphabet, Q: Color, C: Color> Det<LinkedTs<A, Q, C>> {
         self.0.edge_bound()
     }
 
+    /// The edges leaving `state` together with their ids, see [`LinkedTs::edges_with_id_from`].
+    pub fn edges_with_id_from(
+        &self,
+        state: StateIndex<Self>,
+    ) -> Option<impl Iterator<Item = (EdgeId, EdgeOf<'_, Self>)>> {
+        self.0.edges_with_id_from(state)
+    }
+
     /// The edge with the given id, if it exists.
     pub fn edge_by_id(&self, id: EdgeId) -> Option<EdgeOf<'_, Self>> {
         self.0.edge_by_id(id)
@@ -644,12 +683,8 @@ impl<A: Alphabet, Q: Color, C: Color> Deterministic for Det<LinkedTs<A, Q, C>> {
     /// Scans the out-list of `state` for an edge matching `symbol`; there is no constant-time lookup yet.
     #[inline]
     fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
-        let position = self.0.out_edge_position(state, symbol)?;
-        Some(
-            self.0.edges[position]
-                .as_edge_ref()
-                .with_id(EdgeId::from_usize(position)),
-        )
+        let (_, edge) = self.0.out_edge_matching(state, symbol)?;
+        Some(edge.as_edge_ref())
     }
 
     #[inline]
@@ -658,8 +693,8 @@ impl<A: Alphabet, Q: Color, C: Color> Deterministic for Det<LinkedTs<A, Q, C>> {
         state: StateIndex<Self>,
         symbol: SymbolOf<Self>,
     ) -> Option<StateIndex<Self>> {
-        let position = self.0.out_edge_position(state, symbol)?;
-        Some(self.0.edges[position].target)
+        let (_, edge) = self.0.out_edge_matching(state, symbol)?;
+        Some(edge.target)
     }
 }
 
@@ -676,6 +711,19 @@ impl<A: Alphabet> Storage<A> for Det<Linked> {
 impl<A: Alphabet, Q: Color, C: Color> Shrinkable for LinkedTs<A, Q, C> {
     fn remove_edge(&mut self, id: EdgeId) -> Option<EdgeTuple<Self>> {
         LinkedTs::remove_edge(self, id)
+    }
+
+    fn out_edge_ids(
+        &self,
+        source: StateIndex<Self>,
+        mut keep: impl for<'e> FnMut(&EdgeOf<'e, Self>) -> bool,
+    ) -> Option<Vec<EdgeId>> {
+        Some(
+            self.edges_with_id_from(source)?
+                .filter(|(_, e)| keep(e))
+                .map(|(id, _)| id)
+                .collect(),
+        )
     }
 
     fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor> {
@@ -1175,7 +1223,7 @@ mod tests {
         assert_ne!(first, second);
         assert_eq!(ts.edge_count(), 1);
         assert!(ts.edge_by_id(first).is_none());
-        assert_eq!(ts.edge(0, 'a').unwrap().id(), Some(second));
+        assert_eq!(ts.edge_by_id(second).unwrap().target(), 0);
         assert_eq!(ts.successor(0, 'a'), Some(0));
         ts.check_consistency();
 
@@ -1225,7 +1273,7 @@ mod tests {
         use std::mem::size_of;
         // endpoints and four links, all u32
         assert_eq!(size_of::<LinkedEdge<(), ()>>(), 24);
-        assert_eq!(size_of::<LinkedEdge<char, ()>>(), 28);
+        assert_eq!(size_of::<LinkedEdge<char, ()>>(), 32);
         assert_eq!(size_of::<LinkedEdge<char, u32>>(), 32);
     }
 }

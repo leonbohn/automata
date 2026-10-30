@@ -113,6 +113,14 @@ impl<T: Shrinkable> Shrinkable for Det<T> {
         self.0.remove_edge(id)
     }
 
+    fn out_edge_ids(
+        &self,
+        source: StateIndex<Self>,
+        keep: impl for<'e> FnMut(&crate::ts::EdgeOf<'e, Self>) -> bool,
+    ) -> Option<Vec<crate::ts::EdgeId>> {
+        self.0.out_edge_ids(source, keep)
+    }
+
     fn remove_state(&mut self, state: StateIndex<Self>) -> Option<StateColor<Self>> {
         self.0.remove_state(state)
     }

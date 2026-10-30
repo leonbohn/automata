@@ -277,6 +277,14 @@ impl<T: Shrinkable, Sem> Shrinkable for Automaton<T, Sem> {
         self.ts.remove_edge(id)
     }
 
+    fn out_edge_ids(
+        &self,
+        source: StateIndex<Self>,
+        keep: impl for<'e> FnMut(&crate::ts::EdgeOf<'e, Self>) -> bool,
+    ) -> Option<Vec<crate::ts::EdgeId>> {
+        self.ts.out_edge_ids(source, keep)
+    }
+
     fn remove_state(&mut self, q: StateIndex<Self>) -> Option<Self::StateColor> {
         self.ts.remove_state(q)
     }

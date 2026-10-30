@@ -527,9 +527,6 @@ where
         // priority of an edge is stored in a table that is indexed by its id.
         let mut ts = out.clone();
         let mut recoloring: Vec<Option<Int>> = vec![None; out.edge_bound()];
-        let id_of = |e: &crate::ts::EdgeRef<'_, _, _, _>| -> usize {
-            e.id().expect("edges of a storage have an id").into_usize()
-        };
 
         let mut remove_states = Vec::new();
         let mut remove_edges: Vec<EdgeId> = Vec::new();
@@ -545,9 +542,9 @@ where
             for state in remove_states.drain(..) {
                 trace!("removing state {state}");
                 debug_assert!(
-                    ts.edges_from(state)
+                    ts.edges_with_id_from(state)
                         .unwrap()
-                        .all(|e| recoloring[id_of(&e)].is_some()),
+                        .all(|(id, _)| recoloring[id.into_usize()].is_some()),
                     "every edge of a removed state must have been recolored"
                 );
                 assert!(
@@ -568,7 +565,7 @@ where
                 if scc.is_transient() {
                     trace!("scc {:?} is transient", scc);
                     for state in scc.iter() {
-                        for edge in ts.edges_from(*state).unwrap() {
+                        for (id, edge) in ts.edges_with_id_from(*state).unwrap() {
                             trace!(
                                 "recoloring and removing {state:?} --{}|{}--> {:?} with priority {}",
                                 edge.expression().show(),
@@ -576,8 +573,8 @@ where
                                 edge.target(),
                                 priority
                             );
-                            recoloring[id_of(&edge)] = Some(priority);
-                            remove_edges.push(edge.id().expect("edges of a storage have an id"));
+                            recoloring[id.into_usize()] = Some(priority);
+                            remove_edges.push(id);
                         }
                         remove_states.push(*state);
                     }
@@ -587,7 +584,7 @@ where
                 // the edges leaving the scc get the current priority, the others are interior
                 let mut minimal_interior_edge_color = None;
                 for q in scc.iter() {
-                    for edge in ts.edges_from(*q).unwrap() {
+                    for (id, edge) in ts.edges_with_id_from(*q).unwrap() {
                         if scc.contains(&edge.target()) {
                             let color = *edge.color();
                             minimal_interior_edge_color = Some(
@@ -599,7 +596,7 @@ where
                                 edge.expression().show(),
                                 edge.target()
                             );
-                            recoloring[id_of(&edge)] = Some(priority);
+                            recoloring[id.into_usize()] = Some(priority);
                         }
                     }
                 }
@@ -615,7 +612,7 @@ where
                     "minimal interior priority: {minimal_interior_edge_color}, recoloring edges"
                 );
                 for q in scc.iter() {
-                    for edge in ts.edges_from(*q).unwrap() {
+                    for (id, edge) in ts.edges_with_id_from(*q).unwrap() {
                         if scc.contains(&edge.target())
                             && *edge.color() == minimal_interior_edge_color
                         {
@@ -626,8 +623,8 @@ where
                                 edge.target(),
                                 priority
                             );
-                            recoloring[id_of(&edge)] = Some(priority);
-                            remove_edges.push(edge.id().expect("edges of a storage have an id"));
+                            recoloring[id.into_usize()] = Some(priority);
+                            remove_edges.push(id);
                         }
                     }
                 }

@@ -11,6 +11,7 @@ pub(super) const NONE: u32 = u32::MAX;
 /// A removed edge stays in the edge vector as a tombstone (`source == NONE`) so that the ids of all
 /// other edges stay valid. A tombstone is not part of any list.
 #[derive(Clone, Eq, PartialEq, Hash)]
+#[repr(align(8))]
 pub(super) struct LinkedEdge<E, C> {
     pub(super) source: u32,
     pub(super) target: u32,

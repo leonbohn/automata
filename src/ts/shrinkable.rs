@@ -29,6 +29,15 @@ pub trait Shrinkable: States {
     /// ```
     fn remove_edge(&mut self, id: EdgeId) -> Option<EdgeTuple<Self>>;
 
+    /// The ids of the edges leaving `source` for which `keep` returns `true`, or `None` if the
+    /// state does not exist. Edge references do not carry their id, so the provided `remove_edges_*`
+    /// methods use this to find what to remove.
+    fn out_edge_ids(
+        &self,
+        source: StateIndex<Self>,
+        keep: impl for<'e> FnMut(&super::EdgeOf<'e, Self>) -> bool,
+    ) -> Option<Vec<EdgeId>>;
+
     /// Removes a state from the transition system and returns the color associated with the removed state.
     /// Returns `None` if the state does not exist.
     ///
@@ -75,11 +84,7 @@ pub trait Shrinkable: States {
         source: StateIndex<Self>,
         matcher: impl Matcher<EdgeExpression<Self>>,
     ) -> Option<Vec<EdgeTuple<Self>>> {
-        let ids: Vec<EdgeId> = self
-            .edges_from(source)?
-            .filter(|e| matcher.matches(e.expression()))
-            .filter_map(|e| e.id())
-            .collect();
+        let ids = self.out_edge_ids(source, |e| matcher.matches(e.expression()))?;
         Some(
             ids.into_iter()
                 .filter_map(|id| self.remove_edge(id))
@@ -126,11 +131,9 @@ pub trait Shrinkable: States {
         if !self.contains_state(target) {
             return None;
         }
-        let ids: Vec<EdgeId> = self
-            .edges_from(source)?
-            .filter(|e| e.target() == target && matcher.matches(e.expression()))
-            .filter_map(|e| e.id())
-            .collect();
+        let ids = self.out_edge_ids(source, |e| {
+            e.target() == target && matcher.matches(e.expression())
+        })?;
         Some(
             ids.into_iter()
                 .filter_map(|id| self.remove_edge(id))
@@ -169,11 +172,7 @@ pub trait Shrinkable: States {
         if !self.contains_state(target) {
             return None;
         }
-        let ids: Vec<EdgeId> = self
-            .edges_from(source)?
-            .filter(|e| e.target() == target)
-            .filter_map(|e| e.id())
-            .collect();
+        let ids = self.out_edge_ids(source, |e| e.target() == target)?;
         Some(
             ids.into_iter()
                 .filter_map(|id| self.remove_edge(id))
@@ -207,7 +206,7 @@ pub trait Shrinkable: States {
     /// assert_eq!(ts.reached_state_from(q1, "a"), Some(q0));
     /// ```
     fn remove_edges_from(&mut self, source: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>> {
-        let ids: Vec<EdgeId> = self.edges_from(source)?.filter_map(|e| e.id()).collect();
+        let ids = self.out_edge_ids(source, |_| true)?;
         Some(
             ids.into_iter()
                 .filter_map(|id| self.remove_edge(id))
