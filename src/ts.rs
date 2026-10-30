@@ -63,6 +63,11 @@ pub mod run;
 pub mod predecessors;
 
 mod word_as_ts;
+
+/// Naive reference model for model-based tests of the storages.
+#[cfg(test)]
+mod model;
+
 pub use crate::ts::predecessors::PredecessorIterable;
 pub use word_as_ts::WordTs;
 
