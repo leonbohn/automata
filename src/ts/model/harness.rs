@@ -7,6 +7,8 @@
 //! unknown ids, the selector one past the last live item resolves to something that does not
 //! exist, which exercises the `None` paths of the storage.
 
+mod round_trip;
+
 use std::collections::HashMap;
 
 use crate::{
@@ -972,6 +974,28 @@ mod tests {
                 .run(&ops);
             harness.complete(&fill);
             harness.assert_equivalence_agrees();
+        }
+
+        #[test]
+        fn linked_ts_round_trips(ops in proptest::collection::vec(op(), 0..60)) {
+            let ts = Linked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            let harness = Harness::new(ts, Linked::check_consistency)
+                .with_compaction(compact_linked)
+                .run(&ops);
+            harness.assert_round_trip_via::<Linked>();
+            if harness.model.is_deterministic() {
+                harness.assert_round_trip_via::<DetLinked>();
+            }
+        }
+
+        #[test]
+        fn det_linked_ts_round_trips(ops in proptest::collection::vec(op(), 0..60)) {
+            let ts = DetLinked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            let harness = Harness::new_deterministic(ts, DetLinked::check_consistency)
+                .with_compaction(compact_det)
+                .run(&ops);
+            harness.assert_round_trip_via::<Linked>();
+            harness.assert_round_trip_via::<DetLinked>();
         }
 
         #[test]

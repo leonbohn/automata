@@ -339,6 +339,17 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
         classes
     }
 
+    /// Whether no state has two edges with the same symbol.
+    pub fn is_deterministic(&self) -> bool {
+        self.states().into_iter().all(|q| {
+            let edges = self.edges_from(q).expect("state exists");
+            edges
+                .iter()
+                .enumerate()
+                .all(|(i, e)| edges[i + 1..].iter().all(|f| f.symbol != e.symbol))
+        })
+    }
+
     /// The edge leaving `state` with `symbol`, in a deterministic model.
     fn edge_on(&self, state: usize, symbol: usize) -> Option<ModelEdge<C>> {
         let mut edges = self
