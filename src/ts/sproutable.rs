@@ -95,8 +95,8 @@ pub trait Sproutable: States {
     fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>>;
 
     /// Applies `f` to the color of every edge, in place and without touching the structure. This
-    /// is the owned counterpart of [`TransitionSystem::map_edge_colors`] for maps that keep the
-    /// type of the color, like [`Vec::iter_mut`] is for `into_iter().map().collect()`.
+    /// is the owned counterpart of [`TransitionSystem::map_edge_colors`](crate::ts::TransitionSystem::map_edge_colors) for maps that keep the
+    /// type of the color, like `iter_mut` is for `into_iter().map().collect()` on a `Vec`.
     ///
     /// # Example
     /// ```
