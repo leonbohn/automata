@@ -223,12 +223,14 @@ impl<'ts, T: Deterministic, W: Word<Symbol = SymbolOf<T>>> Run<'ts, T, W> {
     }
 
     /// Executes the run and returns what the observer `O` has collected, or `None` if the run
-    /// escapes the transition system.
+    /// escapes the transition system. A run that starts in a state that does not exist escapes,
+    /// even on the empty word.
     #[inline]
     pub fn observe<O: Observer<T>>(self) -> Option<O::Current>
     where
         W::Kind: RunKind<T, W>,
     {
+        self.ts.state_color(self.start)?;
         <W::Kind as RunKind<T, W>>::run::<O>(self.ts, self.start, &self.word).ok()
     }
 
@@ -789,6 +791,18 @@ mod tests {
             dts.run(&w1).escape_prefix(),
             Some(EscapePrefix::new(&w1, 2))
         );
+    }
+
+    #[test]
+    fn run_from_missing_state_escapes_even_on_the_empty_word() {
+        let dts = Builder::without_colors()
+            .with_transitions([(0, 'a', 1), (1, 'a', 0)])
+            .into_dts_with_initial(0);
+
+        assert_eq!(dts.reached_state_from(0, ""), Some(0));
+        assert_eq!(dts.reached_state_from(7, ""), None);
+        assert_eq!(dts.reached_state_from(7, "a"), None);
+        assert!(!dts.run_from(7, "").is_successful());
     }
 
     #[test]
