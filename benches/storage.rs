@@ -1,7 +1,8 @@
-//! The same operations on the two storages for deterministic systems over a [`CharAlphabet`]:
-//! `Det<LinkedTs>` (`DTS`, benchmarks ending in `_linked`) and `DenseTs` (`_dense`). Every
-//! operation is written once, generic over the storage, and instantiated for both, so the two
-//! numbers of a pair always measure the same work on the same input.
+//! The same operations on the storages for deterministic systems over a [`CharAlphabet`]:
+//! `Det<LinkedTs>` (`DTS`, benchmarks ending in `_linked`), `DenseTs` (`_dense`) and the read-only
+//! `CsrTs` (`_csr`, only for the operations that do not change the system). Every operation is
+//! written once, generic over the storage, and instantiated for each, so the numbers of a group
+//! always measure the same work on the same input.
 
 mod common;
 
@@ -9,7 +10,7 @@ use automata::alphabet::{Alphabet, CharAlphabet};
 use automata::automaton::DFA;
 use automata::ts::operations::{MatchingProduct, ProductIndex};
 use automata::ts::{
-    DenseTs, Deterministic, ForAlphabet, PredecessorIterable, Shrinkable, Sproutable,
+    CsrTs, DenseTs, Deterministic, ForAlphabet, PredecessorIterable, Shrinkable, Sproutable,
 };
 use automata::{DTS, States, TransitionSystem, Void};
 use gungraun::{Dhat, prelude::*};
@@ -17,30 +18,33 @@ use std::hint::black_box;
 
 type Linked = DTS<CharAlphabet, bool, Void>;
 type Dense = DenseTs<CharAlphabet, bool, Void>;
+type Csr = CsrTs<CharAlphabet, bool, Void>;
 
-/// What the operations need from a storage.
-trait Storage:
-    Sproutable<Alphabet = CharAlphabet, StateColor = bool, EdgeColor = Void>
-    + ForAlphabet<CharAlphabet>
-    + TransitionSystem<StateIndex = u32>
+/// What the operations that only read need from a storage.
+trait ReadOnly:
+    TransitionSystem<Alphabet = CharAlphabet, StateColor = bool, EdgeColor = Void, StateIndex = u32>
     + Deterministic
-    + Shrinkable
     + PredecessorIterable
     + States
     + Clone
 {
 }
-impl<T> Storage for T where
-    T: Sproutable<Alphabet = CharAlphabet, StateColor = bool, EdgeColor = Void>
-        + ForAlphabet<CharAlphabet>
-        + TransitionSystem<StateIndex = u32>
-        + Deterministic
-        + Shrinkable
+impl<T> ReadOnly for T where
+    T: TransitionSystem<
+            Alphabet = CharAlphabet,
+            StateColor = bool,
+            EdgeColor = Void,
+            StateIndex = u32,
+        > + Deterministic
         + PredecessorIterable
         + States
         + Clone
 {
 }
+
+/// What the operations that change the system need from a storage.
+trait Storage: ReadOnly + Sproutable + ForAlphabet<CharAlphabet> + Shrinkable {}
+impl<T> Storage for T where T: ReadOnly + Sproutable + ForAlphabet<CharAlphabet> + Shrinkable {}
 
 // ---- inputs ------------------------------------------------------------------------------------
 //
@@ -56,6 +60,9 @@ fn scrambled_linked(n: usize, k: usize) -> Linked {
 }
 fn scrambled_dense(n: usize, k: usize) -> Dense {
     convert(&common::scrambled(n, k))
+}
+fn scrambled_csr(n: usize, k: usize) -> Csr {
+    Csr::from_ts(&common::scrambled(n, k))
 }
 
 type EdgeList = (usize, usize, Vec<(u32, char, u32)>);
@@ -116,6 +123,9 @@ fn word(len: usize) -> Vec<char> {
 fn with_word_linked(n: usize) -> (Linked, Vec<char>) {
     (common::scrambled(n, 2), word(100_000))
 }
+fn with_word_csr(n: usize) -> (Csr, Vec<char>) {
+    (scrambled_csr(n, 2), word(100_000))
+}
 fn with_word_dense(n: usize) -> (Dense, Vec<char>) {
     (scrambled_dense(n, 2), word(100_000))
 }
@@ -127,6 +137,9 @@ fn short_words(count: usize) -> Vec<Vec<char>> {
 }
 fn with_words_linked(n: usize) -> (Linked, Vec<Vec<char>>) {
     (common::scrambled(n, 2), short_words(1_000))
+}
+fn with_words_csr(n: usize) -> (Csr, Vec<Vec<char>>) {
+    (scrambled_csr(n, 2), short_words(1_000))
 }
 fn with_words_dense(n: usize) -> (Dense, Vec<Vec<char>>) {
     (scrambled_dense(n, 2), short_words(1_000))
@@ -158,6 +171,17 @@ fn product_dense(n: usize) -> (Dense, Dense, Queries) {
     )
 }
 
+fn product_csr(n: usize) -> (Csr, Csr, Queries) {
+    (
+        scrambled_csr(n, 2),
+        Csr::from_ts(&common::counter(n, 2)),
+        product_queries(n),
+    )
+}
+
+fn redundant_csr(n: usize) -> Csr {
+    Csr::from_ts(&common::redundant_counter(n, 2))
+}
 fn redundant_linked(n: usize) -> Linked {
     common::redundant_counter(n, 2)
 }
@@ -182,7 +206,7 @@ fn overwrite_all<T: Storage>(input: EdgeList) -> T {
     ts
 }
 
-fn successors<T: Storage>(ts: &T, k: usize) -> u64 {
+fn successors<T: ReadOnly>(ts: &T, k: usize) -> u64 {
     let symbols = common::symbols(k);
     let mut sum = 0u64;
     for q in ts.states() {
@@ -193,7 +217,7 @@ fn successors<T: Storage>(ts: &T, k: usize) -> u64 {
     black_box(sum)
 }
 
-fn edges_from<T: Storage>(ts: &T) -> usize {
+fn edges_from<T: ReadOnly>(ts: &T) -> usize {
     black_box(
         ts.states()
             .map(|q| ts.edges_from(q).map_or(0, |e| e.count()))
@@ -201,7 +225,7 @@ fn edges_from<T: Storage>(ts: &T) -> usize {
     )
 }
 
-fn predecessors<T: Storage>(ts: &T) -> usize {
+fn predecessors<T: ReadOnly>(ts: &T) -> usize {
     black_box(
         ts.states()
             .map(|q| ts.predecessors(q).map_or(0, |p| p.count()))
@@ -209,15 +233,15 @@ fn predecessors<T: Storage>(ts: &T) -> usize {
     )
 }
 
-fn reachable<T: Storage>(ts: &T) -> usize {
+fn reachable<T: ReadOnly>(ts: &T) -> usize {
     black_box(ts.reachable_state_indices_from(0).count())
 }
 
-fn run_one_word<T: Storage>((ts, word): &(T, Vec<char>)) -> u64 {
+fn run_one_word<T: ReadOnly>((ts, word): &(T, Vec<char>)) -> u64 {
     black_box(ts.reached_state_from(0, word.as_slice()).unwrap_or(0) as u64)
 }
 
-fn run_many_words<T: Storage>((ts, words): &(T, Vec<Vec<char>>)) -> u64 {
+fn run_many_words<T: ReadOnly>((ts, words): &(T, Vec<Vec<char>>)) -> u64 {
     black_box(
         words
             .iter()
@@ -226,7 +250,7 @@ fn run_many_words<T: Storage>((ts, words): &(T, Vec<Vec<char>>)) -> u64 {
     )
 }
 
-fn product_successors<T: Storage>((l, r, queries): &(T, T, Queries)) -> usize {
+fn product_successors<T: ReadOnly>((l, r, queries): &(T, T, Queries)) -> usize {
     let product = MatchingProduct(&l, &r);
     black_box(
         queries
@@ -236,7 +260,7 @@ fn product_successors<T: Storage>((l, r, queries): &(T, T, Queries)) -> usize {
     )
 }
 
-fn minimize<T: Storage>(ts: &T) -> usize {
+fn minimize<T: ReadOnly>(ts: &T) -> usize {
     black_box(DFA::from_parts(ts, 0).minimize().state_count())
 }
 
@@ -253,7 +277,7 @@ fn remove_states<T: Storage>(mut ts: T) -> T {
     ts
 }
 
-fn clone_ts<T: Storage>(ts: T) -> (T, T) {
+fn clone_ts<T: Clone>(ts: T) -> (T, T) {
     let copy = black_box(ts.clone());
     (ts, copy)
 }
@@ -431,6 +455,72 @@ fn clone_dense(ts: Dense) -> (Dense, Dense) {
     clone_ts(ts)
 }
 
+#[library_benchmark]
+#[bench::k2_2000(args = (2_000, 2), setup = scrambled_csr)]
+#[bench::k8_2000(args = (2_000, 8), setup = scrambled_csr)]
+fn successor_all_pairs_csr(ts: Csr) -> (Csr, u64) {
+    let k = ts.alphabet().size();
+    let sum = successors(&ts, k);
+    (ts, sum)
+}
+
+#[library_benchmark]
+#[bench::k2_2000(args = (2_000, 2), setup = scrambled_csr)]
+#[bench::k8_2000(args = (2_000, 8), setup = scrambled_csr)]
+fn edges_from_all_states_csr(ts: Csr) -> (Csr, usize) {
+    let result = edges_from(&ts);
+    (ts, result)
+}
+
+#[library_benchmark]
+#[bench::k2_2000(args = (2_000, 2), setup = scrambled_csr)]
+fn predecessors_of_all_states_csr(ts: Csr) -> (Csr, usize) {
+    let result = predecessors(&ts);
+    (ts, result)
+}
+
+#[library_benchmark]
+#[bench::k2_8000(args = (8_000, 2), setup = scrambled_csr)]
+fn reachable_states_csr(ts: Csr) -> (Csr, usize) {
+    let result = reachable(&ts);
+    (ts, result)
+}
+
+#[library_benchmark]
+#[bench::len_100000(args = (1_000), setup = with_word_csr)]
+fn run_one_word_csr(input: (Csr, Vec<char>)) -> ((Csr, Vec<char>), u64) {
+    let result = run_one_word(&input);
+    (input, result)
+}
+
+#[library_benchmark]
+#[bench::count_1000(args = (1_000), setup = with_words_csr)]
+fn run_many_words_csr(input: (Csr, Vec<Vec<char>>)) -> ((Csr, Vec<Vec<char>>), u64) {
+    let result = run_many_words(&input);
+    (input, result)
+}
+
+#[library_benchmark]
+#[bench::n200(args = (200), setup = product_csr)]
+fn product_successor_csr(input: (Csr, Csr, Queries)) -> ((Csr, Csr, Queries), usize) {
+    let result = product_successors(&input);
+    (input, result)
+}
+
+#[library_benchmark]
+#[bench::redundant_2000(args = (2_000), setup = redundant_csr)]
+#[bench::redundant_8000(args = (8_000), setup = redundant_csr)]
+fn minimize_csr(ts: Csr) -> (Csr, usize) {
+    let result = minimize(&ts);
+    (ts, result)
+}
+
+#[library_benchmark]
+#[bench::k2_10000(args = (10_000, 2), setup = scrambled_csr)]
+fn clone_csr(ts: Csr) -> (Csr, Csr) {
+    clone_ts(ts)
+}
+
 library_benchmark_group!(
     name = storage;
     benchmarks =
@@ -446,7 +536,10 @@ library_benchmark_group!(
         minimize_linked, minimize_dense,
         complete_linked, complete_dense,
         remove_state_linked, remove_state_dense,
-        clone_linked, clone_dense
+        clone_linked, clone_dense,
+        successor_all_pairs_csr, edges_from_all_states_csr, predecessors_of_all_states_csr,
+        reachable_states_csr, run_one_word_csr, run_many_words_csr, product_successor_csr,
+        minimize_csr, clone_csr
 );
 
 main!(

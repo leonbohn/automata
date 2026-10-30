@@ -22,7 +22,7 @@ There are three layers:
 |---|---|
 | `scc` | Strongly connected components (iterative and recursive Tarjan, Kosaraju) on rings, paths, trees, grids, chains of cycles, irregular graphs |
 | `ts` | Building a transition system edge by edge and with the builder, edge lookup, products, reachability, minimal representatives, predecessors, `clone`/`collect`/`map_edge_colors`, removing edges and states, subset construction |
-| `storage` | The same operations on `Det<LinkedTs>` and on `DenseTs` (benchmarks ending in `_linked` and `_dense`): building, overwriting, successor and edge lookup, predecessors, reachability, runs, products, minimization, completion, removing states, `clone` |
+| `storage` | The same operations on `Det<LinkedTs>`, `DenseTs` and the read-only `CsrTs` (benchmarks ending in `_linked`, `_dense` and `_csr`, the latter only for operations that do not change the system): building, overwriting, successor and edge lookup, predecessors, reachability, runs, products, minimization, completion, removing states, `clone` |
 | `runs` | Runs of finite words (one long word, many short ones), runs of lassos, infinity sets (recurrent edge colors and states), visited sequences, on synthetic and on fixture automata |
 | `dfa` | Minimization (Hopcroft/Moore, with and without edge colors), union, intersection, complement, emptiness and witness, equivalence |
 | `dpa` | Normalization, complement, accepted/rejected words, witnesses per priority, equivalence/inclusion/counterexamples, SCCs, prefix partition, HOA parsing and printing |

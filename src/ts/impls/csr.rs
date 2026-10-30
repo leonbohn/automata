@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// The sentinel that stands for "no edge" in the target slots of [`CsrTs`].
-const NONE: DefaultIdType = DefaultIdType::MAX;
+pub(super) const NONE: DefaultIdType = DefaultIdType::MAX;
 
 /// A deterministic transition system over an [`IndexedAlphabet`] that cannot be changed after it
 /// has been built, and keeps everything in a few flat vectors.
@@ -20,7 +20,7 @@ const NONE: DefaultIdType = DefaultIdType::MAX;
 /// Like [`DenseTs`](crate::ts::DenseTs), the edge leaving state `q` on the symbol with index `a` is
 /// in slot `q * k + a` of a table (and has this slot as its [`EdgeId`]), so a lookup is one index
 /// computation and a load. The incoming edges are stored in compressed sparse row form: the slots
-/// that lead to state `p` are `in_slots[in_offsets[p]..in_offsets[p + 1]]`, in increasing order.
+/// that lead to a state are listed in increasing order, see `ReverseCsr`.
 /// Compared to the growable storages there are no tombstones, no links and one allocation per
 /// vector instead of one per state.
 ///
@@ -32,10 +32,63 @@ pub struct CsrTs<A: IndexedAlphabet = CharAlphabet, Q = Void, C = Void> {
     states: Vec<Q>,
     targets: Vec<DefaultIdType>,
     colors: Vec<Option<C>>,
-    /// For every state, the position of its first incoming slot in `in_slots`; one entry more
-    /// than there are states.
-    in_offsets: Vec<DefaultIdType>,
-    in_slots: Vec<DefaultIdType>,
+    incoming: ReverseCsr,
+}
+
+/// The incoming edges of the states of a deterministic table in compressed sparse row form: the
+/// slots that lead to state `p` are `slots[offsets[p]..offsets[p + 1]]`, in increasing order.
+#[derive(Clone, Debug)]
+pub(super) struct ReverseCsr {
+    offsets: Vec<DefaultIdType>,
+    slots: Vec<DefaultIdType>,
+}
+
+impl ReverseCsr {
+    /// Collects the slots of the `n` states whose targets are given, where `NONE` marks an empty
+    /// slot, in O(number of slots).
+    pub(super) fn build(targets: &[DefaultIdType], n: usize) -> Self {
+        let mut offsets = vec![0 as DefaultIdType; n + 1];
+        for target in targets.iter().filter(|t| **t != NONE) {
+            offsets[*target as usize + 1] += 1;
+        }
+        for p in 0..n {
+            offsets[p + 1] += offsets[p];
+        }
+        let mut fill = offsets.clone();
+        let mut slots = vec![NONE; offsets[n] as usize];
+        for (slot, target) in targets.iter().enumerate() {
+            if *target != NONE {
+                slots[fill[*target as usize] as usize] = slot as DefaultIdType;
+                fill[*target as usize] += 1;
+            }
+        }
+        Self { offsets, slots }
+    }
+
+    /// The slots that lead to state `p`.
+    #[inline]
+    pub(super) fn to_state(&self, p: usize) -> &[DefaultIdType] {
+        &self.slots[self.offsets[p] as usize..self.offsets[p + 1] as usize]
+    }
+
+    /// Panics unless this is the table of the given targets. If `stale` is set, it may also list
+    /// slots that no longer lead to the state, as left behind by removing edges.
+    pub(super) fn check_against(&self, targets: &[DefaultIdType], n: usize, stale: bool) {
+        assert_eq!(self.offsets.len(), n + 1, "wrong number of offsets");
+        for p in 0..n {
+            let expected: Vec<_> = (0..targets.len())
+                .filter(|slot| targets[*slot] as usize == p)
+                .map(|slot| slot as DefaultIdType)
+                .collect();
+            let listed: Vec<_> = self
+                .to_state(p)
+                .iter()
+                .copied()
+                .filter(|slot| !stale || targets[*slot as usize] as usize == p)
+                .collect();
+            assert_eq!(listed, expected, "wrong incoming edges of state {p}");
+        }
+    }
 }
 
 impl<A: IndexedAlphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
@@ -64,41 +117,23 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
         let mut states = Vec::with_capacity(n);
         let mut targets = vec![NONE; n * k];
         let mut colors = vec![None; n * k];
-        let mut in_degree = vec![0 as DefaultIdType; n + 1];
         for (q, i) in renaming.iter() {
             states.push(ts.state_color(*q).expect("state exists").into_owned());
             for edge in ts.edges_from(*q).expect("state exists") {
                 let slot = *i as usize * k + alphabet.expression_to_index(edge.expression());
                 let target = renaming[&edge.target()];
-                if targets[slot] != NONE {
-                    in_degree[targets[slot] as usize] -= 1;
-                }
                 targets[slot] = target;
                 colors[slot] = Some(edge.color().clone());
-                in_degree[target as usize] += 1;
             }
         }
 
-        // the offsets are the prefix sums of the in-degrees
-        let mut in_offsets = vec![0; n + 1];
-        for p in 0..n {
-            in_offsets[p + 1] = in_offsets[p] + in_degree[p];
-        }
-        let mut fill = in_offsets.clone();
-        let mut in_slots = vec![NONE; in_offsets[n] as usize];
-        for (slot, target) in targets.iter().enumerate() {
-            if *target != NONE {
-                in_slots[fill[*target as usize] as usize] = slot as DefaultIdType;
-                fill[*target as usize] += 1;
-            }
-        }
+        let incoming = ReverseCsr::build(&targets, n);
         Self {
             alphabet,
             states,
             targets,
             colors,
-            in_offsets,
-            in_slots,
+            incoming,
         }
     }
 
@@ -134,13 +169,6 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
         let n = self.states.len();
         assert_eq!(self.targets.len(), n * k, "wrong number of target slots");
         assert_eq!(self.colors.len(), n * k, "wrong number of color slots");
-        assert_eq!(self.in_offsets.len(), n + 1, "wrong number of offsets");
-        assert_eq!(self.in_offsets[0], 0, "offsets do not start at 0");
-        assert_eq!(
-            self.in_offsets[n] as usize,
-            self.in_slots.len(),
-            "offsets do not end at the number of incoming edges"
-        );
         for (slot, target) in self.targets.iter().enumerate() {
             assert_eq!(
                 self.colors[slot].is_some(),
@@ -152,18 +180,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
                 "edge {slot} leads to a state that does not exist"
             );
         }
-        for p in 0..n {
-            let range = self.in_offsets[p] as usize..self.in_offsets[p + 1] as usize;
-            let expected: Vec<_> = (0..n * k)
-                .filter(|slot| self.targets[*slot] as usize == p)
-                .map(|slot| slot as DefaultIdType)
-                .collect();
-            assert_eq!(
-                &self.in_slots[range],
-                expected.as_slice(),
-                "wrong incoming edges of state {p}"
-            );
-        }
+        self.incoming.check_against(&self.targets, n, false);
     }
 }
 
@@ -321,8 +338,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> PredecessorIterable for CsrTs<A, Q,
         let p = state as usize;
         (p < self.states.len()).then(|| CsrEdgesTo {
             ts: self,
-            slots: self.in_slots[self.in_offsets[p] as usize..self.in_offsets[p + 1] as usize]
-                .iter(),
+            slots: self.incoming.to_state(p).iter(),
         })
     }
 }
