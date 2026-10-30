@@ -496,6 +496,20 @@ impl<A: Alphabet, Q: Color, C: Color> Sproutable for LinkedTs<A, Q, C> {
     fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>> {
         LinkedTs::state_color_mut(self, state)
     }
+
+    fn map_edge_colors_in_place(&mut self, mut f: impl FnMut(&mut EdgeColor<Self>)) {
+        for edge in self.edges.iter_mut().filter(|e| e.is_live()) {
+            f(&mut edge.color);
+        }
+    }
+
+    fn map_state_colors_in_place(&mut self, mut f: impl FnMut(&mut StateColor<Self>)) {
+        for state in self.states.iter_mut() {
+            if let Some(color) = state.color_mut() {
+                f(color);
+            }
+        }
+    }
 }
 
 impl<A: Alphabet, Q: Color, C: Color> Det<LinkedTs<A, Q, C>> {
@@ -585,6 +599,14 @@ impl<A: Alphabet, Q: Color, C: Color> Sproutable for Det<LinkedTs<A, Q, C>> {
 
     fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>> {
         self.0.state_color_mut(state)
+    }
+
+    fn map_edge_colors_in_place(&mut self, f: impl FnMut(&mut EdgeColor<Self>)) {
+        self.0.map_edge_colors_in_place(f)
+    }
+
+    fn map_state_colors_in_place(&mut self, f: impl FnMut(&mut StateColor<Self>)) {
+        self.0.map_state_colors_in_place(f)
     }
 }
 

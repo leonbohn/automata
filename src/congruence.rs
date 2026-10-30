@@ -323,6 +323,14 @@ impl<T: Sproutable> Sproutable for RightCongruence<T> {
         self.invalidate();
         self.ts.state_color_mut(state)
     }
+    fn map_edge_colors_in_place(&mut self, f: impl FnMut(&mut crate::ts::EdgeColor<Self>)) {
+        self.invalidate();
+        self.ts.map_edge_colors_in_place(f)
+    }
+    fn map_state_colors_in_place(&mut self, f: impl FnMut(&mut StateColor<Self>)) {
+        self.invalidate();
+        self.ts.map_state_colors_in_place(f)
+    }
 }
 
 impl<T: Shrinkable> Shrinkable for RightCongruence<T> {

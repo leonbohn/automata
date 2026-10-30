@@ -94,6 +94,25 @@ pub trait Sproutable: States {
     /// A mutable reference to the color of the given state, or `None` if there is no such state.
     fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>>;
 
+    /// Applies `f` to the color of every edge, in place and without touching the structure. This
+    /// is the owned counterpart of [`TransitionSystem::map_edge_colors`](crate::ts::TransitionSystem::map_edge_colors) for maps that keep the
+    /// type of the color, like `iter_mut` is for `into_iter().map().collect()` on a `Vec`.
+    ///
+    /// # Example
+    /// ```
+    /// use automata::ts::{Builder, Sproutable, TransitionSystem};
+    ///
+    /// let mut ts = Builder::without_state_colors()
+    ///     .with_transitions([(0, 'a', 1u8, 0), (0, 'b', 2, 0)])
+    ///     .into_dts();
+    /// ts.map_edge_colors_in_place(|c| *c += 1);
+    /// assert_eq!(ts.edges_from(0).unwrap().map(|e| *e.color()).max(), Some(3));
+    /// ```
+    fn map_edge_colors_in_place(&mut self, f: impl FnMut(&mut EdgeColor<Self>));
+
+    /// Applies `f` to the color of every state in place, see [`Self::map_edge_colors_in_place`].
+    fn map_state_colors_in_place(&mut self, f: impl FnMut(&mut StateColor<Self>));
+
     /// Turns the automaton into a complete one, by adding a sink state and adding transitions
     /// to it from all states that do not have a transition for a given symbol.
     ///
