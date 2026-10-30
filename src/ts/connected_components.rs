@@ -78,8 +78,9 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
                     continue;
                 };
                 for target in it {
+                    // a decomposition of only some of the states has edges that leave it
                     let Some(&target_scc_index) = index_of.get(&target) else {
-                        panic!("could not find SCC index for state {target:?}");
+                        continue;
                     };
                     // no self loops and check that no such edge is present, already
                     if target_scc_index == i || !targets.insert(target_scc_index) {
@@ -284,6 +285,18 @@ impl<Ts: TransitionSystem> PartialEq for SccDecomposition<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn decomposition_of_some_states_ignores_edges_leaving_them() {
+        use crate::ts::TransitionSystem;
+        let ts = ts();
+        // the edges 0 -> 1 and 0 -> 2 leave the considered states
+        let sccs = ts.reachable_sccs_from([0]);
+        assert_eq!(sccs.size(), 1);
+        assert_eq!(sccs.scc_of(0).unwrap().size(), 1);
+        let sccs = ts.reachable_sccs_from([2, 3]);
+        assert_eq!(sccs.size(), 1);
+        assert_eq!(sccs.scc_of(3).unwrap().size(), 2);
+    }
     use crate::States;
     use crate::Void;
 
