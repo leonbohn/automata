@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Rabin and Streett conditions are read from HOA (`acc-name: Rabin n` / `Streett n`, one `Fin` set and one group of `Inf` sets per pair) and written with an `acc-name` when the pairs use the standard layout (#52).
+- `Semantics` for `OmegaAcceptanceCondition`: `accepts`/`transform` work on every deterministic omega automaton (`OmegaAutomaton`), for all conditions including Rabin and Streett. A run with malformed acceptance sets (see `satisfied`) is rejecting (#52, #6).
+- `OmegaAcceptanceCondition::Rabin` and `Streett` carry their pairs (`Vec<RabinPair<Int>>`; Rabin: `Fin(fin) & Inf(inf)` for some pair, Streett: `Fin(fin) | Inf(inf)` for every pair). `satisfied` evaluates them; `into_dpa` for them is still open (#5, #6, #52).
+- `hoa::output::HoaAcceptance`: the acceptance condition decides how the `Acceptance` header and the sets of an edge are written. Implemented for `BuchiCondition`, `MinEvenParityCondition` and `OmegaAcceptanceCondition`, which now also writes co-Büchi, reachability, safety, max parity, Rabin and Streett (#52).
+- `dot::DotStyle`: the acceptance condition decides how an automaton is drawn. Nondeterministic omega automata and DBAs are now `Dottable` (#52).
 - `Builder::build::<T>()` and `try_build::<T>()` build any growable transition system (`LinkedTs`, `Det<LinkedTs>`, `DenseTs`, ...); whether overlapping edges are an error is decided by the target (`Storage::DETERMINISTIC`). Shorthands for the default storage: `into_dts`, `into_nts`, `into_dts_with_initial`, `into_nts_with_initial` and `into_right_congruence`, and `into_automaton(initial, acceptance)` for every acceptance condition (#51).
 - `Builder` is generic over the symbol type (default `char`), so alphabets like `Fixed<usize, N>` can be built. New: the traits `alphabet::FromSymbols` (creates a `SimpleAlphabet` from its symbols; implemented for `CharAlphabet` and `Fixed`), `ts::IntoBuilderEdge`, the error `alphabet::WrongAlphabetSize` and `BuilderError::Alphabet`. `Fixed<S, N>` now implements `SimpleAlphabet` (#51).
 - `ts::Storage`, a marker family for the representation of owned transition systems (`Storage::Ts<Q, C>`, `try_from_linked`), with the storages `Linked` and `Det<Linked>`, and `ts::Det`, see the changes below.
@@ -25,6 +30,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Breaking:** `WriteHoa` is implemented once, for `Automaton<T, Z>` with `Z: HoaAcceptance<T>`; the per-automaton hook methods are gone. `write_hoa` and `to_hoa` return a `HoaError` instead of panicking or discarding it. `OmegaAcceptanceCondition::write_hoa` is replaced by `HoaAcceptance::write_acceptance` (#52).
+- **Breaking:** `Dottable` is implemented once, for `Automaton<T, Z>` with `Z: DotStyle<T>` (`RightCongruence` keeps its own impl). Moore and Mealy machines are named `Moore` and `Mealy` instead of `DPA`, and the Mealy initial state is no longer additionally marked in its label; it already has the initial arrow (#52).
+- The HOA output of edges that belong to no acceptance set no longer has `{1}` (DBAs) or a trailing space; Büchi edges that are not accepting are written without a set (#52).
+- **Breaking:** `OmegaAcceptanceCondition` is no longer `Copy` (the Rabin and Streett variants hold their pairs) (#52).
+- The `Parity` condition of a parsed HOA automaton has `high = Acceptance sets - 1` (it was one too large) (#52).
 - **Breaking:** the `Builder` no longer has one method per target type: `build::<T>()` is the generic entry point and `into_dts`, `into_nts`, `into_automaton` etc. are shorthands for the default storage (22 public methods in total including the `try_` twins, 10 of them for the five automata helpers). `Builder` gained a third type parameter for the symbols. Every method has a `try_` twin that returns a `BuilderError`. The edges of a built system are iterated in the order in which they were given (before, `into_dts` and `into_nts` iterated them in reverse); `EdgeId`s run in the opposite order (#51).
 
   | Before | Now |

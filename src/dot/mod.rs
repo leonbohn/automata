@@ -8,8 +8,8 @@
 //!
 //! Both can hand images to the viewer of the system (`open_in_viewer`).
 
-use crate::ts::EdgeOf;
-use crate::ts::States;
+use crate::Show;
+use crate::ts::{EdgeOf, StateIndex, States};
 use itertools::Itertools;
 
 mod attributes;
@@ -25,6 +25,32 @@ mod render;
 pub use attributes::{DotStateAttribute, DotTransitionAttribute};
 #[cfg(any(feature = "render", feature = "graphviz"))]
 pub use render::{RenderError, open_in_viewer, svg_to_data_url};
+
+/// Decides how the states and edges of an [`crate::Automaton`] with this acceptance condition are
+/// drawn. Every `Automaton<T, Z>` with `Z: DotStyle<T>` is [`Dottable`]. By default, states are
+/// labelled with their identifier and edges with their expression and color.
+pub trait DotStyle<T: States> {
+    /// The name of the graph, if any.
+    fn dot_name(&self) -> Option<String>;
+
+    /// The attributes of the node that represents the state `q` of `ts`.
+    fn dot_state_attributes(&self, _ts: &T, q: StateIndex<T>) -> Vec<DotStateAttribute> {
+        vec![DotStateAttribute::Label(format!("q{q:?}"))]
+    }
+
+    /// The attributes of the DOT edge that represents `edge` of `ts`.
+    fn dot_transition_attributes(
+        &self,
+        _ts: &T,
+        edge: EdgeOf<'_, T>,
+    ) -> Vec<DotTransitionAttribute> {
+        vec![DotTransitionAttribute::Label(format!(
+            "{}|{:?}",
+            edge.expression().show(),
+            edge.color()
+        ))]
+    }
+}
 
 /// Transition systems that can be written in the [DOT](https://graphviz.org/doc/info/lang.html)
 /// format. [`Self::dot_representation`] is always available; rendering to images is experimental
@@ -230,6 +256,32 @@ mod tests {
         assert!(dot.contains(r#"q1 [shape="circle""#), "{dot}");
         assert!(dot.contains(r#"q0 -> q1 [label="a"]"#), "{dot}");
         assert!(dot.contains(r#"q1 -> q1 [label="b"]"#), "{dot}");
+        assert!(dot.contains("init -> q0"), "{dot}");
+    }
+
+    #[test]
+    fn dot_representation_of_edge_colored_automata() {
+        use crate::automaton::{AcceptanceMask, OmegaAcceptanceCondition};
+
+        let dpa = Builder::without_state_colors()
+            .with_transitions([(0, 'a', 1, 0), (0, 'b', 0, 0)])
+            .into_dpa(0);
+        let dot = dpa.dot_representation();
+        assert!(dot.starts_with("digraph DPA"), "{dot}");
+        assert!(dot.contains(r#"q0 -> q0 [label="a|1"]"#), "{dot}");
+
+        // nondeterministic omega automata can be drawn as well
+        let ts = Builder::default()
+            .with_state_colors([0, 0])
+            .with_edges([
+                (0, 'a', AcceptanceMask::from_iter([0]), 0),
+                (0, 'a', AcceptanceMask::from_iter([]), 1),
+            ])
+            .into_nts();
+        let omega =
+            crate::Automaton::from_parts_with_acceptance(ts, 0, OmegaAcceptanceCondition::Buchi);
+        let dot = omega.dot_representation();
+        assert!(dot.contains("q0 -> q1"), "{dot}");
         assert!(dot.contains("init -> q0"), "{dot}");
     }
 }

@@ -17,10 +17,15 @@ use crate::Error;
 use crate::Int;
 use crate::Void;
 use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
+use crate::automaton::Semantics;
+use crate::automaton::semantics::observe_omega;
 use crate::representation::IntoTs;
 use crate::ts::States;
+use crate::ts::run::{self, Observer as _};
 use crate::ts::{Builder, DefaultIdType, DenseId, ForAlphabet, Sproutable};
 use crate::ts::{Det, Linked, Storage};
+use crate::ts::{Deterministic, StateIndex, SymbolOf};
+use crate::word::OmegaWord;
 use crate::{DTS, NTS, Pointed, TransitionSystem};
 pub use acceptance_mask::{AcceptanceError, AcceptanceMask};
 use std::collections::BTreeSet;
@@ -46,17 +51,21 @@ pub type OmegaAutomaton<A, S = Det<Linked>> =
 /// used in conjunction with [`OmegaAutomaton`]/[`DeterministicOmegaAutomaton`] when
 /// the exact type is not known beforehand (such as when parsing an automaton). Usually
 /// one should prefer using specific automaton types such as [`DBA`]/[`DPA`] etc.
-#[derive(Debug, Clone, Eq, Copy, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum OmegaAcceptanceCondition {
     /// Parity condition on the priorities `low..=high` (usually `0..=n`): the smallest priority
     /// that is seen infinitely often has to be even.
     Parity(Int, Int),
     /// Büchi condition: the edges in acceptance set `0` are seen infinitely often.
     Buchi,
-    /// Rabin condition (not supported by most operations yet).
-    Rabin,
-    /// Streett condition (not supported by most operations yet).
-    Streett,
+    /// Rabin condition: accepting if for at least one pair, no acceptance set in `fin` and at
+    /// least one acceptance set in `inf` is seen infinitely often (`Fin(fin) & Inf(inf)`).
+    /// An empty list of pairs rejects everything.
+    Rabin(Vec<RabinPair<Int>>),
+    /// Streett condition: accepting if for every pair, no acceptance set in `fin` or at least
+    /// one acceptance set in `inf` is seen infinitely often (`Fin(fin) | Inf(inf)`). An empty
+    /// list of pairs accepts everything.
+    Streett(Vec<RabinPair<Int>>),
     /// Parity condition on the priorities `low..=high` where the *largest* priority that is seen
     /// infinitely often decides: a run is accepting if `high` minus that priority is even.
     MaxParity(Int, Int),
@@ -84,8 +93,6 @@ impl OmegaAcceptanceCondition {
     /// # Errors
     /// For the parity conditions every mask needs exactly one acceptance set within the range
     /// of the condition, otherwise an [`Error::Acceptance`] is returned.
-    /// [`OmegaAcceptanceCondition::Rabin`] and [`OmegaAcceptanceCondition::Streett`] yield
-    /// [`Error::NotYetImplemented`].
     pub fn satisfied(&self, infset: &BTreeSet<AcceptanceMask>) -> Result<bool, Error> {
         match self {
             OmegaAcceptanceCondition::Parity(low, high) => {
@@ -102,10 +109,24 @@ impl OmegaAcceptanceCondition {
             OmegaAcceptanceCondition::CoBuchi | OmegaAcceptanceCondition::Safety => {
                 Ok(!infset.iter().any(AcceptanceMask::as_bool))
             }
-            OmegaAcceptanceCondition::Rabin | OmegaAcceptanceCondition::Streett => Err(
-                Error::NotYetImplemented("checking satisfaction for Rabin and Streett conditions"),
-            ),
+            OmegaAcceptanceCondition::Rabin(pairs) => {
+                let seen = Self::seen_sets(infset);
+                Ok(pairs
+                    .iter()
+                    .any(|p| p.fin.is_disjoint(&seen) && !p.inf.is_disjoint(&seen)))
+            }
+            OmegaAcceptanceCondition::Streett(pairs) => {
+                let seen = Self::seen_sets(infset);
+                Ok(pairs
+                    .iter()
+                    .all(|p| p.fin.is_disjoint(&seen) || !p.inf.is_disjoint(&seen)))
+            }
         }
+    }
+
+    /// The acceptance sets that occur in at least one of the masks.
+    fn seen_sets(infset: &BTreeSet<AcceptanceMask>) -> BTreeSet<Int> {
+        infset.iter().flat_map(AcceptanceMask::iter).collect()
     }
 
     fn priorities(
@@ -127,6 +148,33 @@ impl OmegaAcceptanceCondition {
                 Ok(priority)
             })
             .collect()
+    }
+}
+
+/// Evaluates the condition on the masks of the edges that a run takes infinitely often. A run
+/// whose masks are malformed for the condition, e.g. a parity edge without a priority, is
+/// rejecting. Use [`OmegaAcceptanceCondition::satisfied`] to see the error instead.
+impl<T, W> Semantics<T, W> for OmegaAcceptanceCondition
+where
+    T: Deterministic<EdgeColor = AcceptanceMask>,
+    W: OmegaWord<Symbol = SymbolOf<T>>,
+{
+    type Output = bool;
+    type Observer = run::EdgeColorSet<T>;
+    fn observe(
+        &self,
+        ts: &T,
+        initial: StateIndex<T>,
+        word: W,
+    ) -> Option<<Self::Observer as run::Observer<T>>::Current> {
+        observe_omega::<T, W, Self::Observer>(ts, initial, word)
+    }
+    fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
+        let infset: BTreeSet<_> = observed.into_current().0.into_iter().collect();
+        self.satisfied(&infset).unwrap_or_else(|error| {
+            tracing::warn!("rejecting a run with malformed acceptance sets: {error}");
+            false
+        })
     }
 }
 
@@ -218,7 +266,7 @@ impl<A: Alphabet> Automaton<DTS<A, Int, AcceptanceMask>, OmegaAcceptanceConditio
             OmegaAcceptanceCondition::MaxParity(low, high) => self.check_priorities(low, high)?,
             _ => {}
         }
-        match self.acceptance {
+        match &self.acceptance {
             OmegaAcceptanceCondition::Parity(_, _) => Ok(self
                 .ts
                 .map_edge_colors(|mask| mask.as_priority())
@@ -248,10 +296,10 @@ impl<A: Alphabet> Automaton<DTS<A, Int, AcceptanceMask>, OmegaAcceptanceConditio
                     .with_initial(self.initial)
                     .into_dpa())
             }
-            OmegaAcceptanceCondition::Rabin => Err(Error::NotYetImplemented(
+            OmegaAcceptanceCondition::Rabin(_) => Err(Error::NotYetImplemented(
                 "conversion of Rabin automata into DPA",
             )),
-            OmegaAcceptanceCondition::Streett => Err(Error::NotYetImplemented(
+            OmegaAcceptanceCondition::Streett(_) => Err(Error::NotYetImplemented(
                 "conversion of Streett automata into DPA",
             )),
         }
@@ -375,16 +423,35 @@ mod tests {
     }
 
     #[test]
-    fn satisfied_reports_unsupported_conditions() {
-        for unsupported in [
-            OmegaAcceptanceCondition::Rabin,
-            OmegaAcceptanceCondition::Streett,
-        ] {
-            assert!(matches!(
-                unsupported.satisfied(&infset(&[])),
-                Err(Error::NotYetImplemented(_))
-            ));
-        }
+    fn satisfied_rabin_and_streett() {
+        use OmegaAcceptanceCondition::{Rabin, Streett};
+        let pairs = vec![
+            RabinPair::from_iters([0], [1]),
+            RabinPair::from_iters([], [2]),
+        ];
+        // Rabin: some pair has no `fin` set and some `inf` set
+        assert_eq!(Rabin(pairs.clone()).satisfied(&infset(&[&[1]])), Ok(true));
+        assert_eq!(
+            Rabin(pairs.clone()).satisfied(&infset(&[&[0, 1]])),
+            Ok(false)
+        );
+        assert_eq!(
+            Rabin(pairs.clone()).satisfied(&infset(&[&[0], &[2]])),
+            Ok(true)
+        );
+        assert_eq!(Rabin(pairs.clone()).satisfied(&infset(&[&[0]])), Ok(false));
+        assert_eq!(Rabin(vec![]).satisfied(&infset(&[&[0]])), Ok(false));
+        // Streett: every pair has no `fin` set or some `inf` set
+        assert_eq!(Streett(pairs.clone()).satisfied(&infset(&[])), Ok(true));
+        assert_eq!(
+            Streett(pairs.clone()).satisfied(&infset(&[&[0]])),
+            Ok(false)
+        );
+        assert_eq!(
+            Streett(pairs.clone()).satisfied(&infset(&[&[0, 1, 2]])),
+            Ok(true)
+        );
+        assert_eq!(Streett(vec![]).satisfied(&infset(&[])), Ok(true));
     }
 
     /// `into_dpa` and `satisfied` have to agree on a one-state automaton that loops on `mask`.
@@ -410,8 +477,10 @@ mod tests {
             let set: BTreeSet<_> = [mask.clone()].into_iter().collect();
             assert_eq!(acc.satisfied(&set), Ok(expected), "{acc:?} {mask:?}");
 
-            let dpa = two_state_automaton(acc, mask).into_dpa().unwrap();
             let word = crate::upw!("a");
+            let aut = two_state_automaton(acc.clone(), mask);
+            assert_eq!(aut.accepts(&word), expected, "{acc:?}");
+            let dpa = aut.into_dpa().unwrap();
             assert_eq!(dpa.accepts(&word), expected, "{acc:?}");
         }
     }
@@ -431,20 +500,20 @@ mod tests {
     fn into_dpa_validates_priorities() {
         use crate::automaton::AcceptanceError;
 
-        let parity = OmegaAcceptanceCondition::Parity(0, 2);
+        let parity = || OmegaAcceptanceCondition::Parity(0, 2);
         assert!(
-            two_state_automaton(parity, AcceptanceMask::from_iter([1]))
+            two_state_automaton(parity(), AcceptanceMask::from_iter([1]))
                 .into_dpa()
                 .is_ok()
         );
         assert_eq!(
-            two_state_automaton(parity, AcceptanceMask::from_iter([]))
+            two_state_automaton(parity(), AcceptanceMask::from_iter([]))
                 .into_dpa()
                 .err(),
             Some(Error::Acceptance(AcceptanceError::NoAcceptanceSet))
         );
         assert_eq!(
-            two_state_automaton(parity, AcceptanceMask::from_iter([0, 1]))
+            two_state_automaton(parity(), AcceptanceMask::from_iter([0, 1]))
                 .into_dpa()
                 .err(),
             Some(Error::Acceptance(AcceptanceError::MultipleAcceptanceSets(
@@ -452,7 +521,7 @@ mod tests {
             )))
         );
         assert_eq!(
-            two_state_automaton(parity, AcceptanceMask::from_iter([5]))
+            two_state_automaton(parity(), AcceptanceMask::from_iter([5]))
                 .into_dpa()
                 .err(),
             Some(Error::Acceptance(AcceptanceError::PriorityOutOfRange {
@@ -474,8 +543,8 @@ mod tests {
     #[test]
     fn into_dpa_reports_unsupported_conditions() {
         for unsupported in [
-            OmegaAcceptanceCondition::Rabin,
-            OmegaAcceptanceCondition::Streett,
+            OmegaAcceptanceCondition::Rabin(vec![]),
+            OmegaAcceptanceCondition::Streett(vec![]),
         ] {
             assert!(matches!(
                 single_state_automaton(unsupported).into_dpa(),

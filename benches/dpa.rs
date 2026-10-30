@@ -243,7 +243,11 @@ fn hoa_parse(texts: Vec<String>) -> usize {
 #[bench::ltl(setup = common::ltl_dpas)]
 #[bench::synthetic(setup = common::synthetic_dpas)]
 fn hoa_print(dpas: Vec<FixtureDpa>) -> usize {
-    black_box(dpas.iter().map(|dpa| dpa.to_hoa().len()).sum())
+    black_box(
+        dpas.iter()
+            .map(|dpa| dpa.to_hoa().expect("writable").len())
+            .sum(),
+    )
 }
 
 library_benchmark_group!(
