@@ -13,7 +13,8 @@ use crate::{
     TransitionSystem,
     alphabet::CharAlphabet,
     ts::{
-        EdgeId, EdgeTuple, IdType, PredecessorIterable, Shrinkable, Sproutable, States,
+        Deterministic, EdgeId, EdgeTuple, IdType, PredecessorIterable, Shrinkable, Sproutable,
+        States,
         model::{Model, ModelEdgeTuple},
     },
 };
@@ -112,10 +113,11 @@ where
     }
 
     /// Applies `ops` one after the other, comparing storage and model after every step.
-    pub fn run(mut self, ops: &[Op]) {
+    pub fn run(mut self, ops: &[Op]) -> Self {
         for op in ops {
             self.step(op);
         }
+        self
     }
 
     /// The state of the model selected by `sel`, or a state that does not exist.
@@ -502,6 +504,68 @@ where
     }
 }
 
+impl<Ts> Harness<Ts>
+where
+    Ts: Sproutable<Alphabet = CharAlphabet, StateColor = u8, EdgeColor = u8>
+        + Shrinkable
+        + PredecessorIterable
+        + Deterministic
+        + States,
+{
+    /// Compares `edge`, `successor` and runs of a deterministic storage with the model. Every
+    /// word is run from every state, and from a state that does not exist.
+    pub fn assert_runs_agree(&self, words: &[Vec<usize>]) {
+        for q in self.model.states() {
+            let sq = self.storage_state(q);
+            for symbol in 0..ALPHABET_SIZE {
+                let expected = self.model.reach(q, &[symbol]);
+                assert!(expected.len() <= 1, "model is not deterministic");
+                let actual = self
+                    .ts
+                    .successor(sq, symbol_char(symbol))
+                    .map(|t| self.reverse_state(t));
+                assert_eq!(
+                    expected.first().copied(),
+                    actual,
+                    "successor of {q} on {symbol}"
+                );
+            }
+            for word in words {
+                let expected = self.model.reach(q, word);
+                assert!(expected.len() <= 1, "model is not deterministic");
+                let letters: Vec<char> = word.iter().copied().map(symbol_char).collect();
+                let actual = self
+                    .ts
+                    .reached_state_from(sq, letters)
+                    .map(|t| self.reverse_state(t));
+                assert_eq!(
+                    expected.first().copied(),
+                    actual,
+                    "run from {q} on {word:?}"
+                );
+            }
+        }
+        let missing = self.storage_state(self.created_states);
+        assert_eq!(
+            self.ts.reached_state_from(missing, Vec::<char>::new()),
+            None
+        );
+        assert_eq!(
+            self.ts.reached_state_from(missing, vec![symbol_char(0)]),
+            None
+        );
+    }
+
+    fn reverse_state(&self, t: Ts::StateIndex) -> usize {
+        *self
+            .states
+            .iter()
+            .find(|(_, s)| **s == t)
+            .map(|(m, _)| m)
+            .unwrap_or_else(|| panic!("run reached unknown state {t:?}"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -558,6 +622,18 @@ mod tests {
             Harness::new(ts, Linked::check_consistency)
                 .with_compaction(compact_linked)
                 .run(&ops);
+        }
+
+        #[test]
+        fn det_linked_ts_runs_agree_with_model(
+            ops in proptest::collection::vec(op(), 0..80),
+            words in proptest::collection::vec(proptest::collection::vec(0..ALPHABET_SIZE, 0..8), 0..8),
+        ) {
+            let ts = DetLinked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, DetLinked::check_consistency)
+                .with_compaction(compact_det)
+                .run(&ops)
+                .assert_runs_agree(&words);
         }
 
         #[test]

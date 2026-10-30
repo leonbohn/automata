@@ -154,6 +154,29 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
         )
     }
 
+    /// The states in which a run on `word` starting in `from` can end, in ascending order. The
+    /// run takes every edge labelled with the next symbol, so for a deterministic model the result
+    /// has at most one element. Empty if `from` does not exist or no run on `word` exists.
+    pub fn reach(&self, from: usize, word: &[usize]) -> Vec<usize> {
+        if !self.contains_state(from) {
+            return Vec::new();
+        }
+        let mut current = vec![from];
+        for &symbol in word {
+            let mut next = Vec::new();
+            for &q in &current {
+                for e in self.edges_from(q).expect("state exists") {
+                    if e.symbol == symbol && !next.contains(&e.target) {
+                        next.push(e.target);
+                    }
+                }
+            }
+            current = next;
+        }
+        current.sort();
+        current
+    }
+
     /// The states reachable from `origin` (including itself), in ascending order. Computed by
     /// repeating "add all successors" until nothing changes. Empty if `origin` does not exist.
     pub fn reachable_from(&self, origin: usize) -> Vec<usize> {
@@ -328,6 +351,20 @@ mod tests {
         assert_eq!(m.remove_edges_from(9), None);
         assert_eq!(m.trim_from(q[0]), vec![(q[1], 1), (q[2], 2), (q[3], 3)]);
         assert_eq!(m.states(), vec![q[0]]);
+    }
+
+    #[test]
+    fn reach_follows_words() {
+        let mut m = Model::<(), ()>::new();
+        let q: Vec<_> = (0..3).map(|_| m.add_state(())).collect();
+        m.add_edge(q[0], 0, (), q[1]);
+        m.add_edge(q[0], 0, (), q[2]);
+        m.add_edge(q[1], 1, (), q[0]);
+        assert_eq!(m.reach(q[0], &[]), vec![q[0]]);
+        assert_eq!(m.reach(q[0], &[0]), vec![q[1], q[2]]);
+        assert_eq!(m.reach(q[0], &[0, 1]), vec![q[0]]);
+        assert_eq!(m.reach(q[0], &[1]), vec![]);
+        assert_eq!(m.reach(9, &[]), vec![]);
     }
 
     #[test]
