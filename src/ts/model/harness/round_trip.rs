@@ -170,3 +170,29 @@ where
         })
     }
 }
+
+impl<Ts> Harness<Ts>
+where
+    Ts: Sproutable<Alphabet = CharAlphabet, StateColor = u8, EdgeColor = u8>
+        + Shrinkable
+        + PredecessorIterable
+        + ForAlphabet<CharAlphabet>
+        + States,
+{
+    /// Builds a read-only copy of the storage with `freeze`, which has to number the states in the
+    /// order of [`States::states`] of the storage. The copy has to agree with the model up to that
+    /// renumbering and has to preserve the language of every state.
+    pub fn assert_frozen_agrees<O: Snapshot>(&self, freeze: impl FnOnce(&Ts) -> O) {
+        self.reported(|| {
+            let frozen = freeze(&self.ts);
+            let renaming: BiBTreeMap<_, _> = self.ts.states().zip(frozen.states()).collect();
+            assert_eq!(
+                renaming.len(),
+                self.ts.state_count(),
+                "frozen copy has a different number of states"
+            );
+            self.assert_snapshot_agrees(&frozen, &renaming, "freezing");
+            self.assert_languages_preserved(&frozen, &renaming, "freezing");
+        })
+    }
+}

@@ -27,7 +27,7 @@ struct Cli {
 #[derive(Args, Clone)]
 struct EngineArgs {
     /// Gungraun bench targets to run (those a revision does not define are skipped).
-    #[arg(long = "bench", default_values_t = ["scc".to_string(), "ts".into(), "runs".into(), "dfa".into(), "dpa".into()])]
+    #[arg(long = "bench", default_values_t = ["scc".to_string(), "ts".into(), "storage".into(), "runs".into(), "dfa".into(), "dpa".into()])]
     benches: Vec<String>,
     /// The criterion target with the wall-clock times, shown in the detail view only.
     #[arg(long, default_value = "wallclock")]

@@ -27,17 +27,17 @@ pub mod operations;
 
 /// This module contains the various provided implementations of [`crate::TransitionSystem`].
 pub(crate) mod impls;
-pub use impls::{Compaction, DefaultIdType, Det, LinkedTs};
+pub use impls::{Compaction, CsrTs, DefaultIdType, DenseTs, Det, LinkedTs};
 
 mod storage;
-pub use storage::{Linked, Storage};
+pub use storage::{Csr, Dense, Linked, SproutableStorage, Storage};
 
 /// Contains implementations and definitions for dealing with paths through a transition system.
 pub mod path;
 pub use path::Path;
 
 mod sproutable;
-pub use sproutable::{ForAlphabet, IndexedAlphabet, Sproutable};
+pub use sproutable::{ForAlphabet, Sproutable};
 
 mod shrinkable;
 pub use shrinkable::Shrinkable;
