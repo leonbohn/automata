@@ -63,9 +63,19 @@ where
     /// Creates a harness around an empty storage. `check` is the consistency check of the storage
     /// and is run after every step.
     pub fn new(ts: Ts, check: fn(&Ts)) -> Self {
+        Self::with_model(ts, check, Model::new())
+    }
+
+    /// Like [`Self::new`], but compares against a deterministic model, for storages whose
+    /// `add_edge` replaces overlapping edges.
+    pub fn new_deterministic(ts: Ts, check: fn(&Ts)) -> Self {
+        Self::with_model(ts, check, Model::new_deterministic())
+    }
+
+    fn with_model(ts: Ts, check: fn(&Ts), model: Model<u8, u8>) -> Self {
         let h = Self {
             ts,
-            model: Model::new(),
+            model,
             check,
             states: HashMap::new(),
             edges: HashMap::new(),
@@ -108,6 +118,12 @@ where
         self.edges.get(&id).copied().unwrap_or(EdgeId(1_000_000))
     }
 
+    /// Forgets the storage ids of edges that no longer exist in the model.
+    fn forget_dead_edges(&mut self) {
+        let live: Vec<_> = self.model.edges().iter().map(|e| e.0).collect();
+        self.edges.retain(|id, _| live.contains(id));
+    }
+
     /// Applies `op` to the storage and the model, checks that the results agree and then compares
     /// the full state of both.
     pub fn step(&mut self, op: &Op) {
@@ -134,6 +150,8 @@ where
                     .model
                     .add_edge(s, symbol % ALPHABET_SIZE, color, t)
                     .expect("both endpoints exist");
+                // a deterministic model may have replaced edges, their ids are dead now
+                self.forget_dead_edges();
                 let edge: EdgeTuple<Ts> = (
                     self.storage_state(s),
                     symbol_char(symbol),
@@ -167,9 +185,7 @@ where
                 let actual = self.ts.remove_state(self.storage_state(q));
                 assert_eq!(removed, actual, "remove_state({q}) disagrees");
                 self.states.remove(&q);
-                // edges incident to the state are gone from the model, forget their ids
-                let live: Vec<_> = self.model.edges().iter().map(|e| e.0).collect();
-                self.edges.retain(|id, _| live.contains(id));
+                self.forget_dead_edges();
             }
             Op::SetStateColor(sel, color) => {
                 let Some(q) = self.pick_state(sel, true) else {
@@ -302,10 +318,24 @@ where
     }
 }
 
+/// Like [`run_ops`] for storages that are deterministic.
+pub fn run_ops_deterministic<Ts>(ts: Ts, check: fn(&Ts), ops: &[Op])
+where
+    Ts: Sproutable<Alphabet = CharAlphabet, StateColor = u8, EdgeColor = u8>
+        + Shrinkable
+        + PredecessorIterable
+        + States,
+{
+    let mut harness = Harness::new_deterministic(ts, check);
+    for op in ops {
+        harness.step(op);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ts::{ForAlphabet, LinkedTs};
+    use crate::ts::{Det, ForAlphabet, LinkedTs};
     use proptest::prelude::*;
 
     fn op() -> impl Strategy<Value = Op> {
@@ -327,6 +357,12 @@ mod tests {
         fn linked_ts_agrees_with_model(ops in proptest::collection::vec(op(), 0..80)) {
             let ts = LinkedTs::<CharAlphabet, u8, u8>::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
             run_ops(ts, LinkedTs::check_consistency, &ops);
+        }
+
+        #[test]
+        fn det_linked_ts_agrees_with_deterministic_model(ops in proptest::collection::vec(op(), 0..80)) {
+            let ts = Det::<LinkedTs<CharAlphabet, u8, u8>>::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            run_ops_deterministic(ts, Det::check_consistency, &ops);
         }
     }
 }

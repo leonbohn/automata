@@ -34,6 +34,7 @@ pub type ModelEdgeTuple<C> = (usize, usize, usize, C, usize);
 pub struct Model<Q, C> {
     states: Vec<Option<(Q, Vec<ModelEdge<C>>)>>,
     next_edge_id: usize,
+    deterministic: bool,
 }
 
 impl<Q: Clone, C: Clone> Model<Q, C> {
@@ -42,6 +43,16 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
         Self {
             states: Vec::new(),
             next_edge_id: 0,
+            deterministic: false,
+        }
+    }
+
+    /// Creates an empty model that is deterministic: adding an edge replaces the edges that leave
+    /// the same state with the same symbol, like `Det` does.
+    pub fn new_deterministic() -> Self {
+        Self {
+            deterministic: true,
+            ..Self::new()
         }
     }
 
@@ -51,7 +62,8 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
         self.states.len() - 1
     }
 
-    /// Adds an edge and returns its id, or `None` if `source` or `target` does not exist.
+    /// Adds an edge and returns its id (in a deterministic model, edges with the same source and
+    /// symbol are removed first), or `None` if `source` or `target` does not exist.
     pub fn add_edge(
         &mut self,
         source: usize,
@@ -65,6 +77,9 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
         let id = self.next_edge_id;
         self.next_edge_id += 1;
         let (_, edges) = self.states[source].as_mut()?;
+        if self.deterministic {
+            edges.retain(|e| e.symbol != symbol);
+        }
         edges.push(ModelEdge {
             id,
             symbol,
@@ -202,6 +217,17 @@ mod tests {
         assert_eq!(m.state_count(), 1);
         assert_eq!(m.add_state(()), 2);
         assert_eq!(m.add_edge(q0, 0, (), q1), None);
+    }
+
+    #[test]
+    fn deterministic_model_replaces_overlapping_edges() {
+        let mut m = Model::<(), u8>::new_deterministic();
+        let q = m.add_state(());
+        let a = m.add_edge(q, 0, 1, q).unwrap();
+        let b = m.add_edge(q, 1, 2, q).unwrap();
+        let c = m.add_edge(q, 0, 3, q).unwrap();
+        assert_eq!(m.edges(), vec![(b, q, 1, 2, q), (c, q, 0, 3, q)]);
+        assert_eq!(m.remove_edge(a), None);
     }
 
     #[test]
