@@ -73,7 +73,7 @@ fn or_panic<T>(result: Result<T, BuilderError>) -> T {
 /// Helper struct for the construction of transition systems and automata. It stores a list of edges, a list of colors and a default color.
 ///
 /// The type that is built is chosen at the end.
-/// - [`Self::build_dts`] and [`Self::build_nts`] create a [`DTS`] or an [`NTS`], and
+/// - [`Self::into_dts`] and [`Self::into_nts`] create a [`DTS`] or an [`NTS`], and
 ///   [`Self::into_dts_with_initial`], [`Self::into_nts_with_initial`] and
 ///   [`Self::into_right_congruence`] add an initial state (and turn the result into a congruence).
 /// - [`Self::into_automaton`] attaches an initial state and an acceptance condition, and
@@ -359,25 +359,25 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// This is [`Self::build`] without the need to name the target type.
     ///
     /// # Panics
-    /// Panics if the builder is inconsistent, see [`Self::try_build_dts`].
+    /// Panics if the builder is inconsistent, see [`Self::try_into_dts`].
     ///
     /// # Example
     /// ```
     /// use automata::ts::{Builder, States};
     ///
-    /// let ts = Builder::without_colors().with_edges([(0, 'a', 1), (1, 'a', 0)]).build_dts();
+    /// let ts = Builder::without_colors().with_edges([(0, 'a', 1), (1, 'a', 0)]).into_dts();
     /// assert_eq!(ts.state_count(), 2);
     /// ```
     #[track_caller]
-    pub fn build_dts(self) -> DTS<CharAlphabet, Q, C> {
-        or_panic(self.try_build_dts())
+    pub fn into_dts(self) -> DTS<CharAlphabet, Q, C> {
+        or_panic(self.try_into_dts())
     }
 
-    /// Fallible version of [`Self::build_dts`].
+    /// Fallible version of [`Self::into_dts`].
     ///
     /// # Errors
     /// See [`Self::try_build`]: an overlapping edge is an error because a [`DTS`] is deterministic.
-    pub fn try_build_dts(self) -> Result<DTS<CharAlphabet, Q, C>, BuilderError> {
+    pub fn try_into_dts(self) -> Result<DTS<CharAlphabet, Q, C>, BuilderError> {
         self.try_build()
     }
 
@@ -385,24 +385,24 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// [`CharAlphabet`]. Overlapping edges are allowed.
     ///
     /// # Panics
-    /// Panics if the builder is inconsistent, see [`Self::try_build_nts`].
+    /// Panics if the builder is inconsistent, see [`Self::try_into_nts`].
     #[track_caller]
-    pub fn build_nts(self) -> NTS<CharAlphabet, Q, C> {
-        or_panic(self.try_build_nts())
+    pub fn into_nts(self) -> NTS<CharAlphabet, Q, C> {
+        or_panic(self.try_into_nts())
     }
 
-    /// Fallible version of [`Self::build_nts`].
+    /// Fallible version of [`Self::into_nts`].
     ///
     /// # Errors
     /// See [`Self::try_build`].
-    pub fn try_build_nts(self) -> Result<NTS<CharAlphabet, Q, C>, BuilderError> {
+    pub fn try_into_nts(self) -> Result<NTS<CharAlphabet, Q, C>, BuilderError> {
         self.try_build()
     }
 
     /// Builds a [`DTS`] and sets `initial` as its designated initial state.
     ///
     /// # Panics
-    /// Panics if the builder is inconsistent, see [`Self::try_build_dts`].
+    /// Panics if the builder is inconsistent, see [`Self::try_into_dts`].
     #[track_caller]
     pub fn into_dts_with_initial(
         self,
@@ -414,18 +414,18 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// Fallible version of [`Self::into_dts_with_initial`].
     ///
     /// # Errors
-    /// See [`Self::try_build_dts`].
+    /// See [`Self::try_into_dts`].
     pub fn try_into_dts_with_initial(
         self,
         initial: DefaultIdType,
     ) -> Result<WithInitial<DTS<CharAlphabet, Q, C>>, BuilderError> {
-        Ok(self.try_build_dts()?.with_initial(initial))
+        Ok(self.try_into_dts()?.with_initial(initial))
     }
 
     /// Builds an [`NTS`] and sets `initial` as its designated initial state.
     ///
     /// # Panics
-    /// Panics if the builder is inconsistent, see [`Self::try_build_nts`].
+    /// Panics if the builder is inconsistent, see [`Self::try_into_nts`].
     #[track_caller]
     pub fn into_nts_with_initial(
         self,
@@ -437,18 +437,18 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// Fallible version of [`Self::into_nts_with_initial`].
     ///
     /// # Errors
-    /// See [`Self::try_build_nts`].
+    /// See [`Self::try_into_nts`].
     pub fn try_into_nts_with_initial(
         self,
         initial: DefaultIdType,
     ) -> Result<WithInitial<NTS<CharAlphabet, Q, C>>, BuilderError> {
-        Ok(self.try_build_nts()?.with_initial(initial))
+        Ok(self.try_into_nts()?.with_initial(initial))
     }
 
     /// Turns `self` into a [`RightCongruence`] with the given initial state.
     ///
     /// # Panics
-    /// Panics if the builder is inconsistent, see [`Self::try_build_dts`].
+    /// Panics if the builder is inconsistent, see [`Self::try_into_dts`].
     #[track_caller]
     pub fn into_right_congruence(
         self,
@@ -460,7 +460,7 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// Fallible version of [`Self::into_right_congruence`].
     ///
     /// # Errors
-    /// See [`Self::try_build_dts`].
+    /// See [`Self::try_into_dts`].
     pub fn try_into_right_congruence(
         self,
         initial: DefaultIdType,
@@ -623,7 +623,7 @@ mod tests {
             .default_color(false)
             .color(5, true)
             .with_transitions([(0, 'a', 5)])
-            .try_build_nts()
+            .try_into_nts()
             .unwrap();
         assert_eq!(ts.states().count(), 6);
         assert_eq!(ts.state_color(5).as_deref(), Some(&true));
@@ -638,7 +638,7 @@ mod tests {
             .color(5, true)
             .with_transitions([(0, 'a', 5)]);
         assert_eq!(
-            builder.try_build_nts().err(),
+            builder.try_into_nts().err(),
             Some(BuilderError::MissingStateColor(1))
         );
     }
@@ -665,7 +665,7 @@ mod tests {
     fn building_reports_overlapping_edges() {
         let builder = Builder::without_colors().with_transitions([(0, 'a', 1), (0, 'a', 0)]);
         assert_eq!(
-            builder.try_build_dts().err(),
+            builder.try_into_dts().err(),
             Some(BuilderError::OverlappingEdge {
                 source_state: 0,
                 expression: "a".to_string(),
@@ -676,7 +676,7 @@ mod tests {
         // the same edges are fine in a nondeterministic transition system
         let nondeterministic = Builder::<crate::Void, crate::Void>::without_colors()
             .with_transitions([(0, 'a', 1), (0, 'a', 0)])
-            .try_build_nts();
+            .try_into_nts();
         assert!(nondeterministic.is_ok());
     }
 
@@ -701,7 +701,7 @@ mod tests {
         );
         let _: Det<LinkedTs<CharAlphabet, Void, Void>> = Builder::without_colors()
             .with_edges([(0, 'a', 1), (1, 'a', 0)])
-            .build_dts();
+            .into_dts();
     }
 
     #[test]
@@ -768,8 +768,8 @@ mod tests {
     fn built_systems_iterate_edges_in_the_order_they_were_given() {
         let edges = [(0, 'a', 1), (0, 'b', 0), (0, 'c', 1), (1, 'a', 0)];
         let expected: Vec<_> = edges.iter().filter(|e| e.0 == 0).map(|e| e.1).collect();
-        let nts = Builder::without_colors().with_edges(edges).build_nts();
-        let dts = Builder::without_colors().with_edges(edges).build_dts();
+        let nts = Builder::without_colors().with_edges(edges).into_nts();
+        let dts = Builder::without_colors().with_edges(edges).into_dts();
         let nts: Vec<char> = nts
             .edges_from(0)
             .unwrap()

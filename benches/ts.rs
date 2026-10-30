@@ -82,7 +82,7 @@ fn builder_with_edges((n, _k, edges): (usize, usize, Vec<(u32, char, u32)>)) -> 
     Builder::without_edge_colors()
         .with_state_colors((0..n).map(|q| q % 3 == 0))
         .with_edges(edges)
-        .build_dts()
+        .into_dts()
 }
 
 // ---- lookups ---------------------------------------------------------------------------------

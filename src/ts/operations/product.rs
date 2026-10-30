@@ -285,7 +285,7 @@ mod tests {
         let r = NTS::builder()
             .default_color(Void)
             .with_transitions([(0, 'a', 0), (0, 'a', 1), (1, 'a', 0)])
-            .build_nts();
+            .into_nts();
         let prod = (&l).ts_product(&r);
         let mut targets: Vec<_> = prod
             .edges_from(ProductIndex(0, 0))
