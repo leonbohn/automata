@@ -111,6 +111,88 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
         Some(color)
     }
 
+    /// Removes all edges entering `state` and returns them, or `None` if the state does not exist.
+    pub fn remove_edges_to(&mut self, state: usize) -> Option<Vec<ModelEdgeTuple<C>>> {
+        let ids: Vec<_> = self.predecessors(state)?.iter().map(|e| e.0).collect();
+        Some(
+            ids.into_iter()
+                .filter_map(|id| self.remove_edge(id))
+                .collect(),
+        )
+    }
+
+    /// Removes all edges leaving `state` and returns them, or `None` if the state does not exist.
+    pub fn remove_edges_from(&mut self, state: usize) -> Option<Vec<ModelEdgeTuple<C>>> {
+        let ids: Vec<_> = self.edges_from(state)?.iter().map(|e| e.id).collect();
+        Some(
+            ids.into_iter()
+                .filter_map(|id| self.remove_edge(id))
+                .collect(),
+        )
+    }
+
+    /// Removes all edges from `source` to `target` and returns them, or `None` if one of the two
+    /// states does not exist.
+    pub fn remove_edges_between(
+        &mut self,
+        source: usize,
+        target: usize,
+    ) -> Option<Vec<ModelEdgeTuple<C>>> {
+        if !self.contains_state(target) {
+            return None;
+        }
+        let ids: Vec<_> = self
+            .edges_from(source)?
+            .iter()
+            .filter(|e| e.target == target)
+            .map(|e| e.id)
+            .collect();
+        Some(
+            ids.into_iter()
+                .filter_map(|id| self.remove_edge(id))
+                .collect(),
+        )
+    }
+
+    /// The states reachable from `origin` (including itself), in ascending order. Computed by
+    /// repeating "add all successors" until nothing changes. Empty if `origin` does not exist.
+    pub fn reachable_from(&self, origin: usize) -> Vec<usize> {
+        if !self.contains_state(origin) {
+            return Vec::new();
+        }
+        let mut reached = vec![origin];
+        loop {
+            let mut grew = false;
+            for (_, source, _, _, target) in self.edges() {
+                if reached.contains(&source) && !reached.contains(&target) {
+                    reached.push(target);
+                    grew = true;
+                }
+            }
+            if !grew {
+                reached.sort();
+                return reached;
+            }
+        }
+    }
+
+    /// Removes every state that is not reachable from `origin` and returns them with their colors
+    /// in ascending order.
+    ///
+    /// # Panics
+    /// If `origin` does not exist.
+    pub fn trim_from(&mut self, origin: usize) -> Vec<(usize, Q)> {
+        assert!(self.contains_state(origin));
+        let reachable = self.reachable_from(origin);
+        let mut removed = Vec::new();
+        for q in self.states() {
+            if !reachable.contains(&q) {
+                removed.push((q, self.remove_state(q).expect("state exists")));
+            }
+        }
+        removed
+    }
+
     /// Replaces the color of a state and returns the old one, or `None` if it does not exist.
     pub fn set_state_color(&mut self, state: usize, color: Q) -> Option<Q> {
         let (old, _) = self.states.get_mut(state)?.as_mut()?;
@@ -228,6 +310,24 @@ mod tests {
         let c = m.add_edge(q, 0, 3, q).unwrap();
         assert_eq!(m.edges(), vec![(b, q, 1, 2, q), (c, q, 0, 3, q)]);
         assert_eq!(m.remove_edge(a), None);
+    }
+
+    #[test]
+    fn bulk_removal_and_trim() {
+        let mut m = Model::<u8, ()>::new();
+        let q: Vec<_> = (0..4).map(|c| m.add_state(c)).collect();
+        m.add_edge(q[0], 0, (), q[1]);
+        m.add_edge(q[0], 1, (), q[1]);
+        m.add_edge(q[1], 0, (), q[1]);
+        m.add_edge(q[2], 0, (), q[3]);
+        assert_eq!(m.reachable_from(q[0]), vec![q[0], q[1]]);
+        assert_eq!(m.remove_edges_between(q[0], q[1]).unwrap().len(), 2);
+        assert_eq!(m.remove_edges_between(q[0], 9), None);
+        assert_eq!(m.remove_edges_to(q[1]).unwrap().len(), 1);
+        assert_eq!(m.remove_edges_from(q[2]).unwrap().len(), 1);
+        assert_eq!(m.remove_edges_from(9), None);
+        assert_eq!(m.trim_from(q[0]), vec![(q[1], 1), (q[2], 2), (q[3], 3)]);
+        assert_eq!(m.states(), vec![q[0]]);
     }
 
     #[test]

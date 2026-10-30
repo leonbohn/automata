@@ -35,6 +35,19 @@ pub enum Op {
     RemoveState(usize),
     SetStateColor(usize, u8),
     SetEdgeColor(usize, u8),
+    RemoveEdgesTo(usize),
+    RemoveEdgesFrom(usize),
+    RemoveEdgesBetween(usize, usize),
+    /// Removes all states not reachable from the selected state (which has to exist).
+    TrimFrom(usize),
+    /// Compacts the storage, if it can. Renumbers the storage ids.
+    Compact,
+}
+
+/// The renaming of ids a storage performed when it was compacted.
+pub struct Remap<Ts: TransitionSystem> {
+    pub state: Box<dyn Fn(Ts::StateIndex) -> Option<Ts::StateIndex>>,
+    pub edge: Box<dyn Fn(EdgeId) -> Option<EdgeId>>,
 }
 
 fn symbol_char(symbol: usize) -> char {
@@ -47,8 +60,12 @@ pub struct Harness<Ts: TransitionSystem> {
     ts: Ts,
     model: Model<u8, u8>,
     check: fn(&Ts),
+    compact: Option<fn(&mut Ts) -> Remap<Ts>>,
     states: HashMap<usize, Ts::StateIndex>,
     edges: HashMap<usize, EdgeId>,
+    /// Storage ids of removed states and edges, to check that compaction maps them to `None`.
+    dead_states: Vec<Ts::StateIndex>,
+    dead_edges: Vec<EdgeId>,
     /// Number of states ever added, so we can name a state that never existed.
     created_states: usize,
 }
@@ -77,12 +94,28 @@ where
             ts,
             model,
             check,
+            compact: None,
             states: HashMap::new(),
             edges: HashMap::new(),
+            dead_states: Vec::new(),
+            dead_edges: Vec::new(),
             created_states: 0,
         };
         h.assert_agree();
         h
+    }
+
+    /// Enables [`Op::Compact`] with the given way of compacting the storage.
+    pub fn with_compaction(mut self, compact: fn(&mut Ts) -> Remap<Ts>) -> Self {
+        self.compact = Some(compact);
+        self
+    }
+
+    /// Applies `ops` one after the other, comparing storage and model after every step.
+    pub fn run(mut self, ops: &[Op]) {
+        for op in ops {
+            self.step(op);
+        }
     }
 
     /// The state of the model selected by `sel`, or a state that does not exist.
@@ -121,7 +154,49 @@ where
     /// Forgets the storage ids of edges that no longer exist in the model.
     fn forget_dead_edges(&mut self) {
         let live: Vec<_> = self.model.edges().iter().map(|e| e.0).collect();
-        self.edges.retain(|id, _| live.contains(id));
+        let dead = &mut self.dead_edges;
+        self.edges.retain(|id, storage_id| {
+            let keep = live.contains(id);
+            if !keep {
+                dead.push(*storage_id);
+            }
+            keep
+        });
+    }
+
+    fn forget_state(&mut self, q: usize) {
+        if let Some(storage_id) = self.states.remove(&q) {
+            self.dead_states.push(storage_id);
+        }
+    }
+
+    /// The edge tuple a storage would report for an edge of the model.
+    fn storage_tuple(&self, e: &ModelEdgeTuple<u8>) -> EdgeTuple<Ts> {
+        (
+            self.storage_state(e.1),
+            symbol_char(e.2),
+            e.3,
+            self.storage_state(e.4),
+        )
+    }
+
+    /// Compares the edges removed from the model with those removed from the storage, ignoring order.
+    fn assert_same_removed(
+        &self,
+        what: &str,
+        expected: Option<Vec<ModelEdgeTuple<u8>>>,
+        actual: Option<Vec<EdgeTuple<Ts>>>,
+    ) {
+        let sorted = |v: Vec<EdgeTuple<Ts>>| {
+            let mut v = v;
+            v.sort();
+            v
+        };
+        assert_eq!(
+            expected.map(|v| sorted(v.iter().map(|e| self.storage_tuple(e)).collect())),
+            actual.map(sorted),
+            "{what} disagrees"
+        );
     }
 
     /// Applies `op` to the storage and the model, checks that the results agree and then compares
@@ -184,7 +259,7 @@ where
                 let removed = self.model.remove_state(q);
                 let actual = self.ts.remove_state(self.storage_state(q));
                 assert_eq!(removed, actual, "remove_state({q}) disagrees");
-                self.states.remove(&q);
+                self.forget_state(q);
                 self.forget_dead_edges();
             }
             Op::SetStateColor(sel, color) => {
@@ -207,9 +282,132 @@ where
                     .map(|c| std::mem::replace(c, color));
                 assert_eq!(expected, actual, "recoloring edge {id} disagrees");
             }
+            Op::RemoveEdgesTo(sel) => {
+                let Some(q) = self.pick_state(sel, true) else {
+                    return;
+                };
+                let expected = self.model.remove_edges_to(q);
+                let actual = self.ts.remove_edges_to(self.storage_state(q));
+                self.assert_same_removed(&format!("remove_edges_to({q})"), expected, actual);
+                self.forget_dead_edges();
+            }
+            Op::RemoveEdgesFrom(sel) => {
+                let Some(q) = self.pick_state(sel, true) else {
+                    return;
+                };
+                let expected = self.model.remove_edges_from(q);
+                let actual = self.ts.remove_edges_from(self.storage_state(q));
+                self.assert_same_removed(&format!("remove_edges_from({q})"), expected, actual);
+                self.forget_dead_edges();
+            }
+            Op::RemoveEdgesBetween(source, target) => {
+                let (Some(s), Some(t)) =
+                    (self.pick_state(source, true), self.pick_state(target, true))
+                else {
+                    return;
+                };
+                let expected = self.model.remove_edges_between(s, t);
+                let actual = self
+                    .ts
+                    .remove_edges_between(self.storage_state(s), self.storage_state(t));
+                self.assert_same_removed(
+                    &format!("remove_edges_between({s}, {t})"),
+                    expected,
+                    actual,
+                );
+                self.forget_dead_edges();
+            }
+            Op::TrimFrom(sel) => {
+                let Some(origin) = self.pick_state(sel, false) else {
+                    return;
+                };
+                let removed = self.model.trim_from(origin);
+                let mut actual = self.ts.trim_from(self.storage_state(origin));
+                actual.sort();
+                let mut expected: Vec<_> = removed
+                    .iter()
+                    .map(|(q, c)| (self.storage_state(*q), *c))
+                    .collect();
+                expected.sort();
+                assert_eq!(expected, actual, "trim_from({origin}) disagrees");
+                for (q, _) in removed {
+                    self.forget_state(q);
+                }
+                self.forget_dead_edges();
+            }
+            Op::Compact => {
+                let Some(compact) = self.compact else {
+                    return;
+                };
+                self.compact_storage(compact);
+            }
         }
         (self.check)(&self.ts);
         self.assert_agree();
+    }
+
+    /// Compacts the storage and follows the renaming of ids.
+    fn compact_storage(&mut self, compact: fn(&mut Ts) -> Remap<Ts>) {
+        let live_states = self.states.values().copied().collect::<Vec<_>>();
+        let live_edges = self.edges.values().copied().collect::<Vec<_>>();
+        let remap = compact(&mut self.ts);
+
+        for q in self.dead_states.iter().filter(|q| !live_states.contains(q)) {
+            assert_eq!(
+                (remap.state)(*q),
+                None,
+                "removed state {q:?} survived compaction"
+            );
+        }
+        for e in self.dead_edges.iter().filter(|e| !live_edges.contains(e)) {
+            assert_eq!(
+                (remap.edge)(*e),
+                None,
+                "removed edge {e:?} survived compaction"
+            );
+        }
+        self.dead_states.clear();
+        self.dead_edges.clear();
+
+        let mut by_old_index: Vec<_> = self.states.iter().map(|(m, s)| (*s, *m)).collect();
+        by_old_index.sort();
+        let mut previous = None;
+        for (old, model_id) in by_old_index {
+            let new = (remap.state)(old)
+                .unwrap_or_else(|| panic!("live state {old:?} lost in compaction"));
+            assert!(
+                previous < Some(new),
+                "compaction does not keep the order of states"
+            );
+            previous = Some(new);
+            self.states.insert(model_id, new);
+        }
+        let live = self.states.len();
+        assert!(
+            self.states
+                .values()
+                .all(|q| q.to_dense().is_none_or(|i| i < live)),
+            "states are not consecutive after compaction"
+        );
+
+        let mut by_old_id: Vec<_> = self.edges.iter().map(|(m, e)| (*e, *m)).collect();
+        by_old_id.sort();
+        let mut previous = None;
+        for (old, model_id) in by_old_id {
+            let new =
+                (remap.edge)(old).unwrap_or_else(|| panic!("live edge {old:?} lost in compaction"));
+            assert!(
+                previous < Some(new),
+                "compaction does not keep the order of edges"
+            );
+            previous = Some(new);
+            self.edges.insert(model_id, new);
+        }
+        let live = self.edges.len();
+        assert!(
+            self.edges.values().all(|e| (e.0 as usize) < live),
+            "edge ids are not consecutive after compaction"
+        );
     }
 
     /// Translates an edge of the storage into the vocabulary of the model.
@@ -304,65 +502,70 @@ where
     }
 }
 
-/// Applies `ops` one after the other, comparing storage and model after every step.
-pub fn run_ops<Ts>(ts: Ts, check: fn(&Ts), ops: &[Op])
-where
-    Ts: Sproutable<Alphabet = CharAlphabet, StateColor = u8, EdgeColor = u8>
-        + Shrinkable
-        + PredecessorIterable
-        + States,
-{
-    let mut harness = Harness::new(ts, check);
-    for op in ops {
-        harness.step(op);
-    }
-}
-
-/// Like [`run_ops`] for storages that are deterministic.
-pub fn run_ops_deterministic<Ts>(ts: Ts, check: fn(&Ts), ops: &[Op])
-where
-    Ts: Sproutable<Alphabet = CharAlphabet, StateColor = u8, EdgeColor = u8>
-        + Shrinkable
-        + PredecessorIterable
-        + States,
-{
-    let mut harness = Harness::new_deterministic(ts, check);
-    for op in ops {
-        harness.step(op);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ts::{Det, ForAlphabet, LinkedTs};
+    use crate::ts::{Compaction, Det, ForAlphabet, LinkedTs};
     use proptest::prelude::*;
+
+    type Linked = LinkedTs<CharAlphabet, u8, u8>;
+    type DetLinked = Det<Linked>;
 
     fn op() -> impl Strategy<Value = Op> {
         let sel = 0usize..16;
         prop_oneof![
-            2 => any::<u8>().prop_map(|c| Op::AddState(c % 4)),
-            6 => (sel.clone(), 0..ALPHABET_SIZE, 0u8..4, sel.clone()).prop_map(
+            4 => any::<u8>().prop_map(|c| Op::AddState(c % 4)),
+            12 => (sel.clone(), 0..ALPHABET_SIZE, 0u8..4, sel.clone()).prop_map(
                 |(source, symbol, color, target)| Op::AddEdge { source, symbol, color, target }
             ),
-            2 => sel.clone().prop_map(Op::RemoveEdge),
-            1 => sel.clone().prop_map(Op::RemoveState),
-            1 => (sel.clone(), 0u8..4).prop_map(|(s, c)| Op::SetStateColor(s, c)),
-            1 => (sel, 0u8..4).prop_map(|(s, c)| Op::SetEdgeColor(s, c)),
+            3 => sel.clone().prop_map(Op::RemoveEdge),
+            2 => sel.clone().prop_map(Op::RemoveState),
+            2 => (sel.clone(), 0u8..4).prop_map(|(s, c)| Op::SetStateColor(s, c)),
+            2 => (sel.clone(), 0u8..4).prop_map(|(s, c)| Op::SetEdgeColor(s, c)),
+            1 => sel.clone().prop_map(Op::RemoveEdgesTo),
+            1 => sel.clone().prop_map(Op::RemoveEdgesFrom),
+            1 => (sel.clone(), sel.clone()).prop_map(|(s, t)| Op::RemoveEdgesBetween(s, t)),
+            1 => sel.prop_map(Op::TrimFrom),
+            1 => Just(Op::Compact),
         ]
+    }
+
+    fn remap(compaction: Compaction) -> Remap<Linked> {
+        let for_edges = compaction.clone();
+        Remap {
+            state: Box::new(move |q| compaction.state(q)),
+            edge: Box::new(move |e| for_edges.edge(e)),
+        }
+    }
+
+    fn compact_linked(ts: &mut Linked) -> Remap<Linked> {
+        remap(ts.compact())
+    }
+
+    fn compact_det(ts: &mut DetLinked) -> Remap<DetLinked> {
+        let compaction = ts.compact();
+        let for_edges = compaction.clone();
+        Remap {
+            state: Box::new(move |q| compaction.state(q)),
+            edge: Box::new(move |e| for_edges.edge(e)),
+        }
     }
 
     proptest! {
         #[test]
         fn linked_ts_agrees_with_model(ops in proptest::collection::vec(op(), 0..80)) {
-            let ts = LinkedTs::<CharAlphabet, u8, u8>::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
-            run_ops(ts, LinkedTs::check_consistency, &ops);
+            let ts = Linked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new(ts, Linked::check_consistency)
+                .with_compaction(compact_linked)
+                .run(&ops);
         }
 
         #[test]
         fn det_linked_ts_agrees_with_deterministic_model(ops in proptest::collection::vec(op(), 0..80)) {
-            let ts = Det::<LinkedTs<CharAlphabet, u8, u8>>::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
-            run_ops_deterministic(ts, Det::check_consistency, &ops);
+            let ts = DetLinked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, DetLinked::check_consistency)
+                .with_compaction(compact_det)
+                .run(&ops);
         }
     }
 }
