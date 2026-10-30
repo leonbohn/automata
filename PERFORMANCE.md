@@ -1,434 +1,303 @@
-# Performance Notes: Porting Tricks from Spot
+# Performance opportunities
 
-This document collects performance techniques found in the Spot C++ library
-(source at `/sam/Rust/spot`), together with ideas for how to port or adapt them
-in this crate, plus additional Rust-specific ideas that Spot cannot use.
-Each entry references the relevant Spot source file so it can be consulted
-directly.
-
-A **status after issue #30** section at the end tracks which items the API
-redesign already covers, and a final section collects ways to go *beyond*
-Spot rather than merely matching it.
-
-Spot's speed comes from a small number of structural decisions rather than
-micro-optimizations. The most important ones, in rough order of impact:
-
-1. Edge-centric "flat digraph" storage with intrusive successor chains.
-2. Pervasive use of small unsigned integer indices instead of pointers/Rc.
-3. Hash-consing / interning of formulas and BDD-based label representation.
-4. Fixed-size memory pools with intrusive free lists.
-5. Cheap bit-vector and bitset primitives (SSO).
-6. Aggressive iterator/object recycling instead of per-iteration allocation.
+A ranked list (most impactful first) of places where the crate could be made faster, found by
+reviewing the transition system storages (`LinkedTs`, `DenseTs`, `CsrTs`), the lazy adapters and the
+algorithms built on them. Every entry names the location, the current behavior, the idea, and a
+rough estimate of impact and effort. The existing `gungraun` benchmarks (`benches/ts.rs`,
+`benches/dfa.rs`, `benches/scc.rs`, `benches/runs.rs`) cover most of these paths and can measure
+every change.
 
 ---
 
-## 1. Flat digraph storage with intrusive successor chains
+## 1. O(1) symbol lookup for `Det<LinkedTs>` / `LinkedTs`
 
-**Spot source:** `spot/graph/graph.hh` (the whole file), used by
-`spot/twa/twagraph.hh`.
+**Location:** `src/ts/impls/linked.rs` — `out_edge_position`, `Deterministic::edge`/`successor`.
 
-The core data structure of Spot is a template `digraph` that stores:
+**Current behavior:** `successor(q, sym)` linearly scans the out-list of `q`, matching each edge's
+expression against the symbol. The doc comment on `Deterministic for Det<LinkedTs>` already admits
+"there is no constant-time lookup yet". This is *the* hot path of the whole crate: every run, every
+product, every exploration, every `DeterministicEdgesFrom` step goes through it. The
+`successor_index_all_pairs` benchmark does `n * k` such scans, each chasing linked-list nodes that
+are scattered through the `edges` vector in insertion order (cache-unfriendly, see #3).
 
-- One `std::vector<edge_storage>` holding **all** edges, each edge being a
-  POD of `{ dst, next_succ, src, <edge data> }` — for `twa_graph` exactly
-  three `unsigned` fields plus BDD + acceptance mark.
-- One `std::vector<state_storage>` where each state keeps `succ` (first
-  outgoing edge) and `succ_tail` (last outgoing edge, for O(1) appending).
+**Idea:** for `IndexedAlphabet` alphabets keep a per-state `symbol index -> EdgeId` table (a flat
+`Vec<u32>` of size `n * k`, exactly like `DenseTs::targets`, maintained on edge insert/remove, or
+built lazily on first lookup and invalidated on mutation, like `DenseTs::incoming`). Lookups become
+one index computation and one load instead of an O(out-degree) pointer-chasing scan.
 
-Outgoing edges of a state form an **intrusive singly-linked list threaded
-through the edge vector** (`next_succ`, with 0 as null sentinel since edge 0
-is reserved). There is no per-state adjacency vector, no `Vec<Vec<Edge>>`.
+**Impact/effort:** very high / medium. `LinkedTs` is the default storage (`DTS = Det<LinkedTs>`), so
+this speeds up essentially everything; the alternative is migrating hot code to `DenseTs`/`CsrTs`,
+which don't support all alphabets or in-place growth the same way.
 
-Why this is fast:
+## 2. `SubsetConstruction` recomputes everything on every edge query
 
-- **One allocation** for the entire graph; edges live in one contiguous
-  vector (good for bulk iteration and cache behavior).
-- Iterating `state_out(s)` is a tiny loop over `next_succ` with **zero
-  allocation** — the iterator is just `{graph*, current_edge}` (two words).
-- Appending an edge is O(1) via `succ_tail`, no sorting or scanning.
-- Edge *removal* is handled lazily: deleted edges get `next_succ` pointing to
-  themselves, so the global "all edges" iterator skips them in O(1)
-  (`all_edge_iterator::skip_()`: `while (t < s && tv_[t].next_succ == t)`).
-- `defrag_states()` compacts vectors after bulk deletions rather than paying
-  for tombstones forever.
+**Location:** `src/ts/operations/subset.rs` — `Deterministic for SubsetConstruction::edge`.
 
-**Port to Rust:**
+**Current behavior:** each `edge(set, sym)` call
 
-- The `ts::impls::linked` module already looks close to this idea. Make the
-  "flat edge vector + intrusive succ chain" the *one* canonical dense
-  representation, and treat every other representation as a view over it.
-- Use `u32` state and edge indices (a "sentinel 0" reserved edge makes
-  `Option<u32>` unnecessary — `NonZeroU32` if you want `Option` for free).
-- Provide an `out_edges(state) -> impl Iterator` that is a by-value iterator
-  (no borrow of the graph object beyond a slice access per step, or store
-  a raw slice reference in the iterator). Rust iterators over `&self` are
-  fine here because the chain walk only touches the edge vector.
-- Implement edge deletion as lazy tombstoning + periodic compaction
-  (`defrag`), not eager vector surgery.
+- re-walks the out-edges of every state in the subset,
+- collects all matching edge colors into a `Vec` (cloning each) and all targets into a `StateSet`,
+- sorts and dedups the targets (`normalize`) — even though a bitset-sized membership pass would do,
+- linearly scans `self.expressions` to find the expression for the symbol (should be indexed,
+  e.g. via `expression_map` order or `IndexedAlphabet::expression_to_index`),
+- **memoizes nothing about transitions**: only the set -> id map is remembered. `edges_from` is
+  `DeterministicEdgesFrom`, which calls `edge` once per alphabet symbol, so asking for the
+  successors of one subset costs `k` full recomputations.
 
-## 2. Indices, not pointers; recycling, not allocating
+**Idea:** memoize the successor computation per `(subset id, symbol)` (the struct already uses
+`RefCell` interior mutability for `states`/`ids`), index the expressions by symbol index, and use a
+reusable scratch `FixedBitSet` for target collection instead of sort+dedup. Also skip the color
+`Vec` when the caller only needs the target (e.g. `successor`).
 
-**Spot source:** `spot/twa/twa.hh` (`iter_cache_`, `release_iter`),
-`spot/twa/twagraph.hh` (`twa_graph_state::clone()` returns `this`,
-`destroy()` is a no-op).
+**Impact/effort:** very high for NTS -> DTS determinization / medium. Subset construction is
+quadratic-ish as written; with memoization each transition is computed exactly once.
 
-Because states are indices into the state vector, "cloning" a state is free
-and reference counting does not exist on the hot path. On-the-fly algorithms
-that need the abstract `twa_succ_iterator` interface recycle iterators in a
-one-slot cache (`iter_cache_`) instead of allocating per visited state.
+## 3. Cache-unfriendly edge layout in `LinkedTs`
 
-**Port to Rust:**
+**Location:** `src/ts/impls/linked.rs`, `linked/linked_edge.rs` — edge vector + doubly linked lists.
 
-- Avoid `Rc<...>`/`Arc<...>` for per-state/per-edge data entirely; indices
-  are cheaper and remove borrow-checker friction in algorithms.
-- Where an iterator object must be created repeatedly (e.g. BFS/DFS visiting
-  millions of states), offer a *reusable cursor* API:
-  `struct SuccCursor<'a> { graph: &'a G, current: u32 }` with
-  `fn step(&mut self)`, so a search loop allocates nothing at all.
-  Spot's `state_out::recycle()` is exactly this.
+**Current behavior:** edges live in a `Vec` in insertion order and each state's out-/in-edges are
+chased through `out_next`/`in_next` links, i.e. a pointer chase over essentially random memory for
+every `edges_from`/`predecessors` iteration. Every traversal (BFS, DFS, Tarjan, runs, products)
+pays this. Additionally each edge carries 24 bytes of bookkeeping (6 `u32` links/endpoints) plus
+expression and color.
 
-## 3. Hash-consing of formulas (`fnode`)
+**Idea:** two complementary things.
 
-**Spot source:** `spot/tl/formula.hh`, `spot/tl/formula.cc`.
+- Let `compact()` renumber edges so that the out-list of each state becomes contiguous in the edge
+  vector (order states by index, then their out-edges). Iterating `edges_from` then walks
+  consecutive memory; `Tarjan`/`Bfs` get noticeably faster on large systems. The `Compaction`
+  mapping already exists to fix up ids.
+- Consider singly linked lists plus O(d) unlink (walk to find predecessor) or tombstone-with-lazy-
+  unlink to shrink the 24-byte overhead — a deliberate trade of removal cost for iteration speed;
+  measure against the removal-heavy benchmarks before doing this.
 
-LTL formulas are interned in a global unique table:
+**Impact/effort:** high / medium (the reordering part is contained in `compact`).
 
-- An `fnode` is a single heap allocation of `sizeof(fnode) + (n-1) *
-  sizeof(child)` — **children are stored inline** in a trailing array, so
-  visiting children is pointer-chasing within one cache line or two.
-- Structural equality is **pointer equality**; the node `id_` doubles as the
-  hash value (`id_` is assigned from a global counter).
-- Nodes carry a **precomputed property bitfield** (`is_`:
-  syntactic-safety/recurrence/persistence/…, computed at construction) so
-  later checks are a single bit test instead of a tree walk.
-- Reference counts exist but are `uint16` and destructors are trivial —
-  formulas are only freed via the pool.
-- Boolean short-circuiting in `multop_build_and_or` merges sorted child
-  vectors *at construction time*, keeping children canonically sorted, which
-  makes equality checks cheap and enables the hash-consing to hit.
+## 4. Recursive Tarjan does redundant work and a quadratic stack scan
 
-**Port to Rust:**
+**Location:** `src/ts/connected_components/tarjan.rs` — `Tarjan::visit`, exposed as
+`tarjan_scc_recursive` / `States::sccs_recursive`.
 
-- If/when temporal-logic formulas enter this crate, use an arena
-  (`typed-arena`/`bumpalo` or `Vec<Node>` with `u32` indices) plus a
-  `HashMap<u64, u32>` unique table. Node equality then becomes
-  `(index_a == index_b)`; hash is the id.
-- Precompute syntactic-class flags on construction and expose them as
-  `is_xxx()` bit tests.
-- For `Expression`s over propositional alphabets, note this is exactly what
-  a BDD is (see next point).
+**Current behavior:**
 
-## 4. BDD-labeled edges (shared, canonical edge labels)
+- The relax step is nested inside `for _a in edge.expression().symbols()` — the identical update is
+  repeated once per symbol the expression matches. For `PropExpression`s matching many symbols this
+  is pure duplication (and `symbols()` on BDDs is not free).
+- When a root is found, the SCC boundary is located with `stack.iter().rposition(...)` — an
+  O(stack) scan per SCC root, i.e. O(n^2) on long chains (the `path`/`back_edges` bench shapes).
+- It recurses (stack overflow risk on deep graphs) and uses the hash-based `StateMap` when the
+  bound is unknown.
 
-**Spot source:** `spot/twa/bdddict.hh`, `bdd` package (BuDDy fork under
-`/sam/Rust/spot/buddy`).
+**Idea:** drop the symbols loop; replace the `rposition` scan by tracking the stack segment
+explicitly (as the iterative variant does with `stack.pop` until the root); or simply delete the
+recursive variant and keep `tarjan_scc_iterative` (already the default for `States::sccs`).
 
-Edge labels are BDDs. Consequences:
+**Impact/effort:** high where `sccs_recursive` is used / low.
 
-- Every label is canonical: comparing two labels is a single integer
-  comparison of BDD node indices; hashing a label is hashing one integer.
-- Labels with common structure share memory (a `p ∧ q` edge and an `p` edge
-  share the `p` node).
-- Products/compositions can compute label conjunctions (`bdd_and`) as
-  near-pointer ops, and "is this label ⊥?" is `label == bddfalse`.
+## 5. `Det<LinkedTs>::add_edge` churns tombstones on replacement
 
-This crate currently uses `biodivine-lib-bdd` for
-`alphabet::propositional`. That is a functional, hash-consed BDD —
-correct, but noticeably slower than BuDDy-style table-based BDDs with an
-operation cache.
+**Location:** `src/ts/impls/linked.rs` — `Sproutable for Det<LinkedTs>::add_edge`.
 
-**Port / improve:**
+**Current behavior:** adding an edge that overlaps an existing one first scans the out-list
+(`out_edge_position`), then `remove_edge` (tombstone + relink both lists) and `insert_edge`
+(relink both lists again). Builders that overwrite edges (learning algorithms, completion, tests
+that re-add) accumulate 24-byte tombstones and invalid ids, and the edge ids churn so external
+tables keyed by `EdgeId` must be rebuilt.
 
-- Profile the BDD layer separately; if it shows up, consider
-  - caching/limiting `to_string`/printing of expressions,
-  - precomputing a **symbolic transition matrix** for deterministic
-    automata: a `Vec<ExpressionId>` indexed by `[state][symbol]` so
-    product/simulation code never re-evaluates expressions
-    (see also "DFA-style dense transition function" below),
-  - or porting a BuDDy-style BDD: nodes in a single `Vec<Node>`, unique
-    table + computed-table per operation, `u32` node handles. This is a
-    well-defined, self-contained subproject.
+**Idea:** when exactly one edge overlaps (the common deterministic case: same expression, or a
+single-symbol alphabet), overwrite its expression/color/target in place — no tombstone, stable id,
+no relinking. Only fall back to remove+insert when several edges overlap.
 
-## 5. Fixed-size and multiple-size memory pools
+**Impact/effort:** high for build/mutation-heavy workloads (`add_edges_*`, `builder_with_edges`
+benches) / low.
 
-**Spot source:** `spot/misc/fixpool.hh`, `spot/misc/mspool.hh`.
+## 6. `Quotient::edge` allocates and clones per query
 
-Spot allocates fnode children, states, and other same-sized objects from
-hand-written pools:
+**Location:** `src/ts/operations/quotient.rs` — `Deterministic for Quotient::edge` (~line 203).
 
-- Bump allocation from big chunks (`(size > 128 ? size : 128) * 8192 - 64`
-  bytes per chunk) with an **intrusive free list** threaded through free
-  blocks (the `block_ { block_* next; }` trick: the freelist pointer is
-  stored *in* the free block itself, so the pool costs zero extra memory).
-- `multiple_size_pool` keeps one freelist per rounded size class.
-- Sizes are rounded to powers of two / max alignment for cheap alignment and
-  possible bit-trick division.
-- Debug builds wire the pool into Valgrind (`VALGRIND_MALLOCLIKE_BLOCK`) so
-  memory errors are still caught — worth copying the *idea* (pool can be
-  audited in debug builds).
+**Current behavior:** every edge lookup iterates the whole class, queries the underlying system per
+member, hashes each target through `class_of` (an `FxIndexMap`), and collects into a `BTreeSet`
+plus a `Vec` of cloned colors — all to return one edge. Minimization builds a quotient and then
+collects it (`mealy_partition_refinement`), so this runs `n * k` times with several allocations per
+call.
 
-**Port to Rust:**
+**Idea:** for deterministic systems a quotient edge only needs *one* class representative's edge
+(the others are equal by construction of the partition, as the commented-out `all_equal` asserts
+suggest): query the first member, map its target through `class_of`, done. Also replace
+`class_of: FxIndexMap<Idx, usize>` by a dense `Vec` when the state indices are dense (a
+`StateMap`-style choice at construction).
 
-- Rust rarely needs this for `Vec`-backed data (the allocator already does
-  size-class pooling), but it pays off for **many small fixed-size nodes**
-  (formulas, BDD nodes, edge data in on-the-fly constructions). Consider a
-  `bumpalo`-backed arena or a `typed_arena`-style `Vec<T>` pool where indices
-  replace pointers — in Rust the vector-index approach is both safe and
-  usually faster than a freelist pool.
+**Impact/effort:** high for minimization (`minimize*` benches) / low–medium.
 
-## 6. Small-size-optimized bit vectors and bitsets
+## 7. `is_deterministic` is O(n * d^2)
 
-**Spot source:** `spot/misc/bitvect.hh` (also `spot/twa/acc.hh`
-`mark_t` as a word-backed set of acceptance marks).
+**Location:** `src/ts.rs` — `States::is_deterministic` (line ~530).
 
-- `bitvect` stores the first block **inline** (`local_storage_`) and only
-  mallocs when growing beyond one machine word — classic SSO.
-- `mark_t` (acceptance sets on an edge) is a plain unsigned word when the
-  automaton has ≤ 32/64 acceptance sets, so `&`, `|`, `==`, `is_subset` are
-  single ALU ops. Acceptance computations (degeneralization, SCC handling)
-  run on these words.
+**Current behavior:** per state, all pairs of out-edges are checked with `Alphabet::overlapping`,
+after collecting the edges into a `Vec`. This runs every time a `Det` storage is built from a
+linked system (`Det::try_new`, `Storage::try_from_linked`, `try_into_deterministic`) and on every
+`is_deterministic` call.
 
-**Port to Rust:**
+**Idea:** sort the state's edges by expression (or by symbol interval) and only compare adjacent
+overlapping candidates — O(d log d) per state. For single-symbol expressions (`CharAlphabet`,
+`Fixed`) a `FixedBitSet` of seen symbol indices gives O(d) per state.
 
-- Represent acceptance colors as a bitset type that is a `u64` when the
-  number of colors fits, falling back to `Vec<u64>` (a small
-  `enum Mark { Inline(u64), Spilled(Box<[u64]>) }` or a const-generic
-  `ArrayVec`). This crate's `fixedbitset` dependency is heavier than needed
-  on hot paths; check with a benchmark before replacing, but a
-  `u64`-fast-path is nearly free to add.
-- Same for "visited/reached" sets in traversals: use a `Vec<u64>` bitmask
-  keyed by state index instead of `HashSet<Idx>` (rustc-hash or not).
-  Spot's sccinfo and emptiness checks do exactly this.
+**Impact/effort:** medium (one-off per conversion, but conversions are common) / low.
 
-## 7. Integer hashing tricks
+## 8. `MatchingProduct::edges_from` is a nested O(d_l * d_r) loop with expression equality
 
-**Spot source:** `spot/misc/hashfunc.hh`.
+**Location:** `src/ts/operations/product.rs` — `ProductEdges::next`.
 
-- `wang32_hash`, `knuth32_hash` (`(key >> 3) * 2654435761` — good for
-  pointers/aligned values), FNV over sequences.
-- Used everywhere state sets / seen sets are hashed.
+**Current behavior:** for each left edge the right edge iterator is restarted and expressions are
+compared with `==`. Exploration of a product (emptiness checks, `reachable_part`, the boolean-op
+benches `with_minimized`/`with_empty`/`deep_difference`) iterates `edges_from`, so each product
+state costs `d_l * d_r` comparisons plus color clones for every yielded edge.
 
-**Port to Rust:**
+**Idea:** for deterministic sides over an `IndexedAlphabet`, merge the two (symbol-ordered) edge
+lists by symbol index instead of the nested loop — O(d_l + d_r) per state. The
+`Deterministic for MatchingProduct::edge` fast path already exists for single-symbol queries; the
+iterator needs the same idea. Also avoid cloning both colors when the caller only reads targets.
 
-- Mostly obsoleted by Rust's `FxHashMap`/`rustc-hash` (already a
-  dependency — good). The actionable lesson is Spot's *discipline*: keys are
-  plain integers (state ids, edge ids, BDD handles), never structs requiring
-  deep hashing. Prefer `indexmap`/`FxHashMap<Idx, V>` with `Idx = u32`, and
-  precompute hashes once (`id_` as hash) rather than rehashing composite
-  structures on every lookup.
+**Impact/effort:** medium–high (automata boolean operations) / medium.
 
-## 8. Miscellany worth stealing
+## 9. Omega-run cycle detection uses a hash map and keeps every pass
 
-- **`SPOT_ASSUME` / `__builtin_unreachable`** (common.hh): in Rust use
-  `debug_assert!` + `unreachable_unchecked()` via a small macro in release
-  builds — helps the optimizer in match dispatch over operator/state enums.
-  (Only with real invariants; misuse is UB.)
-- **`SPOT_UNLIKELY`** → `#[cold]` / `core::intrinsics::likely` (or the
-  `likely` crate) on hot error paths.
-- **On-the-fly product** (`twaproduct.hh`): states of a product are pairs of
-  state indices computed lazily, with a hash map `(s1,s2) -> s`. Keep this
-  pattern for `operations/product.rs`; key the map by `(u32, u32)` packed
-  into a `u64` if possible.
-- **Named properties attached to the automaton** (`twa::prop_*`):
-  cheap boolean hints (`state-based acc`, `deterministic`, `inherently
-  weak`) carried alongside the automaton let algorithms skip whole passes.
-  Spot updates these through every construction. Keeping a
-  `properties: PropertySet` on automata (already partially present via type
-  system) pays off; consider runtime flags for properties the type system
-  can't express, and *maintain them* through operations.
-- **`iter_cache_`** single-slot iterator recycling (see §2).
-- **`killer_edge_iterator`** (graph.hh): an out-edge iterator that unlinks
-  edges from the successor chain as it iterates, enabling O(out-degree)
-  edge removal without a second pass. Nice pattern for pruning algorithms
-  (`purge_dead_states`, simulation pruning).
-- **`defrag_states`** (twagraph.hh): after bulk deletions, compact the state
-  and edge vectors using a renumbering map, with a callback hook so caches
-  keyed by old ids can be fixed up. If the `shrinkable` module does eager
-  deletion, consider defragmentation-on-demand instead.
-- **Parallel policy** (common.hh `parallel_policy`, graph.hh
-  `sort_edges_srcfirst_` parallel variant): algorithms accept a thread
-  budget instead of deciding themselves. Spot parallelizes only the few
-  places that pay (edge sorting, `scc_info`). In Rust, prefer `rayon` on
-  embarrassingly parallel bulk passes (edge sort, SCC of disjoint
-  components) and keep traversals single-threaded and allocation-free.
+**Location:** `src/ts/run.rs` — `RunKind for Omega::run`.
 
-## 9. Additional Rust-specific ideas (not in Spot)
+**Current behavior:** `let mut seen = crate::ts::StateMap::new(None);` ignores `ts.state_bound()`,
+so cycle detection always hashes (`StateMap::Sparse`) even for dense `u32` indices. Also one
+observer per cycle pass is kept in a `Vec` and all of them from the first repeat onward are merged
+at the end.
 
-1. **SoA edge storage where profitable.** Spot's edge records are 16–24
-   bytes. For algorithms that only need `dst` (BFS, reachability, product),
-   a split layout `Vec<u32 dst>` + `Vec<Label>` halves the memory traffic of
-   those passes. A `CSR` (compressed sparse row) snapshot view — sort edges
-   by source, store offsets — makes sequential out-edge iteration *perfectly*
-   cache-friendly for read-heavy passes (minimization, quotient, SCC).
-   Cheap to build in O(n) from the flat representation; consider offering
-   both views ("mutable intrusive" for construction, "CSR" for analysis).
+**Idea:** pass `ts.state_bound()` to `StateMap::new` so dense systems get a `Vec<Option<usize>>`.
+(Merging must keep the passes of the loop, so the `Vec` stays, but it is bounded by the number of
+distinct cycle-entry states.)
 
-2. **Dense transition function for deterministic automata.** For a DFA
-   over a finite alphabet, the fastest membership test is
-   `trans[(state as usize) * k + symbol as usize]` with `k` precomputed and
-   symbols mapped to `0..k` at parse time. This is what makes DFA
-   operations in practice instant; keep it as a specialized representation
-   behind the `Deterministic` trait (`Vec<u32>`, sentinel `u32::MAX` for
-   missing edges) used by `run`/`path`/`omega` acceptance checks.
+**Impact/effort:** medium (every omega acceptance check) / trivial.
 
-3. **Copy-on-write only at the boundaries.** Cheap `clone()` of automata via
-   `im`/persistent vectors is tempting but slow; instead make automata
-   cheaply *sharable* (`&G`) and let algorithms take snapshots where needed.
+## 10. Removal helpers on `LinkedTs` allocate and sort unnecessarily
 
-4. **Branchless acceptance checking.** Parity/Rabin acceptance evaluation on
-   runs is a hot inner loop; evaluate priority vectors with `min`/`max`
-   reductions (`itertools::min`, `u32::min`) instead of match chains. For
-   deterministic parity, precompute per-state priority into a `Vec<u8>`.
+**Location:** `src/ts/impls/linked.rs` — `linked_remove_state`, `filter_remove_edges`,
+`out_edge_ids`/`in_edge_ids`.
 
-5. **Iteration order discipline.** Rust `HashMap` iteration is random —
-   good for tests but bad for reproducible benchmark comparisons. Spot's
-   determinism makes profiling and regression-tracking sane. Where iteration
-   order leaks into output, use `indexmap`/sorted vectors or BTree where it
-   matters (already available as dependencies).
+**Current behavior:** `linked_remove_state` collects out ids and in ids into two `Vec`s,
+concatenates, `sort_unstable`, `dedup`, then removes one by one. `filter_remove_edges` likewise
+collects all matching ids into a `Vec` first. But `remove_edge` already unlinks from both lists in
+O(1) and returns `None` for tombstones, so neither the sort/dedup nor the intermediate vectors are
+needed: walk the out-list then the in-list, capturing `next` before unlinking.
 
-6. **`#[inline]` audit + PGO-friendly crates.** Keep the edge iterator
-   `.step()`, `mark_t` bit ops, and expression-id comparison inline (they
-   are trivially small). Measure with `cargo flamegraph`/`criterion`
-   (already set up) and consider `-C target-cpu=native` guidance in docs for
-   benching.
+**Idea:** in-place list-walking removal (as the `list_walking_removal_agrees_with_full_scan` test
+already validates for `remove_edges_*`). No allocation, no sort, better locality.
 
-7. **Avoid `tracing` on the hot path.** Spot uses no logging in inner loops;
-   either gate per-edge `tracing` calls behind a feature or make sure the
-   subscriber-disabled path is a cheap check (it usually is, but a
-   `Span::enter` per edge is not).
+**Impact/effort:** medium (shrink-heavy code, e.g. `remove_state` in a loop) / low.
 
----
+## 11. `DenseTs` removals build the full reverse CSR
 
-## Status after the #30 API redesign
+**Location:** `src/ts/impls/dense.rs` — `remove_state`, `remove_edges_to`, `slots_into`.
 
-Issue #30 (and its sub-issues) covers a large part of the original list
-above. Mapping the `Suggested order of attack` against the roadmap:
+**Current behavior:** the first removal (or `predecessors` call) builds the reverse CSR over all
+`n * k` slots and keeps it; `slots_into` additionally collects the slots into a `Vec` per call.
+Removing one state from a large dense system that never queries predecessors pays O(n * k) plus an
+allocation, and interleaving `add_edge` (which drops the table) with removals rebuilds it
+repeatedly.
 
-| #30 item | PERFORMANCE.md items it covers | Verdict |
-|---|---|---|
-| #41 ids, `CompactIdMap`, `StateSet`/`StateMap`, one bitset crate | §2 (u32 indices, indices-not-pointers), §6 (word-backed visit sets — replaces `BTreeSet`/SipHash visited sets, P8), §7 (integer hashing discipline) | **Covered** |
-| #42 `Cow` colours | Part of §2 (owned `state_color()`/`color()` clones per query) | **Covered** |
-| #43 traversal module `Bfs`/`Dfs`/`AccessWords` | §2 (allocation-free cursors), the P9 minimal-representatives restart problem | **Covered** |
-| #46 `Automaton<T, Z>` + `Semantics<T, W>` | Removes `OMEGA`/`DET` const generics (type-level, not per-se) | **Covered** (enabler) |
-| #47 allocation-free omega runs | §2 cursors on the run path, P12 (`spoke_vec`/`cycle_vec`/`Word::nth` per step) | **Covered** |
-| #48 one `EdgeRef`, merged adapters, product fast path | P5/P11 (linear `contains_state`, O(d_l·d_r) product matching), lazy adapter re-evaluation | **Covered** |
-| #49 `Linked` storage with stable `EdgeId`s and compact layout | Parts of §1 (O(1) `remove_edge(id)` replaces lazy tombstoning as the *mechanism*; edge shrinks from ~80 to ~40 bytes of bookkeeping if in-links move out — decision 4 keeps them in for now) | **Partially covered** — see *remaining* below |
-| #50 `Dense` storage (n × |A| table over `IndexedAlphabet`) | §9.2 dense transition function | **Covered** |
-| #54 `IntoTransitions`/`FromTransitions` | P4 (multi-pass collect, 6–11× gap vs `clone`) | **Covered** |
-| #55 `Sccs` problem type | P8 (three ad-hoc densify paths), shared SCC entry point | **Covered** |
-| #56/#57 equivalence/witnesses, `Minimize`, fast `Quotient` | P10, P14 | **Covered** |
+**Idea:** when the CSR is not built, find incoming edges of `q` by scanning the slot column
+directly (`targets[s * k + a] == q`) without building the table, or scan `targets` once and filter;
+build the CSR only when `predecessors` is actually iterated. Reuse a scratch `Vec` for `slots_into`.
 
-### What remains after #30
+**Impact/effort:** medium (mutation-heavy `DenseTs` use) / low.
 
-1. **Flat digraph with intrusive successor chains (§1).** The redesigned
-   `Linked` still stores per-state edge lists; Spot's single contiguous
-   `Vec<edge_storage>` with `next_succ` threading and lazy tombstoning +
-   `defrag_states` compaction is *not* part of #30. `EdgeId` gives O(1)
-   removal, but the memory-locality win of one flat vector is still open.
-2. **`Csr` frozen snapshot view (§9.1).** The redesign explicitly defers it
-   (`// later: pub struct Csr`). After phase 3 this is the natural next
-   storage: an O(E) snapshot from `Linked`/`Dense` for read-heavy passes
-   (minimization, quotient, SCC, inclusion).
-3. **BDD layer (§4).** Unchanged by #30 — `biodivine-lib-bdd` stays for
-   `Linked`/propositional automata. If profiling after 0.2 shows it hot, a
-   BuDDy-style table BDD (nodes in one `Vec`, unique table + computed table
-   per operation, `u32` handles) is a self-contained follow-up project.
-4. **SoA edge splitting (§9.1).** Not in #30. Once `Csr` exists, a variant
-   that splits `dst` from label/colour arrays halves memory traffic for
-   structure-only passes.
-5. **Branchless priority evaluation (§9.4).** #47 fixes the run *allocation*
-   problem, not the acceptance-evaluation inner loop. Keep this for after the
-   omega-run rewrite lands.
-6. **Micro items (§8, §9.6, §9.7).** `#[inline]` audits, `unreachable_unchecked`
-   hints, `#[cold]` error paths, `tracing` off the hot path (P16 flags one
-   `tracing::info!` in iterative Tarjan — check whether #55 removes it).
-7. **Word-backed acceptance marks specifically (§6).** #41 standardizes
-   *state* sets; a `mark_t`-style `u64`-fast-path enum for acceptance colours
-   (falling back to `fixedbitset`) should ride along with #52 (`WriteHoa`,
-   acceptance on the new `Automaton`) so all acceptance computations benefit.
-8. **Parallelism (§8).** Not in #30. Once storages are stable, `rayon` on
-   bulk passes (edge sort, per-SCC work) is cheap to add.
+## 12. Hopcroft refinement: sort per splitter and tree-based partitions
+
+**Location:** `src/minimization/partition_refinement.rs` — `refine`, `collect_partition`;
+`src/partition.rs` — `Partition<I> = Vec<BTreeSet<I>>`.
+
+**Current behavior:** in `refine`, `found.sort_unstable()` runs on every splitter pop whenever
+there is more than one edge label (Mealy case); a counting/bucket pass over the small label set
+would avoid the comparison sort. `collect_partition` builds an `FxIndexMap<usize, BTreeSet<I>>`
+and then sorts `BTreeSet`s; `Partition` itself stores one `BTreeSet` per class — a tree allocation
+per class and pointer-chasing iteration, where sorted `Vec`s would be faster and smaller (the
+classes are already built from dense indices in the minimization pipeline).
+
+**Idea:** bucket `found` by label with a reusable `Vec<Vec<..>>` indexed by label; build partitions
+as `Vec<Vec<I>>` (sorted once) or at least collect classes directly from the dense `block_of`
+array with a counting pass.
+
+**Impact/effort:** medium (the `minimize*` benches) / medium.
+
+## 13. `LinkedTs` equality builds two hash sets per state
+
+**Location:** `src/ts/impls/linked.rs` — `PartialEq for LinkedTs`, `edge_set`.
+
+**Current behavior:** comparing two systems allocates an `FxIndexSet` per state per side (2n hash
+sets, each hashing every edge) — e.g. in learning/equivalence loops and tests.
+
+**Idea:** compare out-lists by sorting into two reusable scratch `Vec`s (or, since both sides are
+linked lists over the same index space, intersect by walking). Reuse the scratch buffers across
+states.
+
+**Impact/effort:** low–medium / low.
+
+## 14. `DenseTs`/`CsrTs` color storage wastes a word per slot and edges iteration scans all `k` slots
+
+**Location:** `src/ts/impls/dense.rs`, `src/ts/impls/csr.rs` — `colors: Vec<Option<C>>`,
+`DenseEdgesFrom`/`CsrEdgesFrom`.
+
+**Current behavior:** `Option<C>` stores a discriminant per slot even though `targets[slot] != NONE`
+already encodes presence (e.g. `DenseTs<char, u32>` spends 8 bytes per slot on the color array where
+4 would do). `edges_from` iterates all `k` slots of a state skipping `NONE`, which is O(k) even for
+near-empty rows (fine for small alphabets, wasteful for large `k`).
+
+**Idea:** store `colors: Vec<C>` (or `MaybeUninit<C>` behind the target sentinel — requires
+`unsafe`, weigh it) and, for large alphabets, a per-state list of occupied symbol indices. Also the
+iterators carry redundant `slot`/`symbol_index` counters next to two slice iterators; zipping one
+enumerated slice pair would generate tighter code.
+
+**Impact/effort:** low (memory footprint, large-alphabet iteration) / low–medium.
+
+## 15. Default `States::is_complete` builds B-tree sets per state
+
+**Location:** `src/ts.rs` — `States::is_complete` (line ~554).
+
+**Current behavior:** collects the universe into a `BTreeSet` once and then a `BTreeSet` of symbols
+per state (via `transitions_from`, which also expands expressions into symbols). `DenseTs`/`CsrTs`
+override it; `LinkedTs` (the default storage) does not, so `complete_with_colors` on linked systems
+pays for it.
+
+**Idea:** for `IndexedAlphabet` use a `FixedBitSet` of size `k` per state (the `Sproutable`
+completion already does exactly this) or count distinct covered symbol indices.
+
+**Impact/effort:** low / trivial.
+
+## 16. Smaller items
+
+- `src/ts/transitions_from.rs` — `TransitionsFrom::next` clones the edge color twice per first
+  symbol of an edge (`self.color = Some(color.clone())` then `color.clone()` into the tuple); one
+  clone suffices.
+- `src/ts/impls/csr.rs` — `ReverseCsr::build` clones the offsets vector (`fill = offsets.clone()`);
+  the offsets can be used as fill cursors and restored by shifting afterwards (standard CSR trick).
+- `src/ts/visit.rs` — `AccessWords::expand` allocates and sorts a `Vec<(sym, target)>` per
+  dequeued state; a reusable buffer or sorting only the newly discovered edges would cut
+  allocations in `minimal_representatives` loops.
+- `src/ts/operations/restricted.rs` — `EdgeColorRestricted::edges_from` clones `min`/`max` colors
+  into every iterator; keeping references would avoid two clones per call.
+- `src/ts/run.rs` — observers like `EdgeColorSet`/`EdgeColorSequence` clone the edge color per
+  transition; inherent to the observer design, but `EdgeColorSet` could insert a borrowed-then-
+  cloned-on-miss entry to avoid hashing twice (`contains` then `insert`).
+- `src/ts/impls/linked.rs` — `compact()` allocates four new vectors; with tombstone-heavy systems
+  this is fine, but the `state_map`/`edge_map` could be reused scratch space if `compact` is called
+  repeatedly (e.g. via `linked_map_*`, which always compacts first).
 
 ---
 
-## Going beyond Spot: what they do not do
+## Suggested order of attack
 
-Can we beat Spot? In the domains where this crate operates (explicit,
-finite-alphabet automata — DFAs/DPAs over `CharAlphabet`-style alphabets),
-yes, plausibly, for structural reasons Spot cannot fix without breaking
-its C++ API. Where Spot wins is BDD-heavy, propositional-label work
-(large LTL → TGBA translations); that is a different arena (see §4).
+1. #1 (lookup index) and #5 (in-place replace) — they define the speed of the default storage.
+2. #2 (subset memoization) and #6 (quotient edge) — the two worst offenders in automaton-level
+   algorithms.
+3. #3 (edge reordering in `compact`) and #4 (Tarjan) — traversals.
+4. #8–#12 as benchmark-driven follow-ups; #13–#16 are cleanups with measurable but small wins.
 
-Spot's own ceiling comes from four invariants of its design:
-
-1. **One representation for everything.** Every `twa_graph` stores a BDD
-   label per edge, even when the alphabet is two symbols and labels are
-   single `p` or `¬p`. There is no dense `n × |A|` storage; `#50`'s `Dense`
-   has no Spot equivalent. For explicit automata this is an entire
-   representation Spot never specializes to.
-2. **Virtual dispatch on the fly.** Spot's on-the-fly interface
-   (`twa_succ_iterator` with virtual `first()`/`next()`/`dst()`, heap-
-   allocated and recycled through `iter_cache_`) exists so that any
-   algorithm can consume any representation. Every successor step is a
-   virtual call through a pointer-chased iterator. In Rust, monomorphized
-   generic code over `EdgesFrom<'a>` iterators compiles to the same tight
-   loop as hand-written code, with no dynamic dispatch and no allocation.
-   This is the structural gap we can exploit: an iterator *type* instead
-   of an iterator *object*.
-3. **No SIMD.** Verified: no `__m*` intrinsics anywhere in `spot/` (only a
-   robin-hood hash header). Spot's bitvectors, acceptance marks and
-   simulation signatures are scalar. Partition refinement
-   (minimization) and signature hashing over bitsets is exactly the kind
-   of code that autovectorizes or takes explicit `std::simd` in Rust.
-4. **Sequential core.** Spot has `parallel_policy`, but it parallelizes
-   only edge sorting and a few `scc_info` uses; `twacube` exists for
-   concurrent model checking but is a separate representation. A Rust
-   crate with `Send + Sync` storages and `rayon` can parallelize the same
-   bulk passes by default with far less machinery.
-
-Concrete opportunities, in order of expected payoff:
-
-- **`Dense` + const-generic specialization (#50 + follow-ups).** Compile
-  a DFA transition table into `Vec<u32>` (or even `[u8; k]` per state for
-  small alphabets and ≤ 256 states) with symbols pre-mapped to indices at
-  parse time. A membership query becomes one indexed load; Spot must
-  compare BDD labels for the same question. This alone should make DFA
-  runs, products and subset construction over explicit alphabets faster
-  than Spot's equivalents.
-- **Monomorphized algorithms.** Keep #30's `EdgesFrom<'a>: Iterator`
-  (by-value, not dyn) as *the* algorithm interface and resist adding a
-  `dyn TransitionSystem` fast path that reintroduces virtual dispatch.
-  Combined with `#[inline]` on `step()`/`color()` accessors, whole
-  traversals can stay in registers/L1 in a way Spot's vtable-based
-  iterators cannot.
-- **`Csr` + SoA snapshots.** Freeze into `Vec<u32 dst>` + offset array;
-  structure-only passes (SCC, reachability, minimization sweeps) then
-  stream contiguous memory, optionally via `rayon` chunks per offset
-  range. Spot has no read-optimized snapshot at all — it re-walks the
-  intrusive chains every time.
-- **SIMD/bitset partition refinement.** In `Minimize`/`Quotient`, encode
-  each block's per-symbol target signature as bitset rows and hash
-  blocks with `u64::xored`-style reductions (`wide`/`std::simd` or plain
-  chunks of `u64`, which LLVM vectorizes). Spot's `simulation.cc` works
-  on BDD-label equivalence classes instead.
-- **A modern allocator and no exceptions on the hot path.** `mimalloc`
-  (feature-gated) typically beats glibc malloc for the allocation
-  pattern of bulk construction; Spot uses system `malloc` throughout.
-  Also, Rust guarantees no unwinding through our inner loops, which
-  removes the cleanup scaffolding C++ generates around throwing code.
-- **Thread-local / concurrent BDD tables.** If the BuDDy-style BDD from
-  §4 ever materializes: BuDDy is a global singleton with a unique table
-  guarded essentially by convention; a Rust BDD with per-thread computed
-  tables and a shared unique table (`arc-swap`d or sharded) would
-  parallelize BDD operations that Spot must serialize. This is the
-  arena where Spot is strongest, so treat it as ambitious.
-- **PGO/LTO and `target-cpu` guidance** for benchmarking parity: Spot
-  ships generic `-O2` builds. Not a code change, but part of any honest
-  comparison.
-
-Honest caveats: Spot's *algorithmic* portfolio (degeneralization,
-simulation, SAT-based minimization, `translate` pipeline) is far larger
-than anything planned here, so "faster" claims must be scoped to the
-constructions both libraries implement — the redesign's `Linked`/`Dense`
-   world versus `twa_graph` on explicit inputs, and, eventually, the
-   BDD front.
+Every change should be validated with `./scripts/check` plus the instruction-count benchmarks
+(`tools/bench`), and benchmark names must stay stable so history remains comparable.
