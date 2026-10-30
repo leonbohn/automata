@@ -330,6 +330,119 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
         classes
     }
 
+    /// The edge leaving `state` with `symbol`, in a deterministic model.
+    fn edge_on(&self, state: usize, symbol: usize) -> Option<ModelEdge<C>> {
+        let mut edges = self
+            .edges_from(state)?
+            .into_iter()
+            .filter(|e| e.symbol == symbol);
+        let edge = edges.next();
+        assert!(edges.next().is_none(), "model is not deterministic");
+        edge
+    }
+
+    /// Whether the DFAs that start in `p` and `q` accept the same words, where a state is
+    /// accepting if `accepting` holds for its color, and a run that cannot continue is rejecting.
+    /// All pairs of states that the two can be in after reading the same word are explored, a
+    /// missing state counts as a rejecting sink (`None`).
+    pub fn language_equivalent(
+        &self,
+        p: usize,
+        q: usize,
+        symbols: usize,
+        accepting: impl Fn(&Q) -> bool,
+    ) -> bool {
+        let accepts = |state: Option<usize>| {
+            state.is_some_and(|s| accepting(&self.state_color(s).expect("state exists")))
+        };
+        let mut seen = vec![(Some(p), Some(q))];
+        let mut todo = 0;
+        while todo < seen.len() {
+            let (a, b) = seen[todo];
+            todo += 1;
+            if accepts(a) != accepts(b) {
+                return false;
+            }
+            for symbol in 0..symbols {
+                let next = (
+                    a.and_then(|s| self.edge_on(s, symbol)).map(|e| e.target),
+                    b.and_then(|s| self.edge_on(s, symbol)).map(|e| e.target),
+                );
+                if !seen.contains(&next) {
+                    seen.push(next);
+                }
+            }
+        }
+        true
+    }
+
+    /// Whether every state reachable from `origin` has an edge for each of the `symbols`.
+    pub fn is_complete_from(&self, origin: usize, symbols: usize) -> bool {
+        self.reachable_from(origin).into_iter().all(|q| {
+            (0..symbols).all(|a| {
+                self.edges_from(q)
+                    .expect("state exists")
+                    .iter()
+                    .any(|e| e.symbol == a)
+            })
+        })
+    }
+
+    /// Whether the Moore machines that start in `p` and `q` have the same state colors on every
+    /// word that can be read from both.
+    pub fn moore_compatible(&self, p: usize, q: usize, symbols: usize) -> bool
+    where
+        Q: PartialEq,
+    {
+        let mut seen = vec![(p, q)];
+        let mut todo = 0;
+        while todo < seen.len() {
+            let (a, b) = seen[todo];
+            todo += 1;
+            if self.state_color(a) != self.state_color(b) {
+                return false;
+            }
+            for symbol in 0..symbols {
+                if let (Some(x), Some(y)) = (self.edge_on(a, symbol), self.edge_on(b, symbol))
+                    && !seen.contains(&(x.target, y.target))
+                {
+                    seen.push((x.target, y.target));
+                }
+            }
+        }
+        true
+    }
+
+    /// Whether the Mealy machines that start in `p` and `q` read the same words and produce the
+    /// same edge colors on them: at every pair of states reached on a common word, the same
+    /// symbols have an edge and the edges have the same colors.
+    pub fn mealy_equivalent(&self, p: usize, q: usize, symbols: usize) -> bool
+    where
+        C: PartialEq,
+    {
+        let mut seen = vec![(p, q)];
+        let mut todo = 0;
+        while todo < seen.len() {
+            let (a, b) = seen[todo];
+            todo += 1;
+            for symbol in 0..symbols {
+                match (self.edge_on(a, symbol), self.edge_on(b, symbol)) {
+                    (None, None) => {}
+                    (Some(x), Some(y)) => {
+                        if x.color != y.color {
+                            return false;
+                        }
+                        if !seen.contains(&(x.target, y.target)) {
+                            seen.push((x.target, y.target));
+                        }
+                    }
+                    _ => return false,
+                }
+            }
+        }
+        true
+    }
+
     /// The strongly connected components: two states are in the same one iff each is reachable
     /// from the other. Every component is sorted, and the components are sorted by their smallest
     /// state.
@@ -595,6 +708,24 @@ mod tests {
             m.mealy_classes(1),
             vec![vec![q[0], q[2]], vec![q[1]], vec![q[3]]]
         );
+    }
+
+    #[test]
+    fn equivalence_of_states() {
+        let mut m = Model::<u8, u8>::new();
+        let q: Vec<_> = [1, 1, 0, 1].iter().map(|&c| m.add_state(c)).collect();
+        m.add_edge(q[0], 0, 5, q[2]);
+        m.add_edge(q[1], 0, 6, q[2]);
+        m.add_edge(q[2], 0, 5, q[2]);
+        let even = |c: &u8| *c == 0;
+        // q[3] has no edge but accepts nothing different from q[0] on the empty word
+        assert!(m.language_equivalent(q[0], q[1], 1, even));
+        assert!(!m.language_equivalent(q[0], q[3], 1, even));
+        assert!(m.moore_compatible(q[0], q[3], 1));
+        assert!(!m.moore_compatible(q[0], q[2], 1));
+        assert!(!m.mealy_equivalent(q[0], q[1], 1));
+        assert!(!m.mealy_equivalent(q[0], q[3], 1));
+        assert!(m.mealy_equivalent(q[0], q[0], 1));
     }
 
     #[test]

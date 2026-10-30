@@ -10,11 +10,13 @@
 use std::collections::HashMap;
 
 use crate::{
-    TransitionSystem,
+    TransitionSystem, Void,
     alphabet::CharAlphabet,
+    automaton::MealyMachine,
     minimization::partition_refinement::{
         mealy_greatest_bisimulation, moore_greatest_bisimulation,
     },
+    representation::{CollectTs, IntoTs},
     ts::{
         Deterministic, EdgeId, EdgeTuple, IdType, Pointed, PredecessorIterable, Shrinkable,
         Sproutable, States,
@@ -212,6 +214,29 @@ where
             actual.map(sorted),
             "{what} disagrees"
         );
+    }
+
+    /// Adds every missing edge, so that the storage becomes complete. The target and color of the
+    /// i-th added edge are taken from `fill` (cyclically). Does nothing if `fill` is empty.
+    pub fn complete(&mut self, fill: &[(usize, u8)]) {
+        if fill.is_empty() {
+            return;
+        }
+        let mut next = 0;
+        for (position, q) in self.model.states().into_iter().enumerate() {
+            for symbol in 0..ALPHABET_SIZE {
+                if self.model.reach(q, &[symbol]).is_empty() {
+                    let (target, color) = fill[next % fill.len()];
+                    next += 1;
+                    self.step(&Op::AddEdge {
+                        source: position,
+                        symbol,
+                        color,
+                        target,
+                    });
+                }
+            }
+        }
     }
 
     /// Applies `op` to the storage and the model, checks that the results agree and then compares
@@ -702,6 +727,59 @@ where
         );
     }
 
+    /// Compares the equivalence checks of the library with the model, for every pair of states:
+    /// language equivalence of DFAs (a state is accepting if its color is even), bisimilarity of
+    /// Moore machines and of Mealy machines. The machines are collected from the storage, so this
+    /// also exercises collecting.
+    pub fn assert_equivalence_agrees(&self) {
+        let states = self.model.states();
+        let even = |c: &u8| c.is_multiple_of(2);
+        let collect = |q: usize| {
+            (&self.ts)
+                .with_initial(self.storage_state(q))
+                .collect_dts_and_initial()
+        };
+        let dfa = |q: usize| {
+            let (ts, initial) = collect(q);
+            ts.map_state_colors(|c| c.is_multiple_of(2))
+                .into_dfa_with_initial(initial)
+        };
+        let moore = |q: usize| {
+            let (ts, initial) = collect(q);
+            ts.into_moore_with_initial(initial)
+        };
+        let mealy = |q: usize| {
+            let (ts, initial) = collect(q);
+            MealyMachine::from_parts(ts.linked_map_states(|_, _| Void), initial)
+        };
+        for &p in &states {
+            let (dfa_p, moore_p, mealy_p) = (dfa(p), moore(p), mealy(p));
+            for &q in &states {
+                // `DFA::equivalent` only compares what both automata can read, so it does not
+                // tell apart languages of incomplete DFAs; only complete ones are compared
+                if self.model.is_complete_from(p, ALPHABET_SIZE)
+                    && self.model.is_complete_from(q, ALPHABET_SIZE)
+                {
+                    assert_eq!(
+                        self.model.language_equivalent(p, q, ALPHABET_SIZE, even),
+                        dfa_p.equivalent(&dfa(q)),
+                        "DFA equivalence of {p} and {q} differs"
+                    );
+                }
+                assert_eq!(
+                    self.model.moore_compatible(p, q, ALPHABET_SIZE),
+                    moore_p.bisimilar(&moore(q)),
+                    "Moore bisimilarity of {p} and {q} differs"
+                );
+                assert_eq!(
+                    self.model.mealy_equivalent(p, q, ALPHABET_SIZE),
+                    mealy_p.bisimilar(&mealy(q)),
+                    "Mealy bisimilarity of {p} and {q} differs"
+                );
+            }
+        }
+    }
+
     /// Compares `edge`, `successor` and runs of a deterministic storage with the model. Every
     /// word is run from every state, and from a state that does not exist.
     pub fn assert_runs_agree(&self, words: &[Vec<usize>]) {
@@ -856,6 +934,28 @@ mod tests {
                 .with_compaction(compact_det)
                 .run(&ops)
                 .assert_minimization_agrees();
+        }
+
+        #[test]
+        fn det_linked_ts_equivalence_agrees_with_model(ops in proptest::collection::vec(op(), 0..40)) {
+            let ts = DetLinked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, DetLinked::check_consistency)
+                .with_compaction(compact_det)
+                .run(&ops)
+                .assert_equivalence_agrees();
+        }
+
+        #[test]
+        fn complete_det_linked_ts_equivalence_agrees_with_model(
+            ops in proptest::collection::vec(op(), 0..40),
+            fill in proptest::collection::vec((0usize..16, 0u8..4), 1..8),
+        ) {
+            let ts = DetLinked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            let mut harness = Harness::new_deterministic(ts, DetLinked::check_consistency)
+                .with_compaction(compact_det)
+                .run(&ops);
+            harness.complete(&fill);
+            harness.assert_equivalence_agrees();
         }
 
         #[test]
