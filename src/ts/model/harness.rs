@@ -13,8 +13,8 @@ use crate::{
     TransitionSystem,
     alphabet::CharAlphabet,
     ts::{
-        Deterministic, EdgeId, EdgeTuple, IdType, PredecessorIterable, Shrinkable, Sproutable,
-        States,
+        Deterministic, EdgeId, EdgeTuple, IdType, Pointed, PredecessorIterable, Shrinkable,
+        Sproutable, States,
         connected_components::SccDecomposition,
         model::{Model, ModelEdgeTuple},
     },
@@ -538,6 +538,73 @@ where
         sccs
     }
 
+    /// Compares a subset construction of the storage, started in the states selected by
+    /// `origins`, with the model: following a word, the colors of the states of the subset and of
+    /// the edges that are taken have to be those of the set of states the model is in.
+    pub fn assert_subset_construction_agrees(&self, origins: &[usize], words: &[Vec<usize>]) {
+        let states = self.model.states();
+        if states.is_empty() {
+            return;
+        }
+        let mut start: Vec<usize> = origins.iter().map(|o| states[o % states.len()]).collect();
+        start.sort();
+        start.dedup();
+        let storage_start: Vec<_> = start.iter().map(|&q| self.storage_state(q)).collect();
+        let subset = (&self.ts).subset_construction_from(storage_start);
+        let sorted = |mut v: Vec<u8>| {
+            v.sort();
+            v
+        };
+        let colors_of = |set: &[usize]| -> Vec<u8> {
+            sorted(
+                set.iter()
+                    .map(|&q| self.model.state_color(q).expect("state exists"))
+                    .collect(),
+            )
+        };
+
+        for word in words {
+            let mut model_set = start.clone();
+            let mut current = subset.initial();
+            for &symbol in word {
+                assert_eq!(
+                    colors_of(&model_set),
+                    sorted(
+                        subset
+                            .state_color(current)
+                            .expect("subset state")
+                            .into_owned()
+                    ),
+                    "state colors of the subset differ after a prefix of {word:?}"
+                );
+                let edge = subset
+                    .edge(current, symbol_char(symbol))
+                    .expect("subset construction is complete");
+                assert_eq!(
+                    self.model.edge_colors_on(&model_set, symbol),
+                    sorted(edge.color().clone()),
+                    "edge colors of the subset differ on {symbol} in {word:?}"
+                );
+                current = edge.target();
+                model_set = self.model.successors_on(&model_set, symbol);
+            }
+            assert_eq!(
+                colors_of(&model_set),
+                sorted(
+                    subset
+                        .state_color(current)
+                        .expect("subset state")
+                        .into_owned()
+                ),
+                "state colors of the subset differ at the end of {word:?}"
+            );
+            assert_eq!(
+                subset.reached_state(word.iter().copied().map(symbol_char).collect::<Vec<_>>()),
+                Some(current)
+            );
+        }
+    }
+
     /// Compares the SCC decompositions of the storage (Tarjan iterative and recursive, and the
     /// variants restricted to what is reachable from a state, also Kosaraju) with the model.
     pub fn assert_sccs_agree(&self) {
@@ -724,6 +791,32 @@ mod tests {
                 .with_compaction(compact_det)
                 .run(&ops)
                 .assert_sccs_agree();
+        }
+
+        #[test]
+        fn linked_ts_subset_construction_agrees_with_model(
+            ops in proptest::collection::vec(op(), 0..80),
+            origins in proptest::collection::vec(0usize..16, 1..4),
+            words in proptest::collection::vec(proptest::collection::vec(0..ALPHABET_SIZE, 0..8), 0..8),
+        ) {
+            let ts = Linked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new(ts, Linked::check_consistency)
+                .with_compaction(compact_linked)
+                .run(&ops)
+                .assert_subset_construction_agrees(&origins, &words);
+        }
+
+        #[test]
+        fn det_linked_ts_subset_construction_agrees_with_model(
+            ops in proptest::collection::vec(op(), 0..80),
+            origins in proptest::collection::vec(0usize..16, 1..4),
+            words in proptest::collection::vec(proptest::collection::vec(0..ALPHABET_SIZE, 0..8), 0..8),
+        ) {
+            let ts = DetLinked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, DetLinked::check_consistency)
+                .with_compaction(compact_det)
+                .run(&ops)
+                .assert_subset_construction_agrees(&origins, &words);
         }
 
         #[test]

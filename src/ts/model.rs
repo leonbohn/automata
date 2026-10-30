@@ -158,23 +158,53 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
     /// run takes every edge labelled with the next symbol, so for a deterministic model the result
     /// has at most one element. Empty if `from` does not exist or no run on `word` exists.
     pub fn reach(&self, from: usize, word: &[usize]) -> Vec<usize> {
-        if !self.contains_state(from) {
-            return Vec::new();
-        }
-        let mut current = vec![from];
+        self.reach_from_set(&[from], word)
+    }
+
+    /// Like [`Self::reach`], but the run may start in any of the states in `from`. States that do
+    /// not exist are ignored.
+    pub fn reach_from_set(&self, from: &[usize], word: &[usize]) -> Vec<usize> {
+        let mut current: Vec<usize> = from
+            .iter()
+            .copied()
+            .filter(|&q| self.contains_state(q))
+            .collect();
+        current.sort();
+        current.dedup();
         for &symbol in word {
-            let mut next = Vec::new();
-            for &q in &current {
-                for e in self.edges_from(q).expect("state exists") {
-                    if e.symbol == symbol && !next.contains(&e.target) {
-                        next.push(e.target);
-                    }
+            current = self.successors_on(&current, symbol);
+        }
+        current
+    }
+
+    /// The states that can be reached from any of `from` by one edge labelled with `symbol`, in
+    /// ascending order.
+    pub fn successors_on(&self, from: &[usize], symbol: usize) -> Vec<usize> {
+        let mut next = Vec::new();
+        for &q in from {
+            for e in self.edges_from(q).expect("state exists") {
+                if e.symbol == symbol && !next.contains(&e.target) {
+                    next.push(e.target);
                 }
             }
-            current = next;
         }
-        current.sort();
-        current
+        next.sort();
+        next
+    }
+
+    /// The colors of the edges labelled with `symbol` that leave any of `from`, in ascending order.
+    pub fn edge_colors_on(&self, from: &[usize], symbol: usize) -> Vec<C>
+    where
+        C: Ord,
+    {
+        let mut colors: Vec<C> = from
+            .iter()
+            .flat_map(|&q| self.edges_from(q).expect("state exists"))
+            .filter(|e| e.symbol == symbol)
+            .map(|e| e.color)
+            .collect();
+        colors.sort();
+        colors
     }
 
     /// The states reachable from `origin` (including itself), in ascending order. Computed by
@@ -432,6 +462,19 @@ mod tests {
             vec![vec![q[0], q[1]], vec![q[2]]]
         );
         assert_eq!(m.transient_states(), vec![q[3], q[4]]);
+    }
+
+    #[test]
+    fn reach_from_sets() {
+        let mut m = Model::<u8, u8>::new();
+        let q: Vec<_> = (0..3).map(|c| m.add_state(c)).collect();
+        m.add_edge(q[0], 0, 5, q[1]);
+        m.add_edge(q[2], 0, 4, q[1]);
+        m.add_edge(q[2], 0, 3, q[2]);
+        assert_eq!(m.reach_from_set(&[q[2], q[0], 9], &[0]), vec![q[1], q[2]]);
+        assert_eq!(m.reach_from_set(&[q[0], q[0]], &[]), vec![q[0]]);
+        assert_eq!(m.edge_colors_on(&[q[0], q[2]], 0), vec![3, 4, 5]);
+        assert_eq!(m.edge_colors_on(&[q[1]], 0), Vec::<u8>::new());
     }
 
     #[test]
