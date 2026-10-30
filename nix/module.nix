@@ -7,7 +7,12 @@ self:
 }:
 let
   cfg = config.services.automata-bench;
-  inherit (lib) mkOption mkEnableOption mkIf types;
+  inherit (lib)
+    mkOption
+    mkEnableOption
+    mkIf
+    types
+    ;
   stateDir = "/var/lib/automata-bench";
 in
 {
@@ -112,6 +117,7 @@ in
         "runs"
         "dfa"
         "dpa"
+        "storage"
       ];
       description = "Gungraun bench targets to run, those a revision does not define are skipped.";
     };
@@ -170,7 +176,12 @@ in
           ++ map (u: "--allowed-labeler=${u}") cfg.allowedLabelers
           ++ lib.optional cfg.allowForks "--allow-forks"
           ++ lib.optional (cfg.githubTokenFile != null) "--github-token-file=%d/github-token"
-          ++ (if cfg.wallclockBench == null then [ "--no-wallclock" ] else [ "--wallclock-bench=${cfg.wallclockBench}" ])
+          ++ (
+            if cfg.wallclockBench == null then
+              [ "--no-wallclock" ]
+            else
+              [ "--wallclock-bench=${cfg.wallclockBench}" ]
+          )
           ++ lib.optional (cfg.virtualHost != null) "--public-url=https://${cfg.virtualHost}/"
           ++ lib.optional (cfg.cpu != null) "--cpu=${cfg.cpu}"
           # the default bench list is replaced, not extended, so it is always passed
