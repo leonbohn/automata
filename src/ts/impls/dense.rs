@@ -20,7 +20,7 @@ pub(super) const NONE: DefaultIdType = DefaultIdType::MAX;
 /// For `n` states and an alphabet of size `k`, the edge leaving state `q` on the symbol with
 /// index `a` lives in slot `q * k + a`, which is also its [`EdgeId`]. Looking up an edge is thus one
 /// index computation and a load. The targets and colors of the slots are kept in two separate
-/// vectors, a target of [`NONE`] marks an absent edge.
+/// vectors, a target of `NONE` marks an absent edge.
 ///
 /// No expression is stored per edge, it is lent out by the alphabet via
 /// [`IndexedAlphabet::expression_ref`].

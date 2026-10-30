@@ -885,7 +885,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ts::{Compaction, DenseTs, Det, ForAlphabet, LinkedTs};
+    use crate::ts::{Compaction, CsrTs, DenseTs, Det, ForAlphabet, LinkedTs};
     use proptest::prelude::*;
 
     type Linked = LinkedTs<CharAlphabet, u8, u8>;
@@ -1172,6 +1172,31 @@ mod tests {
             Harness::new_deterministic(ts, Dense::check_consistency)
                 .run(&ops)
                 .assert_runs_agree(&words);
+        }
+
+        #[test]
+        fn csr_ts_built_from_dense_agrees_with_model(ops in proptest::collection::vec(op(), 0..80)) {
+            let ts = Dense::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, Dense::check_consistency)
+                .run(&ops)
+                .assert_frozen_agrees(|ts| {
+                    let csr = CsrTs::from_ts(ts);
+                    csr.check_consistency();
+                    csr
+                });
+        }
+
+        #[test]
+        fn csr_ts_built_from_linked_agrees_with_model(ops in proptest::collection::vec(op(), 0..80)) {
+            let ts = DetLinked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, DetLinked::check_consistency)
+                .with_compaction(compact_det)
+                .run(&ops)
+                .assert_frozen_agrees(|ts| {
+                    let csr = CsrTs::from_ts(ts);
+                    csr.check_consistency();
+                    csr
+                });
         }
     }
 }
