@@ -97,6 +97,47 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
         )
     }
 
+    /// Checks the invariants of the data structure and panics if one is violated:
+    /// - there is one slot per state and symbol, and one predecessor list per state,
+    /// - a slot has a color exactly if it has a target,
+    /// - the source and the target of every edge are live states,
+    /// - the predecessor list of a state holds exactly the ids of the edges that lead to it.
+    pub fn check_consistency(&self) {
+        let k = self.alphabet.size();
+        let n = self.states.len();
+        assert_eq!(self.targets.len(), n * k, "wrong number of target slots");
+        assert_eq!(self.colors.len(), n * k, "wrong number of color slots");
+        assert_eq!(
+            self.predecessors.len(),
+            n,
+            "wrong number of predecessor lists"
+        );
+
+        let mut incoming = vec![Vec::new(); n];
+        for (slot, target) in self.targets.iter().enumerate() {
+            assert_eq!(
+                self.colors[slot].is_some(),
+                *target != NONE,
+                "slot {slot} has a color iff it has a target"
+            );
+            if *target == NONE {
+                continue;
+            }
+            assert!(self.is_live(slot / k), "edge {slot} leaves a removed state");
+            assert!(
+                self.is_live(*target as usize),
+                "edge {slot} leads to a removed state"
+            );
+            incoming[*target as usize].push(EdgeId(slot as u32));
+        }
+        for (q, mut expected) in incoming.into_iter().enumerate() {
+            let mut actual = self.predecessors[q].clone();
+            actual.sort();
+            expected.sort();
+            assert_eq!(actual, expected, "wrong predecessors of state {q}");
+        }
+    }
+
     /// Writes the edge into `slot`, replacing the edge that was there, and keeps the predecessors
     /// up to date. Both endpoints must exist.
     fn set_slot(&mut self, slot: usize, color: C, target: DefaultIdType) -> EdgeId {

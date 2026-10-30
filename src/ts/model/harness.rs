@@ -885,11 +885,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ts::{Compaction, Det, ForAlphabet, LinkedTs};
+    use crate::ts::{Compaction, DenseTs, Det, ForAlphabet, LinkedTs};
     use proptest::prelude::*;
 
     type Linked = LinkedTs<CharAlphabet, u8, u8>;
     type DetLinked = Det<Linked>;
+    type Dense = DenseTs<CharAlphabet, u8, u8>;
 
     fn op() -> impl Strategy<Value = Op> {
         let sel = 0usize..16;
@@ -1065,6 +1066,7 @@ mod tests {
             harness.assert_round_trip_via::<Linked>();
             if harness.model.is_deterministic() {
                 harness.assert_round_trip_via::<DetLinked>();
+                harness.assert_round_trip_via::<Dense>();
             }
         }
 
@@ -1076,6 +1078,7 @@ mod tests {
                 .run(&ops);
             harness.assert_round_trip_via::<Linked>();
             harness.assert_round_trip_via::<DetLinked>();
+            harness.assert_round_trip_via::<Dense>();
         }
 
         #[test]
@@ -1096,6 +1099,79 @@ mod tests {
             Harness::new_deterministic(ts, DetLinked::check_consistency)
                 .with_compaction(compact_det)
                 .run(&ops);
+        }
+
+        #[test]
+        fn dense_ts_agrees_with_deterministic_model(ops in proptest::collection::vec(op(), 0..80)) {
+            let ts = Dense::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, Dense::check_consistency).run(&ops);
+        }
+
+        #[test]
+        fn dense_ts_sccs_agree_with_model(ops in proptest::collection::vec(op(), 0..80)) {
+            let ts = Dense::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, Dense::check_consistency)
+                .run(&ops)
+                .assert_sccs_agree();
+        }
+
+        #[test]
+        fn dense_ts_subset_construction_agrees_with_model(
+            ops in proptest::collection::vec(op(), 0..60),
+            origins in proptest::collection::vec(0usize..16, 1..4),
+            words in proptest::collection::vec(proptest::collection::vec(0..ALPHABET_SIZE, 0..6), 0..6),
+        ) {
+            let ts = Dense::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, Dense::check_consistency)
+                .run(&ops)
+                .assert_subset_construction_agrees(&origins, &words);
+        }
+
+        #[test]
+        fn dense_ts_minimization_agrees_with_model(ops in proptest::collection::vec(op(), 0..80)) {
+            let ts = Dense::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, Dense::check_consistency)
+                .run(&ops)
+                .assert_minimization_agrees();
+        }
+
+        #[test]
+        fn dense_ts_equivalence_agrees_with_model(ops in proptest::collection::vec(op(), 0..40)) {
+            let ts = Dense::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, Dense::check_consistency)
+                .run(&ops)
+                .assert_equivalence_agrees();
+        }
+
+        #[test]
+        fn complete_dense_ts_equivalence_agrees_with_model(
+            ops in proptest::collection::vec(op(), 0..40),
+            fill in proptest::collection::vec((0usize..16, 0u8..4), 1..8),
+        ) {
+            let ts = Dense::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            let mut harness = Harness::new_deterministic(ts, Dense::check_consistency).run(&ops);
+            harness.complete(&fill);
+            harness.assert_equivalence_agrees();
+        }
+
+        #[test]
+        fn dense_ts_round_trips(ops in proptest::collection::vec(op(), 0..60)) {
+            let ts = Dense::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            let harness = Harness::new_deterministic(ts, Dense::check_consistency).run(&ops);
+            harness.assert_round_trip_via::<Linked>();
+            harness.assert_round_trip_via::<DetLinked>();
+            harness.assert_round_trip_via::<Dense>();
+        }
+
+        #[test]
+        fn dense_ts_runs_agree_with_model(
+            ops in proptest::collection::vec(op(), 0..80),
+            words in proptest::collection::vec(proptest::collection::vec(0..ALPHABET_SIZE, 0..8), 0..8),
+        ) {
+            let ts = Dense::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, Dense::check_consistency)
+                .run(&ops)
+                .assert_runs_agree(&words);
         }
     }
 }
