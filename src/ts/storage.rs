@@ -13,6 +13,11 @@ use crate::ts::{CsrTs, DenseTs, Det, ForAlphabet, LinkedTs, Sproutable, States};
 ///
 /// [`Det<Linked>`]: crate::ts::Det
 pub trait Storage<A: Alphabet> {
+    /// Whether the systems of this storage are deterministic, that is whether adding an edge
+    /// replaces the edges that overlap with it. The builder uses this to report overlapping edges
+    /// instead of silently dropping them.
+    const DETERMINISTIC: bool;
+
     /// The transition system of this storage with the given colors.
     type Ts<Q: Color, C: Color>: States<Alphabet = A, StateColor = Q, EdgeColor = C>;
 
@@ -43,6 +48,8 @@ impl<A: Alphabet> SproutableStorage<A> for Linked {
 }
 
 impl<A: Alphabet> Storage<A> for Linked {
+    const DETERMINISTIC: bool = false;
+
     type Ts<Q: Color, C: Color> = LinkedTs<A, Q, C>;
 
     fn try_from_linked<Q: Color, C: Color>(
@@ -62,6 +69,8 @@ impl<A: IndexedAlphabet> SproutableStorage<A> for Dense {
 }
 
 impl<A: IndexedAlphabet> Storage<A> for Dense {
+    const DETERMINISTIC: bool = true;
+
     type Ts<Q: Color, C: Color> = DenseTs<A, Q, C>;
 
     fn try_from_linked<Q: Color, C: Color>(
@@ -81,6 +90,8 @@ impl<A: IndexedAlphabet> Storage<A> for Dense {
 pub struct Csr;
 
 impl<A: IndexedAlphabet> Storage<A> for Csr {
+    const DETERMINISTIC: bool = true;
+
     type Ts<Q: Color, C: Color> = CsrTs<A, Q, C>;
 
     fn try_from_linked<Q: Color, C: Color>(

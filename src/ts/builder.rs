@@ -1,10 +1,12 @@
-use super::{DefaultIdType, ForAlphabet, IntoEdgeTuple, Sproutable};
-use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine, WithInitial};
+use super::{DefaultIdType, ForAlphabet, IntoEdgeTuple, Sproutable, Storage};
+use crate::automaton::{Automaton, DBA, DFA, DPA, MealyMachine, MooreMachine, WithInitial};
+use crate::automaton::{
+    BuchiCondition, MealySemantics, MinEvenParityCondition, MooreSemantics, ReachabilityCondition,
+};
 use crate::representation::IntoTs;
-use crate::ts::Deterministic;
 use crate::{Color, Int, Void, alphabet::CharAlphabet};
 use crate::{DTS, NTS, RightCongruence, TransitionSystem};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use thiserror::Error;
 
 /// Errors that can occur when turning a [`Builder`] into a transition system or automaton.
@@ -139,13 +141,52 @@ impl<Q: Color, C: Color> Builder<Q, C> {
             .fold(self, |acc, (i, x)| acc.color(i as DefaultIdType, x))
     }
 
-    /// Creates the states and the alphabet of the system and adds the edges with `add`.
-    fn build<T>(
-        self,
-        mut add: impl FnMut(&mut T, (DefaultIdType, char, C, DefaultIdType)) -> Result<(), BuilderError>,
-    ) -> Result<T, BuilderError>
+    /// Builds the transition system `T` from `self`. The target type decides about determinism:
+    /// for a deterministic one (like [`DTS`] or [`DenseTs`](super::DenseTs)) overlapping edges are an
+    /// error, a non-deterministic one (like [`NTS`]) accepts them.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_build`].
+    ///
+    /// # Example
+    /// ```
+    /// use automata::{DTS, ts::Builder};
+    ///
+    /// let builder = Builder::without_colors().with_edges([(0, 'a', 1), (1, 'a', 0)]);
+    /// let _dts = builder.build::<DTS>();
+    /// ```
+    #[track_caller]
+    pub fn build<T>(self) -> T
     where
-        T: ForAlphabet<CharAlphabet> + Sproutable<StateColor = Q, EdgeColor = C>,
+        T: ForAlphabet<CharAlphabet>
+            + Sproutable<
+                Alphabet = CharAlphabet,
+                StateIndex = DefaultIdType,
+                StateColor = Q,
+                EdgeColor = C,
+            >,
+    {
+        or_panic(self.try_build())
+    }
+
+    /// Fallible version of [`Self::build`]. The states are `0..=m` where `m` is the largest id
+    /// that appears on an edge, and the alphabet consists of the symbols on the edges
+    /// and the ones added with [`Self::with_alphabet_symbols`].
+    ///
+    /// # Errors
+    /// - [`BuilderError::MissingStateColor`] if a state has no color and there is no default color
+    ///   (so gaps in the ids need a default color),
+    /// - [`BuilderError::OverlappingEdge`] if `T` is deterministic and an edge overlaps with a
+    ///   previously added one.
+    pub fn try_build<T>(self) -> Result<T, BuilderError>
+    where
+        T: ForAlphabet<CharAlphabet>
+            + Sproutable<
+                Alphabet = CharAlphabet,
+                StateIndex = DefaultIdType,
+                StateColor = Q,
+                EdgeColor = C,
+            >,
     {
         let alphabet =
             CharAlphabet::from_iter(self.edges.iter().map(|(_, c, _, _)| *c).chain(self.symbols));
@@ -173,8 +214,24 @@ impl<Q: Color, C: Color> Builder<Q, C> {
             ts.add_state(color);
         }
 
-        for edge in self.edges {
-            add(&mut ts, edge)?;
+        if <<T as Sproutable>::Storage as Storage<CharAlphabet>>::DETERMINISTIC {
+            let mut seen = HashMap::<(DefaultIdType, char), DefaultIdType>::new();
+            for &(q, e, _, p) in &self.edges {
+                if let Some(existing_target) = seen.insert((q, e), p) {
+                    return Err(BuilderError::OverlappingEdge {
+                        source_state: q,
+                        expression: e.to_string(),
+                        target: p,
+                        existing_target,
+                    });
+                }
+            }
+        }
+
+        // linked storages iterate the edges of a state in reverse order of insertion, so we insert
+        // them back to front to get them in the order in which they were given
+        for edge in self.edges.into_iter().rev() {
+            ts.add_edge(edge);
         }
         Ok(ts)
     }
@@ -190,10 +247,7 @@ impl<Q: Color, C: Color> Builder<Q, C> {
 
     /// Fallible version of [`Self::into_nts`].
     pub fn try_into_nts(self) -> Result<NTS<CharAlphabet, Q, C>, BuilderError> {
-        self.build(|ts: &mut NTS<CharAlphabet, Q, C>, edge| {
-            ts.add_edge(edge);
-            Ok(())
-        })
+        self.try_build()
     }
 
     /// Builds a [NondeterministicTransitionSystem](`NTS`) from `self` with an initial state.
@@ -314,18 +368,7 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     ///   color),
     /// - [`BuilderError::OverlappingEdge`] if an edge overlaps with a previously added one.
     pub fn try_into_dts(self) -> Result<DTS<CharAlphabet, Q, C>, BuilderError> {
-        self.build(|ts: &mut DTS<CharAlphabet, Q, C>, (q, e, c, p)| {
-            if let Some(existing) = ts.edge(q, e) {
-                return Err(BuilderError::OverlappingEdge {
-                    source_state: q,
-                    expression: e.to_string(),
-                    target: p,
-                    existing_target: existing.target(),
-                });
-            }
-            ts.add_edge((q, e, c, p));
-            Ok(())
-        })
+        self.try_build()
     }
 
     /// Builds an instance of [`DTS`] from `self` and sets the given `initial` state
@@ -347,6 +390,48 @@ impl<Q: Color, C: Color> Builder<Q, C> {
         initial: DefaultIdType,
     ) -> Result<WithInitial<DTS<CharAlphabet, Q, C>>, BuilderError> {
         Ok(self.try_into_dts()?.with_initial(initial))
+    }
+
+    /// Builds an [`Automaton`] with the given `initial` state and `acceptance` over a [`DTS`]. The
+    /// helpers [`Self::into_dfa`], [`Self::into_dba`], [`Self::into_dpa`], [`Self::into_moore`] and
+    /// [`Self::into_mealy`] are shorthands for the common acceptance conditions.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_build`].
+    ///
+    /// # Example
+    /// ```
+    /// use automata::{automaton::ReachabilityCondition, ts::Builder};
+    ///
+    /// let dfa = Builder::without_edge_colors()
+    ///     .with_state_colors([true, false])
+    ///     .with_edges([(0, 'a', 1), (1, 'a', 0)])
+    ///     .into_automaton(0, ReachabilityCondition);
+    /// assert!(dfa.accepts("aa"));
+    /// ```
+    #[track_caller]
+    pub fn into_automaton<Sem>(
+        self,
+        initial: DefaultIdType,
+        acceptance: Sem,
+    ) -> Automaton<DTS<CharAlphabet, Q, C>, Sem> {
+        or_panic(self.try_into_automaton(initial, acceptance))
+    }
+
+    /// Fallible version of [`Self::into_automaton`].
+    ///
+    /// # Errors
+    /// See [`Self::try_build`].
+    pub fn try_into_automaton<Sem>(
+        self,
+        initial: DefaultIdType,
+        acceptance: Sem,
+    ) -> Result<Automaton<DTS<CharAlphabet, Q, C>, Sem>, BuilderError> {
+        Ok(Automaton::from_parts_with_acceptance(
+            self.try_build()?,
+            initial,
+            acceptance,
+        ))
     }
 
     /// Turns `self` into a [`RightCongruence`] with the given initial state.
@@ -414,7 +499,7 @@ impl Builder<bool, Void> {
         self,
         initial: DefaultIdType,
     ) -> Result<DFA<DTS<CharAlphabet, bool, Void>>, BuilderError> {
-        Ok(self.try_into_dts()?.with_initial(initial).into_dfa())
+        self.try_into_automaton(initial, ReachabilityCondition)
     }
 }
 
@@ -433,11 +518,8 @@ impl Builder<Void, bool> {
         self,
         initial: DefaultIdType,
     ) -> Result<DBA<DTS<CharAlphabet, Void, bool>>, BuilderError> {
-        Ok(self
-            .default_color(Void)
-            .try_into_dts()?
-            .with_initial(initial)
-            .into_dba())
+        self.default_color(Void)
+            .try_into_automaton(initial, BuchiCondition)
     }
 }
 
@@ -456,11 +538,8 @@ impl Builder<Void, Int> {
         self,
         initial: DefaultIdType,
     ) -> Result<DPA<DTS<CharAlphabet, Void, Int>>, BuilderError> {
-        Ok(self
-            .default_color(Void)
-            .try_into_dts()?
-            .with_initial(initial)
-            .into_dpa())
+        self.default_color(Void)
+            .try_into_automaton(initial, MinEvenParityCondition)
     }
 
     /// Builds a Mealy machine from `self`.
@@ -477,11 +556,8 @@ impl Builder<Void, Int> {
         self,
         initial: DefaultIdType,
     ) -> Result<MealyMachine<DTS<CharAlphabet, Void, Int>>, BuilderError> {
-        Ok(self
-            .default_color(Void)
-            .try_into_dts()?
-            .with_initial(initial)
-            .into_mealy())
+        self.default_color(Void)
+            .try_into_automaton(initial, MealySemantics)
     }
 }
 
@@ -500,7 +576,7 @@ impl Builder<Int, Void> {
         self,
         initial: DefaultIdType,
     ) -> Result<MooreMachine<DTS<CharAlphabet, Int, Void>>, BuilderError> {
-        Ok(self.try_into_dts()?.with_initial(initial).into_moore())
+        self.try_into_automaton(initial, MooreSemantics)
     }
 }
 
@@ -508,6 +584,7 @@ impl Builder<Int, Void> {
 mod tests {
     use super::{Builder, BuilderError};
     use crate::TransitionSystem;
+    use crate::alphabet::CharAlphabet;
     use crate::ts::States;
 
     #[test]
@@ -571,6 +648,54 @@ mod tests {
             .with_transitions([(0, 'a', 1), (0, 'a', 0)])
             .try_into_nts();
         assert!(nondeterministic.is_ok());
+    }
+
+    #[test]
+    fn build_decides_about_determinism_by_the_target_type() {
+        use crate::{
+            DTS, NTS, Void,
+            ts::{DenseTs, Det, LinkedTs},
+        };
+        let builder =
+            || Builder::<Void, Void>::without_colors().with_transitions([(0, 'a', 1), (0, 'a', 0)]);
+        assert!(builder().try_build::<NTS>().is_ok());
+        let overlap = BuilderError::OverlappingEdge {
+            source_state: 0,
+            expression: "a".to_string(),
+            target: 0,
+            existing_target: 1,
+        };
+        assert_eq!(builder().try_build::<DTS>().err(), Some(overlap.clone()));
+        assert_eq!(
+            builder()
+                .try_build::<DenseTs<CharAlphabet, Void, Void>>()
+                .err(),
+            Some(overlap)
+        );
+        let _: Det<LinkedTs<CharAlphabet, Void, Void>> = Builder::without_colors()
+            .with_edges([(0, 'a', 1), (1, 'a', 0)])
+            .build();
+    }
+
+    #[test]
+    fn built_systems_iterate_edges_in_the_order_they_were_given() {
+        use crate::{DTS, NTS, TransitionSystem};
+        let edges = [(0, 'a', 1), (0, 'b', 0), (0, 'c', 1), (1, 'a', 0)];
+        let expected: Vec<_> = edges.iter().filter(|e| e.0 == 0).map(|e| e.1).collect();
+        let nts = Builder::without_colors().with_edges(edges).build::<NTS>();
+        let dts = Builder::without_colors().with_edges(edges).build::<DTS>();
+        let nts: Vec<char> = nts
+            .edges_from(0)
+            .unwrap()
+            .map(|e| *e.expression())
+            .collect();
+        let dts: Vec<char> = dts
+            .edges_from(0)
+            .unwrap()
+            .map(|e| *e.expression())
+            .collect();
+        assert_eq!(nts, expected);
+        assert_eq!(dts, expected);
     }
 
     #[test]
