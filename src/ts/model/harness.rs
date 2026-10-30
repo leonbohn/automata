@@ -12,6 +12,9 @@ use std::collections::HashMap;
 use crate::{
     TransitionSystem,
     alphabet::CharAlphabet,
+    minimization::partition_refinement::{
+        mealy_greatest_bisimulation, moore_greatest_bisimulation,
+    },
     ts::{
         Deterministic, EdgeId, EdgeTuple, IdType, Pointed, PredecessorIterable, Shrinkable,
         Sproutable, States,
@@ -672,6 +675,33 @@ where
         + Deterministic
         + States,
 {
+    /// Compares the greatest bisimulations (the partitions that minimization is based on) of
+    /// the storage, seen as Moore machine and as Mealy machine, with the classes of the model.
+    pub fn assert_minimization_agrees(&self) {
+        let to_model = |partition: crate::partition::Partition<Ts::StateIndex>| {
+            let mut classes: Vec<Vec<usize>> = (&partition)
+                .into_iter()
+                .map(|class| {
+                    let mut class: Vec<_> = class.iter().map(|&q| self.reverse_state(q)).collect();
+                    class.sort();
+                    class
+                })
+                .collect();
+            classes.sort();
+            classes
+        };
+        assert_eq!(
+            self.model.moore_classes(ALPHABET_SIZE),
+            to_model(moore_greatest_bisimulation(&self.ts)),
+            "Moore bisimulation differs"
+        );
+        assert_eq!(
+            self.model.mealy_classes(ALPHABET_SIZE),
+            to_model(mealy_greatest_bisimulation(&self.ts)),
+            "Mealy bisimulation differs"
+        );
+    }
+
     /// Compares `edge`, `successor` and runs of a deterministic storage with the model. Every
     /// word is run from every state, and from a state that does not exist.
     pub fn assert_runs_agree(&self, words: &[Vec<usize>]) {
@@ -817,6 +847,15 @@ mod tests {
                 .with_compaction(compact_det)
                 .run(&ops)
                 .assert_subset_construction_agrees(&origins, &words);
+        }
+
+        #[test]
+        fn det_linked_ts_minimization_agrees_with_model(ops in proptest::collection::vec(op(), 0..80)) {
+            let ts = DetLinked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, DetLinked::check_consistency)
+                .with_compaction(compact_det)
+                .run(&ops)
+                .assert_minimization_agrees();
         }
 
         #[test]

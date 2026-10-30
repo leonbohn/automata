@@ -26,6 +26,10 @@ pub struct ModelEdge<C> {
 /// A fully expanded edge `source --symbol:color--> target` together with its identifier.
 pub type ModelEdgeTuple<C> = (usize, usize, usize, C, usize);
 
+/// What distinguishes a state during refinement: its current class and, for every symbol, the
+/// color of the edge (only for Mealy machines) and the class it leads to, if there is an edge.
+type Signature<C> = (usize, Vec<Option<(Option<C>, usize)>>);
+
 /// Naive transition system with state colors `Q` and edge colors `C`.
 ///
 /// `states[i]` is `None` once state `i` has been removed, otherwise it holds the color of the
@@ -227,6 +231,103 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
                 return reached;
             }
         }
+    }
+
+    /// The coarsest partition of the states such that states in one class have the same state
+    /// color and, for every symbol, either no edge or edges into the same class. Computed by
+    /// refining the classes by color until nothing changes. Classes and their members are sorted.
+    ///
+    /// # Panics
+    /// If the model is not deterministic.
+    pub fn moore_classes(&self, symbols: usize) -> Vec<Vec<usize>>
+    where
+        Q: PartialEq,
+        C: PartialEq,
+    {
+        self.refine_classes(symbols, true)
+    }
+
+    /// The coarsest partition of the states such that, for every symbol, states in one class have
+    /// either no edge or edges with the same color into the same class. The state colors are
+    /// ignored.
+    ///
+    /// # Panics
+    /// If the model is not deterministic.
+    pub fn mealy_classes(&self, symbols: usize) -> Vec<Vec<usize>>
+    where
+        Q: PartialEq,
+        C: PartialEq,
+    {
+        self.refine_classes(symbols, false)
+    }
+
+    fn refine_classes(&self, symbols: usize, by_state_color: bool) -> Vec<Vec<usize>>
+    where
+        Q: PartialEq,
+        C: PartialEq,
+    {
+        let states = self.states();
+        // the class of every state, indexed by position in `states`
+        let mut class = vec![0usize; states.len()];
+        if by_state_color {
+            let mut seen: Vec<Q> = Vec::new();
+            for (i, &q) in states.iter().enumerate() {
+                let color = self.state_color(q).expect("state exists");
+                class[i] = match seen.iter().position(|c| *c == color) {
+                    Some(k) => k,
+                    None => {
+                        seen.push(color);
+                        seen.len() - 1
+                    }
+                };
+            }
+        }
+        loop {
+            let class_of = |q: usize| class[states.iter().position(|&p| p == q).unwrap()];
+            let mut signatures: Vec<Signature<C>> = Vec::new();
+            let mut next = vec![0usize; states.len()];
+            for (i, &q) in states.iter().enumerate() {
+                let outgoing = self.edges_from(q).expect("state exists");
+                let signature: Vec<_> = (0..symbols)
+                    .map(|symbol| {
+                        let mut on_symbol = outgoing.iter().filter(|e| e.symbol == symbol);
+                        let edge = on_symbol.next();
+                        assert!(on_symbol.next().is_none(), "model is not deterministic");
+                        edge.map(|e| {
+                            let color = (!by_state_color).then(|| e.color.clone());
+                            (color, class_of(e.target))
+                        })
+                    })
+                    .collect();
+                let entry = (class[i], signature);
+                next[i] = match signatures.iter().position(|s| *s == entry) {
+                    Some(k) => k,
+                    None => {
+                        signatures.push(entry);
+                        signatures.len() - 1
+                    }
+                };
+            }
+            let before = class.iter().max().map_or(0, |m| m + 1);
+            let after = signatures.len();
+            class = next;
+            if before == after {
+                break;
+            }
+        }
+        let mut classes: Vec<Vec<usize>> = Vec::new();
+        for k in 0..class.iter().max().map_or(0, |m| m + 1) {
+            classes.push(
+                states
+                    .iter()
+                    .zip(&class)
+                    .filter(|(_, c)| **c == k)
+                    .map(|(q, _)| *q)
+                    .collect(),
+            );
+        }
+        classes.sort();
+        classes
     }
 
     /// The strongly connected components: two states are in the same one iff each is reachable
@@ -475,6 +576,25 @@ mod tests {
         assert_eq!(m.reach_from_set(&[q[0], q[0]], &[]), vec![q[0]]);
         assert_eq!(m.edge_colors_on(&[q[0], q[2]], 0), vec![3, 4, 5]);
         assert_eq!(m.edge_colors_on(&[q[1]], 0), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn minimization_classes() {
+        let mut m = Model::<u8, u8>::new();
+        let q: Vec<_> = [0, 0, 1, 0].iter().map(|&c| m.add_state(c)).collect();
+        // 0 and 1 behave the same, 3 has no edge so it differs from them
+        m.add_edge(q[0], 0, 7, q[2]);
+        m.add_edge(q[1], 0, 8, q[2]);
+        m.add_edge(q[2], 0, 7, q[2]);
+        assert_eq!(
+            m.moore_classes(1),
+            vec![vec![q[0], q[1]], vec![q[2]], vec![q[3]]]
+        );
+        // for Mealy machines the edge colors tell 0 and 1 apart, 2 and 0 agree on the edge color
+        assert_eq!(
+            m.mealy_classes(1),
+            vec![vec![q[0], q[2]], vec![q[1]], vec![q[3]]]
+        );
     }
 
     #[test]
