@@ -1,3 +1,5 @@
+mod dense;
+pub use dense::DenseTs;
 mod det;
 pub use det::Det;
 pub(crate) mod linked;

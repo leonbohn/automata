@@ -124,6 +124,28 @@ pub trait Alphabet: Clone + Debug {
     }
 }
 
+/// Implemented by [`Alphabet`]s that can be indexed, i.e. where we can associate each
+/// [`Alphabet::Symbol`] and [`Alphabet::Expression`] with a unique index (a `usize`).
+/// All conversions are expected to take constant time.
+pub trait IndexedAlphabet: Alphabet {
+    /// Turns the given symbol into an index.
+    fn symbol_to_index(&self, sym: Self::Symbol) -> usize;
+    /// Turns the given expression into an index.
+    fn expression_to_index(&self, sym: &Self::Expression) -> usize;
+    /// Returns the symbol that corresponds to the given index.
+    fn symbol_from_index(&self, index: usize) -> Self::Symbol;
+    /// Returns the expression that corresponds to the given index.
+    fn expression_from_index(&self, index: usize) -> Self::Expression;
+    /// Turns the given expression into a symbol.
+    fn expression_to_symbol(&self, expression: &Self::Expression) -> Self::Symbol {
+        self.symbol_from_index(self.expression_to_index(expression))
+    }
+    /// Turns the given symbol into an expression.
+    fn symbol_to_expression(&self, symbol: Self::Symbol) -> Self::Expression {
+        self.expression_from_index(self.symbol_to_index(symbol))
+    }
+}
+
 impl<A: Alphabet> Alphabet for &A {
     type Expression = A::Expression;
     type Symbol = A::Symbol;

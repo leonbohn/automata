@@ -1,4 +1,4 @@
-use crate::alphabet::{Alphabet, CharAlphabet};
+use crate::alphabet::{Alphabet, IndexedAlphabet};
 use crate::ts::States;
 use crate::{Pointed, TransitionSystem};
 use bimap::BiBTreeMap;
@@ -22,48 +22,6 @@ pub trait ForAlphabet<A: Alphabet>: Sized {
     /// system allowing for preallocation of memory. The resulting TS should be empty.
     fn for_alphabet_size_hint(from: A, _size_hint: usize) -> Self {
         Self::for_alphabet(from)
-    }
-}
-
-/// Marker trait for [`Alphabet`]s that can be indexed, i.e. where we can associate each
-/// [`Alphabet::Symbol`] and [`Alphabet::Expression`] with a unique index (a `usize`).
-pub trait IndexedAlphabet: Alphabet {
-    /// Turns the given symbol into an index.
-    fn symbol_to_index(&self, sym: Self::Symbol) -> usize;
-    /// Turns the given expression into an index.
-    fn expression_to_index(&self, sym: &Self::Expression) -> usize;
-    /// Returns the symbol that corresponds to the given index.
-    fn symbol_from_index(&self, index: usize) -> Self::Symbol;
-    /// Returns the expression that corresponds to the given index.
-    fn expression_from_index(&self, index: usize) -> Self::Expression;
-    /// Turns the given expression into a symbol.
-    fn expression_to_symbol(&self, expression: &Self::Expression) -> Self::Symbol {
-        self.symbol_from_index(self.expression_to_index(expression))
-    }
-    /// Turns the given symbol into an expression.
-    fn symbol_to_expression(&self, symbol: Self::Symbol) -> Self::Expression {
-        self.expression_from_index(self.symbol_to_index(symbol))
-    }
-}
-
-impl IndexedAlphabet for CharAlphabet {
-    fn symbol_to_index(&self, sym: Self::Symbol) -> usize {
-        self.expression_to_index(&sym)
-    }
-
-    fn expression_to_index(&self, sym: &Self::Expression) -> usize {
-        self.universe()
-            .position(|x| x == *sym)
-            .expect("Must be present in alphabet")
-    }
-
-    fn symbol_from_index(&self, index: usize) -> Self::Symbol {
-        self.expression_from_index(index)
-    }
-
-    fn expression_from_index(&self, index: usize) -> Self::Expression {
-        assert!(index < self.size());
-        self[index]
     }
 }
 

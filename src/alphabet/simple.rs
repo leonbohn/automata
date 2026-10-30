@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::show::Show;
 
-use super::{Alphabet, Expression, Matcher, Symbol};
+use super::{Alphabet, Expression, IndexedAlphabet, Matcher, Symbol};
 
 /// An alphabet of individual symbols that are their own expressions, i.e. every edge is labeled
 /// by a single symbol. The symbols are numbered in a fixed order.
@@ -47,15 +47,27 @@ where
 pub struct CharAlphabet(pub(crate) Vec<char>);
 
 impl CharAlphabet {
-    /// Creates a new [`CharAlphabet`] alphabet of the given size. The symbols are just the first `size` letters
-    /// of the alphabet, i.e. 'a' to 'z'.
+    /// Sorts and deduplicates the symbols, so that the position of a symbol can be found by binary
+    /// search.
+    fn from_symbols(mut symbols: Vec<char>) -> Self {
+        symbols.sort_unstable();
+        symbols.dedup();
+        Self(symbols)
+    }
+
+    /// Creates a new [`CharAlphabet`] alphabet of the given size. The symbols are the first `size`
+    /// letters of the alphabet, i.e. 'a' to 'z', followed by the characters after 'z' in code point
+    /// order if `size` exceeds 26.
     ///
     /// # Panics
     ///
-    /// Panics if `size` is 26 or more, as every symbol is a lowercase letter.
+    /// Panics if the symbols would leave the range of valid characters.
     pub fn of_size(size: usize) -> Self {
-        assert!(size < 26, "Alphabet is too large");
-        Self((0..size).map(|i| (b'a' + i as u8) as char).collect())
+        Self::from_symbols(
+            (0..size)
+                .map(|i| char::from_u32('a' as u32 + i as u32).expect("Alphabet is too large"))
+                .collect(),
+        )
     }
 }
 
@@ -69,20 +81,20 @@ impl std::ops::Index<usize> for CharAlphabet {
 
 impl From<Vec<char>> for CharAlphabet {
     fn from(value: Vec<char>) -> Self {
-        Self(value)
+        Self::from_symbols(value)
     }
 }
 
 impl FromIterator<char> for CharAlphabet {
     fn from_iter<T: IntoIterator<Item = char>>(iter: T) -> Self {
-        Self(iter.into_iter().unique().sorted().collect())
+        Self::from_symbols(iter.into_iter().collect())
     }
 }
 
 impl CharAlphabet {
     /// Creates a new [`CharAlphabet`] alphabet from an iterator over the symbols.
     pub fn new(symbols: Vec<char>) -> Self {
-        Self(symbols)
+        Self::from_symbols(symbols)
     }
 }
 
@@ -137,7 +149,7 @@ impl Alphabet for CharAlphabet {
     }
 
     fn contains(&self, symbol: Self::Symbol) -> bool {
-        self.0.contains(&symbol)
+        self.0.binary_search(&symbol).is_ok()
     }
 
     #[inline(always)]
@@ -170,7 +182,31 @@ impl SimpleAlphabet for CharAlphabet {
     }
 
     fn try_position(&self, symbol: Self::Symbol) -> Option<usize> {
-        self.0.iter().position(|x| symbol.eq(x))
+        self.0.binary_search(&symbol).ok()
+    }
+}
+
+impl IndexedAlphabet for CharAlphabet {
+    #[inline]
+    fn symbol_to_index(&self, sym: Self::Symbol) -> usize {
+        self.0
+            .binary_search(&sym)
+            .expect("Must be present in alphabet")
+    }
+
+    #[inline]
+    fn expression_to_index(&self, sym: &Self::Expression) -> usize {
+        self.symbol_to_index(*sym)
+    }
+
+    #[inline]
+    fn symbol_from_index(&self, index: usize) -> Self::Symbol {
+        self.0[index]
+    }
+
+    #[inline]
+    fn expression_from_index(&self, index: usize) -> Self::Expression {
+        self.symbol_from_index(index)
     }
 }
 
@@ -202,6 +238,31 @@ impl Expression for usize {
 
     fn matched_by(&self, symbol: usize) -> bool {
         *self == symbol
+    }
+}
+
+impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> IndexedAlphabet for Fixed<S, N> {
+    #[inline]
+    fn symbol_to_index(&self, sym: Self::Symbol) -> usize {
+        self.0
+            .iter()
+            .position(|x| *x == sym)
+            .expect("Must be present in alphabet")
+    }
+
+    #[inline]
+    fn expression_to_index(&self, sym: &Self::Expression) -> usize {
+        self.symbol_to_index(*sym)
+    }
+
+    #[inline]
+    fn symbol_from_index(&self, index: usize) -> Self::Symbol {
+        self.0[index]
+    }
+
+    #[inline]
+    fn expression_from_index(&self, index: usize) -> Self::Expression {
+        self.symbol_from_index(index)
     }
 }
 
@@ -390,8 +451,9 @@ impl Alphabet for Directional {
 
 #[cfg(test)]
 mod tests {
-    use super::Alphabet;
-    use super::{CharAlphabet, Directional};
+    use super::{Alphabet, SimpleAlphabet};
+    use super::{CharAlphabet, Directional, Fixed};
+    use crate::alphabet::IndexedAlphabet;
     use itertools::Itertools;
 
     #[test]
@@ -399,5 +461,67 @@ mod tests {
         let alph = CharAlphabet::from_iter(['a', 'b', 'c']);
         let bi = Directional::from_alphabet(alph);
         assert_eq!(bi.universe().collect_vec().len(), 6);
+    }
+
+    #[test]
+    fn char_alphabet_is_sorted_and_deduplicated() {
+        let alph = CharAlphabet::new(vec!['c', 'a', 'b', 'a']);
+        assert_eq!(alph.universe().collect_vec(), vec!['a', 'b', 'c']);
+        assert_eq!(alph, CharAlphabet::from(vec!['b', 'c', 'a']));
+    }
+
+    #[test]
+    fn char_alphabet_of_size() {
+        assert_eq!(
+            CharAlphabet::of_size(3).universe().collect_vec(),
+            vec!['a', 'b', 'c']
+        );
+        let large = CharAlphabet::of_size(40);
+        assert_eq!(large.size(), 40);
+        assert_eq!(large.symbol_from_index(39), (b'a' + 39) as char);
+    }
+
+    #[test]
+    fn char_alphabet_indexing_round_trips() {
+        for alph in [
+            CharAlphabet::of_size(0),
+            CharAlphabet::of_size(5),
+            CharAlphabet::new(vec!['x', 'a', 'é', 'λ', '0']),
+        ] {
+            for (i, sym) in alph.universe().enumerate() {
+                assert_eq!(alph.symbol_to_index(sym), i);
+                assert_eq!(alph.expression_to_index(&sym), i);
+                assert_eq!(alph.symbol_from_index(i), sym);
+                assert_eq!(alph.expression_from_index(i), sym);
+                assert_eq!(alph.expression_to_symbol(&sym), sym);
+                assert_eq!(alph.symbol_to_expression(sym), sym);
+                assert_eq!(alph.try_position(sym), Some(i));
+                assert!(alph.contains(sym));
+            }
+        }
+    }
+
+    #[test]
+    fn char_alphabet_absent_symbols() {
+        let alph = CharAlphabet::of_size(3);
+        assert!(!alph.contains('d'));
+        assert_eq!(alph.try_position('d'), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "Must be present in alphabet")]
+    fn char_alphabet_index_of_absent_symbol_panics() {
+        CharAlphabet::of_size(3).symbol_to_index('z');
+    }
+
+    #[test]
+    fn fixed_alphabet_indexing_follows_array_order() {
+        let alph = Fixed::from([7usize, 2, 5]);
+        for (i, sym) in [7usize, 2, 5].into_iter().enumerate() {
+            assert_eq!(alph.symbol_to_index(sym), i);
+            assert_eq!(alph.expression_to_index(&sym), i);
+            assert_eq!(alph.symbol_from_index(i), sym);
+            assert_eq!(alph.expression_from_index(i), sym);
+        }
     }
 }
