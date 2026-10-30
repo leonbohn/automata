@@ -13,8 +13,7 @@ pub use scc::Scc;
 
 mod tarjan;
 use crate::TransitionSystem;
-use crate::ts::EdgeColor;
-pub use tarjan::{kosaraju, tarjan_scc_iterative, tarjan_scc_iterative_from, tarjan_scc_recursive};
+pub use tarjan::{AllStates, Roots, Sccs};
 
 /// Newtype wrapper for storing indices of SCCs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -113,10 +112,7 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     /// Returns an iterator over all transient states in the transition system. A state is transient
     /// if it is in a singleton SCC and there are no self loops. This means that from the state, there
     /// is no way to reach itself.
-    pub fn transient_states(&self) -> impl Iterator<Item = Ts::StateIndex> + '_
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
+    pub fn transient_states(&self) -> impl Iterator<Item = Ts::StateIndex> + '_ {
         self.dag
             .nodes()
             .filter_map(|scc| {
@@ -147,10 +143,7 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
 
     /// Returns the number of SCCs which are not transient, meaning an SCC counts towards
     /// the total if there is at least one transition that starts and ends in it.
-    pub fn proper_size(&self) -> usize
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
+    pub fn proper_size(&self) -> usize {
         self.dag
             .iter()
             .filter(|(_, scc)| scc.is_nontransient())
@@ -186,11 +179,10 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     pub fn fold_edge_colors<F, D>(&self, init: D, f: F) -> Dag<D>
     where
         D: Clone,
-        F: FnMut(D, &Ts::EdgeColor) -> D + Copy,
-        EdgeColor<Ts>: Hash + Eq,
+        F: FnMut(D, Ts::EdgeColor) -> D + Copy,
     {
         self.dag
-            .reduce(|x| x.interior_edge_colors().iter().fold(init.clone(), f))
+            .reduce(|x| x.interior_edge_colors().fold(init.clone(), f))
     }
 
     /// Gives a reference to the actual DAG produced by the decomposition.
@@ -200,17 +192,10 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
 
     /// Returns an iterator over all SCCs which are terminal, meaning they have no outgoing
     /// edges to another SCC.
-    pub fn terminal_sccs(&self) -> impl Iterator<Item = &Scc<'a, Ts>>
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
-        self.dag.iter().filter_map(|(_, scc)| {
-            if scc.border_edges().is_empty() {
-                Some(scc)
-            } else {
-                None
-            }
-        })
+    pub fn terminal_sccs(&self) -> impl Iterator<Item = &Scc<'a, Ts>> {
+        self.dag
+            .iter()
+            .filter_map(|(_, scc)| scc.border_edges().next().is_none().then_some(scc))
     }
 
     /// Gives the first [`Scc`] in the decomposition. This must exist as we only allow
@@ -221,10 +206,7 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
     }
 
     /// Tries to find a nontrivial SCC and if it finds one, asserts that it is the only one.
-    pub fn singleton_nontrivial(&self) -> Option<&Scc<'a, Ts>>
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
+    pub fn singleton_nontrivial(&self) -> Option<&Scc<'a, Ts>> {
         for i in 0..self.dag.size() {
             if self.dag[i].is_trivial() || self.dag[i].is_transient() {
                 continue;
@@ -286,21 +268,16 @@ impl<Ts: TransitionSystem> PartialEq for SccDecomposition<'_, Ts> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn decomposition_of_some_states_ignores_edges_leaving_them() {
-        use crate::ts::TransitionSystem;
+    fn decomposition_from_roots_covers_the_reachable_part() {
         let ts = ts();
-        // the edges 0 -> 1 and 0 -> 2 leave the considered states
-        let sccs = ts.reachable_sccs_from([0]);
-        assert_eq!(sccs.size(), 1);
+        let sccs = Sccs::on(&ts).from([0]).compute();
+        assert_eq!(sccs.size(), 3);
         assert_eq!(sccs.scc_of(0).unwrap().size(), 1);
-        let sccs = ts.reachable_sccs_from([2, 3]);
+        let sccs = Sccs::on(&ts).from([2, 3]).compute();
         assert_eq!(sccs.size(), 1);
         assert_eq!(sccs.scc_of(3).unwrap().size(), 2);
     }
-    use crate::States;
-    use crate::Void;
-
-    use crate::math::FxIndexSet;
+    use crate::ts::Sccs;
 
     use crate::ts::Builder;
     use crate::{
@@ -326,7 +303,7 @@ mod tests {
     #[test]
     fn tarjan_scc_decomposition() {
         let cong = ts();
-        let sccs = cong.sccs();
+        let sccs = Sccs::on(&cong).compute();
 
         let scc1 = Scc::new(&cong, vec![0]);
         let scc2 = Scc::new(&cong, vec![1]);
@@ -337,19 +314,10 @@ mod tests {
             SccDecomposition::from_sccs(&cong, vec![scc1.clone(), scc2.clone(), scc3.clone()])
         );
 
-        assert_eq!(
-            scc2.interior_transitions(),
-            &FxIndexSet::from_iter([(1, 'a', Void, 1), (1, 'b', Void, 1)])
-        );
-        assert_eq!(
-            scc3.interior_transitions(),
-            &FxIndexSet::from_iter([
-                (2, 'a', Void, 3),
-                (2, 'b', Void, 2),
-                (3, 'a', Void, 3),
-                (3, 'b', Void, 2)
-            ])
-        );
+        assert_eq!(scc2.interior_edges().count(), 2);
+        assert_eq!(scc3.interior_edges().count(), 4);
+        assert_eq!(scc3.border_edges().count(), 0);
+        assert_eq!(scc1.border_edges().count(), 2);
 
         assert_eq!(scc1.maximal_word(), None);
         assert_eq!(scc2.maximal_word(), Some(vec!['a', 'b']));

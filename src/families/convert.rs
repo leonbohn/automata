@@ -1,3 +1,4 @@
+use crate::ts::Sccs;
 use crate::ts::States;
 use itertools::Itertools;
 use tracing::{trace, warn};
@@ -21,12 +22,12 @@ impl<A: Alphabet> From<FWPM<A>> for FDFA<A> {
             .map(|(i, pmm)| {
                 let mut coloring = math::FxIndexMap::default();
 
-                let sccs = pmm.sccs();
+                let sccs = Sccs::on(&pmm).compute();
                 // preallocate, in the worst case each SCC is transient
                 let mut transient = Vec::with_capacity(sccs.size());
 
                 for (scc_index, scc) in sccs.dag().iter() {
-                    let Some(&color) = scc.interior_edge_colors().iter().max() else {
+                    let Some(color) = scc.interior_edge_colors().max() else {
                         transient.push(scc_index);
                         continue;
                     };
@@ -76,7 +77,7 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
         let progress = progress
             .into_iter()
             .map(|(i, progress_dfa)| {
-                let scc_dag = progress_dfa.sccs();
+                let scc_dag = Sccs::on(&progress_dfa).compute();
                 let minimal_representatives = progress_dfa.canonical_naming();
                 let mut classifications = math::FxIndexMap::default();
 
@@ -165,11 +166,11 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
 
 #[cfg(test)]
 mod tests {
-    use crate::States;
     use crate::alphabet::CharAlphabet;
     use crate::automaton::DFA;
     use crate::families::{FDFA, FWPM};
     use crate::ts::Builder;
+    use crate::ts::Sccs;
 
     #[test_log::test]
     fn fdfa_to_fwpm() {
@@ -198,16 +199,13 @@ mod tests {
             .with_state_colors([false, true, false, false, true, true])
             .into_dfa(0);
 
-        let dag = prc.sccs();
+        let dag = Sccs::on(&prc).compute();
         let idx = dag.scc_index_of(3).unwrap();
         let scc = dag.scc(idx);
-        println!(
-            "{:?}\n{:?}",
-            scc.interior_edges(),
-            scc.interior_transitions()
-        );
+        assert_eq!(scc.interior_edges().count(), 0);
+        assert_eq!(scc.border_edges().count(), 3);
 
-        assert_eq!(prc.sccs().proper_size(), 4);
+        assert_eq!(Sccs::on(&prc).compute().proper_size(), 4);
 
         let fdfa = FDFA::trivial(alphabet.clone(), prc);
         let fwpm = FWPM::from(fdfa);
@@ -242,7 +240,7 @@ mod tests {
                 (5, 'b', 0, 5),
             ])
             .into_mealy(0);
-        assert_eq!(prc.sccs().dag().size(), 6);
+        assert_eq!(Sccs::on(&prc).compute().dag().size(), 6);
         let fwpm = FWPM::trivial(alphabet, prc);
 
         let fdfa = FDFA::from(fwpm);

@@ -54,7 +54,7 @@ pub use visit::{AccessWords, Bfs, BfsEdges, Dfs, LengthLexicographicMinimalRepre
 
 /// Contains implementations for SCC decompositions and the corresponding/associated types.
 pub mod connected_components;
-use connected_components::{SccDecomposition, tarjan_scc_iterative, tarjan_scc_recursive};
+pub use connected_components::Sccs;
 
 /// In this module, everything concering the run of a transition system on a word is defined.
 pub mod run;
@@ -349,29 +349,6 @@ pub trait TransitionSystem: Sized {
         operations::Recolor::new(self, operations::StateColorFn(f), operations::Keep)
     }
 
-    /// Computes the [`connected_components::SccDecomposition`] of self, restricted
-    /// to the set of vertices that is given.
-    #[inline(always)]
-    fn reachable_sccs_from<I: IntoIterator<Item = StateIndex<Self>>>(
-        &self,
-        from: I,
-    ) -> SccDecomposition<'_, Self>
-    where
-        Self: Sized,
-    {
-        connected_components::tarjan_scc_iterative_from(self, from)
-    }
-
-    /// Performs an SCC decomposition of self using Kosaraju's algorithm, starting from the state `start`. This is an
-    /// efficient algorithm and it might provide more performance over Tarjan's algorithm in some cases.
-    fn sccs_kosaraju(&self, start: Self::StateIndex) -> SccDecomposition<'_, Self>
-    where
-        Self: Sized,
-        Self: PredecessorIterable,
-    {
-        connected_components::kosaraju(self, start)
-    }
-
     /// Returns `true` iff the given `state` is reachable from the given `origin` state.
     fn is_reachable_from(&self, origin: StateIndex<Self>, state: StateIndex<Self>) -> bool
     where
@@ -613,25 +590,6 @@ pub trait States: TransitionSystem {
         Self: Sized,
     {
         operations::Quotient::new(self, partition)
-    }
-
-    /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly
-    /// connected components. Uses Tarjan's algorithm.
-    #[inline(always)]
-    fn sccs(&self) -> SccDecomposition<'_, Self>
-    where
-        Self: Sized,
-    {
-        tarjan_scc_iterative(self)
-    }
-
-    /// Obtains the [`connected_components::SccDecomposition`] of self, which is a partition of the states into strongly
-    /// connected components. Uses Tarjan's algorithm.
-    fn sccs_recursive(&self) -> SccDecomposition<'_, Self>
-    where
-        Self: Sized,
-    {
-        tarjan_scc_recursive(self)
     }
 }
 

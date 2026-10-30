@@ -4,6 +4,7 @@ mod common;
 
 use automata::alphabet::CharAlphabet;
 use automata::representation::IntoTransitions;
+use automata::ts::Sccs;
 use automata::ts::operations::{MatchingProduct, ProductIndex};
 use automata::ts::{
     Builder, Deterministic, ForAlphabet, PredecessorIterable, Shrinkable, Sproutable,
@@ -165,7 +166,7 @@ fn small_cycles_dfa(n: usize) -> automata::automaton::DFA {
 #[bench::small_cycles_100(args = (100), setup = small_cycles_dfa)]
 #[bench::small_cycles_400(args = (400), setup = small_cycles_dfa)]
 fn scc_minimal_representatives(ts: automata::automaton::DFA) -> usize {
-    let sccs = ts.sccs();
+    let sccs = Sccs::on(&ts).compute();
     black_box(
         sccs.iter()
             .filter(|(_, scc)| scc.minimal_representative().is_some())

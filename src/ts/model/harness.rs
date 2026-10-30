@@ -23,7 +23,7 @@ use crate::{
     ts::{
         Deterministic, EdgeId, EdgeTuple, IdType, Pointed, PredecessorIterable, Shrinkable,
         Sproutable, States,
-        connected_components::SccDecomposition,
+        connected_components::{SccDecomposition, Sccs},
         model::{Model, ModelEdgeTuple},
     },
 };
@@ -665,18 +665,13 @@ where
         })
     }
 
-    /// Compares the SCC decompositions of the storage (Tarjan iterative and recursive, and the
-    /// variants restricted to what is reachable from a state, also Kosaraju) with the model.
+    /// Compares the SCC decompositions of the storage (of all states and of what is reachable
+    /// from some states) with the model.
     pub fn assert_sccs_agree(&self) {
         self.reported(|| {
             let expected = self.model.sccs();
-            let all = self.ts.sccs();
-            assert_eq!(expected, self.model_sccs(&all), "sccs() differs");
-            assert_eq!(
-                expected,
-                self.model_sccs(&self.ts.sccs_recursive()),
-                "sccs_recursive() differs"
-            );
+            let all = Sccs::on(&self.ts).compute();
+            assert_eq!(expected, self.model_sccs(&all), "Sccs::compute() differs");
 
             let mut transient: Vec<_> = all
                 .transient_states()
@@ -699,49 +694,21 @@ where
                 }
             }
 
-            for origin in self.model.states() {
-                let expected = self.model.sccs_reachable_from(origin);
-                let sq = self.storage_state(origin);
-                // `reachable_sccs_from` is restricted to the given states
-                let reachable: Vec<_> = self
-                    .model
-                    .reachable_from(origin)
-                    .into_iter()
-                    .map(|q| self.storage_state(q))
-                    .collect();
-                assert_eq!(
-                    expected,
-                    self.model_sccs(&self.ts.reachable_sccs_from(reachable)),
-                    "reachable_sccs_from({origin}) differs"
-                );
-                assert_eq!(
-                    expected,
-                    self.model_sccs(&self.ts.sccs_kosaraju(sq)),
-                    "sccs_kosaraju({origin}) differs"
-                );
-            }
-
-            // decompositions of only some of the states, which can have edges leaving them
+            // decompositions of what is reachable from some states, the first three subsets
+            // are such that edges leave them
             let states = self.model.states();
-            let subsets = [
-                states
-                    .iter()
-                    .copied()
-                    .filter(|q| q % 2 == 0)
-                    .collect::<Vec<_>>(),
-                states
-                    .iter()
-                    .copied()
-                    .filter(|q| q % 3 != 0)
-                    .collect::<Vec<_>>(),
-                states.iter().copied().skip(1).collect::<Vec<_>>(),
-            ];
-            for subset in subsets {
-                let storage: Vec<_> = subset.iter().map(|&q| self.storage_state(q)).collect();
+            let mut origins: Vec<Vec<usize>> = states.iter().map(|&q| vec![q]).collect();
+            origins.extend([
+                states.iter().copied().filter(|q| q % 2 == 0).collect(),
+                states.iter().copied().filter(|q| q % 3 != 0).collect(),
+                states.iter().copied().skip(1).collect(),
+            ]);
+            for origin in origins {
+                let storage: Vec<_> = origin.iter().map(|&q| self.storage_state(q)).collect();
                 assert_eq!(
-                    self.model.sccs_within(&subset),
-                    self.model_sccs(&self.ts.reachable_sccs_from(storage)),
-                    "reachable_sccs_from({subset:?}) differs"
+                    self.model.sccs_reachable_from(&origin),
+                    self.model_sccs(&Sccs::on(&self.ts).from(storage).compute()),
+                    "Sccs::from({origin:?}) differs"
                 );
             }
         })

@@ -3,6 +3,7 @@
 //! Run with `cargo run --example transition_system`.
 
 use automata::States;
+use automata::ts::Sccs;
 use automata::{
     DTS, math,
     representation::IntoTransitions,
@@ -34,7 +35,7 @@ fn main() {
     let from_sink: math::FxIndexSet<_> = dfa.reachable_state_indices_from(3).collect();
     println!("reachable from state 3:           {from_sink:?}");
 
-    let sccs = dfa.sccs();
+    let sccs = Sccs::on(&dfa).compute();
     println!("{} strongly connected components:", sccs.size());
     for (index, scc) in sccs.iter() {
         println!("  {index:?}: {:?}", scc.iter().collect::<Vec<_>>());

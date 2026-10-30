@@ -1,55 +1,26 @@
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
-use std::{cell::OnceCell, collections::BTreeSet, fmt::Debug, hash::Hash};
+use std::{cell::OnceCell, fmt::Debug};
 
+use crate::alphabet::Expression;
 use crate::congruence::MinimalRepresentative;
-use crate::ts::{AccessWords, EdgeColor, EdgeExpression, StateIndex, SymbolOf};
+use crate::ts::{AccessWords, EdgeOf, StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
-use crate::{alphabet::Expression, math::FxIndexSet};
 use itertools::Itertools;
 
-type InteriorEdgeSet<Ts> = FxIndexSet<(
-    <Ts as TransitionSystem>::StateIndex,
-    EdgeExpression<Ts>,
-    <Ts as TransitionSystem>::EdgeColor,
-    <Ts as TransitionSystem>::StateIndex,
-)>;
-type InteriorTransitionSet<Ts> = FxIndexSet<(
-    <Ts as TransitionSystem>::StateIndex,
-    SymbolOf<Ts>,
-    <Ts as TransitionSystem>::EdgeColor,
-    <Ts as TransitionSystem>::StateIndex,
-)>;
-type BorderEdgeSet<Ts> = FxIndexSet<(
-    <Ts as TransitionSystem>::StateIndex,
-    EdgeExpression<Ts>,
-    <Ts as TransitionSystem>::EdgeColor,
-    <Ts as TransitionSystem>::StateIndex,
-)>;
-type BorderTransitionSet<Ts> = FxIndexSet<(
-    <Ts as TransitionSystem>::StateIndex,
-    SymbolOf<Ts>,
-    <Ts as TransitionSystem>::EdgeColor,
-    <Ts as TransitionSystem>::StateIndex,
-)>;
-
-/// Represents a strongly connected component of a transition system.
+/// Represents a strongly connected component of a transition system. It only stores its states;
+/// edges are looked up in the transition system when asked for.
 #[derive(Clone)]
 pub struct Scc<'a, Ts: TransitionSystem> {
     ts: &'a Ts,
-    states: BTreeSet<Ts::StateIndex>,
-    interior_transitions: OnceCell<InteriorTransitionSet<Ts>>,
-    interior_edges: OnceCell<InteriorEdgeSet<Ts>>,
-    edge_colors: OnceCell<FxIndexSet<Ts::EdgeColor>>,
-    minimal_representative: OnceCell<Option<MinimalRepresentative<Ts>>>,
+    /// sorted
+    states: Vec<Ts::StateIndex>,
     access_words: Rc<OnceCell<AccessWords<'a, Ts>>>,
-    border_edges: OnceCell<BorderEdgeSet<Ts>>,
-    border_transitions: OnceCell<BorderTransitionSet<Ts>>,
 }
 
 impl<Ts: TransitionSystem> IntoIterator for Scc<'_, Ts> {
-    type IntoIter = std::collections::btree_set::IntoIter<Ts::StateIndex>;
+    type IntoIter = std::vec::IntoIter<Ts::StateIndex>;
     type Item = Ts::StateIndex;
     fn into_iter(self) -> Self::IntoIter {
         self.states.into_iter()
@@ -57,7 +28,7 @@ impl<Ts: TransitionSystem> IntoIterator for Scc<'_, Ts> {
 }
 
 impl<Ts: TransitionSystem> std::ops::Deref for Scc<'_, Ts> {
-    type Target = BTreeSet<Ts::StateIndex>;
+    type Target = [Ts::StateIndex];
 
     fn deref(&self) -> &Self::Target {
         &self.states
@@ -94,23 +65,16 @@ impl<Ts: TransitionSystem> std::hash::Hash for Scc<'_, Ts> {
 }
 
 impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
-    /// Creates a new strongly connected component from a transition system and a vector of state indices.
+    /// Creates a new strongly connected component from a transition system and some state indices.
     pub fn new<I: IntoIterator<Item = Ts::StateIndex>>(ts: &'a Ts, indices: I) -> Self {
-        let states: BTreeSet<_> = indices.into_iter().collect();
+        let mut states: Vec<_> = indices.into_iter().collect();
+        states.sort_unstable();
+        states.dedup();
         assert!(!states.is_empty(), "Cannot have empty SCC!");
-        let edges = OnceCell::new();
-        let edge_colors = OnceCell::new();
-        let minimal_representative = OnceCell::new();
         Self {
             ts,
-            interior_transitions: edges,
             states,
-            interior_edges: OnceCell::new(),
-            border_edges: OnceCell::new(),
-            border_transitions: OnceCell::new(),
-            minimal_representative,
             access_words: Rc::new(OnceCell::new()),
-            edge_colors,
         }
     }
 
@@ -120,19 +84,19 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         self.access_words = access_words;
     }
 
-    /// Returns the `first` state of `self`. As we know that SCCs are always non-empty,
-    /// this is guaranteed to return an element. It might, however, not always be the
-    /// same between calls.
+    /// Returns the smallest state of `self`. As SCCs are never empty, this always exists.
     pub fn first(&self) -> Ts::StateIndex {
-        *self
-            .states
-            .first()
-            .expect("SCC must contain at least one state")
+        self.states[0]
     }
 
     /// Returns a reference to the underlying transition system.
     pub fn ts(&self) -> &'a Ts {
         self.ts
+    }
+
+    /// Returns `true` iff `state` is part of the SCC.
+    pub fn contains(&self, state: &Ts::StateIndex) -> bool {
+        self.states.binary_search(state).is_ok()
     }
 
     /// Returns an iterator over the state colors of the states in the SCC.
@@ -147,7 +111,6 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
 
     /// Returns the size, i.e. the number of states in the SCC.
     pub fn size(&self) -> usize {
-        assert!(!self.is_empty());
         self.states.len()
     }
 
@@ -156,136 +119,60 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         self.size() == 1
     }
 
-    /// Gives a reference to all edges that leave the SCC, i.e. their source lies inside the
-    /// SCC and the target lies outside of it.
-    pub fn border_edges(&self) -> &BorderEdgeSet<Ts>
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
-        self.border_edges.get_or_init(|| {
-            let mut edges = FxIndexSet::default();
-            for q in &self.states {
-                let it = self.ts.edges_from(*q).expect("State must exist");
-                for edge in it {
-                    let p = edge.target();
-                    if !self.states.contains(&p) {
-                        edges.insert((*q, edge.expression().clone(), edge.color().clone(), p));
-                    }
-                }
-            }
-            edges
+    /// All edges whose source lies inside the SCC, together with `true` if their target does, too.
+    fn edges_with_inside(&self) -> impl Iterator<Item = (EdgeOf<'a, Ts>, bool)> + '_ {
+        self.states.iter().flat_map(move |&q| {
+            self.ts
+                .edges_from(q)
+                .expect("State is in SCC but not in Ts")
+                .map(|edge| {
+                    let inside = self.contains(&edge.target());
+                    (edge, inside)
+                })
         })
     }
 
-    /// Gives a reference to all border edges of the SCC. A border edge is one whose
-    /// source is in the SCC and whose target lies outside of the SCC.
-    pub fn border_transitions(&self) -> &BorderTransitionSet<Ts>
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
-        self.border_transitions.get_or_init(|| {
-            let mut edges = FxIndexSet::default();
-            for q in &self.states {
-                let it = self.ts.edges_from(*q).expect("State must exist");
-                for edge in it {
-                    let p = edge.target();
-                    for a in edge.expression().symbols() {
-                        if !self.states.contains(&p) {
-                            edges.insert((*q, a, edge.color().clone(), p));
-                        }
-                    }
-                }
-            }
-            edges
-        })
+    /// Returns the edges that leave the SCC, i.e. their source lies inside the SCC and the target
+    /// lies outside of it.
+    pub fn border_edges(&self) -> impl Iterator<Item = EdgeOf<'a, Ts>> + '_ {
+        self.edges_with_inside()
+            .filter_map(|(edge, inside)| (!inside).then_some(edge))
     }
 
-    /// Gives a reference to all interior edges of the SCC. An interior edge is an edge whose source
-    /// and target states are in the SCC itself.
-    ///
-    /// This is computed lazily and cached.
-    pub fn interior_edges(&self) -> &InteriorEdgeSet<Ts>
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
-        self.interior_edges.get_or_init(|| {
-            let mut edges = FxIndexSet::default();
-            for q in &self.states {
-                let it = self.ts.edges_from(*q).expect("State must exist");
-                for edge in it {
-                    let p = edge.target();
-                    if self.states.contains(&p) {
-                        edges.insert((*q, edge.expression().clone(), edge.color().clone(), p));
-                    }
-                }
-            }
-            edges
-        })
+    /// Returns the edges whose source and target both lie in the SCC.
+    pub fn interior_edges(&self) -> impl Iterator<Item = EdgeOf<'a, Ts>> + '_ {
+        self.edges_with_inside()
+            .filter_map(|(edge, inside)| inside.then_some(edge))
     }
 
-    /// Gives a reference to all interior transitions of the SCC. An interior transitions is one whose source
-    /// and target states are in the SCC itself.
-    ///
-    /// This is computed lazily and cached.
-    pub fn interior_transitions(&self) -> &InteriorTransitionSet<Ts>
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
-        self.interior_transitions.get_or_init(|| {
-            let mut edges = FxIndexSet::default();
-            for q in &self.states {
-                let it = self.ts.edges_from(*q).expect("State must exist");
-                for edge in it {
-                    let p = edge.target();
-                    for a in edge.expression().symbols() {
-                        if self.states.contains(&p) {
-                            edges.insert((*q, a, edge.color().clone(), p));
-                        }
-                    }
-                }
-            }
-            edges
-        })
-    }
-
-    /// Computes the minimal word on which a state of this SCC may be reached.
-    pub fn minimal_representative(&self) -> &Option<MinimalRepresentative<Ts>>
+    /// Computes the minimal word on which a state of this SCC may be reached, if any state of the
+    /// SCC is reachable from the initial state.
+    pub fn minimal_representative(&self) -> Option<MinimalRepresentative<Ts>>
     where
         Ts: Pointed,
     {
-        self.minimal_representative.get_or_init(|| {
-            let access = self.access_words.get_or_init(|| {
-                let mut access = AccessWords::new(self.ts, self.ts.initial());
-                access.complete();
-                access
-            });
-            let state = self
-                .states
-                .iter()
-                .filter_map(|&q| access.rank(q).map(|rank| (rank, q)))
-                .min()?
-                .1;
-            Some(MinimalRepresentative::new(access.word(state)?, state))
-        })
+        let access = self.access_words.get_or_init(|| {
+            let mut access = AccessWords::new(self.ts, self.ts.initial());
+            access.complete();
+            access
+        });
+        let state = self
+            .states
+            .iter()
+            .filter_map(|&q| access.rank(q).map(|rank| (rank, q)))
+            .min()?
+            .1;
+        Some(MinimalRepresentative::new(access.word(state)?, state))
     }
 
     /// Returns an iterator yielding the colors of edges whose source and target states are
-    /// in the SCC.
-    pub fn interior_edge_colors(&self) -> &FxIndexSet<Ts::EdgeColor>
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
-        self.edge_colors.get_or_init(|| {
-            self.interior_transitions()
-                .iter()
-                .map(|(_, _, c, _)| c.clone())
-                .collect()
-        })
+    /// in the SCC. A color appears once per edge that carries it.
+    pub fn interior_edge_colors(&self) -> impl Iterator<Item = Ts::EdgeColor> + '_ {
+        self.interior_edges().map(|edge| edge.color().clone())
     }
 
     /// Returns a vector of the colors of the states in the SCC.
     pub fn colors(&self) -> Option<Vec<Ts::StateColor>> {
-        debug_assert!(!self.is_empty());
         Some(
             self.states
                 .iter()
@@ -297,30 +184,25 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     /// Attempts to compute a maximal word which is one that visits all states in the scc and uses
     /// each interior transition (one whose source and target are within the SCC) at least once.
     /// If no such word exists, `None` is returned.
-    pub fn maximal_word(&self) -> Option<Vec<SymbolOf<Ts>>>
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
-        self.maximal_loop_from(*self.states.first()?)
+    pub fn maximal_word(&self) -> Option<Vec<SymbolOf<Ts>>> {
+        self.maximal_loop_from(self.first())
     }
 
     /// Attempts to compute a maximal word (i.e. a word visiting all states in the scc). If such a
     /// word exists, it is returned, otherwise the function returns `None`.
     /// This ensures that the word ends back in the state that it started from.
-    pub fn maximal_loop_from(&self, from: Ts::StateIndex) -> Option<Vec<SymbolOf<Ts>>>
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
+    pub fn maximal_loop_from(&self, from: Ts::StateIndex) -> Option<Vec<SymbolOf<Ts>>> {
         assert!(self.contains(&from));
         let ts = self.ts;
-        debug_assert!(!self.is_empty());
 
         let mut queue = BTreeMap::default();
-        for (p, a, _, q) in self.interior_transitions() {
-            queue
-                .entry(*p)
-                .or_insert_with(BTreeSet::default)
-                .insert((*a, *q));
+        for edge in self.interior_edges() {
+            for a in edge.expression().symbols() {
+                queue
+                    .entry(edge.source())
+                    .or_insert_with(BTreeSet::default)
+                    .insert((a, edge.target()));
+            }
         }
         if queue.is_empty() {
             return None;
@@ -387,43 +269,24 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     }
 
     /// Returns an iterator over the state indices making up the scc.
-    pub fn state_indices(&self) -> std::collections::btree_set::Iter<'_, Ts::StateIndex> {
+    pub fn state_indices(&self) -> std::slice::Iter<'_, Ts::StateIndex> {
         self.states.iter()
-    }
-
-    /// Returns the number of states in the SCC.
-    pub fn len(&self) -> usize {
-        self.states.len()
-    }
-
-    /// Returns `true` if and only if the SCC is empty.
-    pub fn is_empty(&self) -> bool {
-        if self.len() == 0 {
-            panic!("SCCs can never be empty!");
-        }
-        false
     }
 
     /// Returns `true` iff the SCC consists of a single state.
     pub fn is_singleton(&self) -> bool {
-        self.states.len() == 1
+        self.is_trivial()
     }
 
     /// Returns `true` iff the SCC is left on every symbol of the alphabet.
-    pub fn is_transient(&self) -> bool
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
-        self.interior_transitions().is_empty()
+    pub fn is_transient(&self) -> bool {
+        self.interior_edges().next().is_none()
     }
 
     /// Returns `true` iff there is a transition from a state in the SCC to another state in the SCC,
     /// i.e. if there is a way of reading a non-empty word and staying in the SCC.
-    pub fn is_nontransient(&self) -> bool
-    where
-        EdgeColor<Ts>: Hash + Eq,
-    {
-        !self.interior_transitions().is_empty()
+    pub fn is_nontransient(&self) -> bool {
+        !self.is_transient()
     }
 }
 
@@ -439,39 +302,45 @@ impl<Ts: TransitionSystem> Debug for Scc<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
-    use crate::States;
-    use crate::math::FxIndexSet;
+    use crate::alphabet::Expression;
+    use crate::ts::Sccs;
     use crate::{DTS, TransitionSystem};
 
     #[test]
-    fn interior_transitions() {
+    fn interior_edges() {
         let transitions = [
             (0, 'a', 0, 0),
             (0, 'b', 1, 1),
             (1, 'a', 2, 1),
             (1, 'b', 0, 0),
-        ]
-        .into_iter()
-        .collect::<FxIndexSet<_>>();
+        ];
         let ts = DTS::builder()
             .default_color(())
-            .with_transitions(&transitions)
+            .with_transitions(transitions)
             .into_dts_with_initial(0);
-        let sccs = ts.sccs();
+        let sccs = Sccs::on(&ts).compute();
         let first = sccs.first();
 
-        assert_eq!(&transitions, first.interior_transitions());
-        assert_eq!(
-            first.interior_edge_colors(),
-            &FxIndexSet::from_iter([0, 1, 2])
-        );
+        let mut interior: Vec<_> = first
+            .interior_edges()
+            .flat_map(|e| {
+                e.expression()
+                    .symbols()
+                    .map(|a| (e.source(), a, *e.color(), e.target()))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        interior.sort();
+        assert_eq!(interior, transitions);
+        assert_eq!(first.border_edges().count(), 0);
+        let mut colors: Vec<_> = first.interior_edge_colors().collect();
+        colors.sort();
+        assert_eq!(colors, [0, 0, 1, 2]);
 
         let color_restricted = (&ts).edge_color_restricted(1, 2);
-        let sccs = color_restricted.sccs();
-        assert_eq!(sccs[0].interior_transitions(), &FxIndexSet::default());
-        assert_eq!(
-            sccs[1].interior_transitions(),
-            &FxIndexSet::from_iter([(1, 'a', 2, 1)])
-        );
+        let sccs = Sccs::on(&color_restricted).compute();
+        assert_eq!(sccs[0].interior_edges().count(), 0);
+        assert_eq!(sccs[0].border_edges().count(), 1);
+        assert_eq!(sccs[1].interior_edge_colors().collect::<Vec<_>>(), [2]);
     }
 }
