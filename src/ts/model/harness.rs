@@ -669,9 +669,7 @@ where
         for origin in self.model.states() {
             let expected = self.model.sccs_reachable_from(origin);
             let sq = self.storage_state(origin);
-            // `reachable_sccs_from` is restricted to the given states, so it is given all that
-            // can be reached (for a set that has edges leaving it, building the decomposition
-            // panics)
+            // `reachable_sccs_from` is restricted to the given states
             let reachable: Vec<_> = self
                 .model
                 .reachable_from(origin)
@@ -687,6 +685,30 @@ where
                 expected,
                 self.model_sccs(&self.ts.sccs_kosaraju(sq)),
                 "sccs_kosaraju({origin}) differs"
+            );
+        }
+
+        // decompositions of only some of the states, which can have edges leaving them
+        let states = self.model.states();
+        let subsets = [
+            states
+                .iter()
+                .copied()
+                .filter(|q| q % 2 == 0)
+                .collect::<Vec<_>>(),
+            states
+                .iter()
+                .copied()
+                .filter(|q| q % 3 != 0)
+                .collect::<Vec<_>>(),
+            states.iter().copied().skip(1).collect::<Vec<_>>(),
+        ];
+        for subset in subsets {
+            let storage: Vec<_> = subset.iter().map(|&q| self.storage_state(q)).collect();
+            assert_eq!(
+                self.model.sccs_within(&subset),
+                self.model_sccs(&self.ts.reachable_sccs_from(storage)),
+                "reachable_sccs_from({subset:?}) differs"
             );
         }
     }
@@ -755,17 +777,11 @@ where
         for &p in &states {
             let (dfa_p, moore_p, mealy_p) = (dfa(p), moore(p), mealy(p));
             for &q in &states {
-                // `DFA::equivalent` only compares what both automata can read, so it does not
-                // tell apart languages of incomplete DFAs; only complete ones are compared
-                if self.model.is_complete_from(p, ALPHABET_SIZE)
-                    && self.model.is_complete_from(q, ALPHABET_SIZE)
-                {
-                    assert_eq!(
-                        self.model.language_equivalent(p, q, ALPHABET_SIZE, even),
-                        dfa_p.equivalent(&dfa(q)),
-                        "DFA equivalence of {p} and {q} differs"
-                    );
-                }
+                assert_eq!(
+                    self.model.language_equivalent(p, q, ALPHABET_SIZE, even),
+                    dfa_p.equivalent(&dfa(q)),
+                    "DFA equivalence of {p} and {q} differs"
+                );
                 assert_eq!(
                     self.model.moore_compatible(p, q, ALPHABET_SIZE),
                     moore_p.bisimilar(&moore(q)),

@@ -214,14 +214,23 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
     /// The states reachable from `origin` (including itself), in ascending order. Computed by
     /// repeating "add all successors" until nothing changes. Empty if `origin` does not exist.
     pub fn reachable_from(&self, origin: usize) -> Vec<usize> {
-        if !self.contains_state(origin) {
+        self.reachable_within(origin, &self.states())
+    }
+
+    /// Like [`Self::reachable_from`], but only the states in `allowed` may be visited. Empty if
+    /// `origin` does not exist or is not allowed.
+    pub fn reachable_within(&self, origin: usize, allowed: &[usize]) -> Vec<usize> {
+        if !self.contains_state(origin) || !allowed.contains(&origin) {
             return Vec::new();
         }
         let mut reached = vec![origin];
         loop {
             let mut grew = false;
             for (_, source, _, _, target) in self.edges() {
-                if reached.contains(&source) && !reached.contains(&target) {
+                if reached.contains(&source)
+                    && allowed.contains(&target)
+                    && !reached.contains(&target)
+                {
                     reached.push(target);
                     grew = true;
                 }
@@ -376,18 +385,6 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
         true
     }
 
-    /// Whether every state reachable from `origin` has an edge for each of the `symbols`.
-    pub fn is_complete_from(&self, origin: usize, symbols: usize) -> bool {
-        self.reachable_from(origin).into_iter().all(|q| {
-            (0..symbols).all(|a| {
-                self.edges_from(q)
-                    .expect("state exists")
-                    .iter()
-                    .any(|e| e.symbol == a)
-            })
-        })
-    }
-
     /// Whether the Moore machines that start in `p` and `q` have the same state colors on every
     /// word that can be read from both.
     pub fn moore_compatible(&self, p: usize, q: usize, symbols: usize) -> bool
@@ -447,15 +444,23 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
     /// from the other. Every component is sorted, and the components are sorted by their smallest
     /// state.
     pub fn sccs(&self) -> Vec<Vec<usize>> {
+        self.sccs_within(&self.states())
+    }
+
+    /// The strongly connected components of the part of the model that consists of the states in
+    /// `allowed` and the edges between them.
+    pub fn sccs_within(&self, allowed: &[usize]) -> Vec<Vec<usize>> {
+        let mut allowed = allowed.to_vec();
+        allowed.sort();
         let mut sccs: Vec<Vec<usize>> = Vec::new();
-        for q in self.states() {
+        for &q in &allowed {
             if sccs.iter().any(|scc| scc.contains(&q)) {
                 continue;
             }
             let scc = self
-                .reachable_from(q)
+                .reachable_within(q, &allowed)
                 .into_iter()
-                .filter(|&p| self.reachable_from(p).contains(&q))
+                .filter(|&p| self.reachable_within(p, &allowed).contains(&q))
                 .collect();
             sccs.push(scc);
         }

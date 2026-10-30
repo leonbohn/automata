@@ -23,3 +23,6 @@ omega-learning-tasks/data
 # Nix
 result
 result-*
+
+# proptest failure persistence, regressions are fixed instead of recorded
+proptest-regressions/
