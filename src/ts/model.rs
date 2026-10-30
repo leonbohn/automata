@@ -7,6 +7,9 @@
 //! States and edges have stable identifiers that are never reused after removal, just like in
 //! the real storages.
 
+#[cfg(test)]
+mod harness;
+
 /// An edge of the model, stored with the state it starts in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ModelEdge<C> {
