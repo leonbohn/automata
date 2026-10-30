@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use crate::{
     DTS, TransitionSystem, Void,
     alphabet::CharAlphabet,
-    automaton::{DFA, MealyMachine, MooreMachine},
+    automaton::{DFA, Equivalence, MealyMachine, MooreMachine},
     minimization::partition_refinement::{
         mealy_greatest_bisimulation, moore_greatest_bisimulation,
     },
@@ -785,7 +785,7 @@ where
                 for &q in &states {
                     assert_eq!(
                         self.model.language_equivalent(p, q, ALPHABET_SIZE, even),
-                        dfa_p.equivalent(&dfa(q)),
+                        Equivalence::of(&dfa_p).and(&dfa(q)).holds(),
                         "DFA equivalence of {p} and {q} differs"
                     );
                     assert_eq!(

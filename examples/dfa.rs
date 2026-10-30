@@ -3,7 +3,10 @@
 //! Run with `cargo run --example dfa`.
 
 use automata::States;
-use automata::{automaton::DFA, ts::Builder};
+use automata::{
+    automaton::{DFA, Emptiness, Equivalence},
+    ts::Builder,
+};
 
 /// The DFA over `{a, b}` that accepts the words in which the number of `a`s leaves the given
 /// remainder when divided by three.
@@ -38,8 +41,8 @@ fn main() {
     }
 
     // the operations are lazy, but every result is an automaton again
-    assert!(zero.intersection(&one).is_empty_language());
-    assert!(!zero.equivalent(&one));
+    assert!(Emptiness::of(&zero.intersection(&one)).holds());
+    assert!(!Equivalence::of(&zero).and(&one).holds());
     assert!(zero.negation().accepts("a"));
 
     // a DFA with redundant states: it accepts the words that end with an `a`, but state 3
@@ -63,6 +66,6 @@ fn main() {
         redundant.state_count(),
         minimized.state_count()
     );
-    assert!(redundant.equivalent(&minimized));
+    assert!(Equivalence::of(&redundant).and(&minimized).holds());
     assert_eq!(minimized.state_count(), 2);
 }

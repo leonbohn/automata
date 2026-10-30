@@ -1,16 +1,14 @@
 use crate::ts::Sccs;
 use crate::ts::States;
 use crate::ts::{DenseId, EdgeId, Sproutable};
-use std::{
-    collections::{BTreeSet, VecDeque},
-    fmt::Debug,
-    hash::Hash,
-};
+use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
+use crate::automaton::problems::search;
 use crate::automaton::semantics::observe_omega;
-use crate::automaton::{Automaton, Semantics};
-use crate::representation::{CollectPointed, IntoTransitions};
-use crate::ts::operations::Product;
+use crate::automaton::{Automaton, Equivalence, Semantics};
+use crate::math;
+use crate::representation::IntoTransitions;
+use crate::ts::operations::{Product, ProductIndex};
 use crate::ts::{Deterministic, EdgeColor, Shrinkable, StateIndex, SymbolOf, operations};
 use crate::word::OmegaWord;
 use crate::{DTS, Pointed, TransitionSystem, ts::run};
@@ -164,27 +162,6 @@ where
             .fold((Int::MAX, 0), |(low, high), c| (low.min(c), high.max(c)))
     }
 
-    /// Gives a witness for the fact that the language accepted by `self` is not empty. This is
-    /// done by finding an accepting cycle in the underlying transition system.
-    ///
-    /// # Example
-    /// ```
-    /// use automata::ts::{Deterministic, Builder, TransitionSystem};
-    ///
-    /// let dpa = Builder::without_state_colors()
-    ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
-    ///     .into_dpa(0);
-    /// assert!(dpa.give_accepted_word().is_some())
-    /// ```
-    pub fn give_accepted_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
-        self.colors().find_map(|i| {
-            if i % 2 == 1 {
-                None
-            } else {
-                self.witness_color(i)
-            }
-        })
-    }
     /// Gives a witness for the fact that the language accepted by `self` is not universal. This is
     /// done by finding a rejecting cycle in the underlying transition system.
     /// # Example
@@ -307,64 +284,69 @@ where
             return None;
         }
 
-        self.with_initial(p)
-            .collect_dpa()
-            .witness_inequivalence(&self.with_initial(q).collect_dpa())
+        let (from_p, from_q) = (DPA::from_parts(self, p), DPA::from_parts(self, q));
+        Equivalence::of(&from_p).and(&from_q).counterexample()
     }
 
-    /// Computes a [`Partition`] of the state indices of `self` such that any two states in the
-    /// same class of the partition are language-equivalent. This is done iteratively, by considering each
-    /// state and finding a state that is language-equivalent to it. If no such state exists, a new
-    /// class is created.
+    /// Computes a [`Partition`] of the reachable state indices of `self` such that any two states
+    /// in the same class of the partition are language-equivalent.
+    ///
+    /// Two states are not equivalent if and only if, in the product of `self` with itself, the
+    /// pair of them can reach a cycle that is accepted by exactly one of the components. These
+    /// pairs are found for all pairs at once: first the cycles are located by decomposing the
+    /// product into strongly connected components, then everything that reaches one of them is
+    /// marked by a backwards search.
     pub fn prefix_partition(&self) -> Partition<D::StateIndex> {
-        fn print<X: Debug>(part: &[BTreeSet<X>]) -> String {
-            format!(
-                "{{{}}}",
-                part.iter()
-                    .map(|class| format!("[{}]", class.iter().map(|x| format!("{x:?}")).join(", ")))
-                    .join(", ")
-            )
-        }
-        let mut it = self.reachable_state_indices();
-        let fst = it.next();
-        assert_eq!(fst, Some(self.initial()));
+        let states: math::FxIndexSet<_> = self.reachable_state_indices().collect();
+        let n = states.len();
+        assert_eq!(states.get_index(0), Some(&self.initial()));
+        let id = |ProductIndex(p, q): ProductIndex<_, _>| {
+            states.get_index_of(&p).expect("reachable") * n
+                + states.get_index_of(&q).expect("reachable")
+        };
 
-        let mut partition = vec![BTreeSet::from_iter([self.initial()])];
-        let mut queue: VecDeque<_> = it.collect();
-        let expected_size = queue.len() + 1;
-
-        'outer: while let Some(q) = queue.pop_front() {
-            trace!(
-                "considering state {:?}, current partition: {}",
-                q,
-                print(&partition)
-            );
-            for i in 0..partition.len() {
-                let p = partition[i]
-                    .first()
-                    .expect("Class of partition must be non-empty");
-                if self
-                    .as_ref()
-                    .with_initial(*p)
-                    .collect_dpa()
-                    .language_equivalent(&self.as_ref().with_initial(q).collect_dpa())
-                {
-                    trace!(
-                        "it is language equivalent to {p:?}, adding it to the equivalence class",
-                    );
-                    partition.get_mut(i).unwrap().insert(q);
-                    continue 'outer;
-                }
+        let product = self.ts_product(self);
+        let pairs: Vec<_> = states
+            .iter()
+            .flat_map(|&p| states.iter().map(move |&q| ProductIndex(p, q)))
+            .collect();
+        let mut predecessors = vec![Vec::new(); n * n];
+        for &pair in &pairs {
+            for edge in product.edges_from(pair).expect("reachable") {
+                predecessors[id(edge.target())].push(id(pair));
             }
-            trace!("not equivalent to any known states, creating a new equivalence class");
-            partition.push(BTreeSet::from_iter([q]));
         }
-        debug_assert_eq!(
-            partition.iter().fold(0, |acc, x| acc + x.len()),
-            expected_size,
-            "size mismatch!"
-        );
-        partition.into()
+
+        let mut separated = vec![false; n * n];
+        let mut todo = Vec::new();
+        for accepted in [(true, false), (false, true)] {
+            search(&product, pairs.clone(), &|&c| c, accepted, |scc| {
+                for &pair in scc.state_indices() {
+                    todo.push(id(pair));
+                }
+                None
+            });
+        }
+        while let Some(pair) = todo.pop() {
+            if !std::mem::replace(&mut separated[pair], true) {
+                todo.extend(&predecessors[pair]);
+            }
+        }
+
+        let mut classes: Vec<(usize, BTreeSet<_>)> = Vec::new();
+        for (i, &q) in states.iter().enumerate() {
+            match classes.iter_mut().find(|(rep, _)| !separated[rep * n + i]) {
+                Some((_, class)) => {
+                    class.insert(q);
+                }
+                None => classes.push((i, BTreeSet::from_iter([q]))),
+            }
+        }
+        classes
+            .into_iter()
+            .map(|(_, class)| class)
+            .collect::<Vec<_>>()
+            .into()
     }
 
     /// Builds the quotient of `self` with respect to the prefix partition. This will result in the prefix
@@ -400,113 +382,11 @@ where
         None
     }
 
-    /// Attempts to find an omega-word `w` such that the least color seen infinitely often
-    /// during the run of `self` on `w` is equal to `k` and the least color seen infinitely often
-    /// during the run of `other` on `w` is equal to `l`. If no such word exists, `None` is returned.
-    /// Main use of this is to witness the fact that `self` and `other` are not language-equivalent.
-    pub fn witness_colors<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States>(
-        &self,
-        k: Int,
-        other: &DPA<O>,
-        l: Int,
-    ) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
-        trace!("attempting to witness colors {k} and {l}");
-        let t1 = self.edge_color_restricted(k, Int::MAX);
-        let t2 = other.edge_color_restricted(l, Int::MAX);
-        let prod = t1.ts_product(t2).reachable_part();
-        let sccs = Sccs::on(&prod).compute();
-        for (_, scc) in sccs.iter() {
-            if scc.is_transient() {
-                continue;
-            }
-            let (a, b) = scc
-                .interior_edge_colors()
-                .min()
-                .expect("we know this is not transient");
-            if a == k && b == l {
-                let Some(rep) = scc.minimal_representative() else {
-                    continue;
-                };
-                let cycle = scc
-                    .maximal_loop_from(rep.state_index())
-                    .expect("This thing is non-transient");
-                return Some(ReducedOmegaWord::ultimately_periodic(rep.into_vec(), cycle));
-            }
-        }
-        None
-    }
-
     /// Returns an iterator over all colors that appear on edges of `self`.
     pub fn colors(&self) -> impl Iterator<Item = Int> + '_ {
         self.states()
             .flat_map(|q| self.edges_from(q).unwrap().map(|e| *e.color()))
             .unique()
-    }
-
-    /// Attempts to find an omega-word that witnesses the fact that `self` and `other` are not
-    /// language-equivalent. If no such word exists, `None` is returned. Internally, this uses
-    /// [`Self::witness_not_subset_of`] in both directions.
-    pub fn witness_inequivalence<
-        O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States,
-    >(
-        &self,
-        other: &DPA<O>,
-    ) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
-        self.witness_not_subset_of(other)
-            .or(other.witness_not_subset_of(self))
-    }
-
-    /// Returns true if `self` is language-equivalent to `other`, i.e. if and only if the Two
-    /// DPAs accept the same language.
-    pub fn language_equivalent<
-        O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States,
-    >(
-        &self,
-        other: &DPA<O>,
-    ) -> bool {
-        self.witness_inequivalence(other).is_none()
-    }
-
-    /// Returns true if and only if `self` is included in `other`, i.e. if and only if the language
-    /// accepted by `self` is a subset of the language accepted by `other`.
-    pub fn included_in<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States>(
-        &self,
-        other: &DPA<O>,
-    ) -> bool {
-        self.witness_not_subset_of(other).is_none()
-    }
-
-    /// Returns true if and only if `self` includes `other`, i.e. if and only if the language
-    /// accepted by `self` is a superset of the language accepted by `other`.
-    pub fn includes<O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States>(
-        &self,
-        other: &DPA<O>,
-    ) -> bool {
-        other.witness_not_subset_of(self).is_none()
-    }
-
-    /// Attempts to find an omega-word that witnesses the fact that `self` is not included in `other`.
-    /// If no such word exists, `None` is returned.
-    pub fn witness_not_subset_of<
-        O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States,
-    >(
-        &self,
-        other: &DPA<O>,
-    ) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
-        for i in self.colors().filter(|x| x % 2 == 0) {
-            for j in other.colors().filter(|x| x % 2 == 1) {
-                if let Some(cex) = self.as_ref().witness_colors(i, other, j) {
-                    trace!(
-                        "found counterexample {:?}, witnessing colors {i} and {j}",
-                        cex
-                    );
-                    return Some(cex);
-                } else {
-                    trace!("colors {i} and {j} are not witnessed by any word");
-                }
-            }
-        }
-        None
     }
 
     /// Produces a DPA that is language-equivalent to `self` but has the minimal number of different colors. This
@@ -658,7 +538,7 @@ where
 
         tracing::debug!("normalizing DPA took {} μs", start.elapsed().as_micros());
 
-        debug_assert!(self.language_equivalent(&ret));
+        debug_assert!(Equivalence::of(self).and(&ret).holds());
         ret
     }
 }
@@ -668,6 +548,7 @@ mod tests {
     use super::DPA;
     use crate::States;
     use crate::Void;
+    use crate::automaton::{Emptiness, Equivalence, Inclusion};
     use crate::representation::CollectPointed;
     use crate::ts::operations::Product;
     use crate::ts::{Builder, Deterministic};
@@ -685,7 +566,7 @@ mod tests {
             ])
             .into_dpa(0);
         let normalized = dpa.normalized();
-        assert!(normalized.language_equivalent(&dpa));
+        assert!(Equivalence::of(&normalized).and(&dpa).holds());
 
         for (input, expected) in [("a", 0), ("b", 0), ("ba", 0), ("bb", 1)] {
             assert_eq!(normalized.run(input).last_edge_color(), Some(expected))
@@ -716,8 +597,12 @@ mod tests {
             .with_transitions([(0, 'a', 254, 0), (0, 'b', 255, 0)])
             .into_dpa(0);
         let complement = dpa.clone().complement();
-        assert!(!complement.language_equivalent(&dpa));
-        assert!(complement.clone().complement().language_equivalent(&dpa));
+        assert!(!Equivalence::of(&complement).and(&dpa).holds());
+        assert!(
+            Equivalence::of(&complement.clone().complement())
+                .and(&dpa)
+                .holds()
+        );
         assert_eq!(complement.low_and_high_priority(), (1, 2));
 
         // every run is rejecting, so the complement is universal. All priorities are positive
@@ -727,7 +612,7 @@ mod tests {
             .into_dpa(0);
         let complement = dpa.complement();
         assert!(complement.give_rejected_word().is_none());
-        assert!(complement.give_accepted_word().is_some());
+        assert!(Emptiness::of(&complement).witness().is_some());
     }
 
     #[test]
@@ -737,7 +622,7 @@ mod tests {
             .into_dpa(0);
         let complement = dpa.clone().complement_without_normalizing().unwrap();
         assert_eq!(complement.low_and_high_priority(), (253, 254));
-        assert!(complement.language_equivalent(&dpa.complement()));
+        assert!(Equivalence::of(&complement).and(&dpa.complement()).holds());
 
         let dpa = Builder::without_state_colors()
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 255, 0)])
@@ -805,11 +690,11 @@ mod tests {
         let r = &bad[2];
         let prod = l.ts_product(r).reachable_part();
         let _sccs = crate::ts::Sccs::on(&prod).compute();
-        assert!(!good[0].language_equivalent(&bad[2]));
+        assert!(!Equivalence::of(&good[0]).and(&bad[2]).holds());
 
         for g in &good {
             for b in &bad {
-                assert!(!g.language_equivalent(b));
+                assert!(!Equivalence::of(g).and(b).holds());
             }
         }
     }
@@ -840,8 +725,8 @@ mod tests {
             .default_color(Void)
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
             .into_dpa(0);
-        assert!(univ.includes(&aomega));
-        assert!(!univ.included_in(&aomega));
+        assert!(Inclusion::of(&aomega).within(&univ).holds());
+        assert!(!Inclusion::of(&univ).within(&aomega).holds());
     }
 
     #[test]
@@ -855,7 +740,7 @@ mod tests {
             ])
             .into_dpa(0);
         let a = (&dpa).with_initial(1).collect_dpa();
-        assert!(!dpa.language_equivalent(&a));
+        assert!(!Equivalence::of(&dpa).and(&a).holds());
 
         let cong = RightCongruence::from_pointed(dpa.prefix_congruence());
         assert_eq!(cong.state_count(), 2);

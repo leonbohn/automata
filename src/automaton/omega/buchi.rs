@@ -3,10 +3,8 @@ use crate::alphabet::CharAlphabet;
 use crate::automaton::semantics::observe_omega;
 use crate::automaton::{DPA, Semantics};
 use crate::representation::IntoTransitions;
-use crate::ts::Sccs;
 use crate::ts::{Deterministic, StateIndex, SymbolOf};
 use crate::word::OmegaWord;
-use crate::word::ReducedOmegaWord;
 use crate::{DTS, TransitionSystem, automaton::Automaton, ts::run};
 use crate::{Int, Void};
 
@@ -70,42 +68,5 @@ where
                 c % 2 == 0
             })
             .collect()
-    }
-
-    /// Tries to identify a word which is accepted by `self`. If such a word exists, it returns it and otherwise
-    /// the function gives back `None`.
-    pub fn give_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
-        for (_, good_scc) in Sccs::on(self)
-            .compute()
-            .iter()
-            .filter(|(_, scc)| !scc.is_empty() && self.is_reachable_from(self.initial, scc.first()))
-        {
-            if let Some(full_word) = good_scc.maximal_word() {
-                // let InfinityColors(colors) = self
-                //     .induced(&full_word, self.initial())
-                //     .expect("word is valid");
-                if let Some(infset) = self
-                    .run_from(good_scc.first(), &full_word)
-                    .observe::<crate::ts::run::EdgeColorSequence<_>>()
-                    && infset.iter().any(|b| *b)
-                {
-                    let spoke = self
-                        .word_from_to(self.initial, good_scc.first())
-                        .expect("We know this is reachable!");
-                    return Some(ReducedOmegaWord::ultimately_periodic(spoke, full_word));
-                }
-                // if colors.contains(&true) {
-                //     let base = self
-                //         .word_from_to(self.initial(), *good_scc.first().unwrap())
-                //         .expect("we know this is reachable");
-                //     return Some(OmegaWord::from_parts(base, full_word));
-            }
-        }
-        None
-    }
-
-    /// Returns `true` if and only if `self` accepts a non-empty language.
-    pub fn is_empty(&self) -> bool {
-        self.give_word().is_none()
     }
 }

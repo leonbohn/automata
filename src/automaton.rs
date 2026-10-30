@@ -17,6 +17,9 @@ pub use moore::{MooreMachine, MooreSemantics};
 mod mealy;
 pub use mealy::{MealyLike, MealyMachine, MealySemantics};
 
+pub mod problems;
+pub use problems::{Emptiness, Equivalence, EquivalenceCheck, Inclusion, InclusionCheck};
+
 mod reachability;
 pub use reachability::{DFA, ReachabilityCondition};
 
@@ -486,6 +489,8 @@ impl<T: Deterministic, Sem: Default> From<(T, StateIndex<T>)> for Automaton<T, S
 
 #[cfg(test)]
 mod tests {
+    use crate::Pointed;
+    use crate::automaton::Emptiness;
     #[test]
     fn set_initial_color_on_automaton() {
         use crate::alphabet::CharAlphabet;
@@ -544,7 +549,7 @@ mod tests {
         assert!(dba.accepts(upw!("a")));
         assert!(!dba.accepts(upw!("b")));
 
-        assert!(!dba.is_empty());
+        assert!(!Emptiness::of(&dba).holds());
     }
 
     #[test]
@@ -554,23 +559,27 @@ mod tests {
             .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 1), (1, 'b', 0)])
             .into_dfa(0);
 
-        assert!(!dfa.is_empty_language());
-        assert_eq!(dfa.give_word(), Some(vec![]));
+        assert!(!Emptiness::of(&dfa).holds());
+        assert_eq!(Emptiness::of(&dfa).witness(), Some(vec![]));
 
         let _dfb = dfa.clone();
 
         assert!(dfa.accepts("ababab"));
         assert!(!dfa.accepts("a"));
 
-        let notdfa = dfa.as_ref().negation().collect_dfa();
+        let notdfa = dfa.as_ref().negation().reachable_part().collect_dfa();
         assert!(!notdfa.accepts("ababab"));
         assert!(notdfa.accepts("a"));
 
-        let intersection = dfa.as_ref().intersection(&notdfa).collect_dfa();
+        let intersection = dfa
+            .as_ref()
+            .intersection(&notdfa)
+            .reachable_part()
+            .collect_dfa();
         assert!(!intersection.accepts("ababab"));
         assert!(!intersection.accepts("a"));
 
-        let union = dfa.as_ref().union(&notdfa).collect_dfa();
+        let union = dfa.as_ref().union(&notdfa).reachable_part().collect_dfa();
         assert!(union.accepts("ababab"));
         assert!(union.accepts("a"));
     }

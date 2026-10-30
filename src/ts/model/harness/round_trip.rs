@@ -7,7 +7,10 @@ use bimap::BiBTreeMap;
 use super::*;
 use crate::representation::{FromTransitions, IntoTransitions};
 use crate::ts::{CompactIdMap, DefaultIdType, DenseId, IdType};
-use crate::{automaton::DFA, ts::ForAlphabet};
+use crate::{
+    automaton::{DFA, Equivalence},
+    ts::ForAlphabet,
+};
 
 /// A storage that can be compared with the model, no matter how its states are numbered.
 pub trait Snapshot:
@@ -141,7 +144,9 @@ where
             let original = self.storage_state(q);
             let renamed = *renaming.get_by_left(&original).expect("state was kept");
             assert!(
-                dfa_at(&self.ts, original).equivalent(&dfa_at(other, renamed)),
+                Equivalence::of(&dfa_at(&self.ts, original))
+                    .and(&dfa_at(other, renamed))
+                    .holds(),
                 "{what}: the language at state {q} changed"
             );
         }
