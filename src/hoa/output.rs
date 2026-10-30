@@ -30,8 +30,8 @@ pub trait HoaAcceptance<T: States> {
     /// [`HoaError::Format`] if the writer fails.
     fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError>;
 
-    /// Writes the acceptance sets that an edge with the given color belongs to, including the
-    /// surrounding braces. Nothing is written if the edge belongs to no set.
+    /// Writes the acceptance sets that an edge with the given color belongs to, as a space
+    /// followed by the sets in braces. Nothing is written if the edge belongs to no set.
     fn write_edge_color<W: Write>(&self, color: &EdgeColor<T>, w: &mut W) -> Result<(), HoaError>;
 }
 
@@ -74,7 +74,7 @@ where
             for edge in ts.edges_from(state).expect("We know this state exists") {
                 w.write_str("\n[")?;
                 ts.alphabet().write_expression(w, edge.expression())?;
-                write!(w, "] {} ", edge.target().into_usize())?;
+                write!(w, "] {}", edge.target().into_usize())?;
                 self.acceptance().write_edge_color(edge.color(), w)?;
             }
         }
@@ -89,7 +89,10 @@ impl<T: States<EdgeColor = bool>> HoaAcceptance<T> for BuchiCondition {
     }
 
     fn write_edge_color<W: Write>(&self, color: &bool, w: &mut W) -> Result<(), HoaError> {
-        Ok(write!(w, "{{{}}}", if *color { 0 } else { 1 })?)
+        if *color {
+            w.write_str(" {0}")?;
+        }
+        Ok(())
     }
 }
 
@@ -105,7 +108,7 @@ impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for MinEvenParityCondition {
     }
 
     fn write_edge_color<W: Write>(&self, color: &Int, w: &mut W) -> Result<(), HoaError> {
-        Ok(write!(w, "{{{color}}}")?)
+        Ok(write!(w, " {{{color}}}")?)
     }
 }
 
@@ -121,17 +124,17 @@ impl<T: States<EdgeColor = AcceptanceMask>> HoaAcceptance<T> for OmegaAcceptance
                 Ok(write!(w, "acc-name: co-Buchi\nAcceptance: 1 Fin(0)\n")?)
             }
             OmegaAcceptanceCondition::Rabin(pairs) => {
-                Ok(write_pairs_hoa(w, pairs, " | ", "f", " & ")?)
+                Ok(write_pairs_hoa(w, "Rabin", pairs, " | ", "f", " & ")?)
             }
             OmegaAcceptanceCondition::Streett(pairs) => {
-                Ok(write_pairs_hoa(w, pairs, " & ", "t", " | ")?)
+                Ok(write_pairs_hoa(w, "Streett", pairs, " & ", "t", " | ")?)
             }
         }
     }
 
     fn write_edge_color<W: Write>(&self, mask: &AcceptanceMask, w: &mut W) -> Result<(), HoaError> {
         if mask.iter().next().is_some() {
-            write!(w, "{{{}}}", mask.iter().join(" "))?;
+            write!(w, " {{{}}}", mask.iter().join(" "))?;
         }
         Ok(())
     }
@@ -177,11 +180,20 @@ fn write_max_parity_hoa<W: Write>(w: &mut W, high: Int) -> std::fmt::Result {
 /// joined by `pair_join`, `empty` is the condition without pairs.
 fn write_pairs_hoa<W: Write>(
     w: &mut W,
+    name: &str,
     pairs: &[RabinPair<Int>],
     pair_join: &str,
     empty: &str,
     pair_op: &str,
 ) -> std::fmt::Result {
+    // `acc-name: Rabin n` promises that pair `i` is `Fin(2i)`, `Inf(2i + 1)`
+    let standard = pairs.iter().enumerate().all(|(i, p)| {
+        let i = (2 * i) as Int;
+        p.fin.iter().eq([&i]) && p.inf.iter().eq([&(i + 1)])
+    });
+    if standard {
+        writeln!(w, "acc-name: {name} {}", pairs.len())?;
+    }
     let sets = pairs
         .iter()
         .flat_map(|p| p.fin.iter().chain(&p.inf))
@@ -383,8 +395,11 @@ State: 1
             ])),
             "Acceptance: 3 (Fin(0)) | (Inf(1)) & (t) | (Inf(2))"
         );
-        assert_eq!(header(Rabin(vec![])), "Acceptance: 0 f");
-        assert_eq!(header(Streett(vec![])), "Acceptance: 0 t");
+        assert_eq!(header(Rabin(vec![])), "acc-name: Rabin 0\nAcceptance: 0 f");
+        assert_eq!(
+            header(Streett(vec![])),
+            "acc-name: Streett 0\nAcceptance: 0 t"
+        );
     }
 
     #[test]
@@ -416,7 +431,7 @@ State: 1
             .into_automaton(0, Buchi);
         let hoa = super::WriteHoa::to_hoa(&aut).expect("writable");
         assert!(hoa.contains("[0 & !1] 0 {0 2}\n"), "{hoa}");
-        assert!(hoa.contains("[!0 & 1] 0 \n--END--"), "{hoa}");
+        assert!(hoa.contains("[!0 & 1] 0\n--END--"), "{hoa}");
     }
 
     use super::WriteHoa;
@@ -454,7 +469,7 @@ State: 1
         let hoa = dba.to_hoa().unwrap();
         assert_eq!(
             hoa,
-            "HOA: v1\nAP: 3 \"a\" \"b\" \"c\"\nStates: 1\nStart: 0\nacc-name: Buchi\nAcceptance: 1 Inf(0)\n--BODY--\nState: 0\n[0 & !1 & !2] 0 {0}\n[!0 & 1 & !2] 0 {1}\n[!0 & !1 & 2] 0 {0}\n--END--\n"
+            "HOA: v1\nAP: 3 \"a\" \"b\" \"c\"\nStates: 1\nStart: 0\nacc-name: Buchi\nAcceptance: 1 Inf(0)\n--BODY--\nState: 0\n[0 & !1 & !2] 0 {0}\n[!0 & 1 & !2] 0\n[!0 & !1 & 2] 0 {0}\n--END--\n"
         );
     }
 }

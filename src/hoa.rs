@@ -1,7 +1,7 @@
 //! Reading and writing automata in the [HOA format](https://adl.github.io/hoaf/), using the
 //! [`hoars`](https://github.com/leonbohn/hoars) crate. Only available with the feature `hoa`.
 //!
-//! Deterministic Büchi and parity automata can be parsed from a [`HoaString`] and written back
+//! Automata can be parsed from a [`HoaString`] and written back
 //! with [`WriteHoa::to_hoa`]. Edges of parsed automata are labeled by formulas over the atomic
 //! propositions (a [`PropAlphabet`]).
 //!
@@ -36,7 +36,8 @@
 //! assert!(written.contains("[0 & !1] 1 {1}"));
 //! ```
 //!
-//! Only deterministic Büchi and parity automata are supported so far. Reading fails with a
+//! Büchi, parity, Rabin and Streett acceptance is supported (pairs of the form `Fin(..) & (Inf(..) | ..)`
+//! for Rabin and its dual for Streett, identified by `acc-name`). Reading fails with a
 //! [`HoaError`] for other acceptance conditions, alternating automata and unsupported inputs.
 
 use tracing::{trace, warn};
@@ -148,7 +149,7 @@ mod tests {
         let one = "HOA: v1\nStates: 1\nStart: 0\nacc-name: Buchi\nAcceptance: 1 Inf(0)\nAP: 1 \"a\"\n--BODY--\nState: 0\n[t] 0 {0}\n--END--\n";
         let two = "HOA: v1\nStates: 2\nStart: 0\nacc-name: Buchi\nAcceptance: 1 Inf(0)\nAP: 1 \"a\"\n--BODY--\nState: 0\n[0] 1\n[!0] 0\nState: 1\n[t] 1 {0}\n--END--\n";
         // the segment in the middle ends with `--END--`, but uses an unsupported acceptance condition
-        let invalid = "HOA: v1\nStates: 1\nStart: 0\nacc-name: Rabin 1\nAcceptance: 2 Fin(0) & Inf(1)\nAP: 1 \"a\"\n--BODY--\nState: 0\n[t] 0 {0}\n--END--\n";
+        let invalid = "HOA: v1\nStates: 1\nStart: 0\nacc-name: generalized-Buchi 2\nAcceptance: 2 Inf(0) & Inf(1)\nAP: 1 \"a\"\n--BODY--\nState: 0\n[t] 0 {0}\n--END--\n";
         let mut hoa = HoaString::from(format!("{one}{invalid}{two}"));
 
         assert_eq!(

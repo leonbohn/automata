@@ -1,7 +1,8 @@
-use std::{io::BufRead, ops::Deref};
+use std::{collections::BTreeSet, io::BufRead, ops::Deref};
 
 use crate::automaton::{
     AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
+    RabinPair,
 };
 use crate::ts::{Det, ForAlphabet, Linked, LinkedTs, Sproutable, Storage};
 use crate::{
@@ -236,12 +237,20 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
     type Error = HoaError;
 
     fn try_from(value: &hoars::Header) -> Result<Self, Self::Error> {
-        let acceptance_sets = value.iter().find_map(|it| match it {
-            hoars::HeaderItem::Acceptance(acceptance, _cond) => Some(*acceptance),
-            _ => None,
-        });
+        let (acceptance_sets, formula) = value
+            .iter()
+            .find_map(|it| match it {
+                hoars::HeaderItem::Acceptance(acceptance, cond) => Some((*acceptance, cond)),
+                _ => None,
+            })
+            .map_or((None, None), |(n, c)| (Some(n), Some(c)));
 
-        match value.acceptance_name() {
+        let name = value
+            .iter()
+            .find_map(|it| it.try_acceptance_name())
+            .map(|(name, _)| name)
+            .ok_or_else(|| HoaError::UnsupportedAcceptance("missing acc-name".into()))?;
+        match name {
             hoars::AcceptanceName::Buchi => Ok(OmegaAcceptanceCondition::Buchi),
             hoars::AcceptanceName::Parity => {
                 let sets = acceptance_sets.ok_or(HoaError::MissingAcceptanceSets)?;
@@ -250,8 +259,139 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
                     (sets as Int).saturating_sub(1),
                 ))
             }
+            hoars::AcceptanceName::Rabin => Ok(OmegaAcceptanceCondition::Rabin(read_pairs(
+                formula.ok_or(HoaError::MissingAcceptanceSets)?,
+                Operator::Or,
+            )?)),
+            hoars::AcceptanceName::Streett => Ok(OmegaAcceptanceCondition::Streett(read_pairs(
+                formula.ok_or(HoaError::MissingAcceptanceSets)?,
+                Operator::And,
+            )?)),
             other => Err(HoaError::UnsupportedAcceptance(format!("{other:?}"))),
         }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Operator {
+    And,
+    Or,
+}
+
+impl Operator {
+    fn dual(self) -> Self {
+        match self {
+            Operator::And => Operator::Or,
+            Operator::Or => Operator::And,
+        }
+    }
+}
+
+/// Collects the operands of nested applications of `op`, e.g. `a & (b & c)` yields `a, b, c`.
+fn flatten<'a>(
+    cond: &'a hoars::AcceptanceCondition,
+    op: Operator,
+    out: &mut Vec<&'a hoars::AcceptanceCondition>,
+) {
+    match (cond, op) {
+        (hoars::AcceptanceCondition::And(l, r), Operator::And)
+        | (hoars::AcceptanceCondition::Or(l, r), Operator::Or) => {
+            flatten(l, op, out);
+            flatten(r, op, out);
+        }
+        _ => out.push(cond),
+    }
+}
+
+/// Reads the pairs of a Rabin condition (`pair_join` is [`Operator::Or`]) or a Streett condition
+/// ([`Operator::And`]). The pairs are joined by `pair_join`. Inside a pair, the operands are
+/// joined by the dual operator; of these, plain `Fin` atoms of Rabin pairs (`Inf` atoms of Streett
+/// pairs) are collected in one set, while the other kind of atom may appear once as a group
+/// of atoms joined by `pair_join` (Rabin: `Inf(1) | Inf(2)`, Streett: `Fin(0) & Fin(1)`).
+fn read_pairs(
+    formula: &hoars::AcceptanceCondition,
+    pair_join: Operator,
+) -> Result<Vec<RabinPair<Int>>, HoaError> {
+    let unsupported = |what: &str| {
+        HoaError::UnsupportedAcceptance(format!(
+            "{what} in {:?} condition",
+            pair_join_name(pair_join)
+        ))
+    };
+    let mut disjuncts = vec![];
+    flatten(formula, pair_join, &mut disjuncts);
+    // The constant that is neutral inside a group, and that makes a whole pair irrelevant when it
+    // is the pair itself or one of its operands: `f` for Rabin, `t` for Streett.
+    let flag = pair_join == Operator::And;
+    let mut pairs = vec![];
+    'pairs: for pair in disjuncts {
+        match pair {
+            hoars::AcceptanceCondition::Boolean(b) if b.0 == flag => continue,
+            hoars::AcceptanceCondition::Boolean(_) => {
+                return Err(unsupported("constant pair"));
+            }
+            _ => {}
+        }
+        let mut items = vec![];
+        flatten(pair, pair_join.dual(), &mut items);
+        let mut single = BTreeSet::new();
+        let mut group: Option<BTreeSet<Int>> = None;
+        for item in items {
+            match (item, pair_join) {
+                (hoars::AcceptanceCondition::Boolean(b), _) => {
+                    if b.0 == flag {
+                        continue 'pairs;
+                    }
+                }
+                (hoars::AcceptanceCondition::Fin(a), Operator::Or)
+                | (hoars::AcceptanceCondition::Inf(a), Operator::And) => {
+                    single
+                        .insert(positive(a).ok_or_else(|| unsupported("negated acceptance set"))?);
+                }
+                _ => {
+                    if group.is_some() {
+                        return Err(unsupported("pair with several groups of acceptance sets"));
+                    }
+                    let mut atoms = vec![];
+                    flatten(item, pair_join, &mut atoms);
+                    let mut set = BTreeSet::new();
+                    for atom in atoms {
+                        match (atom, pair_join) {
+                            (hoars::AcceptanceCondition::Inf(a), Operator::Or)
+                            | (hoars::AcceptanceCondition::Fin(a), Operator::And) => {
+                                set.insert(
+                                    positive(a)
+                                        .ok_or_else(|| unsupported("negated acceptance set"))?,
+                                );
+                            }
+                            (hoars::AcceptanceCondition::Boolean(b), _) if b.0 == flag => {}
+                            _ => return Err(unsupported("unexpected formula")),
+                        }
+                    }
+                    group = Some(set);
+                }
+            }
+        }
+        let group = group.ok_or_else(|| unsupported("pair without a group of acceptance sets"))?;
+        pairs.push(match pair_join {
+            Operator::Or => RabinPair::new(single, group),
+            Operator::And => RabinPair::new(group, single),
+        });
+    }
+    Ok(pairs)
+}
+
+fn pair_join_name(op: Operator) -> &'static str {
+    match op {
+        Operator::Or => "Rabin",
+        Operator::And => "Streett",
+    }
+}
+
+fn positive(atom: &hoars::AcceptanceAtom) -> Option<Int> {
+    match atom {
+        hoars::AcceptanceAtom::Positive(i) => Int::try_from(*i).ok(),
+        hoars::AcceptanceAtom::Negative(_) => None,
     }
 }
 
@@ -446,6 +586,90 @@ mod tests {
             super::OmegaAcceptanceCondition::try_from(parsed.header()),
             Err(super::HoaError::MissingAcceptanceSets)
         );
+    }
+
+    use crate::automaton::{OmegaAcceptanceCondition, RabinPair};
+    use crate::hoa::HoaError;
+
+    fn pair_condition(
+        name: &str,
+        sets: u32,
+        formula: &str,
+    ) -> Result<OmegaAcceptanceCondition, HoaError> {
+        let raw = format!(
+            "HOA: v1\nStates: 1\nStart: 0\nacc-name: {name}\nAcceptance: {sets} {formula}\nAP: 1 \"a\"\n--BODY--\nState: 0\n[t] 0\n--END--\n"
+        );
+        let parsed = hoars::HoaRepresentation::try_from(raw.as_str()).expect("valid HOA syntax");
+        OmegaAcceptanceCondition::try_from(parsed.header())
+    }
+
+    #[test]
+    fn rabin_and_streett_conditions_are_read() {
+        use crate::automaton::OmegaAcceptanceCondition::{Rabin, Streett};
+        let pairs = vec![
+            RabinPair::from_iters([0], [1]),
+            RabinPair::from_iters([2], [3, 4]),
+        ];
+        assert_eq!(
+            pair_condition(
+                "Rabin 2",
+                5,
+                "(Fin(0) & Inf(1)) | (Fin(2) & (Inf(3) | Inf(4)))"
+            ),
+            Ok(Rabin(pairs.clone()))
+        );
+        assert_eq!(
+            pair_condition(
+                "Streett 2",
+                5,
+                "(Fin(0) | Inf(1)) & ((Fin(2)) | (Inf(3) | Inf(4)))"
+            ),
+            Ok(Streett(pairs))
+        );
+        // constants: the empty conditions, and pairs that are irrelevant
+        assert_eq!(pair_condition("Rabin 0", 0, "f"), Ok(Rabin(vec![])));
+        assert_eq!(pair_condition("Streett 0", 0, "t"), Ok(Streett(vec![])));
+        assert_eq!(
+            pair_condition("Rabin 2", 3, "(Fin(0) & f) | (t & Inf(1) & Fin(2))"),
+            Ok(Rabin(vec![RabinPair::from_iters([2], [1])]))
+        );
+    }
+
+    #[test]
+    fn unrepresentable_pairs_are_rejected() {
+        for (name, formula) in [
+            ("Rabin 1", "Fin(0)"),
+            ("Rabin 1", "Inf(0) & Inf(1)"),
+            ("Rabin 1", "Fin(0) & Inf(!1)"),
+            ("Streett 1", "Fin(0) | Fin(1)"),
+            ("Streett 1", "Inf(0)"),
+            ("Streett 1", "f"),
+        ] {
+            assert!(
+                matches!(
+                    pair_condition(name, 2, formula),
+                    Err(HoaError::UnsupportedAcceptance(_))
+                ),
+                "{name} {formula}"
+            );
+        }
+    }
+
+    #[test]
+    fn rabin_automaton_is_written_and_read_back() {
+        use crate::hoa::{HoaString, WriteHoa};
+        let text = "HOA: v1\nAP: 1 \"a\"\nStates: 1\nStart: 0\nacc-name: Rabin 1\nAcceptance: 2 (Fin(0)) & (Inf(1))\n--BODY--\nState: 0\n[0] 0 {1}\n[!0] 0 {0}\n--END--\n";
+        let aut = HoaString::from(text.to_string())
+            .pop::<Det<Linked>>()
+            .expect("valid");
+        assert_eq!(
+            *aut.acceptance(),
+            OmegaAcceptanceCondition::Rabin(vec![RabinPair::from_iters([0], [1])])
+        );
+        let again = HoaString::from(aut.to_hoa().unwrap())
+            .pop::<Det<Linked>>()
+            .unwrap();
+        assert_eq!(again.acceptance(), aut.acceptance());
     }
 
     const NONDETERMINISTIC: &str = r#"HOA: v1
