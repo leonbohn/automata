@@ -186,12 +186,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> TransitionSystem for CsrTs<A, Q, C>
         if q >= self.states.len() {
             return None;
         }
-        let k = self.alphabet.size();
-        Some(CsrEdgesFrom {
-            ts: self,
-            source: state,
-            slots: q * k..(q + 1) * k,
-        })
+        Some(CsrEdgesFrom::new(self, state))
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
@@ -205,22 +200,67 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> TransitionSystem for CsrTs<A, Q, C>
 
 /// Iterates over the edges that leave a state of a [`CsrTs`], in the order of the alphabet.
 pub struct CsrEdgesFrom<'ts, A: IndexedAlphabet, Q, C> {
-    ts: &'ts CsrTs<A, Q, C>,
+    alphabet: &'ts A,
     source: DefaultIdType,
-    slots: std::ops::Range<usize>,
+    /// The slot of the next edge to look at.
+    slot: usize,
+    /// The index of the symbol of the next edge to look at.
+    symbol_index: usize,
+    targets: std::slice::Iter<'ts, DefaultIdType>,
+    colors: std::slice::Iter<'ts, Option<C>>,
+    _ts: std::marker::PhantomData<fn() -> Q>,
+}
+
+impl<'ts, A: IndexedAlphabet, Q, C> CsrEdgesFrom<'ts, A, Q, C> {
+    #[inline(always)]
+    fn new(ts: &'ts CsrTs<A, Q, C>, state: DefaultIdType) -> Self {
+        let k = ts.alphabet.size();
+        let slots = state as usize * k..(state as usize + 1) * k;
+        Self {
+            alphabet: &ts.alphabet,
+            source: state,
+            slot: slots.start,
+            symbol_index: 0,
+            targets: ts.targets[slots.clone()].iter(),
+            colors: ts.colors[slots].iter(),
+            _ts: std::marker::PhantomData,
+        }
+    }
 }
 
 impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for CsrEdgesFrom<'ts, A, Q, C> {
     type Item = EdgeOf<'ts, CsrTs<A, Q, C>>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let k = self.ts.alphabet.size();
-        for slot in self.slots.by_ref() {
-            if let Some(edge) = self.ts.edge_in_slot(self.source, slot, slot % k) {
-                return Some(edge);
+        for (&target, color) in self.targets.by_ref().zip(self.colors.by_ref()) {
+            let (slot, symbol_index) = (self.slot, self.symbol_index);
+            self.slot += 1;
+            self.symbol_index += 1;
+            if target != NONE {
+                let color = color.as_ref().expect("edge has a color");
+                return Some(
+                    EdgeRef::borrowed(
+                        self.source,
+                        self.alphabet.expression_ref(symbol_index),
+                        color,
+                        target,
+                    )
+                    .with_id(EdgeId(slot as u32)),
+                );
             }
         }
         None
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.targets.len()))
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.targets.filter(|t| **t != NONE).count()
     }
 }
 
