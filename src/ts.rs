@@ -46,7 +46,7 @@ mod deterministic;
 pub use deterministic::Deterministic;
 
 mod builder;
-pub use builder::{Builder, BuilderError};
+pub use builder::{Builder, BuilderError, IntoBuilderEdge};
 
 /// Deals with analysing reachability in transition systems.
 pub mod visit;

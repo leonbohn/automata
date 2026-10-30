@@ -352,7 +352,7 @@ impl<D: Deterministic> RightCongruence<D> {
     ///
     /// let ts = Builder::without_colors()
     ///     .with_transitions([(0, 'a', 1), (1, 'a', 0), (0, 'b', 0), (1, 'b', 1)])
-    ///     .into_right_congruence_bare(0);
+    ///     .into_right_congruence(0);
     /// let dfa = ts.looping_words(1);
     /// assert!(dfa.accepts("aa"));
     /// assert!(!dfa.accepts("a"));
@@ -419,7 +419,7 @@ mod tests {
     fn is_idempotent_is_none_for_unknown_classes() {
         let rc = Builder::without_colors()
             .with_transitions([(0, 'a', 1), (1, 'a', 0), (0, 'b', 0), (1, 'b', 1)])
-            .into_right_congruence_bare(0);
+            .into_right_congruence(0);
         assert!(rc.is_idempotent(0).is_some());
         assert_eq!(rc.is_idempotent(42), None);
     }

@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `Builder::build::<T>()` and `try_build::<T>()` build any growable transition system (`LinkedTs`, `Det<LinkedTs>`, `DenseTs`, ...); whether overlapping edges are an error is decided by the target (`Storage::DETERMINISTIC`). Shorthands for the default storage: `into_dts`, `into_nts`, `into_dts_with_initial`, `into_nts_with_initial` and `into_right_congruence`, and `into_automaton(initial, acceptance)` for every acceptance condition (#51).
+- `Builder` is generic over the symbol type (default `char`), so alphabets like `Fixed<usize, N>` can be built. New: the traits `alphabet::FromSymbols` (creates a `SimpleAlphabet` from its symbols; implemented for `CharAlphabet` and `Fixed`), `ts::IntoBuilderEdge`, the error `alphabet::WrongAlphabetSize` and `BuilderError::Alphabet`. `Fixed<S, N>` now implements `SimpleAlphabet` (#51).
 - `ts::Storage`, a marker family for the representation of owned transition systems (`Storage::Ts<Q, C>`, `try_from_linked`), with the storages `Linked` and `Det<Linked>`, and `ts::Det`, see the changes below.
 - `EdgeRef::id` and `EdgeRef::with_id`: the `EdgeId` of an edge in its storage, `None` for edges of adapters. It is ignored by equality, ordering and hashing.
 - `States`, a subtrait of `TransitionSystem` for finite systems whose states can be enumerated, and `Pointed::reachable_part` / `operations::ReachablePart`, which explores everything reachable from the initial state of an implicit system once and provides `States` (with constant time `contains_state`) for it (#44).
@@ -23,6 +25,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Breaking:** the `Builder` no longer has one method per target type: `build::<T>()` is the generic entry point and `into_dts`, `into_nts`, `into_automaton` etc. are shorthands for the default storage (22 public methods in total including the `try_` twins, 10 of them for the five automata helpers). `Builder` gained a third type parameter for the symbols. Every method has a `try_` twin that returns a `BuilderError`. The edges of a built system are iterated in the order in which they were given (before, `into_dts` and `into_nts` iterated them in reverse); `EdgeId`s run in the opposite order (#51).
+
+  | Before | Now |
+  |---|---|
+  | `into_nts()` | `into_nts()` (unchanged) |
+  | `into_dts()` | `into_dts()` (unchanged) |
+  | `into_nts_with_initial(i)` | `into_nts_with_initial(i)` (unchanged) |
+  | `into_dts_with_initial(i)` | `into_dts_with_initial(i)` (unchanged) |
+  | `into_right_congruence(i)` | `into_right_congruence(i)` (unchanged) |
+  | `into_right_congruence_bare(i)` | `into_dts().with_initial(i).erase_colors().into_right_congruence()` |
+  | `into_dfa(i)`, `into_dba(i)`, `into_dpa(i)`, `into_moore(i)`, `into_mealy(i)` | unchanged, now one-liners over `into_automaton(i, acceptance)` |
+  | `try_into_*` | `try_into_dts`, `try_into_nts`, `try_into_dts_with_initial`, `try_into_nts_with_initial`, `try_into_right_congruence`, `try_into_automaton`, `try_into_dfa`, ... |
+  | any other storage, for example `DenseTs` | `build::<DenseTs<CharAlphabet, _, _>>()` / `try_build::<T>()` (the alphabet must be named because it is no longer fixed to `CharAlphabet`) |
 - `DPA::normalized` keeps its recoloring in a table indexed by `EdgeId` instead of a hash map keyed by (state, expression), and removes edges by id.
 - **Breaking:** the `DET` const generic is gone. Determinism is a property of the type: `Det<T>` wraps a transition system and replaces overlapping edges when an edge is added. `DTS<A, Q, C>` is `Det<LinkedTs<A, Q, C>>` and `NTS<A, Q, C>` is `LinkedTs<A, Q, C>`; the alias `TS` is removed. `Builder` lost its `DET` parameter (`into_ts` and `try_into_ts` are gone, use `into_nts` or `into_dts`), `LinkedTs::try_into_deterministic` returns `Det<LinkedTs>`, and `into_nondeterministic` is `Det::into_inner`.
 - **Breaking:** `Sproutable::add_edge` returns the `EdgeId` of the new edge instead of the overwritten edge. A `Det` replaces all overlapping edges; `Builder::try_into_dts` still reports `OverlappingEdge`. `Sproutable` gained `edge_color_mut`, `state_color_mut` (`set_state_color` is provided on top of it) and the associated type `Storage`. `Shrinkable` gained the required `remove_edge(EdgeId)`; the `remove_edges_*` methods other than `remove_edges_to` are provided on top of `remove_edge` and `EdgeRef::id`.

@@ -668,6 +668,8 @@ impl<A: Alphabet> SproutableStorage<A> for Det<Linked> {
 }
 
 impl<A: Alphabet> Storage<A> for Det<Linked> {
+    const DETERMINISTIC: bool = true;
+
     type Ts<QQ: Color, CC: Color> = Det<LinkedTs<A, QQ, CC>>;
 
     fn try_from_linked<QQ: Color, CC: Color>(
