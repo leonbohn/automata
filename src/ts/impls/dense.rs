@@ -25,7 +25,9 @@ pub(super) const NONE: DefaultIdType = DefaultIdType::MAX;
 /// No expression is stored per edge, it is lent out by the alphabet via
 /// [`IndexedAlphabet::expression_ref`].
 ///
-/// Every state keeps a list of its incoming [`EdgeId`]s so that predecessors are available.
+/// The incoming edges of a state form a doubly linked list that is threaded through the slots: the
+/// state stores the first slot and every slot stores its neighbours, so that predecessors are
+/// available, and edges are linked and unlinked in constant time without allocating per state.
 ///
 /// A removed state is a tombstone (`None` in `states`), so that the indices of all other states stay
 /// valid.
@@ -38,7 +40,12 @@ pub struct DenseTs<A: IndexedAlphabet = CharAlphabet, Q = Void, C = Void> {
     states: Vec<Option<Q>>,
     targets: Vec<DefaultIdType>,
     colors: Vec<Option<C>>,
-    predecessors: Vec<Vec<EdgeId>>,
+    /// For every state the first slot of its in-list, or `NONE`.
+    in_head: Vec<DefaultIdType>,
+    /// For every slot with an edge the next slot in the in-list of its target, or `NONE`.
+    in_next: Vec<DefaultIdType>,
+    /// For every slot with an edge the previous slot in the in-list of its target, or `NONE`.
+    in_prev: Vec<DefaultIdType>,
 }
 
 impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
@@ -54,7 +61,9 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
             states: Vec::with_capacity(cap),
             targets: Vec::with_capacity(cap * k),
             colors: Vec::with_capacity(cap * k),
-            predecessors: Vec::with_capacity(cap),
+            in_head: Vec::with_capacity(cap),
+            in_next: Vec::with_capacity(cap * k),
+            in_prev: Vec::with_capacity(cap * k),
             alphabet,
         }
     }
@@ -78,18 +87,23 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
         self.states.get(state).is_some_and(Option::is_some)
     }
 
-    /// The edge in slot `slot` leaving `source`, if there is one.
+    /// The edge in slot `slot` leaving `source` on the symbol with index `symbol_index`, if there
+    /// is one.
     #[inline(always)]
-    fn edge_in_slot(&self, source: DefaultIdType, slot: usize) -> Option<EdgeOf<'_, Self>> {
+    fn edge_in_slot(
+        &self,
+        source: DefaultIdType,
+        slot: usize,
+        symbol_index: usize,
+    ) -> Option<EdgeOf<'_, Self>> {
         let target = self.targets[slot];
         if target == NONE {
             return None;
         }
-        let k = self.alphabet.size();
         Some(
             EdgeRef::borrowed(
                 source,
-                self.alphabet.expression_ref(slot % k),
+                self.alphabet.expression_ref(symbol_index),
                 self.colors[slot].as_ref().expect("edge has a color"),
                 target,
             )
@@ -98,27 +112,45 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
     }
 
     /// Checks the invariants of the data structure and panics if one is violated:
-    /// - there is one slot per state and symbol, and one predecessor list per state,
+    /// - there is one slot per state and symbol, and one in-list head per state,
     /// - a slot has a color exactly if it has a target,
     /// - the source and the target of every edge are live states,
-    /// - the predecessor list of a state holds exactly the ids of the edges that lead to it.
+    /// - the in-list of a state is well linked and holds exactly the edges that lead to it.
     pub fn check_consistency(&self) {
         let k = self.alphabet.size();
         let n = self.states.len();
         assert_eq!(self.targets.len(), n * k, "wrong number of target slots");
         assert_eq!(self.colors.len(), n * k, "wrong number of color slots");
-        assert_eq!(
-            self.predecessors.len(),
-            n,
-            "wrong number of predecessor lists"
-        );
+        assert_eq!(self.in_next.len(), n * k, "wrong number of next links");
+        assert_eq!(self.in_prev.len(), n * k, "wrong number of previous links");
+        assert_eq!(self.in_head.len(), n, "wrong number of in-list heads");
 
-        let mut incoming = vec![Vec::new(); n];
+        let mut listed = vec![false; n * k];
+        for q in 0..n {
+            let (mut prev, mut next) = (NONE, self.in_head[q]);
+            while next != NONE {
+                let slot = next as usize;
+                assert!(slot < n * k, "link to slot {slot} out of range");
+                assert_eq!(
+                    self.targets[slot] as usize, q,
+                    "slot {slot} in wrong in-list"
+                );
+                assert_eq!(self.in_prev[slot], prev, "broken in-list at slot {slot}");
+                assert!(!listed[slot], "cycle in the in-list of state {q}");
+                listed[slot] = true;
+                (prev, next) = (next, self.in_next[slot]);
+            }
+        }
         for (slot, target) in self.targets.iter().enumerate() {
             assert_eq!(
                 self.colors[slot].is_some(),
                 *target != NONE,
                 "slot {slot} has a color iff it has a target"
+            );
+            assert_eq!(
+                listed[slot],
+                *target != NONE,
+                "slot {slot} is in an in-list iff it has a target"
             );
             if *target == NONE {
                 continue;
@@ -128,13 +160,32 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
                 self.is_live(*target as usize),
                 "edge {slot} leads to a removed state"
             );
-            incoming[*target as usize].push(EdgeId(slot as u32));
         }
-        for (q, mut expected) in incoming.into_iter().enumerate() {
-            let mut actual = self.predecessors[q].clone();
-            actual.sort();
-            expected.sort();
-            assert_eq!(actual, expected, "wrong predecessors of state {q}");
+    }
+
+    /// Links `slot` at the front of the in-list of `target`.
+    #[inline]
+    fn link_in(&mut self, slot: usize, target: usize) {
+        let head = self.in_head[target];
+        self.in_prev[slot] = NONE;
+        self.in_next[slot] = head;
+        if head != NONE {
+            self.in_prev[head as usize] = slot as DefaultIdType;
+        }
+        self.in_head[target] = slot as DefaultIdType;
+    }
+
+    /// Removes `slot` from the in-list of `target`.
+    #[inline]
+    fn unlink_in(&mut self, slot: usize, target: usize) {
+        let (prev, next) = (self.in_prev[slot], self.in_next[slot]);
+        if prev == NONE {
+            self.in_head[target] = next;
+        } else {
+            self.in_next[prev as usize] = next;
+        }
+        if next != NONE {
+            self.in_prev[next as usize] = prev;
         }
     }
 
@@ -144,15 +195,10 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
         let id = EdgeId(slot as u32);
         let old = std::mem::replace(&mut self.targets[slot], target);
         if old != NONE {
-            let incoming = &mut self.predecessors[old as usize];
-            let position = incoming
-                .iter()
-                .position(|e| *e == id)
-                .expect("edge is listed at its target");
-            incoming.swap_remove(position);
+            self.unlink_in(slot, old as usize);
         }
         self.colors[slot] = Some(color);
-        self.predecessors[target as usize].push(id);
+        self.link_in(slot, target as usize);
         id
     }
 
@@ -223,7 +269,10 @@ impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for DenseEdgesFrom<'t
 
     fn next(&mut self) -> Option<Self::Item> {
         for slot in self.slots.by_ref() {
-            if let Some(edge) = self.ts.edge_in_slot(self.source, slot) {
+            if let Some(edge) =
+                self.ts
+                    .edge_in_slot(self.source, slot, slot % self.ts.alphabet.size())
+            {
                 return Some(edge);
             }
         }
@@ -272,13 +321,16 @@ impl<Q> Iterator for DenseStateIndices<'_, Q> {
 }
 
 impl<A: IndexedAlphabet, Q: Color, C: Color> Deterministic for DenseTs<A, Q, C> {
+    // The slots of a removed state are empty and those of a state that never existed are out of
+    // range, so neither needs a check of its own.
     #[inline]
     fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
-        let q = state as usize;
-        if !self.is_live(q) || !self.alphabet.contains(symbol) {
+        let index = self.alphabet.try_symbol_to_index(symbol)?;
+        let slot = self.slot(state as usize, index);
+        if slot >= self.targets.len() {
             return None;
         }
-        self.edge_in_slot(state, self.slot(q, self.alphabet.symbol_to_index(symbol)))
+        self.edge_in_slot(state, slot, index)
     }
 
     #[inline]
@@ -287,12 +339,8 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Deterministic for DenseTs<A, Q, C> 
         state: StateIndex<Self>,
         symbol: SymbolOf<Self>,
     ) -> Option<StateIndex<Self>> {
-        let q = state as usize;
-        if !self.is_live(q) || !self.alphabet.contains(symbol) {
-            return None;
-        }
-        let target = self.targets[self.slot(q, self.alphabet.symbol_to_index(symbol))];
-        (target != NONE).then_some(target)
+        let slot = self.slot(state as usize, self.alphabet.try_symbol_to_index(symbol)?);
+        self.targets.get(slot).copied().filter(|t| *t != NONE)
     }
 }
 
@@ -313,7 +361,9 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Sproutable for DenseTs<A, Q, C> {
         self.states.push(Some(color));
         self.targets.resize(self.targets.len() + k, NONE);
         self.colors.resize(self.colors.len() + k, None);
-        self.predecessors.push(Vec::new());
+        self.in_head.push(NONE);
+        self.in_next.resize(self.in_next.len() + k, NONE);
+        self.in_prev.resize(self.in_prev.len() + k, NONE);
         id
     }
 
@@ -360,12 +410,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Shrinkable for DenseTs<A, Q, C> {
         let slot = id.0 as usize;
         let target = self.targets.get(slot).copied().filter(|t| *t != NONE)?;
         let k = self.alphabet.size();
-        let incoming = &mut self.predecessors[target as usize];
-        let position = incoming
-            .iter()
-            .position(|e| *e == id)
-            .expect("edge is listed at its target");
-        incoming.swap_remove(position);
+        self.unlink_in(slot, target as usize);
         self.targets[slot] = NONE;
         let color = self.colors[slot].take().expect("edge has a color");
         Some((
@@ -385,8 +430,8 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Shrinkable for DenseTs<A, Q, C> {
             self.remove_edge(EdgeId(slot as u32));
         }
         // a loop was already removed with the outgoing edges
-        while let Some(id) = self.predecessors[q].last().copied() {
-            self.remove_edge(id);
+        while self.in_head[q] != NONE {
+            self.remove_edge(EdgeId(self.in_head[q]));
         }
         self.states[q].take()
     }
@@ -395,12 +440,11 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Shrinkable for DenseTs<A, Q, C> {
         if !self.is_live(target as usize) {
             return None;
         }
-        let ids = self.predecessors[target as usize].clone();
-        Some(
-            ids.into_iter()
-                .filter_map(|id| self.remove_edge(id))
-                .collect(),
-        )
+        let mut removed = Vec::new();
+        while self.in_head[target as usize] != NONE {
+            removed.extend(self.remove_edge(EdgeId(self.in_head[target as usize])));
+        }
+        Some(removed)
     }
 }
 
@@ -414,26 +458,31 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> PredecessorIterable for DenseTs<A, 
         let q = state as usize;
         self.is_live(q).then(|| DenseEdgesTo {
             ts: self,
-            ids: self.predecessors[q].iter(),
+            next: self.in_head[q],
         })
     }
 }
 
-/// Iterates over the edges that enter a state of a [`DenseTs`], in no particular order.
+/// Iterates over the edges that enter a state of a [`DenseTs`], the most recently added first.
 pub struct DenseEdgesTo<'ts, A: IndexedAlphabet, Q, C> {
     ts: &'ts DenseTs<A, Q, C>,
-    ids: std::slice::Iter<'ts, EdgeId>,
+    next: DefaultIdType,
 }
 
 impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for DenseEdgesTo<'ts, A, Q, C> {
     type Item = EdgeOf<'ts, DenseTs<A, Q, C>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let slot = self.ids.next()?.0 as usize;
-        let source = (slot / self.ts.alphabet.size()) as DefaultIdType;
+        if self.next == NONE {
+            return None;
+        }
+        let slot = self.next as usize;
+        self.next = self.ts.in_next[slot];
+        let k = self.ts.alphabet.size();
+        let source = (slot / k) as DefaultIdType;
         Some(
             self.ts
-                .edge_in_slot(source, slot)
+                .edge_in_slot(source, slot, slot % k)
                 .expect("listed edge exists"),
         )
     }
@@ -478,8 +527,8 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(ts.successor(0, 'a'), Some(2));
         assert_eq!(*ts.edge(0, 'a').unwrap().color(), 9);
-        assert!(ts.predecessors[1].is_empty());
-        assert_eq!(ts.predecessors[2].len(), 2);
+        assert_eq!(ts.predecessors(1).unwrap().count(), 0);
+        assert_eq!(ts.predecessors(2).unwrap().count(), 2);
     }
 
     #[test]

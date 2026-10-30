@@ -128,8 +128,16 @@ pub trait Alphabet: Clone + Debug {
 /// [`Alphabet::Symbol`] and [`Alphabet::Expression`] with a unique index (a `usize`).
 /// All conversions are expected to take constant time.
 pub trait IndexedAlphabet: Alphabet {
+    /// Turns the given symbol into an index, or returns `None` if it is not part of the alphabet.
+    fn try_symbol_to_index(&self, sym: Self::Symbol) -> Option<usize>;
     /// Turns the given symbol into an index.
-    fn symbol_to_index(&self, sym: Self::Symbol) -> usize;
+    ///
+    /// # Panics
+    /// Panics if the symbol is not part of the alphabet, see [`Self::try_symbol_to_index`].
+    fn symbol_to_index(&self, sym: Self::Symbol) -> usize {
+        self.try_symbol_to_index(sym)
+            .expect("Must be present in alphabet")
+    }
     /// Turns the given expression into an index.
     fn expression_to_index(&self, sym: &Self::Expression) -> usize;
     /// Returns the symbol that corresponds to the given index.

@@ -188,10 +188,8 @@ impl SimpleAlphabet for CharAlphabet {
 
 impl IndexedAlphabet for CharAlphabet {
     #[inline]
-    fn symbol_to_index(&self, sym: Self::Symbol) -> usize {
-        self.0
-            .binary_search(&sym)
-            .expect("Must be present in alphabet")
+    fn try_symbol_to_index(&self, sym: Self::Symbol) -> Option<usize> {
+        self.0.binary_search(&sym).ok()
     }
 
     #[inline]
@@ -248,11 +246,8 @@ impl Expression for usize {
 
 impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> IndexedAlphabet for Fixed<S, N> {
     #[inline]
-    fn symbol_to_index(&self, sym: Self::Symbol) -> usize {
-        self.0
-            .iter()
-            .position(|x| *x == sym)
-            .expect("Must be present in alphabet")
+    fn try_symbol_to_index(&self, sym: Self::Symbol) -> Option<usize> {
+        self.0.iter().position(|x| *x == sym)
     }
 
     #[inline]
