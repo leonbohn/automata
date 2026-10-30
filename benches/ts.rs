@@ -3,7 +3,7 @@
 mod common;
 
 use automata::alphabet::CharAlphabet;
-use automata::representation::{CollectTs, IntoTs};
+use automata::representation::IntoTransitions;
 use automata::ts::operations::{MatchingProduct, ProductIndex};
 use automata::ts::{
     Builder, Deterministic, ForAlphabet, PredecessorIterable, Shrinkable, Sproutable,
@@ -156,8 +156,7 @@ fn minimal_representatives(ts: automata::automaton::DFA) -> usize {
 }
 
 fn small_cycles_dfa(n: usize) -> automata::automaton::DFA {
-    use automata::representation::IntoTs;
-    common::small_cycles(n).into_dfa_with_initial(0)
+    common::small_cycles(n).with_initial(0).collect()
 }
 
 // The representative of every SCC (used for witnesses, e.g. of a DPA). Chains of 4-cycles give
@@ -217,26 +216,26 @@ fn clone(ts: Dts) -> Dts {
 #[bench::scrambled_10000(args = (10_000), setup = scrambled)]
 #[bench::scrambled_40000(args = (40_000), setup = scrambled)]
 fn collect_dts(ts: Dts) -> Dts {
-    black_box(ts.collect_dts())
+    black_box(ts.collect())
 }
 
 #[library_benchmark]
 #[bench::scrambled_10000(args = (10_000), setup = scrambled)]
 #[bench::scrambled_40000(args = (40_000), setup = scrambled)]
 fn map_edge_colors_collect(ts: Dts) -> DTS<CharAlphabet, bool, Int> {
-    black_box(ts.map_edge_colors(|_| 0 as Int).collect_dts())
+    black_box(ts.map_edge_colors(|_| 0 as Int).collect())
 }
 
 #[library_benchmark]
 #[bench::scrambled_10000(args = (10_000), setup = scrambled)]
 fn erase_state_colors_collect(ts: Dts) -> DTS<CharAlphabet, Void, Void> {
-    black_box(ts.erase_state_colors().collect_dts())
+    black_box(ts.erase_state_colors().collect())
 }
 
 #[library_benchmark]
 #[bench::scrambled_10000(args = (10_000), setup = scrambled)]
 fn into_dfa(ts: Dts) -> automata::automaton::DFA {
-    black_box(ts.into_dfa_with_initial(0))
+    black_box(ts.with_initial(0).collect())
 }
 
 // ---- shrinking ---------------------------------------------------------------------------------
@@ -274,7 +273,7 @@ fn subset_construction(nts: automata::NTS<CharAlphabet, bool, Void>) -> usize {
         nts.with_initial(0)
             .subset_construction()
             .reachable_part()
-            .collect_dts()
+            .collect::<DTS<CharAlphabet, Vec<bool>, Vec<Void>>>()
             .state_count(),
     )
 }

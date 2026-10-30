@@ -7,7 +7,10 @@
 
 mod common;
 
-use automata::{Pointed, States, TransitionSystem};
+use automata::{
+    DTS, Int, Pointed, States, TransitionSystem, Void, alphabet::CharAlphabet,
+    representation::IntoTransitions,
+};
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
 
@@ -41,14 +44,13 @@ fn operations(c: &mut Criterion) {
 
     let nts = common::nth_from_end(12);
     group.bench_function("nfa/subset_construction/nth_from_end_12", |b| {
-        use automata::representation::CollectTs;
         b.iter(|| {
             black_box(
                 nts.clone()
                     .with_initial(0)
                     .subset_construction()
                     .reachable_part()
-                    .collect_dts()
+                    .collect::<DTS<CharAlphabet, Vec<bool>, Vec<Void>>>()
                     .state_count(),
             )
         })
@@ -68,5 +70,40 @@ fn operations(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, operations);
+fn collecting(c: &mut Criterion) {
+    use criterion::BatchSize::LargeInput;
+    let mut group = c.benchmark_group("collect");
+    group.sample_size(10);
+    for n in [100_000, 1_000_000] {
+        let ts = common::scrambled(n, 2);
+        group.bench_function(format!("clone/{n}"), |b| {
+            b.iter_batched(|| ts.clone(), |ts| black_box(ts.clone()), LargeInput)
+        });
+        group.bench_function(format!("collect_owned/{n}"), |b| {
+            b.iter_batched(
+                || ts.clone(),
+                |ts| black_box(ts.collect::<DTS<CharAlphabet, bool, Void>>()),
+                LargeInput,
+            )
+        });
+        group.bench_function(format!("collect_ref/{n}"), |b| {
+            b.iter(|| black_box((&ts).collect::<DTS<CharAlphabet, bool, Void>>()))
+        });
+        group.bench_function(format!("map_edge_colors_collect_owned/{n}"), |b| {
+            b.iter_batched(
+                || ts.clone(),
+                |ts| {
+                    black_box(
+                        ts.map_edge_colors(|_| 0 as Int)
+                            .collect::<DTS<CharAlphabet, bool, Int>>(),
+                    )
+                },
+                LargeInput,
+            )
+        });
+    }
+    group.finish();
+}
+
+criterion_group!(benches, operations, collecting);
 criterion_main!(benches);
