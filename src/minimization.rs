@@ -5,7 +5,7 @@ use crate::DTS;
 use crate::States;
 use crate::Void;
 use crate::automaton::{DFA, MealyMachine, MooreMachine};
-use crate::representation::IntoTs;
+use crate::representation::IntoTransitions;
 use crate::ts::{Deterministic, EdgeColor, StateColor};
 
 impl<D> MooreMachine<D>
@@ -40,6 +40,6 @@ where
     /// Minimizes `self` using Hopcroft's partition refinement algorithm.
     pub fn minimize(self) -> DFA<DTS<D::Alphabet, bool, Void>> {
         let min = partition_refinement::moore_partition_refinement(self);
-        min.into_dfa()
+        min.collect()
     }
 }

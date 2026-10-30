@@ -6,7 +6,7 @@ use crate::automaton::{Automaton, DBA, DFA, DPA, MealyMachine, MooreMachine};
 use crate::automaton::{
     BuchiCondition, MealySemantics, MinEvenParityCondition, MooreSemantics, ReachabilityCondition,
 };
-use crate::representation::IntoTs;
+use crate::representation::IntoTransitions;
 use crate::{Color, Int, Void, alphabet::CharAlphabet};
 use crate::{DTS, NTS, RightCongruence};
 use std::collections::{BTreeSet, HashMap};
@@ -465,9 +465,7 @@ impl<Q: Color, C: Color> Builder<Q, C> {
         self,
         initial: DefaultIdType,
     ) -> Result<RightCongruence<DTS<CharAlphabet, Q, C>>, BuilderError> {
-        Ok(self
-            .try_into_dts_with_initial(initial)?
-            .into_right_congruence())
+        Ok(self.try_into_dts_with_initial(initial)?.collect())
     }
 
     /// Builds an [`Automaton`] with the given `initial` state and `acceptance` over a [`DTS`]. The

@@ -235,7 +235,7 @@ impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
 
 #[cfg(test)]
 mod tests {
-    use crate::representation::CollectTs;
+    use crate::representation::IntoTransitions;
     use crate::{NTS, TransitionSystem};
     use crate::{Pointed, States};
 
@@ -257,7 +257,7 @@ mod tests {
         assert_eq!(dts.reachable_state_indices().count(), 3);
         let finite = dts.reachable_part();
         assert_eq!(finite.states().count(), 3);
-        assert_eq!(finite.collect_dts().state_count(), 3);
+        assert_eq!(finite.collect::<crate::DTS<_, _, _>>().state_count(), 3);
     }
 
     #[test]

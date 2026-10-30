@@ -1,5 +1,6 @@
 use crate::Color;
 use crate::alphabet::{Alphabet, IndexedAlphabet};
+use crate::representation::IntoTransitions;
 use crate::ts::{CsrTs, DenseTs, Det, ForAlphabet, LinkedTs, Sproutable, States};
 
 /// A family of representations for owned, growable transition systems. A storage is a marker that
@@ -77,7 +78,7 @@ impl<A: IndexedAlphabet> Storage<A> for Dense {
         ts: LinkedTs<A, Q, C>,
     ) -> Result<Self::Ts<Q, C>, LinkedTs<A, Q, C>> {
         if ts.is_deterministic() {
-            Ok(DenseTs::sprout_from_ts(ts))
+            Ok(ts.collect())
         } else {
             Err(ts)
         }
@@ -97,6 +98,6 @@ impl<A: IndexedAlphabet> Storage<A> for Csr {
     fn try_from_linked<Q: Color, C: Color>(
         ts: LinkedTs<A, Q, C>,
     ) -> Result<Self::Ts<Q, C>, LinkedTs<A, Q, C>> {
-        Det::try_new(ts).map(|ts| CsrTs::from_ts(&ts))
+        Det::try_new(ts).map(IntoTransitions::collect)
     }
 }

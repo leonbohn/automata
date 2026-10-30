@@ -38,11 +38,11 @@ pub use semantics::Semantics;
 mod deterministic;
 
 mod priority_mapping;
-use crate::representation::{FromTransitions, IntoTransitions, Parts};
+use crate::representation::{FromTransitions, IntoTransitions, Parts, pointed_from_parts};
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{
-    Builder, DenseId, Deterministic, EdgeExpression, ForAlphabet, IdType, IntoEdgeTuple, Shrinkable, Sproutable,
-    StateColor, StateIndex,
+    Builder, DenseId, Deterministic, EdgeExpression, ForAlphabet, IdType, IntoEdgeTuple,
+    Shrinkable, Sproutable, StateColor, StateIndex,
 };
 use crate::{Congruence, DTS, Pointed, TransitionSystem};
 pub use priority_mapping::{StateBasedWeakPriorityMapping, WeakPriorityMapping};
@@ -272,26 +272,8 @@ where
         S: Iterator<Item = (I, T::StateColor)>,
         E: Iterator<Item = (I, EdgeExpression<T>, T::EdgeColor, I)>,
     {
-        let Parts {
-            alphabet,
-            states,
-            edges,
-            initial,
-        } = parts;
-        let mut new_initial = None;
-        let ts = T::from_transitions(Parts {
-            alphabet,
-            states: states.enumerate().map(|(n, (q, color))| {
-                if q == initial {
-                    new_initial = Some(n);
-                }
-                (q, color)
-            }),
-            edges,
-            initial: (),
-        });
-        let initial = new_initial.expect("the initial state is not among the states");
-        Self::from_parts(ts, T::StateIndex::from_usize(initial))
+        let (ts, initial) = pointed_from_parts(parts);
+        Self::from_parts(ts, initial)
     }
 }
 
@@ -512,7 +494,7 @@ mod tests {
     }
 
     use crate::automaton::{DBA, DFA, MooreMachine};
-    use crate::representation::CollectTs;
+    use crate::representation::CollectPointed;
     use crate::word::ReducedOmegaWord;
 
     #[test]

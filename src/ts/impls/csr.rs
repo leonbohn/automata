@@ -5,10 +5,9 @@ use crate::representation::{FromTransitions, IntoTransitions, Parts, Renumbering
 use crate::{
     Color, TransitionSystem, Void,
     alphabet::{CharAlphabet, IndexedAlphabet},
-    math,
     ts::{
-        DefaultIdType, Deterministic, EdgeId, IdType, EdgeOf, EdgeRef, StateIndex, States, SymbolOf,
-        predecessors::PredecessorIterable,
+        DefaultIdType, Deterministic, EdgeId, EdgeOf, EdgeRef, IdType, StateIndex, States,
+        SymbolOf, predecessors::PredecessorIterable,
     },
 };
 
@@ -26,7 +25,7 @@ pub(super) const NONE: DefaultIdType = DefaultIdType::MAX;
 /// Compared to the growable storages there are no tombstones, no links and one allocation per
 /// vector instead of one per state.
 ///
-/// A system is built with [`CsrTs::from_ts`] or by the [`Csr`](crate::ts::Csr) storage. State
+/// A system is built by collecting another one, see [`IntoTransitions::collect`], or by the [`Csr`](crate::ts::Csr) storage. State
 /// indices are consecutive, starting at 0, in the order of the system it was built from.
 #[derive(Clone)]
 pub struct CsrTs<A: IndexedAlphabet = CharAlphabet, Q = Void, C = Void> {
@@ -94,51 +93,6 @@ impl ReverseCsr {
 }
 
 impl<A: IndexedAlphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
-    /// Builds a system with the states and the edges of the deterministic system `ts`. The states
-    /// are numbered in the order in which [`States::states`] yields them.
-    ///
-    /// # Panics
-    /// Panics if there are too many states or edge slots for 32 bit ids.
-    pub fn from_ts<T>(ts: &T) -> Self
-    where
-        T: Deterministic + States<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    {
-        let alphabet = ts.alphabet().clone();
-        let k = alphabet.size();
-        let renaming: math::FxIndexMap<T::StateIndex, DefaultIdType> = ts
-            .states()
-            .enumerate()
-            .map(|(i, q)| (q, i as DefaultIdType))
-            .collect();
-        let n = renaming.len();
-        DefaultIdType::try_from(n * k)
-            .ok()
-            .filter(|slots| *slots != NONE)
-            .expect("too many edge slots for 32 bit ids");
-
-        let mut states = Vec::with_capacity(n);
-        let mut targets = vec![NONE; n * k];
-        let mut colors = vec![None; n * k];
-        for (q, i) in renaming.iter() {
-            states.push(ts.state_color(*q).expect("state exists").into_owned());
-            for edge in ts.edges_from(*q).expect("state exists") {
-                let slot = *i as usize * k + alphabet.expression_to_index(edge.expression());
-                let target = renaming[&edge.target()];
-                targets[slot] = target;
-                colors[slot] = Some(edge.color().clone());
-            }
-        }
-
-        let incoming = ReverseCsr::build(&targets, n);
-        Self {
-            alphabet,
-            states,
-            targets,
-            colors,
-            incoming,
-        }
-    }
-
     /// The edge in slot `slot` leaving `source` on the symbol with index `symbol_index`, if there
     /// is one.
     #[inline(always)]
@@ -365,81 +319,6 @@ impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for CsrEdgesTo<'ts, A
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ts::{Csr, DenseTs, ForAlphabet, LinkedTs, Shrinkable, Sproutable, Storage};
-
-    fn dense() -> DenseTs<CharAlphabet, bool, u32> {
-        let mut ts = DenseTs::for_alphabet(CharAlphabet::of_size(2));
-        let q: Vec<_> = (0..4).map(|i| ts.add_state(i % 2 == 0)).collect();
-        ts.add_edge((q[0], 'a', 1u32, q[1]));
-        ts.add_edge((q[1], 'a', 2u32, q[2]));
-        ts.add_edge((q[2], 'a', 3u32, q[0]));
-        ts.add_edge((q[0], 'b', 4u32, q[0]));
-        ts.add_edge((q[3], 'b', 5u32, q[0]));
-        ts
-    }
-
-    #[test]
-    fn lookups_and_predecessors() {
-        let ts = CsrTs::from_ts(&dense());
-        ts.check_consistency();
-        assert_eq!(ts.state_count(), 4);
-        assert_eq!(ts.successor(0, 'a'), Some(1));
-        assert_eq!(ts.successor(0, 'b'), Some(0));
-        assert_eq!(ts.successor(1, 'b'), None);
-        assert_eq!(ts.successor(0, 'z'), None);
-        assert_eq!(ts.successor(9, 'a'), None);
-        assert_eq!(ts.edge(2, 'a').unwrap().id(), Some(EdgeId(4)));
-        assert!(*ts.state_color(2).unwrap());
-        assert!(ts.edges_from(9).is_none() && ts.predecessors(9).is_none());
-        // incoming edges of 0, ordered by slot: (0, b), (2, a), (3, b)
-        let into_zero: Vec<_> = ts
-            .predecessors(0)
-            .unwrap()
-            .map(|e| (e.source(), *e.expression(), *e.color()))
-            .collect();
-        assert_eq!(into_zero, vec![(0, 'b', 4), (2, 'a', 3), (3, 'b', 5)]);
-        assert!(!ts.is_complete());
-    }
-
-    #[test]
-    fn removed_states_are_dropped_and_the_rest_renumbered() {
-        let mut source = dense();
-        source.remove_state(1);
-        let ts = CsrTs::from_ts(&source);
-        ts.check_consistency();
-        assert_eq!(ts.state_count(), 3);
-        // the old states 0, 2, 3 are now 0, 1, 2
-        assert_eq!(ts.successor(1, 'a'), Some(0));
-        assert_eq!(ts.successor(2, 'b'), Some(0));
-        assert_eq!(ts.successor(0, 'a'), None);
-    }
-
-    #[test]
-    fn empty_system() {
-        let ts = CsrTs::from_ts(&DenseTs::<CharAlphabet, bool, u32>::for_alphabet(
-            CharAlphabet::of_size(2),
-        ));
-        ts.check_consistency();
-        assert_eq!(ts.state_count(), 0);
-        assert!(ts.is_complete());
-    }
-
-    #[test]
-    fn storage_converts_deterministic_linked() {
-        let mut linked = LinkedTs::for_alphabet(CharAlphabet::of_size(2));
-        let (q0, q1) = (linked.add_state(true), linked.add_state(false));
-        linked.add_edge((q0, 'a', Void, q1));
-        let csr = <Csr as Storage<_>>::try_from_linked(linked.clone()).unwrap();
-        assert_eq!(csr.successor(0, 'a'), Some(1));
-
-        linked.add_edge((q0, 'a', Void, q0));
-        assert!(<Csr as Storage<_>>::try_from_linked(linked).is_err());
-    }
-}
-
 /// Iterator over the states of a [`CsrTs`] that is consumed.
 pub struct CsrIntoStates<Q> {
     states: std::iter::Enumerate<std::vec::IntoIter<Q>>,
@@ -522,5 +401,79 @@ impl<A: IndexedAlphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I,
             colors,
             incoming,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ts::{Csr, DenseTs, ForAlphabet, LinkedTs, Shrinkable, Sproutable, Storage};
+
+    fn dense() -> DenseTs<CharAlphabet, bool, u32> {
+        let mut ts = DenseTs::for_alphabet(CharAlphabet::of_size(2));
+        let q: Vec<_> = (0..4).map(|i| ts.add_state(i % 2 == 0)).collect();
+        ts.add_edge((q[0], 'a', 1u32, q[1]));
+        ts.add_edge((q[1], 'a', 2u32, q[2]));
+        ts.add_edge((q[2], 'a', 3u32, q[0]));
+        ts.add_edge((q[0], 'b', 4u32, q[0]));
+        ts.add_edge((q[3], 'b', 5u32, q[0]));
+        ts
+    }
+
+    #[test]
+    fn lookups_and_predecessors() {
+        let ts: CsrTs<CharAlphabet, bool, u32> = (&dense()).collect();
+        ts.check_consistency();
+        assert_eq!(ts.state_count(), 4);
+        assert_eq!(ts.successor(0, 'a'), Some(1));
+        assert_eq!(ts.successor(0, 'b'), Some(0));
+        assert_eq!(ts.successor(1, 'b'), None);
+        assert_eq!(ts.successor(0, 'z'), None);
+        assert_eq!(ts.successor(9, 'a'), None);
+        assert_eq!(ts.edge(2, 'a').unwrap().id(), Some(EdgeId(4)));
+        assert!(*ts.state_color(2).unwrap());
+        assert!(ts.edges_from(9).is_none() && ts.predecessors(9).is_none());
+        // incoming edges of 0, ordered by slot: (0, b), (2, a), (3, b)
+        let into_zero: Vec<_> = ts
+            .predecessors(0)
+            .unwrap()
+            .map(|e| (e.source(), *e.expression(), *e.color()))
+            .collect();
+        assert_eq!(into_zero, vec![(0, 'b', 4), (2, 'a', 3), (3, 'b', 5)]);
+        assert!(!ts.is_complete());
+    }
+
+    #[test]
+    fn removed_states_are_dropped_and_the_rest_renumbered() {
+        let mut source = dense();
+        source.remove_state(1);
+        let ts: CsrTs<CharAlphabet, bool, u32> = (&source).collect();
+        ts.check_consistency();
+        assert_eq!(ts.state_count(), 3);
+        // the old states 0, 2, 3 are now 0, 1, 2
+        assert_eq!(ts.successor(1, 'a'), Some(0));
+        assert_eq!(ts.successor(2, 'b'), Some(0));
+        assert_eq!(ts.successor(0, 'a'), None);
+    }
+
+    #[test]
+    fn empty_system() {
+        let ts: CsrTs<CharAlphabet, bool, u32> =
+            DenseTs::for_alphabet(CharAlphabet::of_size(2)).collect();
+        ts.check_consistency();
+        assert_eq!(ts.state_count(), 0);
+        assert!(ts.is_complete());
+    }
+
+    #[test]
+    fn storage_converts_deterministic_linked() {
+        let mut linked = LinkedTs::for_alphabet(CharAlphabet::of_size(2));
+        let (q0, q1) = (linked.add_state(true), linked.add_state(false));
+        linked.add_edge((q0, 'a', Void, q1));
+        let csr = <Csr as Storage<_>>::try_from_linked(linked.clone()).unwrap();
+        assert_eq!(csr.successor(0, 'a'), Some(1));
+
+        linked.add_edge((q0, 'a', Void, q0));
+        assert!(<Csr as Storage<_>>::try_from_linked(linked).is_err());
     }
 }

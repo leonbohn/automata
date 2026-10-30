@@ -418,9 +418,9 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let (source, expression, color, target) = self.it.next()?;
         let (source, target, color) = {
-            let recolored = self
-                .recolor
-                .recolor(EdgeRef::owned(source, &expression, color, target));
+            let recolored =
+                self.recolor
+                    .recolor(EdgeRef::owned(source, &expression, color, target));
             (
                 recolored.source(),
                 recolored.target(),

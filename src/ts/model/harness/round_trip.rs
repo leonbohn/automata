@@ -5,6 +5,8 @@
 use bimap::BiBTreeMap;
 
 use super::*;
+use crate::representation::{FromTransitions, IntoTransitions};
+use crate::ts::{CompactIdMap, DefaultIdType, DenseId, IdType};
 use crate::{automaton::DFA, ts::ForAlphabet};
 
 /// A storage that can be compared with the model, no matter how its states are numbered.
@@ -19,9 +21,19 @@ impl<T> Snapshot for T where
 
 /// The DFA that starts in `state` and accepts in the states with an even color.
 fn dfa_at<T: Snapshot>(ts: &T, state: T::StateIndex) -> DFA<crate::DTS<CharAlphabet, bool, Void>> {
-    let (dts, initial) = ts.with_initial(state).collect_dts_and_initial();
-    dts.map_state_colors(|c| c.is_multiple_of(2))
-        .into_dfa_with_initial(initial)
+    ts.map_state_colors(|c| c.is_multiple_of(2))
+        .erase_edge_colors()
+        .with_initial(state)
+        .collect()
+}
+
+/// The numbering that collecting applied, as a bijection between the old and the new state indices.
+fn bijection<I: IdType, J: DenseId>(map: CompactIdMap<I>) -> BiBTreeMap<I, J> {
+    map.states()
+        .iter()
+        .enumerate()
+        .map(|(n, q)| (*q, J::from_usize(n)))
+        .collect()
 }
 
 impl<Ts> Harness<Ts>
@@ -135,7 +147,7 @@ where
         }
     }
 
-    /// Collects the storage into `Copy` (with [`Sproutable::sprout_from_ts_with_bijection`]) and
+    /// Collects the storage into `Copy` (with [`IntoTransitions::collect_with_map`]) and
     /// back into a storage of its own type. Both copies have to agree with the model up to the
     /// renumbering of the states and have to preserve the language of every state.
     ///
@@ -144,19 +156,27 @@ where
     /// model is deterministic.
     pub fn assert_round_trip_via<Copy>(&self)
     where
-        Copy: Sproutable<Alphabet = CharAlphabet, StateColor = u8, EdgeColor = u8>
-            + ForAlphabet<CharAlphabet>
+        Copy: Sproutable<
+                Alphabet = CharAlphabet,
+                StateColor = u8,
+                EdgeColor = u8,
+                StateIndex = DefaultIdType,
+            > + ForAlphabet<CharAlphabet>
             + PredecessorIterable
-            + States,
+            + States
+            + FromTransitions<DefaultIdType>,
+        Ts: FromTransitions<DefaultIdType> + TransitionSystem<StateIndex = DefaultIdType>,
     {
         self.reported(|| {
             let name = std::any::type_name::<Copy>();
-            let (copy, forward) = Copy::sprout_from_ts_with_bijection(&self.ts);
+            let (copy, forward) = (&self.ts).collect_with_map::<Copy>();
+            let forward = bijection(forward);
             let what = format!("collecting into {name}");
             self.assert_snapshot_agrees(&copy, &forward, &what);
             self.assert_languages_preserved(&copy, &forward, &what);
 
-            let (back, backward) = Ts::sprout_from_ts_with_bijection(&copy);
+            let (back, backward) = (&copy).collect_with_map::<Ts>();
+            let backward = bijection(backward);
             let composed: BiBTreeMap<_, _> = forward
                 .iter()
                 .map(|(original, middle)| {

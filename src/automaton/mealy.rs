@@ -119,7 +119,6 @@ mod tests {
     use crate::DTS;
     use crate::Void;
     use crate::automaton::MealyMachine;
-    use crate::representation::IntoTs;
     use crate::ts::Builder;
 
     #[test]
@@ -133,8 +132,7 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 0, 0),
             ])
-            .into_dts_with_initial(0)
-            .into_mealy();
+            .into_mealy(0);
         let mm2: MealyMachine = DTS::builder()
             .default_color(Void)
             .with_transitions([
@@ -145,8 +143,7 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 1, 0),
             ])
-            .into_dts_with_initial(0)
-            .into_mealy();
+            .into_mealy(0);
         let _mm3: MealyMachine = DTS::builder()
             .default_color(Void)
             .with_transitions([
@@ -157,8 +154,7 @@ mod tests {
                 (2, 'a', 1, 0),
                 (2, 'b', 0, 2),
             ])
-            .into_dts_with_initial(0)
-            .into_mealy();
+            .into_mealy(0);
 
         assert_eq!(mm1.witness_inequivalence(&mm2), Some(vec!['b', 'b', 'b']))
     }

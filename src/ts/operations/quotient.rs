@@ -5,7 +5,7 @@ use crate::ts::{EdgeOf, EdgeRef};
 use crate::{
     RightCongruence,
     partition::Partition,
-    representation::CollectTs,
+    representation::CollectPointed,
     ts::{Deterministic, EdgeExpression, Pointed, StateIndex, SymbolOf, TransitionSystem},
 };
 use crate::{
@@ -82,7 +82,7 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
     /// into a [`RightCongruence`].
     pub fn underlying_right_congruence(&self) -> RightCongruence<DTS<Ts::Alphabet, Void, Void>>
     where
-        Ts: Deterministic + Pointed + CollectTs,
+        Ts: Deterministic + Pointed,
     {
         self.erase_state_colors()
             .erase_edge_colors()

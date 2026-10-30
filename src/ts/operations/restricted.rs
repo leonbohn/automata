@@ -505,7 +505,7 @@ impl<D: TransitionSystem> EdgeColorRestricted<D> {
 #[cfg(test)]
 mod tests {
     use crate::TransitionSystem;
-    use crate::representation::IntoTs;
+    use crate::representation::IntoTransitions;
     use crate::ts::Builder;
 
     #[test]
@@ -525,7 +525,12 @@ mod tests {
         assert!(dfa.accepts("aa"));
 
         let restricted = dfa.restrict_state_indices(|idx| idx != 2);
-        assert!(!restricted.into_dfa().accepts("aa"));
+        assert!(
+            !restricted
+                .erase_edge_colors()
+                .collect::<crate::automaton::DFA>()
+                .accepts("aa")
+        );
     }
 
     #[test]
