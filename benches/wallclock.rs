@@ -7,6 +7,7 @@
 
 mod common;
 
+use automata::ts::Sccs;
 use automata::{
     DTS, Int, Pointed, States, TransitionSystem, Void, alphabet::CharAlphabet,
     representation::IntoTransitions,
@@ -20,7 +21,7 @@ fn operations(c: &mut Criterion) {
 
     let ts = common::scrambled(10_000, 2);
     group.bench_function("scc/tarjan/scrambled_10000", |b| {
-        b.iter(|| black_box(ts.sccs().size()))
+        b.iter(|| black_box(Sccs::on(&ts).compute().size()))
     });
 
     let dpa = common::scrambled_dpa(4_000, 2, 8);

@@ -3,6 +3,7 @@ use crate::alphabet::CharAlphabet;
 use crate::automaton::semantics::observe_omega;
 use crate::automaton::{DPA, Semantics};
 use crate::representation::IntoTransitions;
+use crate::ts::Sccs;
 use crate::ts::{Deterministic, StateIndex, SymbolOf};
 use crate::word::OmegaWord;
 use crate::word::ReducedOmegaWord;
@@ -74,8 +75,8 @@ where
     /// Tries to identify a word which is accepted by `self`. If such a word exists, it returns it and otherwise
     /// the function gives back `None`.
     pub fn give_word(&self) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
-        for (_, good_scc) in self
-            .sccs()
+        for (_, good_scc) in Sccs::on(self)
+            .compute()
             .iter()
             .filter(|(_, scc)| !scc.is_empty() && self.is_reachable_from(self.initial, scc.first()))
         {

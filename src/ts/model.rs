@@ -507,9 +507,12 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
         sccs
     }
 
-    /// The strongly connected components that contain a state reachable from `origin`.
-    pub fn sccs_reachable_from(&self, origin: usize) -> Vec<Vec<usize>> {
-        let reachable = self.reachable_from(origin);
+    /// The strongly connected components that contain a state reachable from one of `origins`.
+    pub fn sccs_reachable_from(&self, origins: &[usize]) -> Vec<Vec<usize>> {
+        let reachable: Vec<usize> = origins
+            .iter()
+            .flat_map(|&origin| self.reachable_from(origin))
+            .collect();
         self.sccs()
             .into_iter()
             .filter(|scc| reachable.contains(&scc[0]))
@@ -717,7 +720,7 @@ mod tests {
             vec![vec![q[0], q[1]], vec![q[2]], vec![q[3]], vec![q[4]]]
         );
         assert_eq!(
-            m.sccs_reachable_from(q[1]),
+            m.sccs_reachable_from(&[q[1]]),
             vec![vec![q[0], q[1]], vec![q[2]]]
         );
         assert_eq!(m.transient_states(), vec![q[3], q[4]]);

@@ -1,256 +1,123 @@
-use super::SccDecomposition;
-use crate::alphabet::Expression;
-use crate::ts::connected_components::Scc;
-use crate::ts::predecessors::PredecessorIterable;
-use crate::ts::{CompactIdMap, IdType, StateIndex, StateMap};
+use super::{Scc, SccDecomposition};
+use crate::ts::{CompactIdMap, StateIndex};
 use crate::{States, TransitionSystem};
 
+/// Marker for an [`Sccs`] problem that considers all states of the transition system.
+#[derive(Debug, Clone, Copy)]
+pub struct AllStates;
+
+/// The states from which an [`Sccs`] problem starts its search.
 #[derive(Debug, Clone)]
-struct TarjanData {
-    rootindex: Option<usize>,
+pub struct Roots<I>(Vec<I>);
+
+/// The problem of decomposing a transition system into strongly connected components, solved by
+/// an iterative version of Tarjan's algorithm (so deep graphs do not overflow the stack).
+///
+/// ```
+/// use automata::{DTS, ts::{Sccs, TransitionSystem}};
+///
+/// let ts = DTS::builder()
+///     .default_color(())
+///     .with_transitions([(0, 'a', (), 1), (1, 'a', (), 1), (1, 'b', (), 0)])
+///     .into_dts_with_initial(0);
+/// // all states (needs `States`)
+/// assert_eq!(Sccs::on(&ts).compute().size(), 1);
+/// // only the part that is reachable from the given states
+/// assert_eq!(Sccs::on(&ts).from([1]).compute().size(), 1);
+/// ```
+#[derive(Debug, Clone, Copy)]
+pub struct Sccs<'a, Ts, R = AllStates> {
+    ts: &'a Ts,
+    roots: R,
 }
 
-/// Struct that is used to compute the strongly connected components of a transition system.
-/// Many thanks go out to the authors of the petgraph crate <3.
-#[derive(Debug, Clone)]
-pub struct Tarjan<Idx> {
-    index: usize,
-    component_count: usize,
-    stack: Vec<Idx>,
-    data: StateMap<Idx, TarjanData>,
-}
-
-impl<Idx: IdType> Default for Tarjan<Idx> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<Idx: IdType> Tarjan<Idx> {
-    /// Creates a new Tarjan SCC decomposition instance.
-    pub fn new() -> Self {
+impl<'a, Ts: TransitionSystem> Sccs<'a, Ts> {
+    /// Sets up the decomposition of `ts`. Without further configuration all of its states are
+    /// considered, which requires [`States`].
+    pub fn on(ts: &'a Ts) -> Self {
         Self {
-            index: 0,
-            component_count: usize::MAX,
-            stack: Vec::new(),
-            data: StateMap::default(),
+            ts,
+            roots: AllStates,
         }
     }
 
-    pub(crate) fn visit<Ts, F>(&mut self, ts: &Ts, v: Idx, f: &mut F)
+    /// Only decompose the part of the transition system that is reachable from the given states.
+    /// States that do not exist are ignored.
+    pub fn from<I>(self, roots: I) -> Sccs<'a, Ts, Roots<StateIndex<Ts>>>
     where
-        Ts: TransitionSystem<StateIndex = Idx>,
-        F: FnMut(&[Idx]),
+        I: IntoIterator<Item = StateIndex<Ts>>,
     {
-        let mut node_v_is_root = true;
-        let node_v_index = self.index;
-        self.data.insert(
-            v,
-            TarjanData {
-                rootindex: Some(node_v_index),
-            },
-        );
-        self.index += 1;
-
-        if let Some(it) = ts.edges_from(v) {
-            for edge in it {
-                let q = edge.target();
-                for _a in edge.expression().symbols() {
-                    if self.data.get(&q).and_then(|data| data.rootindex).is_none() {
-                        self.visit(ts, q, f);
-                    }
-                    let w_index = self.data.get(&q).unwrap().rootindex;
-                    let v_mut = self.data.get_mut(&v).unwrap();
-                    if w_index < v_mut.rootindex {
-                        v_mut.rootindex = w_index;
-                        node_v_is_root = false;
-                    }
-                }
-            }
+        Sccs {
+            ts: self.ts,
+            roots: Roots(roots.into_iter().collect()),
         }
-
-        if node_v_is_root {
-            let mut adjust = 1;
-            let c = self.component_count;
-            let node_data = &mut self.data;
-
-            let start = self
-                .stack
-                .iter()
-                .rposition(|w| {
-                    if node_data.get(&v).unwrap().rootindex > node_data.get(w).unwrap().rootindex {
-                        true
-                    } else {
-                        node_data.get_mut(w).unwrap().rootindex = Some(c);
-                        adjust += 1;
-                        false
-                    }
-                })
-                .map(|x| x + 1)
-                .unwrap_or_default();
-
-            node_data.get_mut(&v).unwrap().rootindex = Some(c);
-            self.stack.push(v);
-            f(&self.stack[start..]);
-            self.stack.truncate(start);
-            self.index -= adjust;
-            self.component_count -= 1;
-        } else {
-            self.stack.push(v);
-        }
-    }
-
-    pub(crate) fn execute<Ts, F>(&mut self, ts: &Ts, mut f: F)
-    where
-        Ts: States<StateIndex = Idx>,
-        F: FnMut(&[Idx]),
-    {
-        self.data = StateMap::new(ts.state_bound());
-
-        for q in ts.states() {
-            if let Some(TarjanData { rootindex: None }) | None = self.data.get(&q) {
-                self.visit(ts, q, &mut f);
-            }
-        }
-        debug_assert!(self.stack.is_empty())
     }
 }
 
-/// Recursive application of Tarjan's algorithm form computing the SCC decomposition.
-pub fn tarjan_scc_recursive<Ts>(ts: &Ts) -> SccDecomposition<'_, Ts>
-where
-    Ts: States,
-{
-    let mut sccs = Vec::new();
-    {
-        let mut tj = Tarjan::new();
-        tj.execute(ts, |scc| sccs.push(Scc::new(ts, scc.to_vec())));
+impl<'a, Ts: States> Sccs<'a, Ts, AllStates> {
+    /// Computes the decomposition of all states.
+    pub fn compute(self) -> SccDecomposition<'a, Ts> {
+        let roots: Vec<_> = self.ts.states().collect();
+        // a dense numbering costs time proportional to the bound, which is not worth it if only
+        // few of the states are considered (e.g. after removing states from a linked list system)
+        let bound = self.ts.state_bound().filter(|&b| b <= 4 * roots.len());
+        tarjan(self.ts, roots, bound)
     }
-    debug_assert!(
-        sccs.iter().collect::<std::collections::HashSet<_>>().len() == sccs.len(),
-        "All SCCs must be unique!"
-    );
-    sccs.sort();
-    SccDecomposition::from_sccs(ts, sccs)
 }
 
-/// Implementation of Kosaraju's algorithm for computing the SCC decomposition.
-/// Only states reachable from `start` are considered.
-pub fn kosaraju<Ts>(ts: &Ts, start: Ts::StateIndex) -> SccDecomposition<'_, Ts>
-where
-    Ts: TransitionSystem + PredecessorIterable,
-{
-    // first pass: dfs on the forward graph, recording states in order of finishing
-    let mut ids = CompactIdMap::new(ts.state_bound(), 0);
-    ids.get_or_insert(start);
-    let mut finished = Vec::new();
-    let mut queue = vec![(start, ts.edges_from(start).unwrap())];
-
-    while let Some((q, edges)) = queue.last_mut() {
-        let q = *q;
-        if let Some(edge) = edges.next() {
-            let target = edge.target();
-            if ids.id(&target).is_none() {
-                ids.get_or_insert(target);
-                queue.push((target, ts.edges_from(target).unwrap()));
-            }
-        } else {
-            queue.pop();
-            finished.push(ids.id(&q).expect("state was numbered when discovered"));
-        }
+impl<'a, Ts: TransitionSystem> Sccs<'a, Ts, Roots<StateIndex<Ts>>> {
+    /// Computes the decomposition of the states that are reachable from the roots.
+    pub fn compute(self) -> SccDecomposition<'a, Ts> {
+        tarjan(self.ts, self.roots.0, self.ts.state_bound())
     }
-
-    // second pass: backward dfs in decreasing order of finishing time, restricted to
-    // states that have not been assigned to an scc yet
-    let mut assigned = vec![false; ids.len()];
-    let mut sccs = vec![];
-    let mut work = vec![];
-
-    for &root in finished.iter().rev() {
-        if assigned[root] {
-            continue;
-        }
-        assigned[root] = true;
-        work.push(root);
-        let mut scc = vec![];
-        while let Some(v) = work.pop() {
-            let q = ids.state(v);
-            scc.push(q);
-            for edge in ts.predecessors(q).into_iter().flatten() {
-                if let Some(u) = ids.id(&edge.source())
-                    && !assigned[u]
-                {
-                    assigned[u] = true;
-                    work.push(u);
-                }
-            }
-        }
-        sccs.push(Scc::new(ts, scc));
-    }
-
-    SccDecomposition::from_sccs(ts, sccs)
 }
 
-/// Calls [`tarjan_scc_iterative_from`] for the set of all states.
-pub fn tarjan_scc_iterative<Ts>(ts: &Ts) -> SccDecomposition<'_, Ts>
-where
-    Ts: States,
-{
-    tarjan_scc_iterative_from(ts, ts.states())
-}
-
-/// Iterative application of Tarjan's algorithm form computing the SCC decomposition.
-/// Only states reachable from `iter` through states contained in `iter` are considered.
-pub fn tarjan_scc_iterative_from<Ts, I>(ts: &Ts, iter: I) -> SccDecomposition<'_, Ts>
-where
-    Ts: TransitionSystem,
-    I: IntoIterator<Item = StateIndex<Ts>>,
-{
+fn tarjan<Ts: TransitionSystem>(
+    ts: &Ts,
+    roots: Vec<StateIndex<Ts>>,
+    bound: Option<usize>,
+) -> SccDecomposition<'_, Ts> {
     const UNVISITED: usize = usize::MAX;
 
-    let start_time = std::time::Instant::now();
-    let roots: Vec<_> = iter.into_iter().collect();
-
-    // dense numbering of the considered states, so that all bookkeeping can use plain vectors
-    // a dense numbering costs time proportional to the bound, which is not worth it if only few
-    // of the states are considered (e.g. after removing states from a linked list system)
-    let bound = ts.state_bound().filter(|&b| b <= 4 * roots.len());
+    // dense numbering of the states in order of discovery, so that all bookkeeping can use
+    // plain vectors
     let mut ids = CompactIdMap::new(bound, roots.len());
     for &q in &roots {
         ids.get_or_insert(q);
     }
-    let states = ids.states().to_vec();
-    let n = states.len();
+    let seeds = ids.len();
 
-    let mut index = vec![UNVISITED; n];
-    let mut low = vec![0usize; n];
-    let mut on_stack = vec![false; n];
+    let mut index = vec![UNVISITED; seeds];
+    let mut low = vec![0usize; seeds];
+    let mut on_stack = vec![false; seeds];
     let mut stack: Vec<usize> = Vec::new();
     let mut call_stack = Vec::new();
     let mut counter = 0usize;
     let mut sccs = Vec::new();
 
-    for root in 0..n {
+    for root in 0..seeds {
         if index[root] != UNVISITED {
             continue;
         }
+        let Some(edges) = ts.edges_from(ids.state(root)) else {
+            continue;
+        };
         index[root] = counter;
         low[root] = counter;
         counter += 1;
         stack.push(root);
         on_stack[root] = true;
-        call_stack.push((
-            root,
-            ts.edges_from(states[root])
-                .expect("state is known to exist"),
-        ));
+        call_stack.push((root, edges));
 
         while let Some((v, edges)) = call_stack.last_mut() {
             let v = *v;
             if let Some(edge) = edges.next() {
-                let Some(w) = ids.id(&edge.target()) else {
-                    continue;
-                };
+                let w = ids.get_or_insert(edge.target());
+                if w == index.len() {
+                    index.push(UNVISITED);
+                    low.push(0);
+                    on_stack.push(false);
+                }
                 if index[w] == UNVISITED {
                     index[w] = counter;
                     low[w] = counter;
@@ -259,7 +126,8 @@ where
                     on_stack[w] = true;
                     call_stack.push((
                         w,
-                        ts.edges_from(states[w]).expect("state is known to exist"),
+                        ts.edges_from(ids.state(w))
+                            .expect("the target of an edge exists"),
                     ));
                 } else if on_stack[w] {
                     low[v] = low[v].min(index[w]);
@@ -276,7 +144,7 @@ where
                 loop {
                     let top = stack.pop().expect("root of scc is on the stack");
                     on_stack[top] = false;
-                    scc.push(states[top]);
+                    scc.push(ids.state(top));
                     if top == v {
                         break;
                     }
@@ -286,63 +154,15 @@ where
         }
     }
 
-    tracing::info!(
-        "tarjan scc iterative took {}µs",
-        start_time.elapsed().as_micros()
-    );
-
     sccs.sort();
     SccDecomposition::from_sccs(ts, sccs)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, time::Instant};
-
-    use super::tarjan_scc_iterative;
-    use crate::Pointed;
+    use super::Sccs;
     use crate::Void;
-    use crate::ts::{Builder, TransitionSystem};
-    use crate::ts::{
-        connected_components::{kosaraju, tarjan_scc_recursive},
-        predecessors::PredecessorIterable,
-    };
-    use tracing::debug;
-
-    #[test]
-    fn kosaraju_agrees_with_tarjan() {
-        // state 5 is not reachable from 0 but has an edge into the reachable part
-        let ts = Builder::without_colors()
-            .with_transitions([
-                (0, 'a', Void, 1),
-                (0, 'b', Void, 2),
-                (1, 'a', Void, 0),
-                (1, 'b', Void, 3),
-                (2, 'a', Void, 2),
-                (2, 'b', Void, 4),
-                (3, 'a', Void, 4),
-                (3, 'b', Void, 3),
-                (4, 'a', Void, 2),
-                (4, 'b', Void, 4),
-                (5, 'a', Void, 0),
-                (5, 'b', Void, 5),
-            ])
-            .into_right_congruence(0);
-
-        let mut expected: Vec<Vec<_>> = tarjan_scc_iterative(&ts)
-            .sccs_iter()
-            .map(|scc| scc.iter().copied().collect())
-            .filter(|scc: &Vec<_>| !scc.contains(&5))
-            .collect();
-        let mut actual: Vec<Vec<_>> = kosaraju(&ts, 0)
-            .sccs_iter()
-            .map(|scc| scc.iter().copied().collect())
-            .collect();
-        expected.sort();
-        actual.sort();
-        assert_eq!(actual, expected);
-        assert_eq!(actual, vec![vec![0, 1], vec![2, 4], vec![3]]);
-    }
+    use crate::ts::Builder;
 
     #[test]
     fn tarjan_iterative() {
@@ -358,31 +178,23 @@ mod tests {
             ])
             .into_right_congruence(0);
 
-        let rev = (&ts).reversed();
-        let reachable = rev.reachable_state_indices_from(3).collect::<HashSet<_>>();
-
-        assert!(reachable.contains(&3));
-        assert!(reachable.contains(&2));
-
-        let start = Instant::now();
-        let _sccs = kosaraju(&ts, ts.initial());
-        debug!("Kosaraju took {} microseconds", start.elapsed().as_micros());
-
-        let start = Instant::now();
-        let _sccs = tarjan_scc_recursive(&ts);
-        debug!(
-            "Tarjan recursive took {} microseconds",
-            start.elapsed().as_micros()
-        );
-
-        let start = Instant::now();
-        let sccs = tarjan_scc_iterative(&ts);
-        debug!(
-            "Tarjan iterative took {} microseconds",
-            start.elapsed().as_micros()
-        );
+        let sccs = Sccs::on(&ts).compute();
         assert_eq!(sccs[0], vec![0]);
         assert_eq!(sccs[1], vec![1]);
         assert_eq!(sccs[2], vec![2, 3]);
+
+        let sccs = Sccs::on(&ts).from([2]).compute();
+        assert_eq!(sccs.size(), 1);
+        assert_eq!(sccs[0], vec![2, 3]);
+        assert_eq!(Sccs::on(&ts).from([0]).compute().size(), 3);
+    }
+
+    #[test]
+    fn long_path_does_not_overflow_the_stack() {
+        let n = 1_000_000;
+        let ts = Builder::without_colors()
+            .with_transitions((0..n - 1).map(|q| (q, 'a', Void, q + 1)))
+            .into_right_congruence(0);
+        assert_eq!(Sccs::on(&ts).from([0]).compute().size(), n as usize);
     }
 }

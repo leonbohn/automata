@@ -7,6 +7,7 @@ use automata::alphabet::CharAlphabet;
 use automata::automaton::DPA;
 use automata::hoa::WriteHoa;
 use automata::representation::IntoTransitions;
+use automata::ts::Sccs;
 use automata::{DTS, Int, States, TransitionSystem, Void};
 use common::FixtureDpa;
 use gungraun::prelude::*;
@@ -188,7 +189,7 @@ fn witness_inequivalence((a, b): (DPA, DPA)) -> bool {
 #[bench::chain_1000(args = (1_000), setup = chain)]
 #[bench::chain_4000(args = (4_000), setup = chain)]
 fn sccs(dpa: DPA) -> usize {
-    black_box(dpa.sccs().size())
+    black_box(Sccs::on(&dpa).compute().size())
 }
 
 // The congruence that the learning algorithms ask for.

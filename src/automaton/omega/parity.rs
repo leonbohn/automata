@@ -1,3 +1,4 @@
+use crate::ts::Sccs;
 use crate::ts::States;
 use crate::ts::{DenseId, EdgeId, Sproutable};
 use std::{
@@ -377,14 +378,14 @@ where
     /// word exists, `None` is returned.
     pub fn witness_color(&self, color: Int) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         let restrict = self.edge_color_restricted(color, Int::MAX);
-        let sccs = restrict.sccs();
+        let sccs = Sccs::on(&restrict).compute();
         for (_, scc) in sccs.iter() {
             if scc.is_transient() {
                 continue;
             }
-            if scc.interior_edge_colors().contains(&color) {
+            if scc.interior_edge_colors().any(|c| c == color) {
                 // components that cannot be reached from the initial state have no representative
-                let Some(rep) = scc.minimal_representative().as_ref() else {
+                let Some(rep) = scc.minimal_representative() else {
                     continue;
                 };
                 let cycle = scc
@@ -413,17 +414,16 @@ where
         let t1 = self.edge_color_restricted(k, Int::MAX);
         let t2 = other.edge_color_restricted(l, Int::MAX);
         let prod = t1.ts_product(t2).reachable_part();
-        let sccs = prod.sccs();
+        let sccs = Sccs::on(&prod).compute();
         for (_, scc) in sccs.iter() {
             if scc.is_transient() {
                 continue;
             }
             let (a, b) = scc
                 .interior_edge_colors()
-                .iter()
                 .min()
                 .expect("we know this is not transient");
-            if *a == k && *b == l {
+            if a == k && b == l {
                 let Some(rep) = scc.minimal_representative() else {
                     continue;
                 };
@@ -567,7 +567,7 @@ where
                 break 'outer;
             }
 
-            let dag = ts.sccs();
+            let dag = Sccs::on(&ts).compute();
 
             'inner: for (_, scc) in dag.iter() {
                 trace!("inner priority {priority} | scc {:?}", scc);
@@ -804,7 +804,7 @@ mod tests {
         let l = &good[0];
         let r = &bad[2];
         let prod = l.ts_product(r).reachable_part();
-        let _sccs = prod.sccs();
+        let _sccs = crate::ts::Sccs::on(&prod).compute();
         assert!(!good[0].language_equivalent(&bad[2]));
 
         for g in &good {
