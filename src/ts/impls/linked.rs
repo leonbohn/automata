@@ -15,7 +15,7 @@ pub use linked_state::{LinkedEdgesFrom, LinkedEdgesTo};
 mod linked_edge;
 use crate::TransitionSystem;
 use crate::ts::predecessors::PredecessorIterable;
-use crate::ts::{Det, Linked, Storage};
+use crate::ts::{Det, Linked, SproutableStorage, Storage};
 use crate::{
     Color, Show, Void,
     alphabet::{Alphabet, CharAlphabet, Matcher},
@@ -661,6 +661,10 @@ impl<A: Alphabet, Q: Color, C: Color> Deterministic for Det<LinkedTs<A, Q, C>> {
         let position = self.0.out_edge_position(state, symbol)?;
         Some(self.0.edges[position].target)
     }
+}
+
+impl<A: Alphabet> SproutableStorage<A> for Det<Linked> {
+    type Grown<QQ: Color, CC: Color> = Det<LinkedTs<A, QQ, CC>>;
 }
 
 impl<A: Alphabet> Storage<A> for Det<Linked> {

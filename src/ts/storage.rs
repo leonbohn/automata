@@ -6,6 +6,7 @@ use crate::ts::{DenseTs, ForAlphabet, LinkedTs, Sproutable, States};
 /// is chosen at the type level and turned into a concrete system by [`Storage::Ts`], which fixes
 /// the colors. This allows code to be generic over the representation without naming a concrete
 /// system, for example a parser that is instantiated with [`Linked`] or with [`Det<Linked>`].
+/// Whether a system can be grown is not part of this, see [`SproutableStorage`].
 ///
 /// Only systems that own their states and edges have a storage. Lazy views (products, recolorings,
 /// subset constructions) do not.
@@ -13,8 +14,7 @@ use crate::ts::{DenseTs, ForAlphabet, LinkedTs, Sproutable, States};
 /// [`Det<Linked>`]: crate::ts::Det
 pub trait Storage<A: Alphabet> {
     /// The transition system of this storage with the given colors.
-    type Ts<Q: Color, C: Color>: Sproutable<Alphabet = A, StateColor = Q, EdgeColor = C>
-        + ForAlphabet<A>;
+    type Ts<Q: Color, C: Color>: States<Alphabet = A, StateColor = Q, EdgeColor = C>;
 
     /// Converts a non-deterministic [`LinkedTs`] into this storage. A storage that cannot
     /// represent `ts` (because it is deterministic and `ts` is not) returns it as the error.
@@ -23,9 +23,24 @@ pub trait Storage<A: Alphabet> {
     ) -> Result<Self::Ts<Q, C>, LinkedTs<A, Q, C>>;
 }
 
+/// A [`Storage`] whose systems can be grown state by state and edge by edge, which is what the
+/// builder and the parsers need. Storages that are built in one go from another system (like
+/// [`Csr`]) only implement [`Storage`].
+pub trait SproutableStorage<A: Alphabet>: Storage<A> {
+    /// The system of this storage that can be grown, a type that converts into [`Storage::Ts`]
+    /// (for most storages it is the same type).
+    type Grown<Q: Color, C: Color>: Sproutable<Alphabet = A, StateColor = Q, EdgeColor = C>
+        + ForAlphabet<A>
+        + Into<Self::Ts<Q, C>>;
+}
+
 /// The storage [`LinkedTs`]: non-deterministic, works for any alphabet.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Linked;
+
+impl<A: Alphabet> SproutableStorage<A> for Linked {
+    type Grown<Q: Color, C: Color> = LinkedTs<A, Q, C>;
+}
 
 impl<A: Alphabet> Storage<A> for Linked {
     type Ts<Q: Color, C: Color> = LinkedTs<A, Q, C>;
@@ -41,6 +56,10 @@ impl<A: Alphabet> Storage<A> for Linked {
 /// constant time.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Dense;
+
+impl<A: IndexedAlphabet> SproutableStorage<A> for Dense {
+    type Grown<Q: Color, C: Color> = DenseTs<A, Q, C>;
+}
 
 impl<A: IndexedAlphabet> Storage<A> for Dense {
     type Ts<Q: Color, C: Color> = DenseTs<A, Q, C>;

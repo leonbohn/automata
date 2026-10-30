@@ -5,7 +5,7 @@ use bimap::BiBTreeMap;
 use fixedbitset::FixedBitSet;
 use itertools::Itertools;
 
-use super::{EdgeColor, EdgeId, IntoEdgeTuple, StateColor, StateIndex, Storage};
+use super::{EdgeColor, EdgeId, IntoEdgeTuple, SproutableStorage, StateColor, StateIndex};
 
 /// Implemented by [`TransitionSystem`]s (TS) that can be created for a given [`Alphabet`],
 /// which is may be used in conjunction with [`Sproutable`] to successively grow a
@@ -28,8 +28,8 @@ pub trait ForAlphabet<A: Alphabet>: Sized {
 /// Trait for transition systems that allow insertion of states and transitions.
 pub trait Sproutable: States {
     /// The family of storages that `Self` belongs to, so that generic code can name a system of the
-    /// same representation with other colors, see [`Storage::Ts`].
-    type Storage: Storage<Self::Alphabet>;
+    /// same representation with other colors, see [`Storage::Ts`](super::Storage::Ts).
+    type Storage: SproutableStorage<Self::Alphabet>;
 
     /// Adds a new state with the given color. The method returns the index of the newly created
     /// state.
