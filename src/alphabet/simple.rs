@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 
 use itertools::Itertools;
 
@@ -34,6 +34,28 @@ where
     fn position(&self, symbol: Self::Symbol) -> usize {
         self.try_position(symbol).unwrap()
     }
+}
+
+/// The symbols given for an alphabet do not fit its size, see [`FromSymbols::try_from_symbols`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("the alphabet has {expected} symbols but {found} were given")]
+pub struct WrongAlphabetSize {
+    /// The number of symbols of the alphabet.
+    pub expected: usize,
+    /// The number of distinct symbols that were given.
+    pub found: usize,
+}
+
+/// A [`SimpleAlphabet`] that can be created from its set of symbols. This is what the
+/// [`Builder`](crate::ts::Builder) uses to create the alphabet of the system it builds from the
+/// symbols on the edges.
+pub trait FromSymbols: SimpleAlphabet + Sized {
+    /// Creates the alphabet with exactly the given symbols.
+    ///
+    /// # Errors
+    /// Returns [`WrongAlphabetSize`] if the alphabet has a fixed size that differs from the number
+    /// of symbols.
+    fn try_from_symbols(symbols: BTreeSet<Self::Symbol>) -> Result<Self, WrongAlphabetSize>;
 }
 
 /// Represents an alphabet where a [`Symbol`] is just a single `char`.
@@ -186,6 +208,12 @@ impl SimpleAlphabet for CharAlphabet {
     }
 }
 
+impl FromSymbols for CharAlphabet {
+    fn try_from_symbols(symbols: BTreeSet<char>) -> Result<Self, WrongAlphabetSize> {
+        Ok(Self(symbols.into_iter().collect()))
+    }
+}
+
 impl IndexedAlphabet for CharAlphabet {
     #[inline]
     fn try_symbol_to_index(&self, sym: Self::Symbol) -> Option<usize> {
@@ -317,6 +345,33 @@ impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> Alphabet for Fi
             .iter()
             .find(|c| c == &&symbol)
             .expect("symbol does not exist")
+    }
+}
+
+impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> SimpleAlphabet for Fixed<S, N> {
+    fn express(&self, sym: Self::Symbol) -> &Self::Expression {
+        self.0
+            .iter()
+            .find(|c| c == &&sym)
+            .expect("cannot express unavailable symbol!")
+    }
+
+    fn try_nth(&self, pos: usize) -> Option<Self::Symbol> {
+        self.0.get(pos).copied()
+    }
+
+    fn try_position(&self, symbol: Self::Symbol) -> Option<usize> {
+        self.0.iter().position(|c| *c == symbol)
+    }
+}
+
+impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> FromSymbols for Fixed<S, N> {
+    /// The symbols are put in ascending order.
+    fn try_from_symbols(symbols: BTreeSet<S>) -> Result<Self, WrongAlphabetSize> {
+        let found = symbols.len();
+        <[S; N]>::try_from(symbols.into_iter().collect::<Vec<_>>())
+            .map(Self)
+            .map_err(|_| WrongAlphabetSize { expected: N, found })
     }
 }
 

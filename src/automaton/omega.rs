@@ -271,7 +271,7 @@ impl From<DeterministicOmegaAutomaton<PropAlphabet>> for DeterministicOmegaAutom
                         .map(move |sym| (edge.source(), sym, edge.color().clone(), edge.target()))
                 })
             }))
-            .into_dts();
+            .build_dts();
         DeterministicOmegaAutomaton::new(ts, value.initial, value.acceptance)
     }
 }

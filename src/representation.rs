@@ -377,7 +377,7 @@ mod tests {
                 (5, 'a', 2, 5),
                 (5, 'b', 1, 5),
             ])
-            .into_dts();
+            .build_dts();
         let moore = ts.clone().into_moore_with_initial(0);
         let mealy = ts.into_mealy();
         assert_eq!(moore.state_count(), mealy.state_count());

@@ -116,7 +116,7 @@ pub trait Sproutable: States {
     /// let source: DTS<CharAlphabet, usize, usize> = DTS::builder()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
     ///     .with_state_colors([0])
-    ///     .into_dts();
+    ///     .build_dts();
     ///
     /// let (dts, map) = DTS::sprout_from_ts_with_bijection(&source);
     /// assert_eq!(source.state_count(), dts.state_count());
@@ -178,7 +178,7 @@ pub trait Sproutable: States {
     /// let source: DTS<CharAlphabet, usize, usize> = DTS::builder()
     ///     .with_transitions([(0, 'a', 0, 0), (0, 'b', 0, 0)])
     ///     .with_state_colors([0])
-    ///     .into_dts();
+    ///     .build_dts();
     ///
     /// let dts = DTS::sprout_from_ts(&source);
     /// assert_eq!(source.state_count(), dts.state_count());
@@ -215,7 +215,7 @@ pub trait Sproutable: States {
     /// let mut ts = Builder::without_colors()
     ///     .with_edges([(0, 'a', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
-    ///     .into_dts();
+    ///     .build_dts();
     /// assert!(!ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
     /// assert_eq!(ts.state_count(), 2);
@@ -234,7 +234,7 @@ pub trait Sproutable: States {
     /// let mut ts = Builder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 0)])
     ///     .with_alphabet_symbols(['a', 'b'])
-    ///     .into_dts();
+    ///     .build_dts();
     /// assert!(ts.is_complete());
     /// ts.complete_with_colors(Void, Void);
     /// assert_eq!(ts.state_count(), 1);
@@ -358,7 +358,7 @@ mod tests {
                 (0, 'c', 0, 1),
                 (1, 'a', 0, 0),
             ])
-            .into_dts();
+            .build_dts();
         assert_eq!(partial.reached_state_from(0, "aaacb"), None);
         assert!(!partial.is_complete());
 

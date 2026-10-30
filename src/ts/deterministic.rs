@@ -34,7 +34,7 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// let ts = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', Void, 1), (1, 'a', Void, 2), (2, 'a', Void, 0)])
-    ///     .into_right_congruence_bare(0);
+    ///     .into_right_congruence(0);
     /// assert_eq!(ts.edge(0, 'a').unwrap().target(), 1);
     /// assert_eq!(ts.edge(1, 'a').unwrap().target(), 2);
     /// assert_eq!(ts.edge(2, 'a').unwrap().target(), 0);

@@ -430,7 +430,7 @@ mod tests {
                 (2, 'a', 3, 0),
                 (0, 'b', 4, 0),
             ])
-            .into_dts()
+            .build_dts()
     }
 
     #[test]

@@ -920,14 +920,14 @@ mod tests {
         let nts = Builder::default()
             .with_state_colors([0, 0, 0])
             .with_edges([(0, 'a', 0u32, 1), (0, 'b', 0, 1), (0, 'a', 0, 2)])
-            .into_nts();
+            .build_nts();
         assert!(!nts.is_deterministic());
         assert!(nts.try_into_deterministic().is_err());
 
         let nts = Builder::default()
             .with_state_colors([0, 0, 0])
             .with_edges([(0, 'a', 0u32, 1), (0, 'b', 0, 1), (1, 'a', 0, 2)])
-            .into_nts();
+            .build_nts();
         assert!(nts.is_deterministic());
         assert!(nts.try_into_deterministic().is_ok());
     }
@@ -937,7 +937,7 @@ mod tests {
         let small = Builder::default()
             .with_state_colors([0, 0])
             .with_edges([(0, 'a', 0u32, 1), (1, 'a', 0, 0), (1, 'b', 0, 1)])
-            .into_dts();
+            .build_dts();
         let big = Builder::default()
             .with_state_colors([0, 0])
             .with_edges([
@@ -946,7 +946,7 @@ mod tests {
                 (1, 'b', 0, 1),
                 (0, 'b', 0, 0),
             ])
-            .into_dts();
+            .build_dts();
         assert!(small != big);
         assert!(big != small);
         assert!(small == small.clone());
@@ -962,7 +962,7 @@ mod tests {
                 (1, 'a', 200, 0),
                 (1, 'b', 2000, 1),
             ])
-            .into_dts();
+            .build_dts();
         let second = Builder::default()
             .with_state_colors([0, 1])
             .with_edges([
@@ -971,7 +971,7 @@ mod tests {
                 (0, 'a', 100u32, 0),
                 (1, 'a', 200, 0),
             ])
-            .into_dts();
+            .build_dts();
         assert!(first == second, "equality should disregard order of edges");
     }
 
