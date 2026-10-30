@@ -516,9 +516,9 @@ where
     {
         let start = std::time::Instant::now();
 
-        let (out, numbering): (DTS<D::Alphabet, D::StateColor, D::EdgeColor>, _) =
-            self.ts.clone().collect_with_map();
-        let out_initial = StateIndex::<DTS<D::Alphabet, D::StateColor, D::EdgeColor>>::from_usize(
+        let (out, numbering): (DTS<D::Alphabet, Void, D::EdgeColor>, _) =
+            self.ts.clone().erase_state_colors().collect_with_map();
+        let out_initial = StateIndex::<DTS<D::Alphabet, Void, D::EdgeColor>>::from_usize(
             numbering
                 .id(&self.initial)
                 .expect("the initial state is a state"),
@@ -639,7 +639,7 @@ where
         }
 
         trace!("computation done, building output automaton");
-        let mut out = out.linked_map_edge_colors(|_, _, _, _| 0 as Int);
+        let mut out = out;
         for id in 0..out.edge_bound() {
             let id = EdgeId::from_usize(id);
             let Some(slot) = out.edge_color_mut(id) else {
@@ -648,8 +648,7 @@ where
             *slot = recoloring[id.into_usize()]
                 .unwrap_or_else(|| panic!("Could not find recoloring for edge {id}"));
         }
-        let ret: DPA<DTS<D::Alphabet, Void, Int>> =
-            out.erase_state_colors().with_initial(out_initial).collect();
+        let ret: DPA<DTS<D::Alphabet, Void, Int>> = DPA::from_parts(out, out_initial);
 
         tracing::debug!("normalizing DPA took {} μs", start.elapsed().as_micros());
 
