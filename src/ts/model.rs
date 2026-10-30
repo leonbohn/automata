@@ -339,6 +339,35 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
         classes
     }
 
+    /// The model as text, one line per state: its color and the edges leaving it as
+    /// `symbol/color -> target`.
+    pub fn describe(&self) -> String
+    where
+        Q: std::fmt::Debug,
+        C: std::fmt::Debug,
+    {
+        let mut text = String::new();
+        for q in self.states() {
+            let (color, edges) = self.states[q].as_ref().expect("state exists");
+            let edges: Vec<_> = edges
+                .iter()
+                .map(|e| {
+                    format!(
+                        "{}/{:?} -> q{}",
+                        (b'a' + e.symbol as u8) as char,
+                        e.color,
+                        e.target
+                    )
+                })
+                .collect();
+            text += &format!("  q{q} (color {color:?}): {}\n", edges.join(", "));
+        }
+        if text.is_empty() {
+            text = "  (no states)\n".to_string();
+        }
+        text
+    }
+
     /// Whether no state has two edges with the same symbol.
     pub fn is_deterministic(&self) -> bool {
         self.states().into_iter().all(|q| {

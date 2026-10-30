@@ -7,6 +7,7 @@
 //! unknown ids, the selector one past the last live item resolves to something that does not
 //! exist, which exercises the `None` paths of the storage.
 
+mod report;
 mod round_trip;
 
 use std::collections::HashMap;
@@ -31,7 +32,7 @@ use crate::{
 pub const ALPHABET_SIZE: usize = 3;
 
 /// A single step of a test run. All `usize` fields except `symbol` are selectors.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Op {
     AddState(u8),
     AddEdge {
@@ -59,6 +60,23 @@ pub struct Remap<Ts: TransitionSystem> {
     pub edge: Box<dyn Fn(EdgeId) -> Option<EdgeId>>,
 }
 
+/// Edges as `e0: q1 -a/2-> q3`, sorted as given.
+fn show_edges(edges: &[ModelEdgeTuple<u8>]) -> String {
+    if edges.is_empty() {
+        return "(none)".to_string();
+    }
+    edges
+        .iter()
+        .map(|(id, source, symbol, color, target)| {
+            format!(
+                "e{id}: q{source} -{}/{color}-> q{target}",
+                symbol_char(*symbol)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn symbol_char(symbol: usize) -> char {
     (b'a' + (symbol % ALPHABET_SIZE) as u8) as char
 }
@@ -75,6 +93,9 @@ pub struct Harness<Ts: TransitionSystem> {
     /// Storage ids of removed states and edges, to check that compaction maps them to `None`.
     dead_states: Vec<Ts::StateIndex>,
     dead_edges: Vec<EdgeId>,
+    /// The operations applied so far, as they were given and in a readable form.
+    applied: Vec<Op>,
+    trace: Vec<String>,
     /// Number of states ever added, so we can name a state that never existed.
     created_states: usize,
 }
@@ -108,6 +129,8 @@ where
             edges: HashMap::new(),
             dead_states: Vec::new(),
             dead_edges: Vec::new(),
+            applied: Vec::new(),
+            trace: Vec::new(),
             created_states: 0,
         };
         h.assert_agree();
@@ -241,9 +264,7 @@ where
         }
     }
 
-    /// Applies `op` to the storage and the model, checks that the results agree and then compares
-    /// the full state of both.
-    pub fn step(&mut self, op: &Op) {
+    fn apply(&mut self, op: &Op) {
         match *op {
             Op::AddState(color) => {
                 let expected = self.model.add_state(color);
@@ -520,7 +541,12 @@ where
                 v.sort();
                 v
             };
-            assert_eq!(expected_out, out, "edges leaving state {q} differ");
+            assert!(
+                expected_out == out,
+                "edges leaving q{q} differ\n  model:   {}\n  storage: {}",
+                show_edges(&expected_out),
+                show_edges(&out)
+            );
 
             let mut preds: Vec<_> = self
                 .ts
@@ -529,10 +555,12 @@ where
                 .map(|e| self.to_model_edge(&reverse_states, &reverse_edges, &e))
                 .collect();
             preds.sort();
-            assert_eq!(
-                self.model.predecessors(q).unwrap(),
-                preds,
-                "edges entering state {q} differ"
+            let expected_preds = self.model.predecessors(q).unwrap();
+            assert!(
+                expected_preds == preds,
+                "edges entering q{q} differ\n  model:   {}\n  storage: {}",
+                show_edges(&expected_preds),
+                show_edges(&preds)
             );
         }
 
@@ -572,31 +600,53 @@ where
     /// `origins`, with the model: following a word, the colors of the states of the subset and of
     /// the edges that are taken have to be those of the set of states the model is in.
     pub fn assert_subset_construction_agrees(&self, origins: &[usize], words: &[Vec<usize>]) {
-        let states = self.model.states();
-        if states.is_empty() {
-            return;
-        }
-        let mut start: Vec<usize> = origins.iter().map(|o| states[o % states.len()]).collect();
-        start.sort();
-        start.dedup();
-        let storage_start: Vec<_> = start.iter().map(|&q| self.storage_state(q)).collect();
-        let subset = (&self.ts).subset_construction_from(storage_start);
-        let sorted = |mut v: Vec<u8>| {
-            v.sort();
-            v
-        };
-        let colors_of = |set: &[usize]| -> Vec<u8> {
-            sorted(
-                set.iter()
-                    .map(|&q| self.model.state_color(q).expect("state exists"))
-                    .collect(),
-            )
-        };
+        self.reported(|| {
+            let states = self.model.states();
+            if states.is_empty() {
+                return;
+            }
+            let mut start: Vec<usize> = origins.iter().map(|o| states[o % states.len()]).collect();
+            start.sort();
+            start.dedup();
+            let storage_start: Vec<_> = start.iter().map(|&q| self.storage_state(q)).collect();
+            let subset = (&self.ts).subset_construction_from(storage_start);
+            let sorted = |mut v: Vec<u8>| {
+                v.sort();
+                v
+            };
+            let colors_of = |set: &[usize]| -> Vec<u8> {
+                sorted(
+                    set.iter()
+                        .map(|&q| self.model.state_color(q).expect("state exists"))
+                        .collect(),
+                )
+            };
 
-        for word in words {
-            let mut model_set = start.clone();
-            let mut current = subset.initial();
-            for &symbol in word {
+            for word in words {
+                let mut model_set = start.clone();
+                let mut current = subset.initial();
+                for &symbol in word {
+                    assert_eq!(
+                        colors_of(&model_set),
+                        sorted(
+                            subset
+                                .state_color(current)
+                                .expect("subset state")
+                                .into_owned()
+                        ),
+                        "state colors of the subset differ after a prefix of {word:?}"
+                    );
+                    let edge = subset
+                        .edge(current, symbol_char(symbol))
+                        .expect("subset construction is complete");
+                    assert_eq!(
+                        self.model.edge_colors_on(&model_set, symbol),
+                        sorted(edge.color().clone()),
+                        "edge colors of the subset differ on {symbol} in {word:?}"
+                    );
+                    current = edge.target();
+                    model_set = self.model.successors_on(&model_set, symbol);
+                }
                 assert_eq!(
                     colors_of(&model_set),
                     sorted(
@@ -605,114 +655,96 @@ where
                             .expect("subset state")
                             .into_owned()
                     ),
-                    "state colors of the subset differ after a prefix of {word:?}"
+                    "state colors of the subset differ at the end of {word:?}"
                 );
-                let edge = subset
-                    .edge(current, symbol_char(symbol))
-                    .expect("subset construction is complete");
                 assert_eq!(
-                    self.model.edge_colors_on(&model_set, symbol),
-                    sorted(edge.color().clone()),
-                    "edge colors of the subset differ on {symbol} in {word:?}"
+                    subset.reached_state(word.iter().copied().map(symbol_char).collect::<Vec<_>>()),
+                    Some(current)
                 );
-                current = edge.target();
-                model_set = self.model.successors_on(&model_set, symbol);
             }
-            assert_eq!(
-                colors_of(&model_set),
-                sorted(
-                    subset
-                        .state_color(current)
-                        .expect("subset state")
-                        .into_owned()
-                ),
-                "state colors of the subset differ at the end of {word:?}"
-            );
-            assert_eq!(
-                subset.reached_state(word.iter().copied().map(symbol_char).collect::<Vec<_>>()),
-                Some(current)
-            );
-        }
+        })
     }
 
     /// Compares the SCC decompositions of the storage (Tarjan iterative and recursive, and the
     /// variants restricted to what is reachable from a state, also Kosaraju) with the model.
     pub fn assert_sccs_agree(&self) {
-        let expected = self.model.sccs();
-        let all = self.ts.sccs();
-        assert_eq!(expected, self.model_sccs(&all), "sccs() differs");
-        assert_eq!(
-            expected,
-            self.model_sccs(&self.ts.sccs_recursive()),
-            "sccs_recursive() differs"
-        );
+        self.reported(|| {
+            let expected = self.model.sccs();
+            let all = self.ts.sccs();
+            assert_eq!(expected, self.model_sccs(&all), "sccs() differs");
+            assert_eq!(
+                expected,
+                self.model_sccs(&self.ts.sccs_recursive()),
+                "sccs_recursive() differs"
+            );
 
-        let mut transient: Vec<_> = all
-            .transient_states()
-            .map(|q| self.reverse_state(q))
-            .collect();
-        transient.sort();
-        assert_eq!(
-            self.model.transient_states(),
-            transient,
-            "transient states differ"
-        );
+            let mut transient: Vec<_> = all
+                .transient_states()
+                .map(|q| self.reverse_state(q))
+                .collect();
+            transient.sort();
+            assert_eq!(
+                self.model.transient_states(),
+                transient,
+                "transient states differ"
+            );
 
-        for scc in all.sccs_iter() {
-            for &q in scc.state_indices() {
+            for scc in all.sccs_iter() {
+                for &q in scc.state_indices() {
+                    assert_eq!(
+                        all.scc_of(q).map(|s| s.first()),
+                        Some(scc.first()),
+                        "scc_of({q:?}) is not the component containing it"
+                    );
+                }
+            }
+
+            for origin in self.model.states() {
+                let expected = self.model.sccs_reachable_from(origin);
+                let sq = self.storage_state(origin);
+                // `reachable_sccs_from` is restricted to the given states
+                let reachable: Vec<_> = self
+                    .model
+                    .reachable_from(origin)
+                    .into_iter()
+                    .map(|q| self.storage_state(q))
+                    .collect();
                 assert_eq!(
-                    all.scc_of(q).map(|s| s.first()),
-                    Some(scc.first()),
-                    "scc_of({q:?}) is not the component containing it"
+                    expected,
+                    self.model_sccs(&self.ts.reachable_sccs_from(reachable)),
+                    "reachable_sccs_from({origin}) differs"
+                );
+                assert_eq!(
+                    expected,
+                    self.model_sccs(&self.ts.sccs_kosaraju(sq)),
+                    "sccs_kosaraju({origin}) differs"
                 );
             }
-        }
 
-        for origin in self.model.states() {
-            let expected = self.model.sccs_reachable_from(origin);
-            let sq = self.storage_state(origin);
-            // `reachable_sccs_from` is restricted to the given states
-            let reachable: Vec<_> = self
-                .model
-                .reachable_from(origin)
-                .into_iter()
-                .map(|q| self.storage_state(q))
-                .collect();
-            assert_eq!(
-                expected,
-                self.model_sccs(&self.ts.reachable_sccs_from(reachable)),
-                "reachable_sccs_from({origin}) differs"
-            );
-            assert_eq!(
-                expected,
-                self.model_sccs(&self.ts.sccs_kosaraju(sq)),
-                "sccs_kosaraju({origin}) differs"
-            );
-        }
-
-        // decompositions of only some of the states, which can have edges leaving them
-        let states = self.model.states();
-        let subsets = [
-            states
-                .iter()
-                .copied()
-                .filter(|q| q % 2 == 0)
-                .collect::<Vec<_>>(),
-            states
-                .iter()
-                .copied()
-                .filter(|q| q % 3 != 0)
-                .collect::<Vec<_>>(),
-            states.iter().copied().skip(1).collect::<Vec<_>>(),
-        ];
-        for subset in subsets {
-            let storage: Vec<_> = subset.iter().map(|&q| self.storage_state(q)).collect();
-            assert_eq!(
-                self.model.sccs_within(&subset),
-                self.model_sccs(&self.ts.reachable_sccs_from(storage)),
-                "reachable_sccs_from({subset:?}) differs"
-            );
-        }
+            // decompositions of only some of the states, which can have edges leaving them
+            let states = self.model.states();
+            let subsets = [
+                states
+                    .iter()
+                    .copied()
+                    .filter(|q| q % 2 == 0)
+                    .collect::<Vec<_>>(),
+                states
+                    .iter()
+                    .copied()
+                    .filter(|q| q % 3 != 0)
+                    .collect::<Vec<_>>(),
+                states.iter().copied().skip(1).collect::<Vec<_>>(),
+            ];
+            for subset in subsets {
+                let storage: Vec<_> = subset.iter().map(|&q| self.storage_state(q)).collect();
+                assert_eq!(
+                    self.model.sccs_within(&subset),
+                    self.model_sccs(&self.ts.reachable_sccs_from(storage)),
+                    "reachable_sccs_from({subset:?}) differs"
+                );
+            }
+        })
     }
 }
 
@@ -727,28 +759,31 @@ where
     /// Compares the greatest bisimulations (the partitions that minimization is based on) of
     /// the storage, seen as Moore machine and as Mealy machine, with the classes of the model.
     pub fn assert_minimization_agrees(&self) {
-        let to_model = |partition: crate::partition::Partition<Ts::StateIndex>| {
-            let mut classes: Vec<Vec<usize>> = (&partition)
-                .into_iter()
-                .map(|class| {
-                    let mut class: Vec<_> = class.iter().map(|&q| self.reverse_state(q)).collect();
-                    class.sort();
-                    class
-                })
-                .collect();
-            classes.sort();
-            classes
-        };
-        assert_eq!(
-            self.model.moore_classes(ALPHABET_SIZE),
-            to_model(moore_greatest_bisimulation(&self.ts)),
-            "Moore bisimulation differs"
-        );
-        assert_eq!(
-            self.model.mealy_classes(ALPHABET_SIZE),
-            to_model(mealy_greatest_bisimulation(&self.ts)),
-            "Mealy bisimulation differs"
-        );
+        self.reported(|| {
+            let to_model = |partition: crate::partition::Partition<Ts::StateIndex>| {
+                let mut classes: Vec<Vec<usize>> = (&partition)
+                    .into_iter()
+                    .map(|class| {
+                        let mut class: Vec<_> =
+                            class.iter().map(|&q| self.reverse_state(q)).collect();
+                        class.sort();
+                        class
+                    })
+                    .collect();
+                classes.sort();
+                classes
+            };
+            assert_eq!(
+                self.model.moore_classes(ALPHABET_SIZE),
+                to_model(moore_greatest_bisimulation(&self.ts)),
+                "Moore bisimulation differs"
+            );
+            assert_eq!(
+                self.model.mealy_classes(ALPHABET_SIZE),
+                to_model(mealy_greatest_bisimulation(&self.ts)),
+                "Mealy bisimulation differs"
+            );
+        })
     }
 
     /// Compares the equivalence checks of the library with the model, for every pair of states:
@@ -756,90 +791,94 @@ where
     /// Moore machines and of Mealy machines. The machines are collected from the storage, so this
     /// also exercises collecting.
     pub fn assert_equivalence_agrees(&self) {
-        let states = self.model.states();
-        let even = |c: &u8| c.is_multiple_of(2);
-        let collect = |q: usize| {
-            (&self.ts)
-                .with_initial(self.storage_state(q))
-                .collect_dts_and_initial()
-        };
-        let dfa = |q: usize| {
-            let (ts, initial) = collect(q);
-            ts.map_state_colors(|c| c.is_multiple_of(2))
-                .into_dfa_with_initial(initial)
-        };
-        let moore = |q: usize| {
-            let (ts, initial) = collect(q);
-            ts.into_moore_with_initial(initial)
-        };
-        let mealy = |q: usize| {
-            let (ts, initial) = collect(q);
-            MealyMachine::from_parts(ts.linked_map_states(|_, _| Void), initial)
-        };
-        for &p in &states {
-            let (dfa_p, moore_p, mealy_p) = (dfa(p), moore(p), mealy(p));
-            for &q in &states {
-                assert_eq!(
-                    self.model.language_equivalent(p, q, ALPHABET_SIZE, even),
-                    dfa_p.equivalent(&dfa(q)),
-                    "DFA equivalence of {p} and {q} differs"
-                );
-                assert_eq!(
-                    self.model.moore_compatible(p, q, ALPHABET_SIZE),
-                    moore_p.bisimilar(&moore(q)),
-                    "Moore bisimilarity of {p} and {q} differs"
-                );
-                assert_eq!(
-                    self.model.mealy_equivalent(p, q, ALPHABET_SIZE),
-                    mealy_p.bisimilar(&mealy(q)),
-                    "Mealy bisimilarity of {p} and {q} differs"
-                );
+        self.reported(|| {
+            let states = self.model.states();
+            let even = |c: &u8| c.is_multiple_of(2);
+            let collect = |q: usize| {
+                (&self.ts)
+                    .with_initial(self.storage_state(q))
+                    .collect_dts_and_initial()
+            };
+            let dfa = |q: usize| {
+                let (ts, initial) = collect(q);
+                ts.map_state_colors(|c| c.is_multiple_of(2))
+                    .into_dfa_with_initial(initial)
+            };
+            let moore = |q: usize| {
+                let (ts, initial) = collect(q);
+                ts.into_moore_with_initial(initial)
+            };
+            let mealy = |q: usize| {
+                let (ts, initial) = collect(q);
+                MealyMachine::from_parts(ts.linked_map_states(|_, _| Void), initial)
+            };
+            for &p in &states {
+                let (dfa_p, moore_p, mealy_p) = (dfa(p), moore(p), mealy(p));
+                for &q in &states {
+                    assert_eq!(
+                        self.model.language_equivalent(p, q, ALPHABET_SIZE, even),
+                        dfa_p.equivalent(&dfa(q)),
+                        "DFA equivalence of {p} and {q} differs"
+                    );
+                    assert_eq!(
+                        self.model.moore_compatible(p, q, ALPHABET_SIZE),
+                        moore_p.bisimilar(&moore(q)),
+                        "Moore bisimilarity of {p} and {q} differs"
+                    );
+                    assert_eq!(
+                        self.model.mealy_equivalent(p, q, ALPHABET_SIZE),
+                        mealy_p.bisimilar(&mealy(q)),
+                        "Mealy bisimilarity of {p} and {q} differs"
+                    );
+                }
             }
-        }
+        })
     }
 
     /// Compares `edge`, `successor` and runs of a deterministic storage with the model. Every
     /// word is run from every state, and from a state that does not exist.
     pub fn assert_runs_agree(&self, words: &[Vec<usize>]) {
-        for q in self.model.states() {
-            let sq = self.storage_state(q);
-            for symbol in 0..ALPHABET_SIZE {
-                let expected = self.model.reach(q, &[symbol]);
-                assert!(expected.len() <= 1, "model is not deterministic");
-                let actual = self
-                    .ts
-                    .successor(sq, symbol_char(symbol))
-                    .map(|t| self.reverse_state(t));
-                assert_eq!(
-                    expected.first().copied(),
-                    actual,
-                    "successor of {q} on {symbol}"
-                );
+        self.reported(|| {
+            for q in self.model.states() {
+                let sq = self.storage_state(q);
+                for symbol in 0..ALPHABET_SIZE {
+                    let expected = self.model.reach(q, &[symbol]);
+                    assert!(expected.len() <= 1, "model is not deterministic");
+                    let actual = self
+                        .ts
+                        .successor(sq, symbol_char(symbol))
+                        .map(|t| self.reverse_state(t));
+                    assert_eq!(
+                        expected.first().copied(),
+                        actual,
+                        "successor of {q} on {symbol}"
+                    );
+                }
+                for word in words {
+                    let expected = self.model.reach(q, word);
+                    assert!(expected.len() <= 1, "model is not deterministic");
+                    let letters: Vec<char> = word.iter().copied().map(symbol_char).collect();
+                    let actual = self
+                        .ts
+                        .reached_state_from(sq, letters)
+                        .map(|t| self.reverse_state(t));
+                    assert_eq!(
+                        expected.first().copied(),
+                        actual,
+                        "run from {q} on {word:?}"
+                    );
+                }
             }
-            for word in words {
-                let expected = self.model.reach(q, word);
-                assert!(expected.len() <= 1, "model is not deterministic");
-                let letters: Vec<char> = word.iter().copied().map(symbol_char).collect();
-                let actual = self
-                    .ts
-                    .reached_state_from(sq, letters)
-                    .map(|t| self.reverse_state(t));
-                assert_eq!(
-                    expected.first().copied(),
-                    actual,
-                    "run from {q} on {word:?}"
-                );
-            }
-        }
-        let missing = self.storage_state(self.created_states);
-        assert_eq!(
-            self.ts.reached_state_from(missing, Vec::<char>::new()),
-            None
-        );
-        assert_eq!(
-            self.ts.reached_state_from(missing, vec![symbol_char(0)]),
-            None
-        );
+            let missing = self.storage_state(self.created_states);
+            assert_eq!(
+                self.ts.reached_state_from(missing, Vec::<char>::new()),
+                None
+            );
+            assert_eq!(
+                self.ts.reached_state_from(missing, vec![symbol_char(0)]),
+                None
+            );
+        })
     }
 }
 
@@ -892,7 +931,48 @@ mod tests {
         }
     }
 
+    #[test]
+    fn failures_report_the_operations_that_led_to_them() {
+        let ts = Linked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+        let mut harness = Harness::new(ts, Linked::check_consistency);
+        harness.step(&Op::AddState(1));
+        harness.step(&Op::AddEdge {
+            source: 7,
+            symbol: 4,
+            color: 2,
+            target: 0,
+        });
+        // the model gets a state the storage does not know
+        harness.model.add_state(0);
+        let payload =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| harness.assert_sccs_agree()))
+                .expect_err("the storage and the model differ");
+        let report = payload.downcast_ref::<String>().expect("a String");
+        for expected in [
+            "after 2 operation(s)",
+            "1. q0 = add_state(color 1)",
+            "2. e0 = add_edge(q0 -b/2-> q0)",
+            "q0 (color 1): b/2 -> q0",
+            "Op::AddEdge { source: 0, symbol: 1, color: 2, target: 0 }",
+        ] {
+            assert!(
+                report.contains(expected),
+                "missing {expected:?} in\n{report}"
+            );
+        }
+    }
+
+    /// Failures are fixed, not recorded, so nothing is persisted.
+    fn config() -> ProptestConfig {
+        ProptestConfig {
+            failure_persistence: None,
+            ..ProptestConfig::default()
+        }
+    }
+
     proptest! {
+        #![proptest_config(config())]
+
         #[test]
         fn linked_ts_agrees_with_model(ops in proptest::collection::vec(op(), 0..80)) {
             let ts = Linked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
