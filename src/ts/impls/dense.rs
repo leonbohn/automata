@@ -97,6 +97,24 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
         )
     }
 
+    /// Writes the edge into `slot`, replacing the edge that was there, and keeps the predecessors
+    /// up to date. Both endpoints must exist.
+    fn set_slot(&mut self, slot: usize, color: C, target: DefaultIdType) -> EdgeId {
+        let id = EdgeId(slot as u32);
+        let old = std::mem::replace(&mut self.targets[slot], target);
+        if old != NONE {
+            let incoming = &mut self.predecessors[old as usize];
+            let position = incoming
+                .iter()
+                .position(|e| *e == id)
+                .expect("edge is listed at its target");
+            incoming.swap_remove(position);
+        }
+        self.colors[slot] = Some(color);
+        self.predecessors[target as usize].push(id);
+        id
+    }
+
     /// The color of the edge with the given id, mutable.
     fn edge_color_slot_mut(&mut self, id: EdgeId) -> Option<&mut C> {
         let slot = id.0 as usize;
@@ -185,6 +203,14 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> States for DenseTs<A, Q, C> {
     fn contains_state(&self, index: StateIndex<Self>) -> bool {
         self.is_live(index as usize)
     }
+
+    /// Checks that no slot of a live state is empty, which takes O(n * k) time.
+    fn is_complete(&self) -> bool {
+        let k = self.alphabet.size();
+        (0..self.states.len())
+            .filter(|q| self.is_live(*q))
+            .all(|q| self.targets[q * k..(q + 1) * k].iter().all(|t| *t != NONE))
+    }
 }
 
 /// Iterates over the indices of the states of a [`DenseTs`], skipping removed ones.
@@ -259,24 +285,28 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Sproutable for DenseTs<A, Q, C> {
         assert!(self.is_live(q as usize), "source state {q} does not exist");
         assert!(self.is_live(p as usize), "target state {p} does not exist");
 
-        let id = EdgeId(self.slot(q as usize, self.alphabet.expression_to_index(&a)) as u32);
-        let slot = id.0 as usize;
-        let old = std::mem::replace(&mut self.targets[slot], p);
-        if old != NONE {
-            let incoming = &mut self.predecessors[old as usize];
-            let position = incoming
-                .iter()
-                .position(|e| *e == id)
-                .expect("edge is listed at its target");
-            incoming.swap_remove(position);
-        }
-        self.colors[slot] = Some(c);
-        self.predecessors[p as usize].push(id);
-        id
+        let slot = self.slot(q as usize, self.alphabet.expression_to_index(&a));
+        self.set_slot(slot, c, p)
     }
 
     fn edge_color_mut(&mut self, id: EdgeId) -> Option<&mut EdgeColor<Self>> {
         self.edge_color_slot_mut(id)
+    }
+
+    /// Fills every empty slot with an edge to a new sink, in O(n * k) time. Nothing is added if the
+    /// system is already complete.
+    fn complete_with_colors(&mut self, sink_color: Self::StateColor, edge_color: Self::EdgeColor) {
+        if self.is_complete() {
+            return;
+        }
+        let k = self.alphabet.size();
+        let sink = self.add_state(sink_color);
+        // the sink is the last state and gets all its edges from the loop below
+        for slot in 0..self.targets.len() {
+            if self.targets[slot] == NONE && self.is_live(slot / k) {
+                self.set_slot(slot, edge_color.clone(), sink);
+            }
+        }
     }
 
     fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>> {
@@ -477,5 +507,24 @@ mod tests {
         assert_eq!(ts.remove_edges_to(7), None);
         assert_eq!(ts.successor(0, 'b'), None);
         assert_eq!(ts.successor(0, 'a'), Some(1));
+    }
+
+    #[test]
+    fn completion() {
+        let mut ts = triangle();
+        assert!(!ts.is_complete());
+        ts.remove_state(1);
+        ts.complete_with_colors(Void, 7);
+        assert!(ts.is_complete());
+        // the sink is a new state, the removed state stays removed
+        assert_eq!(ts.states().collect::<Vec<_>>(), vec![0, 2, 3]);
+        assert_eq!(ts.successor(0, 'a'), Some(3));
+        assert_eq!(ts.successor(2, 'b'), Some(3));
+        assert_eq!(ts.successor(3, 'a'), Some(3));
+        assert_eq!(*ts.edge(3, 'b').unwrap().color(), 7);
+        assert_eq!(ts.successor(0, 'b'), Some(0));
+
+        ts.complete_with_colors(Void, 7);
+        assert_eq!(ts.state_count(), 3);
     }
 }
