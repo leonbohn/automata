@@ -358,7 +358,21 @@ State: 1
             );
         }
         let second = parse(&first).to_hoa().unwrap();
-        assert_eq!(first, second);
+        // the edges of a state are written newest first, so their order flips with every parse
+        let per_state = |text: &str| {
+            let mut states: Vec<Vec<String>> = Vec::new();
+            for line in text.lines() {
+                if line.starts_with("State:") {
+                    states.push(Vec::new());
+                }
+                if let Some(state) = states.last_mut() {
+                    state.push(line.to_string());
+                }
+            }
+            states.iter_mut().for_each(|lines| lines.sort());
+            states
+        };
+        assert_eq!(per_state(&first), per_state(&second));
     }
 
     #[test]

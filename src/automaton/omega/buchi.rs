@@ -1,13 +1,13 @@
 use crate::States;
-use crate::Void;
 use crate::alphabet::CharAlphabet;
-use crate::automaton::Semantics;
 use crate::automaton::semantics::observe_omega;
-use crate::representation::{CollectTs, IntoTs};
+use crate::automaton::{DPA, Semantics};
+use crate::representation::IntoTransitions;
 use crate::ts::{Deterministic, StateIndex, SymbolOf};
 use crate::word::OmegaWord;
 use crate::word::ReducedOmegaWord;
 use crate::{DTS, TransitionSystem, automaton::Automaton, ts::run};
+use crate::{Int, Void};
 
 /// Defines the [`Semantics`] of a deterministic Büchi automaton (DBA),
 /// which is an acceptor of infinite words. It considers the set of
@@ -56,18 +56,19 @@ where
     /// Performs a streamlining operation akin to [`super::DPA::streamlined`].
     pub fn streamlined(&self) -> DBA<DTS<C::Alphabet, Void, bool>>
     where
-        C: IntoTs + Clone,
+        C: IntoTransitions<Initial = ()> + Clone,
     {
-        self.clone()
+        let dpa: DPA<DTS<C::Alphabet, Void, Int>> = self
+            .clone()
             .map_edge_colors(|c| if c { 0 } else { 1 })
-            .with_initial(self.initial)
-            .into_dpa()
-            .streamlined()
+            .erase_state_colors()
+            .collect();
+        dpa.streamlined()
             .map_edge_colors(|c| {
                 assert!(c == 0 || c == 1, "too many colors");
                 c % 2 == 0
             })
-            .collect_dba()
+            .collect()
     }
 
     /// Tries to identify a word which is accepted by `self`. If such a word exists, it returns it and otherwise

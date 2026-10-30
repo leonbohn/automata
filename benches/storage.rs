@@ -8,6 +8,7 @@ mod common;
 
 use automata::alphabet::{Alphabet, CharAlphabet};
 use automata::automaton::DFA;
+use automata::representation::{FromTransitions, IntoTransitions};
 use automata::ts::operations::{MatchingProduct, ProductIndex};
 use automata::ts::{
     CsrTs, DenseTs, Deterministic, ForAlphabet, PredecessorIterable, Shrinkable, Sproutable,
@@ -51,8 +52,8 @@ impl<T> Storage for T where T: ReadOnly + Sproutable + ForAlphabet<CharAlphabet>
 // Every input is made from the same `common` generator and converted, so both storages get the
 // same transition system. Nothing here is measured.
 
-fn convert<T: Storage>(ts: &Linked) -> T {
-    T::sprout_from_ts(ts)
+fn convert<T: Storage + FromTransitions<u32>>(ts: &Linked) -> T {
+    ts.collect()
 }
 
 fn scrambled_linked(n: usize, k: usize) -> Linked {
@@ -62,7 +63,7 @@ fn scrambled_dense(n: usize, k: usize) -> Dense {
     convert(&common::scrambled(n, k))
 }
 fn scrambled_csr(n: usize, k: usize) -> Csr {
-    Csr::from_ts(&common::scrambled(n, k))
+    common::scrambled(n, k).collect()
 }
 
 type EdgeList = (usize, usize, Vec<(u32, char, u32)>);
@@ -174,13 +175,13 @@ fn product_dense(n: usize) -> (Dense, Dense, Queries) {
 fn product_csr(n: usize) -> (Csr, Csr, Queries) {
     (
         scrambled_csr(n, 2),
-        Csr::from_ts(&common::counter(n, 2)),
+        common::counter(n, 2).collect(),
         product_queries(n),
     )
 }
 
 fn redundant_csr(n: usize) -> Csr {
-    Csr::from_ts(&common::redundant_counter(n, 2))
+    common::redundant_counter(n, 2).collect()
 }
 fn redundant_linked(n: usize) -> Linked {
     common::redundant_counter(n, 2)

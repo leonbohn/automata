@@ -292,7 +292,7 @@ mod tests {
     use crate::States;
     use crate::Void;
     use crate::alphabet::CharAlphabet;
-    use crate::representation::CollectTs;
+    use crate::representation::CollectPointed;
     use crate::ts::{ForAlphabet, Shrinkable, Sproutable};
     use crate::{DTS, TransitionSystem};
 

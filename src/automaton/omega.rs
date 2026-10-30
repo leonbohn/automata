@@ -19,7 +19,7 @@ use crate::Void;
 use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
 use crate::automaton::Semantics;
 use crate::automaton::semantics::observe_omega;
-use crate::representation::IntoTs;
+use crate::representation::IntoTransitions;
 use crate::ts::States;
 use crate::ts::run::{self, Observer as _};
 use crate::ts::{Builder, DefaultIdType, DenseId, ForAlphabet, Sproutable};
@@ -271,17 +271,20 @@ impl<A: Alphabet> Automaton<DTS<A, Int, AcceptanceMask>, OmegaAcceptanceConditio
                 .ts
                 .map_edge_colors(|mask| mask.as_priority())
                 .with_initial(self.initial)
-                .into_dpa()),
+                .erase_state_colors()
+                .collect()),
             OmegaAcceptanceCondition::Buchi | OmegaAcceptanceCondition::Reachability => Ok(self
                 .ts
                 .map_edge_colors(|mask| if mask.as_bool() { 0 } else { 1 })
                 .with_initial(self.initial)
-                .into_dpa()),
+                .erase_state_colors()
+                .collect()),
             OmegaAcceptanceCondition::CoBuchi | OmegaAcceptanceCondition::Safety => Ok(self
                 .ts
                 .map_edge_colors(|mask| if mask.as_bool() { 1 } else { 0 })
                 .with_initial(self.initial)
-                .into_dpa()),
+                .erase_state_colors()
+                .collect()),
             OmegaAcceptanceCondition::MaxParity(low, high) => {
                 let k = (high - low) + if low % 2 == 0 { 0 } else { 1 };
                 let to_new = |mask: AcceptanceMask| {
@@ -294,7 +297,8 @@ impl<A: Alphabet> Automaton<DTS<A, Int, AcceptanceMask>, OmegaAcceptanceConditio
                     .ts
                     .map_edge_colors(to_new)
                     .with_initial(self.initial)
-                    .into_dpa())
+                    .erase_state_colors()
+                    .collect())
             }
             OmegaAcceptanceCondition::Rabin(_) => Err(Error::NotYetImplemented(
                 "conversion of Rabin automata into DPA",

@@ -1,7 +1,7 @@
 use super::semantics::observe_finite;
 use super::{Automaton, Semantics, StatesWithColor};
 use crate::alphabet::CharAlphabet;
-use crate::representation::CollectTs;
+use crate::representation::CollectPointed;
 use crate::ts::States;
 use crate::ts::operations::{DefaultIfMissing, Product, ProductIndex};
 use crate::ts::run::ReachedStateColor;

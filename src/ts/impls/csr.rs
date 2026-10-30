@@ -1,12 +1,13 @@
 use std::borrow::Cow;
 
+use super::dense::TableIntoEdges;
+use crate::representation::{FromTransitions, IntoTransitions, Parts, Renumbering};
 use crate::{
     Color, TransitionSystem, Void,
     alphabet::{CharAlphabet, IndexedAlphabet},
-    math,
     ts::{
-        DefaultIdType, Deterministic, EdgeId, EdgeOf, EdgeRef, StateIndex, States, SymbolOf,
-        predecessors::PredecessorIterable,
+        DefaultIdType, Deterministic, EdgeId, EdgeOf, EdgeRef, IdType, StateIndex, States,
+        SymbolOf, predecessors::PredecessorIterable,
     },
 };
 
@@ -24,7 +25,7 @@ pub(super) const NONE: DefaultIdType = DefaultIdType::MAX;
 /// Compared to the growable storages there are no tombstones, no links and one allocation per
 /// vector instead of one per state.
 ///
-/// A system is built with [`CsrTs::from_ts`] or by the [`Csr`](crate::ts::Csr) storage. State
+/// A system is built by collecting another one, see [`IntoTransitions::collect`], or by the [`Csr`](crate::ts::Csr) storage. State
 /// indices are consecutive, starting at 0, in the order of the system it was built from.
 #[derive(Clone)]
 pub struct CsrTs<A: IndexedAlphabet = CharAlphabet, Q = Void, C = Void> {
@@ -92,51 +93,6 @@ impl ReverseCsr {
 }
 
 impl<A: IndexedAlphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
-    /// Builds a system with the states and the edges of the deterministic system `ts`. The states
-    /// are numbered in the order in which [`States::states`] yields them.
-    ///
-    /// # Panics
-    /// Panics if there are too many states or edge slots for 32 bit ids.
-    pub fn from_ts<T>(ts: &T) -> Self
-    where
-        T: Deterministic + States<Alphabet = A, StateColor = Q, EdgeColor = C>,
-    {
-        let alphabet = ts.alphabet().clone();
-        let k = alphabet.size();
-        let renaming: math::FxIndexMap<T::StateIndex, DefaultIdType> = ts
-            .states()
-            .enumerate()
-            .map(|(i, q)| (q, i as DefaultIdType))
-            .collect();
-        let n = renaming.len();
-        DefaultIdType::try_from(n * k)
-            .ok()
-            .filter(|slots| *slots != NONE)
-            .expect("too many edge slots for 32 bit ids");
-
-        let mut states = Vec::with_capacity(n);
-        let mut targets = vec![NONE; n * k];
-        let mut colors = vec![None; n * k];
-        for (q, i) in renaming.iter() {
-            states.push(ts.state_color(*q).expect("state exists").into_owned());
-            for edge in ts.edges_from(*q).expect("state exists") {
-                let slot = *i as usize * k + alphabet.expression_to_index(edge.expression());
-                let target = renaming[&edge.target()];
-                targets[slot] = target;
-                colors[slot] = Some(edge.color().clone());
-            }
-        }
-
-        let incoming = ReverseCsr::build(&targets, n);
-        Self {
-            alphabet,
-            states,
-            targets,
-            colors,
-            incoming,
-        }
-    }
-
     /// The edge in slot `slot` leaving `source` on the symbol with index `symbol_index`, if there
     /// is one.
     #[inline(always)]
@@ -363,6 +319,91 @@ impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for CsrEdgesTo<'ts, A
     }
 }
 
+/// Iterator over the states of a [`CsrTs`] that is consumed.
+pub struct CsrIntoStates<Q> {
+    states: std::iter::Enumerate<std::vec::IntoIter<Q>>,
+}
+
+impl<Q> Iterator for CsrIntoStates<Q> {
+    type Item = (DefaultIdType, Q);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.states.next().map(|(i, c)| (i as DefaultIdType, c))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.states.size_hint()
+    }
+}
+
+impl<A: IndexedAlphabet, Q: Color, C: Color> IntoTransitions for CsrTs<A, Q, C> {
+    type Initial = ();
+    type IntoStates = CsrIntoStates<Q>;
+    type IntoEdges = TableIntoEdges<A, C>;
+
+    fn into_transitions(self) -> Parts<A, Self::IntoStates, Self::IntoEdges, ()> {
+        Parts {
+            edges: TableIntoEdges::new(self.alphabet.clone(), self.targets, self.colors),
+            states: CsrIntoStates {
+                states: self.states.into_iter().enumerate(),
+            },
+            alphabet: self.alphabet,
+            initial: (),
+        }
+    }
+}
+
+impl<A: IndexedAlphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I, Init>
+    for CsrTs<A, Q, C>
+{
+    /// Edges that leave the same state on the same symbol replace each other.
+    ///
+    /// # Panics
+    /// Panics if there are too many states or edge slots for 32 bit ids.
+    fn from_transitions<S, E>(parts: Parts<A, S, E, Init>) -> Self
+    where
+        S: Iterator<Item = (I, Q)>,
+        E: Iterator<Item = (I, A::Expression, C, I)>,
+    {
+        let Parts {
+            alphabet,
+            states: colored,
+            edges,
+            ..
+        } = parts;
+        let k = alphabet.size();
+        let mut numbering = Renumbering::new();
+        let mut states = Vec::with_capacity(colored.size_hint().0);
+        for (q, color) in colored {
+            numbering.push(q);
+            states.push(color);
+        }
+        let n = states.len();
+        DefaultIdType::try_from(n * k)
+            .ok()
+            .filter(|slots| *slots != NONE)
+            .expect("too many edge slots for 32 bit ids");
+
+        let mut targets = vec![NONE; n * k];
+        let mut colors = Vec::new();
+        colors.resize_with(n * k, || None);
+        for (p, expression, color, r) in edges {
+            let slot = numbering.get(p) as usize * k + alphabet.expression_to_index(&expression);
+            targets[slot] = numbering.get(r);
+            colors[slot] = Some(color);
+        }
+        let incoming = ReverseCsr::build(&targets, n);
+        Self {
+            alphabet,
+            states,
+            targets,
+            colors,
+            incoming,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -381,7 +422,7 @@ mod tests {
 
     #[test]
     fn lookups_and_predecessors() {
-        let ts = CsrTs::from_ts(&dense());
+        let ts: CsrTs<CharAlphabet, bool, u32> = (&dense()).collect();
         ts.check_consistency();
         assert_eq!(ts.state_count(), 4);
         assert_eq!(ts.successor(0, 'a'), Some(1));
@@ -406,7 +447,7 @@ mod tests {
     fn removed_states_are_dropped_and_the_rest_renumbered() {
         let mut source = dense();
         source.remove_state(1);
-        let ts = CsrTs::from_ts(&source);
+        let ts: CsrTs<CharAlphabet, bool, u32> = (&source).collect();
         ts.check_consistency();
         assert_eq!(ts.state_count(), 3);
         // the old states 0, 2, 3 are now 0, 1, 2
@@ -417,9 +458,8 @@ mod tests {
 
     #[test]
     fn empty_system() {
-        let ts = CsrTs::from_ts(&DenseTs::<CharAlphabet, bool, u32>::for_alphabet(
-            CharAlphabet::of_size(2),
-        ));
+        let ts: CsrTs<CharAlphabet, bool, u32> =
+            DenseTs::for_alphabet(CharAlphabet::of_size(2)).collect();
         ts.check_consistency();
         assert_eq!(ts.state_count(), 0);
         assert!(ts.is_complete());

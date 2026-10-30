@@ -10,9 +10,10 @@ use std::path::{Path, PathBuf};
 use automata::alphabet::{CharAlphabet, PropAlphabet};
 use automata::automaton::{DFA, DPA};
 use automata::hoa::HoaString;
+use automata::representation::IntoTransitions;
 use automata::ts::{ForAlphabet, Sproutable};
 use automata::word::ReducedOmegaWord;
-use automata::{DTS, Int, NTS, Void};
+use automata::{DTS, Int, NTS, TransitionSystem, Void};
 
 /// A DTS with boolean state colors and no edge colors, the shape a [`DFA`] is made from.
 pub type Dts = DTS<CharAlphabet, bool, Void>;
@@ -205,20 +206,17 @@ pub fn scrambled_nts(n: usize) -> NTS<CharAlphabet, bool, Void> {
 
 /// A DFA over `k` symbols with `n` states and the structure of [`scrambled`].
 pub fn dfa(n: usize, k: usize) -> DFA {
-    use automata::representation::IntoTs;
-    scrambled(n, k).into_dfa_with_initial(0)
+    scrambled(n, k).with_initial(0).collect()
 }
 
 /// A DFA that is the minimal automaton of [`counter`].
 pub fn counter_dfa(n: usize, k: usize) -> DFA {
-    use automata::representation::IntoTs;
-    counter(n, k).into_dfa_with_initial(0)
+    counter(n, k).with_initial(0).collect()
 }
 
 /// A DFA with the structure of [`scrambled`] that accepts nothing, so that searching for an
 /// accepted word has to visit every reachable state.
 pub fn empty_dfa(n: usize, k: usize) -> DFA {
-    use automata::representation::IntoTs;
     build(
         n,
         k,
@@ -231,12 +229,12 @@ pub fn empty_dfa(n: usize, k: usize) -> DFA {
             }
         },
     )
-    .into_dfa_with_initial(0)
+    .with_initial(0)
+    .collect()
 }
 
 /// A DFA with the structure of [`scrambled`] in which only state `n - 1` accepts.
 pub fn far_dfa(n: usize, k: usize) -> DFA {
-    use automata::representation::IntoTs;
     build(
         n,
         k,
@@ -249,20 +247,21 @@ pub fn far_dfa(n: usize, k: usize) -> DFA {
             }
         },
     )
-    .into_dfa_with_initial(0)
+    .with_initial(0)
+    .collect()
 }
 
 /// The [`counter`] DFA in which in addition state `n - 1` accepts, hence it differs from
 /// [`counter_dfa`] only on words that lead to the far end of the counter.
 pub fn counter_dfa_with_far_state(n: usize, k: usize) -> DFA {
-    use automata::representation::IntoTs;
-    build(n, k, |q| q == 0 || q + 1 == n, |q, i| (q + i + 1) % n).into_dfa_with_initial(0)
+    build(n, k, |q| q == 0 || q + 1 == n, |q, i| (q + i + 1) % n)
+        .with_initial(0)
+        .collect()
 }
 
 /// A DFA that is not minimal, see [`redundant_counter`].
 pub fn redundant_dfa(n: usize, k: usize) -> DFA {
-    use automata::representation::IntoTs;
-    redundant_counter(n, k).into_dfa_with_initial(0)
+    redundant_counter(n, k).with_initial(0).collect()
 }
 
 /// A deterministic parity automaton with `n` states, `k` symbols and priorities `0..priorities`.
@@ -270,7 +269,6 @@ pub fn redundant_dfa(n: usize, k: usize) -> DFA {
 /// `(q * (2 i + 3) + 7 i + 1) mod n` as in [`fragmented`] with the first symbol going to `q + 1`.
 /// Everything is one SCC that sees all priorities, so normalization has real work to do.
 pub fn scrambled_dpa(n: usize, k: usize, priorities: Int) -> DPA {
-    use automata::representation::IntoTs;
     let mut ts: DTS<CharAlphabet, Void, Int> = DTS::for_alphabet(CharAlphabet::of_size(k));
     for _ in 0..n {
         ts.add_state(Void);
@@ -286,14 +284,13 @@ pub fn scrambled_dpa(n: usize, k: usize, priorities: Int) -> DPA {
             ts.add_edge((q as u32, sym, color, target as u32));
         }
     }
-    ts.into_dpa_with_initial(0)
+    ts.with_initial(0).collect()
 }
 
 /// A parity automaton in which the priority grows along a chain of `n` states that loops back
 /// at the end: state `q` has priority `q mod priorities` on its first symbol and `0` on the
 /// others. The unique SCC sees every priority, the acceptance is decided by the smallest.
 pub fn chain_dpa(n: usize, priorities: Int) -> DPA {
-    use automata::representation::IntoTs;
     let mut ts: DTS<CharAlphabet, Void, Int> = DTS::for_alphabet(CharAlphabet::of_size(2));
     for _ in 0..n {
         ts.add_state(Void);
@@ -307,7 +304,7 @@ pub fn chain_dpa(n: usize, priorities: Int) -> DPA {
         ));
         ts.add_edge((q as u32, 'b', 0, 0u32));
     }
-    ts.into_dpa_with_initial(0)
+    ts.with_initial(0).collect()
 }
 
 // ---------------------------------------------------------------------------------------------

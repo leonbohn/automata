@@ -4,7 +4,7 @@ mod common;
 
 use automata::alphabet::CharAlphabet;
 use automata::automaton::{DFA, MooreMachine};
-use automata::representation::CollectTs;
+use automata::representation::IntoTransitions;
 use automata::{DTS, States, TransitionSystem};
 use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
@@ -62,9 +62,8 @@ fn minimize(dfa: DFA) -> usize {
 
 // A Moore machine whose edges carry colors that are irrelevant for the result (#14).
 fn moore_with_edge_colors(n: usize) -> MooreMachine<DTS<CharAlphabet, bool, u32>> {
-    let ts = common::scrambled(n, 2)
-        .map_edge_colors(|_| 7u32)
-        .collect_dts();
+    let ts: DTS<CharAlphabet, bool, u32> =
+        common::scrambled(n, 2).map_edge_colors(|_| 7u32).collect();
     MooreMachine::from_parts(ts, 0)
 }
 
@@ -102,7 +101,7 @@ fn intersection_is_empty((a, b): (DFA, DFA)) -> bool {
 #[bench::scrambled_1000(args = (1_000), setup = scrambled)]
 #[bench::scrambled_4000(args = (4_000), setup = scrambled)]
 fn complement(dfa: DFA) -> usize {
-    black_box(dfa.map_state_colors(|c| !c).collect_dfa().state_count())
+    black_box(dfa.map_state_colors(|c| !c).collect::<DFA>().state_count())
 }
 
 // ---- emptiness and equivalence -----------------------------------------------------------------

@@ -1,6 +1,6 @@
 use crate::alphabet::{Alphabet, CharAlphabet};
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
-use crate::representation::IntoTs;
+use crate::representation::IntoTransitions;
 use crate::ts::States;
 use crate::ts::{DefaultIdType, ForAlphabet, Shrinkable, Sproutable, StateIndex};
 use crate::word::ReducedOmegaWord;
@@ -63,19 +63,18 @@ pub fn generate_random_dfa(symbols: usize, probability: f64) -> DFA {
     let (ts, initial) = generate_random_ts(symbols, probability);
     ts.map_state_colors(|_| rand::rng().random_bool(probability))
         .with_initial(initial)
-        .into_dfa()
+        .collect()
 }
 
 /// Calls [`generate_random_ts_sized`] and uses the returned transition system to build a
 /// [`MealyMachine`] with colors `0..=max_color`.
 pub fn generate_random_mealy(symbols: usize, max_color: usize, size: usize) -> MealyMachine {
     let (ts, initial) = generate_random_ts_sized(symbols, size);
-    let mut mm = ts
+    let mm: MealyMachine = ts
         .map_edge_colors(|_| rand::rng().random_range(0..=max_color) as Int)
         .with_initial(initial)
-        .into_mealy()
-        .minimize()
-        .into_mealy();
+        .collect();
+    let mut mm: MealyMachine = mm.minimize().erase_state_colors().collect();
     mm.trim();
     mm
 }
@@ -84,12 +83,11 @@ pub fn generate_random_mealy(symbols: usize, max_color: usize, size: usize) -> M
 /// [`MooreMachine`] with colors `0..=max_color`.
 pub fn generate_random_moore(symbols: usize, max_color: usize, size: usize) -> MooreMachine {
     let (ts, initial) = generate_random_ts_sized(symbols, size);
-    let mut mm = ts
+    let mm: MooreMachine = ts
         .map_state_colors(|_| rand::rng().random_range(0..=max_color) as Int)
         .with_initial(initial)
-        .into_moore()
-        .minimize()
-        .into_moore();
+        .collect();
+    let mut mm = mm.minimize();
     mm.trim();
     mm
 }
@@ -138,7 +136,7 @@ pub fn generate_random_dba(symbols: usize, size: usize, lambda: f64) -> DBA {
     // draw acceptance condition
     dts.map_edge_colors(|_| draw_priority(2, lambda) == 0)
         .with_initial(initial)
-        .into_dba()
+        .collect()
 }
 
 /// Works as [`generate_random_ts_sized`], but returns a [`DPA`] instead by randomly
@@ -154,7 +152,7 @@ pub fn generate_random_dpa(symbols: usize, size: usize, num_prios: Int, lambda: 
     // draw acceptance condition
     dts.map_edge_colors(|_| draw_priority(num_prios, lambda))
         .with_initial(initial)
-        .into_dpa()
+        .collect()
 }
 
 /// Randomly draw a priority in range [0,num_prios) from continuous Bernoulli distribution

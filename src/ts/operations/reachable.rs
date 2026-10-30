@@ -1,3 +1,4 @@
+use crate::representation::{IntoTransitions, Parts, materialize};
 use crate::ts::EdgeOf;
 use crate::ts::SymbolOf;
 use crate::ts::{Bfs, Deterministic, Pointed, StateIndex, StateSet, States, TransitionSystem};
@@ -86,6 +87,26 @@ impl<Ts: TransitionSystem> States for ReachablePart<Ts> {
 
     fn contains_state(&self, state: Ts::StateIndex) -> bool {
         self.reachable.contains(&state)
+    }
+}
+
+/// The states and edges are computed (and cloned) up front, since the system may be lazy and
+/// borrow from the wrapped one.
+impl<Ts: TransitionSystem> IntoTransitions for ReachablePart<Ts> {
+    type Initial = Ts::StateIndex;
+    type IntoStates = std::vec::IntoIter<(Ts::StateIndex, Ts::StateColor)>;
+    type IntoEdges = std::vec::IntoIter<crate::representation::OwnedEdge<Ts>>;
+
+    fn into_transitions(
+        self,
+    ) -> Parts<Ts::Alphabet, Self::IntoStates, Self::IntoEdges, Ts::StateIndex> {
+        let (states, edges) = materialize(&self.ts, self.states.iter().copied());
+        Parts {
+            alphabet: self.ts.alphabet().clone(),
+            states,
+            edges,
+            initial: self.initial,
+        }
     }
 }
 

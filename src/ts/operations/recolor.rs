@@ -1,3 +1,4 @@
+use crate::representation::{IntoTransitions, OwnedEdge, Parts};
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{Deterministic, EdgeExpression, EdgeOf, EdgeRef, StateIndex, SymbolOf};
 use crate::{Color, Pointed, States, TransitionSystem, Void, math};
@@ -369,6 +370,104 @@ where
 
     fn state_count(&self) -> usize {
         self.ts.state_count()
+    }
+}
+
+/// Iterator over the recolored states of a [`Recolor`] that is consumed.
+pub struct RecolorIntoStates<I, R, T> {
+    it: I,
+    recolor: R,
+    _ts: PhantomData<fn() -> T>,
+}
+
+impl<T, I, R> Iterator for RecolorIntoStates<I, R, T>
+where
+    T: TransitionSystem,
+    I: Iterator<Item = (StateIndex<T>, T::StateColor)>,
+    R: StateRecolor<T>,
+{
+    type Item = (StateIndex<T>, R::Color);
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        let (q, color) = self.it.next()?;
+        Some((q, self.recolor.recolor(q, Cow::Owned(color)).into_owned()))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
+}
+
+/// Iterator over the recolored edges of a [`Recolor`] that is consumed.
+pub struct RecolorIntoEdges<I, R, T> {
+    it: I,
+    recolor: R,
+    _ts: PhantomData<fn() -> T>,
+}
+
+impl<T, I, R> Iterator for RecolorIntoEdges<I, R, T>
+where
+    T: TransitionSystem,
+    I: Iterator<Item = OwnedEdge<T>>,
+    R: EdgeRecolor<T>,
+{
+    type Item = (StateIndex<T>, EdgeExpression<T>, R::Color, StateIndex<T>);
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        let (source, expression, color, target) = self.it.next()?;
+        let (source, target, color) = {
+            let recolored =
+                self.recolor
+                    .recolor(EdgeRef::owned(source, &expression, color, target));
+            (
+                recolored.source(),
+                recolored.target(),
+                recolored.into_color().into_owned(),
+            )
+        };
+        Some((source, expression, color, target))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
+}
+
+impl<T, FS, FE> IntoTransitions for Recolor<T, FS, FE>
+where
+    T: IntoTransitions,
+    FS: StateRecolor<T>,
+    FE: EdgeRecolor<T>,
+{
+    type Initial = T::Initial;
+    type IntoStates = RecolorIntoStates<T::IntoStates, FS, T>;
+    type IntoEdges = RecolorIntoEdges<T::IntoEdges, FE, T>;
+
+    fn into_transitions(
+        self,
+    ) -> Parts<Self::Alphabet, Self::IntoStates, Self::IntoEdges, Self::Initial> {
+        let Parts {
+            alphabet,
+            states,
+            edges,
+            initial,
+        } = self.ts.into_transitions();
+        Parts {
+            alphabet,
+            states: RecolorIntoStates {
+                it: states,
+                recolor: self.state,
+                _ts: PhantomData,
+            },
+            edges: RecolorIntoEdges {
+                it: edges,
+                recolor: self.edge,
+                _ts: PhantomData,
+            },
+            initial,
+        }
     }
 }
 

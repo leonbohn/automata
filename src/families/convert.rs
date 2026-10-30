@@ -7,7 +7,7 @@ use crate::{
     alphabet::Alphabet,
     families::{FDFA, FWPM},
     math,
-    representation::CollectTs,
+    representation::CollectPointed,
     ts::Deterministic,
 };
 

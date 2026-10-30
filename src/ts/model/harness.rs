@@ -13,13 +13,13 @@ mod round_trip;
 use std::collections::HashMap;
 
 use crate::{
-    TransitionSystem, Void,
+    DTS, TransitionSystem, Void,
     alphabet::CharAlphabet,
-    automaton::MealyMachine,
+    automaton::{DFA, MealyMachine, MooreMachine},
     minimization::partition_refinement::{
         mealy_greatest_bisimulation, moore_greatest_bisimulation,
     },
-    representation::{CollectTs, IntoTs},
+    representation::IntoTransitions,
     ts::{
         Deterministic, EdgeId, EdgeTuple, IdType, Pointed, PredecessorIterable, Shrinkable,
         Sproutable, States,
@@ -794,23 +794,24 @@ where
         self.reported(|| {
             let states = self.model.states();
             let even = |c: &u8| c.is_multiple_of(2);
-            let collect = |q: usize| {
+            let dfa = |q: usize| -> DFA<DTS<CharAlphabet, bool, Void>> {
                 (&self.ts)
+                    .map_state_colors(|c| c.is_multiple_of(2))
+                    .erase_edge_colors()
                     .with_initial(self.storage_state(q))
-                    .collect_dts_and_initial()
+                    .collect()
             };
-            let dfa = |q: usize| {
-                let (ts, initial) = collect(q);
-                ts.map_state_colors(|c| c.is_multiple_of(2))
-                    .into_dfa_with_initial(initial)
+            let moore = |q: usize| -> MooreMachine<DTS<CharAlphabet, u8, Void>> {
+                (&self.ts)
+                    .erase_edge_colors()
+                    .with_initial(self.storage_state(q))
+                    .collect()
             };
-            let moore = |q: usize| {
-                let (ts, initial) = collect(q);
-                ts.into_moore_with_initial(initial)
-            };
-            let mealy = |q: usize| {
-                let (ts, initial) = collect(q);
-                MealyMachine::from_parts(ts.linked_map_states(|_, _| Void), initial)
+            let mealy = |q: usize| -> MealyMachine<DTS<CharAlphabet, Void, u8>> {
+                (&self.ts)
+                    .erase_state_colors()
+                    .with_initial(self.storage_state(q))
+                    .collect()
             };
             for &p in &states {
                 let (dfa_p, moore_p, mealy_p) = (dfa(p), moore(p), mealy(p));
@@ -1180,7 +1181,7 @@ mod tests {
             Harness::new_deterministic(ts, Dense::check_consistency)
                 .run(&ops)
                 .assert_frozen_agrees(|ts| {
-                    let csr = CsrTs::from_ts(ts);
+                    let csr: CsrTs<CharAlphabet, u8, u8> = ts.collect();
                     csr.check_consistency();
                     csr
                 });
@@ -1193,7 +1194,7 @@ mod tests {
                 .with_compaction(compact_det)
                 .run(&ops)
                 .assert_frozen_agrees(|ts| {
-                    let csr = CsrTs::from_ts(ts);
+                    let csr: CsrTs<CharAlphabet, u8, u8> = ts.collect();
                     csr.check_consistency();
                     csr
                 });

@@ -8,7 +8,7 @@ use std::{
 
 use crate::automaton::semantics::observe_omega;
 use crate::automaton::{Automaton, Semantics};
-use crate::representation::{CollectTs, IntoTs};
+use crate::representation::{CollectPointed, IntoTransitions};
 use crate::ts::operations::Product;
 use crate::ts::{Deterministic, EdgeColor, Shrinkable, StateIndex, SymbolOf, operations};
 use crate::word::OmegaWord;
@@ -145,17 +145,15 @@ where
     /// assert_eq!(streamlined.state_count(), 1);
     /// assert_eq!(streamlined.run("ab").last_edge_color(), Some(1))
     /// ```
-    pub fn streamlined(
-        &self,
-    ) -> DPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States>
+    pub fn streamlined(&self) -> DPA<DTS<D::Alphabet, Void, Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
-        D: Clone + IntoTs,
+        D: Clone + IntoTransitions<Initial = ()>,
     {
         let minimized = crate::minimization::partition_refinement::mealy_partition_refinement(
             self.normalized(),
         );
-        DPA::from_pointed(minimized)
+        minimized.erase_state_colors().collect()
     }
 
     /// Computes the least and greatest edge color that appears on any edge of the automaton.
@@ -231,7 +229,7 @@ where
     pub fn complement(self) -> DPA<DTS<D::Alphabet, Void, Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
-        D: Clone + IntoTs,
+        D: Clone + IntoTransitions<Initial = ()>,
     {
         self.normalized()
             .complement_without_normalizing()
@@ -267,21 +265,23 @@ where
     ///     .into_dpa(0);
     /// assert!(dpa.complement_without_normalizing().is_none());
     /// ```
-    pub fn complement_without_normalizing(self) -> Option<DPA<DTS<D::Alphabet, Void, Int>>> {
+    pub fn complement_without_normalizing(self) -> Option<DPA<DTS<D::Alphabet, Void, Int>>>
+    where
+        D: IntoTransitions<Initial = ()>,
+    {
         let (low, high) = self.low_and_high_priority();
-        let initial = self.initial;
         if low > 0 {
             // also covers the case of no edges, where `low == Int::MAX`
             Some(
                 self.map_edge_colors(|c| c - 1)
-                    .with_initial(initial)
-                    .collect_dpa(),
+                    .erase_state_colors()
+                    .collect(),
             )
         } else if high < Int::MAX {
             Some(
                 self.map_edge_colors(|c| c + 1)
-                    .with_initial(initial)
-                    .collect_dpa(),
+                    .erase_state_colors()
+                    .collect(),
             )
         } else {
             None
@@ -508,21 +508,21 @@ where
     /// "Computing the rabin index of a finite automaton". The procedure that this implementation actually uses
     /// is outlined by Schewe and Ehlers in [Natural Colors of Infinite Words](https://arxiv.org/pdf/2207.11000.pdf)
     /// in Section 4.1, Definition 2.
-    pub fn normalized(
-        &self,
-    ) -> DPA<impl Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States>
+    pub fn normalized(&self) -> DPA<DTS<D::Alphabet, Void, Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
-        D: Clone + IntoTs,
+        D: Clone + IntoTransitions<Initial = ()>,
         // StateColor<Self>: Eq + Hash + Clone + Ord,
     {
         let start = std::time::Instant::now();
 
-        let (out, out_initial) = self
-            .ts
-            .clone()
-            .with_initial(self.initial)
-            .into_dts_and_initial();
+        let (out, numbering): (DTS<D::Alphabet, D::StateColor, D::EdgeColor>, _) =
+            self.ts.clone().collect_with_map();
+        let out_initial = StateIndex::<DTS<D::Alphabet, D::StateColor, D::EdgeColor>>::from_usize(
+            numbering
+                .id(&self.initial)
+                .expect("the initial state is a state"),
+        );
         // `ts` is shrunk while we work, `out` keeps all edges. Both use the same edge ids, so the new
         // priority of an edge is stored in a table that is indexed by its id.
         let mut ts = out.clone();
@@ -648,7 +648,8 @@ where
             *slot = recoloring[id.into_usize()]
                 .unwrap_or_else(|| panic!("Could not find recoloring for edge {id}"));
         }
-        let ret = out.with_initial(out_initial).into_dpa();
+        let ret: DPA<DTS<D::Alphabet, Void, Int>> =
+            out.erase_state_colors().with_initial(out_initial).collect();
 
         tracing::debug!("normalizing DPA took {} μs", start.elapsed().as_micros());
 
@@ -662,7 +663,7 @@ mod tests {
     use super::DPA;
     use crate::States;
     use crate::Void;
-    use crate::representation::{CollectTs, IntoTs};
+    use crate::representation::CollectPointed;
     use crate::ts::operations::Product;
     use crate::ts::{Builder, Deterministic};
     use crate::{DTS, Pointed, RightCongruence, TransitionSystem};
@@ -677,8 +678,7 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 1),
             ])
-            .into_dts_with_initial(0)
-            .into_dpa();
+            .into_dpa(0);
         let normalized = dpa.normalized();
         assert!(normalized.language_equivalent(&dpa));
 
@@ -756,17 +756,16 @@ mod tests {
     fn dpa_equivalences() {
         let good = [
             DTS::builder()
-                .default_color(())
+                .default_color(Void)
                 .with_transitions([
                     (0, 'a', 0, 1),
                     (0, 'b', 1, 0),
                     (1, 'a', 1, 1),
                     (1, 'b', 0, 0),
                 ])
-                .into_dts_with_initial(0)
-                .into_dpa(),
+                .into_dpa(0),
             DTS::builder()
-                .default_color(())
+                .default_color(Void)
                 .with_transitions([
                     (0, 'a', 5, 1),
                     (0, 'b', 7, 0),
@@ -775,30 +774,26 @@ mod tests {
                     (2, 'a', 3, 0),
                     (2, 'b', 5, 2),
                 ])
-                .into_dts_with_initial(0)
-                .into_dpa(),
+                .into_dpa(0),
         ];
         let bad = [
             DTS::builder()
-                .default_color(())
+                .default_color(Void)
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 0, 0)])
-                .into_dts_with_initial(0)
-                .into_dpa(),
+                .into_dpa(0),
             DTS::builder()
-                .default_color(())
+                .default_color(Void)
                 .with_transitions([(0, 'a', 1, 0), (0, 'b', 2, 0)])
-                .into_dts_with_initial(0)
-                .into_dpa(),
+                .into_dpa(0),
             DTS::builder()
-                .default_color(())
+                .default_color(Void)
                 .with_transitions([
                     (0, 'a', 4, 1),
                     (0, 'b', 1, 0),
                     (1, 'a', 5, 0),
                     (1, 'b', 3, 1),
                 ])
-                .into_dts_with_initial(0)
-                .into_dpa(),
+                .into_dpa(0),
         ];
 
         let l = &good[0];
@@ -833,15 +828,13 @@ mod tests {
     #[test]
     fn dpa_inclusion() {
         let univ = DTS::builder()
-            .default_color(())
+            .default_color(Void)
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 2, 0)])
-            .into_dts_with_initial(0)
-            .into_dpa();
+            .into_dpa(0);
         let aomega = DTS::builder()
-            .default_color(())
+            .default_color(Void)
             .with_transitions([(0, 'a', 0, 0), (0, 'b', 1, 0)])
-            .into_dts_with_initial(0)
-            .into_dpa();
+            .into_dpa(0);
         assert!(univ.includes(&aomega));
         assert!(!univ.included_in(&aomega));
     }
@@ -912,7 +905,7 @@ mod tests {
                 (1, 'b', 2, 1),
             ])
             .into_dts_with_initial(0);
-        let (ts, initial) = ts.into_dts_and_initial();
+        let (ts, initial) = ts.decompose();
         let min_even: DPA<_> = DPA::from_parts(ts.clone(), initial);
         let max_even: DPA<_, MaxEvenParityCondition> = DPA::from_parts(ts.clone(), initial);
         let min_odd: DPA<_, MinOddParityCondition> = DPA::from_parts(ts.clone(), initial);

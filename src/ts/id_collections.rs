@@ -272,6 +272,16 @@ impl<I: IdType> CompactIdMap<I> {
         }
     }
 
+    /// Creates a map in which the `n`-th of the given states has the number `n`. The states must
+    /// be pairwise distinct.
+    pub fn from_states(states: Vec<I>) -> Self {
+        let mut ids = StateMap::new(Some(0));
+        for (n, state) in states.iter().enumerate() {
+            ids.insert(*state, n);
+        }
+        Self { ids, states }
+    }
+
     /// Returns the number assigned to `state`, assigning the next free one if it has none yet.
     #[inline]
     pub fn get_or_insert(&mut self, state: I) -> usize {

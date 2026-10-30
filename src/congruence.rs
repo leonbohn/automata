@@ -2,6 +2,7 @@ mod class;
 
 use crate::ts::EdgeOf;
 use crate::ts::States;
+use crate::ts::{DenseId, EdgeExpression, IdType};
 use crate::{
     Void,
     alphabet::{Alphabet, CharAlphabet},
@@ -20,12 +21,12 @@ pub use cayley::{Cayley, RightCayley};
 mod minimal_representative;
 use crate::alphabet::Matcher;
 use crate::automaton::DFA;
-use crate::representation::IntoTs;
+use crate::representation::{FromTransitions, IntoTransitions, Parts, pointed_from_parts};
 use crate::ts::operations::DefaultIfMissing;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{
-    Deterministic, EdgeExpression, EdgeTuple, ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable,
-    StateColor, StateIndex, SymbolOf,
+    Deterministic, EdgeTuple, ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable, StateColor,
+    StateIndex, SymbolOf,
 };
 use crate::{DTS, Pointed, TransitionSystem};
 pub use minimal_representative::{LazyMinimalRepresentatives, MinimalRepresentative, StateNaming};
@@ -174,6 +175,50 @@ impl<T: TransitionSystem> RightCongruence<T> {
 
     fn invalidate(&mut self) {
         self.minimal_representatives = LazyMinimalRepresentatives::default();
+    }
+}
+
+impl<T> IntoTransitions for RightCongruence<T>
+where
+    T: IntoTransitions<Initial = ()>,
+{
+    type Initial = T::StateIndex;
+    type IntoStates = T::IntoStates;
+    type IntoEdges = T::IntoEdges;
+
+    fn into_transitions(
+        self,
+    ) -> Parts<T::Alphabet, Self::IntoStates, Self::IntoEdges, T::StateIndex> {
+        let Parts {
+            alphabet,
+            states,
+            edges,
+            ..
+        } = self.ts.into_transitions();
+        Parts {
+            alphabet,
+            states,
+            edges,
+            initial: self.initial,
+        }
+    }
+}
+
+impl<I, T> FromTransitions<I, I> for RightCongruence<T>
+where
+    I: IdType,
+    T: FromTransitions<I, ()>,
+    T::StateIndex: DenseId,
+{
+    /// # Panics
+    /// Panics if the initial state is not among the states.
+    fn from_transitions<S, E>(parts: Parts<T::Alphabet, S, E, I>) -> Self
+    where
+        S: Iterator<Item = (I, T::StateColor)>,
+        E: Iterator<Item = (I, EdgeExpression<T>, T::EdgeColor, I)>,
+    {
+        let (ts, initial) = pointed_from_parts(parts);
+        Self::from_parts(ts, initial)
     }
 }
 
@@ -361,7 +406,7 @@ impl<D: Deterministic> RightCongruence<D> {
     /// ```
     pub fn looping_words(&self, idx: StateIndex<Self>) -> DFA<DTS<D::Alphabet, bool, Void>>
     where
-        D: Clone + IntoTs,
+        D: Clone + IntoTransitions<Initial = ()>,
     {
         self.ts()
             .clone()
@@ -370,7 +415,8 @@ impl<D: Deterministic> RightCongruence<D> {
                 [(idx, true)].into_iter().collect(),
                 false,
             ))
-            .into_dfa()
+            .erase_edge_colors()
+            .collect()
     }
 
     /// Returns a reference to the minimal representatives of the classes of the right congruence.

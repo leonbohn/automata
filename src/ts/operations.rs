@@ -26,7 +26,7 @@ pub use quotient::{Quotient, QuotientEdgesFrom};
 #[cfg(test)]
 mod tests {
     use crate::automaton::DFA;
-    use crate::representation::IntoTs;
+    use crate::representation::IntoTransitions;
     use crate::ts::Deterministic;
     use crate::ts::operations::{Product, ProductIndex};
     use crate::{Pointed, TransitionSystem};
@@ -47,11 +47,12 @@ mod tests {
         assert_eq!(xxx.reached_state("abb"), Some(ProductIndex(0, 0)));
         assert_eq!(xxx.run("aa").reached_state_color(), Some((false, true)));
 
-        let yyy = xxx
+        let yyy: DFA = xxx
             .clone()
             .reachable_part()
             .map_state_colors(|(a, b)| a || b)
-            .into_dfa();
+            .erase_edge_colors()
+            .collect();
         assert_eq!(yyy.run("aa").reached_state_color(), Some(true));
     }
 }

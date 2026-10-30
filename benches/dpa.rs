@@ -3,10 +3,11 @@
 
 mod common;
 
+use automata::alphabet::CharAlphabet;
 use automata::automaton::DPA;
 use automata::hoa::WriteHoa;
-use automata::representation::CollectTs;
-use automata::{Int, States, TransitionSystem};
+use automata::representation::IntoTransitions;
+use automata::{DTS, Int, States, TransitionSystem, Void};
 use common::FixtureDpa;
 use gungraun::prelude::*;
 use std::hint::black_box;
@@ -127,7 +128,7 @@ fn witness_colors(dpa: DPA) -> usize {
 // early and the whole product is searched.
 fn with_normalization(n: usize) -> (DPA, DPA) {
     let dpa = common::scrambled_dpa(n, 2, 8);
-    let normalized = dpa.normalized().collect_dpa();
+    let normalized = dpa.normalized();
     (dpa, normalized)
 }
 
@@ -204,7 +205,7 @@ fn prefix_partition(dpa: DPA) -> usize {
 #[bench::scrambled_1000(args = (1_000), setup = scrambled)]
 #[bench::scrambled_4000(args = (4_000), setup = scrambled)]
 fn collect_dpa(dpa: DPA) -> DPA {
-    black_box(dpa.collect_dpa())
+    black_box(dpa.collect())
 }
 
 #[library_benchmark]
@@ -213,7 +214,7 @@ fn collect_dpa(dpa: DPA) -> DPA {
 fn map_edge_colors_collect(dpa: DPA) -> usize {
     black_box(
         dpa.map_edge_colors(|c| c / 2 as Int)
-            .collect_dts()
+            .collect::<DTS<CharAlphabet, Void, Int>>()
             .state_count(),
     )
 }

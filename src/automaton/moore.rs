@@ -4,9 +4,9 @@ use std::fmt::Debug;
 use crate::{Color, Int, Lattice, Void, alphabet::CharAlphabet, word::FiniteWord};
 
 use super::{Automaton, DFA, MealyMachine};
-use crate::representation::{CollectTs, IntoTs};
+use crate::representation::CollectPointed;
 use crate::ts::operations::{Product, ProductIndex};
-use crate::ts::{Deterministic, StateColor, SymbolOf};
+use crate::ts::{Deterministic, StateColor, States, SymbolOf};
 use crate::{Congruence, DTS, Pointed, TransitionSystem};
 
 /// Represents the semantics of a Moore machine, it produces the color of the
@@ -36,7 +36,7 @@ pub type MooreMachine<T = DTS<CharAlphabet, Int, Void>> = Automaton<T, MooreSema
 
 impl<M> MooreMachine<M>
 where
-    M: IntoTs<EdgeColor: Color> + Deterministic,
+    M: States + Deterministic,
 {
     /// Decomposes `self` into a sequence of DFAs, where the i-th DFA accepts all words which
     /// produce a color less than or equal to i.

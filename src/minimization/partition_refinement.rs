@@ -11,7 +11,7 @@ use crate::ts::States;
 use std::{collections::BTreeSet, time::Instant};
 
 use crate::automaton::{MealyMachine, MooreMachine};
-use crate::representation::{CollectTs, IntoTs};
+use crate::representation::CollectPointed;
 use crate::ts::{Deterministic, EdgeColor, StateColor};
 use crate::{Color, math, partition::Partition};
 use crate::{Congruence, TransitionSystem};
@@ -303,20 +303,19 @@ where
     // The edge colors are irrelevant for a Moore machine. Erasing them before taking the
     // quotient avoids collecting the edge colors of every class, the quotient then only
     // carries (zero-sized) `Void` colors that are dropped when collecting.
-    let (ts, initial) = mm
+    let moore = mm
         .erase_edge_colors()
         .quotient(partition)
         .map_state_colors(|c| {
             // assert!(c.iter().all_equal());
             c[0].clone()
         })
-        .erase_edge_colors()
-        .collect_dts_and_initial();
+        .collect_moore();
     debug!(
         "Collecting into Moore machine took {} microseconds",
         start.elapsed().as_micros()
     );
-    ts.into_moore_with_initial(initial)
+    moore
 }
 
 #[cfg(test)]
@@ -326,7 +325,6 @@ mod tests {
     };
     use crate::States;
     use crate::alphabet::CharAlphabet;
-    use crate::representation::IntoTs;
     use crate::ts::{Deterministic, ForAlphabet, Sproutable};
     use crate::{DTS, TransitionSystem, tests::wiki_dfa};
 
@@ -348,8 +346,8 @@ mod tests {
                 (1, 'a', 0, 0),
                 (1, 'b', 1, 0),
             ])
-            .into_dpa(0);
-        let minimized = mm.into_mealy().minimize();
+            .into_mealy(0);
+        let minimized = mm.minimize();
         assert_eq!(minimized.state_count(), 1)
     }
 
