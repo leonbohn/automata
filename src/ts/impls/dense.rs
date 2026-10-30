@@ -404,6 +404,18 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Sproutable for DenseTs<A, Q, C> {
     fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>> {
         self.states.get_mut(state as usize)?.as_mut()
     }
+
+    fn map_edge_colors_in_place(&mut self, mut f: impl FnMut(&mut EdgeColor<Self>)) {
+        for (target, color) in self.targets.iter().zip(self.colors.iter_mut()) {
+            if *target != NONE {
+                color.as_mut().map(&mut f);
+            }
+        }
+    }
+
+    fn map_state_colors_in_place(&mut self, mut f: impl FnMut(&mut StateColor<Self>)) {
+        self.states.iter_mut().flatten().for_each(&mut f);
+    }
 }
 
 impl<A: IndexedAlphabet, Q: Color, C: Color> Shrinkable for DenseTs<A, Q, C> {

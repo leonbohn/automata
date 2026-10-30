@@ -231,14 +231,20 @@ where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
         D: Clone + IntoTransitions<Initial = ()>,
     {
-        self.normalized()
-            .complement_without_normalizing()
-            .unwrap_or_else(|| {
-                panic!(
-                    "cannot complement a DPA that needs all priorities 0..={}",
-                    Int::MAX
-                )
-            })
+        let mut complement = self.normalized();
+        let (low, high) = complement.low_and_high_priority();
+        // the normalized priorities are minimal, so shifting up only fails if all of them are used
+        if low > 0 {
+            complement.map_edge_colors_in_place(|c| *c -= 1);
+        } else if high < Int::MAX {
+            complement.map_edge_colors_in_place(|c| *c += 1);
+        } else {
+            panic!(
+                "cannot complement a DPA that needs all priorities 0..={}",
+                Int::MAX
+            );
+        }
+        complement
     }
 
     /// Builds the complement of `self` by shifting all priorities by one, without normalizing

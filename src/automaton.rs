@@ -318,6 +318,12 @@ impl<T: Sproutable, Sem> Sproutable for Automaton<T, Sem> {
     fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>> {
         self.ts.state_color_mut(state)
     }
+    fn map_edge_colors_in_place(&mut self, f: impl FnMut(&mut crate::ts::EdgeColor<Self>)) {
+        self.ts.map_edge_colors_in_place(f)
+    }
+    fn map_state_colors_in_place(&mut self, f: impl FnMut(&mut StateColor<Self>)) {
+        self.ts.map_state_colors_in_place(f)
+    }
 }
 
 impl<T: Shrinkable, Sem> Shrinkable for Automaton<T, Sem> {
