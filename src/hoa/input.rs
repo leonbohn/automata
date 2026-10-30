@@ -245,7 +245,10 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
             hoars::AcceptanceName::Buchi => Ok(OmegaAcceptanceCondition::Buchi),
             hoars::AcceptanceName::Parity => {
                 let sets = acceptance_sets.ok_or(HoaError::MissingAcceptanceSets)?;
-                Ok(OmegaAcceptanceCondition::Parity(0, sets as Int))
+                Ok(OmegaAcceptanceCondition::Parity(
+                    0,
+                    (sets as Int).saturating_sub(1),
+                ))
             }
             other => Err(HoaError::UnsupportedAcceptance(format!("{other:?}"))),
         }

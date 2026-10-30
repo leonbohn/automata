@@ -1,18 +1,16 @@
-use super::{DotStateAttribute, DotTransitionAttribute, Dottable};
+use super::{DotStateAttribute, DotStyle, DotTransitionAttribute, Dottable};
 use crate::DTS;
-use crate::Void;
-use crate::automaton::{DFA, DPA, MealyMachine, MooreMachine};
-use crate::ts::EdgeOf;
-use crate::ts::States;
-use crate::ts::{Deterministic, StateColor, StateIndex};
-use crate::{Color, Int, Pointed, Show, TransitionSystem, alphabet::Alphabet};
+use crate::automaton::{
+    Automaton, BuchiCondition, MealySemantics, MinEvenParityCondition, MooreSemantics,
+    OmegaAcceptanceCondition, ReachabilityCondition,
+};
+use crate::ts::{EdgeOf, StateIndex, States};
+use crate::{Color, Pointed, Show, TransitionSystem, alphabet::Alphabet};
 
-impl<A: Alphabet> Dottable for DFA<DTS<A, bool, Void>>
-where
-    StateIndex<Self>: Show,
-{
+/// All automata are drawn through the [`DotStyle`] of their acceptance condition.
+impl<T: States, Z: DotStyle<T>> Dottable for Automaton<T, Z> {
     fn dot_name(&self) -> Option<String> {
-        Some("DFA".into())
+        self.acceptance().dot_name()
     }
 
     fn dot_initial_state(&self) -> Option<Self::StateIndex> {
@@ -20,34 +18,81 @@ where
     }
 
     fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
-        format!("q{}", idx.show())
+        format!("q{idx:?}")
     }
 
     fn dot_transition_attributes<'a>(
         &'a self,
         t: EdgeOf<'a, Self>,
     ) -> impl IntoIterator<Item = DotTransitionAttribute> {
-        [DotTransitionAttribute::Label(t.expression().show())].into_iter()
+        self.acceptance().dot_transition_attributes(self.ts(), t)
     }
 
     fn dot_state_attributes(
         &self,
         idx: Self::StateIndex,
-    ) -> impl IntoIterator<Item = DotStateAttribute>
-    where
-        (String, StateColor<Self>): Show,
-    {
-        let shape = if *self.state_color(idx).unwrap() {
+    ) -> impl IntoIterator<Item = DotStateAttribute> {
+        self.acceptance().dot_state_attributes(self.ts(), idx)
+    }
+}
+
+impl<T: States<StateColor = bool>> DotStyle<T> for ReachabilityCondition {
+    fn dot_name(&self) -> Option<String> {
+        Some("DFA".into())
+    }
+
+    fn dot_state_attributes(&self, ts: &T, q: StateIndex<T>) -> Vec<DotStateAttribute> {
+        let shape = if *ts.state_color(q).unwrap() {
             "doublecircle"
         } else {
             "circle"
         };
         vec![
             DotStateAttribute::Shape(shape.into()),
-            DotStateAttribute::Label(self.dot_state_ident(idx)),
+            DotStateAttribute::Label(format!("q{q:?}")),
         ]
     }
+
+    fn dot_transition_attributes(&self, _ts: &T, t: EdgeOf<'_, T>) -> Vec<DotTransitionAttribute> {
+        vec![DotTransitionAttribute::Label(t.expression().show())]
+    }
 }
+
+impl<T: States> DotStyle<T> for MooreSemantics {
+    fn dot_name(&self) -> Option<String> {
+        Some("Moore".into())
+    }
+
+    fn dot_state_attributes(&self, ts: &T, q: StateIndex<T>) -> Vec<DotStateAttribute> {
+        let color = ts
+            .state_color(q)
+            .map(|c| format!(" | {c:?}"))
+            .unwrap_or_default();
+        vec![DotStateAttribute::Label(format!("q{q:?}{color}"))]
+    }
+
+    fn dot_transition_attributes(&self, _ts: &T, t: EdgeOf<'_, T>) -> Vec<DotTransitionAttribute> {
+        vec![DotTransitionAttribute::Label(t.expression().show())]
+    }
+}
+
+/// Styles that label an edge with its expression and color and draw plain states.
+macro_rules! edge_colored_style {
+    ($($cond:ty => $name:literal),*) => {$(
+        impl<T: States> DotStyle<T> for $cond {
+            fn dot_name(&self) -> Option<String> {
+                Some($name.into())
+            }
+        }
+    )*};
+}
+edge_colored_style!(
+    MealySemantics => "Mealy",
+    MinEvenParityCondition => "DPA",
+    BuchiCondition => "DBA",
+    OmegaAcceptanceCondition => "Omega"
+);
+
 impl<A: Alphabet, Q: Color, C: Color> Dottable for crate::RightCongruence<DTS<A, Q, C>>
 where
     StateIndex<Self>: Show,
@@ -85,120 +130,5 @@ where
             self.dot_state_ident(idx),
             self.state_color(idx).unwrap()
         ))]
-    }
-}
-
-impl<M> Dottable for MooreMachine<M>
-where
-    M: Deterministic + States,
-{
-    fn dot_name(&self) -> Option<String> {
-        Some("DPA".into())
-    }
-
-    fn dot_initial_state(&self) -> Option<Self::StateIndex> {
-        Some(self.initial())
-    }
-
-    fn dot_state_attributes(
-        &self,
-        idx: Self::StateIndex,
-    ) -> impl IntoIterator<Item = DotStateAttribute> {
-        let color = self
-            .state_color(idx)
-            .map(|c| format!(" | {c:?}"))
-            .unwrap_or("".to_string());
-        vec![DotStateAttribute::Label(format!(
-            "{}{color}",
-            self.dot_state_ident(idx)
-        ))]
-    }
-
-    fn dot_transition_attributes<'a>(
-        &'a self,
-        t: EdgeOf<'a, Self>,
-    ) -> impl IntoIterator<Item = DotTransitionAttribute> {
-        vec![DotTransitionAttribute::Label(t.expression().show())]
-    }
-
-    fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
-        format!("q{idx:?}")
-    }
-}
-
-impl<M> Dottable for MealyMachine<M>
-where
-    M: Deterministic + States,
-{
-    fn dot_name(&self) -> Option<String> {
-        Some("DPA".into())
-    }
-
-    fn dot_initial_state(&self) -> Option<Self::StateIndex> {
-        Some(self.initial())
-    }
-
-    fn dot_state_attributes(
-        &self,
-        idx: Self::StateIndex,
-    ) -> impl IntoIterator<Item = DotStateAttribute> {
-        if self.initial() == idx {
-            vec![DotStateAttribute::Label(format!(
-                "->{}",
-                self.dot_state_ident(idx)
-            ))]
-        } else {
-            vec![DotStateAttribute::Label(self.dot_state_ident(idx))]
-        }
-    }
-
-    fn dot_transition_attributes<'a>(
-        &'a self,
-        t: EdgeOf<'a, Self>,
-    ) -> impl IntoIterator<Item = DotTransitionAttribute> {
-        vec![DotTransitionAttribute::Label(format!(
-            "{}|{:?}",
-            t.expression().show(),
-            t.color()
-        ))]
-    }
-
-    fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
-        format!("q{idx:?}")
-    }
-}
-
-impl<D> Dottable for DPA<D>
-where
-    D: Deterministic<EdgeColor = Int> + States,
-{
-    fn dot_name(&self) -> Option<String> {
-        Some("DPA".into())
-    }
-
-    fn dot_initial_state(&self) -> Option<Self::StateIndex> {
-        Some(self.initial())
-    }
-
-    fn dot_state_attributes(
-        &self,
-        idx: Self::StateIndex,
-    ) -> impl IntoIterator<Item = DotStateAttribute> {
-        vec![DotStateAttribute::Label(self.dot_state_ident(idx))]
-    }
-
-    fn dot_transition_attributes<'a>(
-        &'a self,
-        t: EdgeOf<'a, Self>,
-    ) -> impl IntoIterator<Item = DotTransitionAttribute> {
-        vec![DotTransitionAttribute::Label(format!(
-            "{}|{}",
-            t.expression().show(),
-            t.color().show()
-        ))]
-    }
-
-    fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
-        format!("q{idx:?}")
     }
 }

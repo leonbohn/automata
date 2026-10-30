@@ -31,7 +31,7 @@
 //!
 //! // convert to a deterministic parity automaton and write it back
 //! let dpa = automaton.into_dpa().expect("a parity automaton");
-//! let written = dpa.to_hoa();
+//! let written = dpa.to_hoa().expect("a writable automaton");
 //! assert!(written.contains("acc-name: parity min even 3"));
 //! assert!(written.contains("[0 & !1] 1 {1}"));
 //! ```

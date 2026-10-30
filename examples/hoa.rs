@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // the automaton has a generic acceptance condition, make it a parity automaton
         let dpa = automaton.into_dpa()?;
-        println!("{}", dpa.to_hoa());
+        println!("{}", dpa.to_hoa()?);
     }
     Ok(())
 }
