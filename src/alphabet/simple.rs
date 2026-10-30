@@ -208,6 +208,11 @@ impl IndexedAlphabet for CharAlphabet {
     fn expression_from_index(&self, index: usize) -> Self::Expression {
         self.symbol_from_index(index)
     }
+
+    #[inline]
+    fn expression_ref(&self, index: usize) -> &Self::Expression {
+        &self.0[index]
+    }
 }
 
 /// An alphabet of fixed arity, uses const generics. This is more seen as a test
@@ -263,6 +268,11 @@ impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> IndexedAlphabet
     #[inline]
     fn expression_from_index(&self, index: usize) -> Self::Expression {
         self.symbol_from_index(index)
+    }
+
+    #[inline]
+    fn expression_ref(&self, index: usize) -> &Self::Expression {
+        &self.0[index]
     }
 }
 

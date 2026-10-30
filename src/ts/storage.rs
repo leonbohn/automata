@@ -1,6 +1,6 @@
 use crate::Color;
-use crate::alphabet::Alphabet;
-use crate::ts::{ForAlphabet, LinkedTs, Sproutable};
+use crate::alphabet::{Alphabet, IndexedAlphabet};
+use crate::ts::{DenseTs, ForAlphabet, LinkedTs, Sproutable, States};
 
 /// A family of representations for owned, growable transition systems. A storage is a marker that
 /// is chosen at the type level and turned into a concrete system by [`Storage::Ts`], which fixes
@@ -34,5 +34,24 @@ impl<A: Alphabet> Storage<A> for Linked {
         ts: LinkedTs<A, Q, C>,
     ) -> Result<Self::Ts<Q, C>, LinkedTs<A, Q, C>> {
         Ok(ts)
+    }
+}
+
+/// The storage [`DenseTs`]: deterministic, works for [`IndexedAlphabet`]s and looks up edges in
+/// constant time.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Dense;
+
+impl<A: IndexedAlphabet> Storage<A> for Dense {
+    type Ts<Q: Color, C: Color> = DenseTs<A, Q, C>;
+
+    fn try_from_linked<Q: Color, C: Color>(
+        ts: LinkedTs<A, Q, C>,
+    ) -> Result<Self::Ts<Q, C>, LinkedTs<A, Q, C>> {
+        if ts.is_deterministic() {
+            Ok(DenseTs::sprout_from_ts(ts))
+        } else {
+            Err(ts)
+        }
     }
 }

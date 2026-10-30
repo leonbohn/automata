@@ -136,6 +136,9 @@ pub trait IndexedAlphabet: Alphabet {
     fn symbol_from_index(&self, index: usize) -> Self::Symbol;
     /// Returns the expression that corresponds to the given index.
     fn expression_from_index(&self, index: usize) -> Self::Expression;
+    /// Returns a reference to the expression that corresponds to the given index. This allows
+    /// storages that keep no expression per edge to lend one out.
+    fn expression_ref(&self, index: usize) -> &Self::Expression;
     /// Turns the given expression into a symbol.
     fn expression_to_symbol(&self, expression: &Self::Expression) -> Self::Symbol {
         self.symbol_from_index(self.expression_to_index(expression))
