@@ -15,6 +15,7 @@ use crate::{
     ts::{
         Deterministic, EdgeId, EdgeTuple, IdType, PredecessorIterable, Shrinkable, Sproutable,
         States,
+        connected_components::SccDecomposition,
         model::{Model, ModelEdgeTuple},
     },
 };
@@ -151,6 +152,15 @@ where
 
     fn storage_edge(&self, id: usize) -> EdgeId {
         self.edges.get(&id).copied().unwrap_or(EdgeId(1_000_000))
+    }
+
+    fn reverse_state(&self, t: Ts::StateIndex) -> usize {
+        *self
+            .states
+            .iter()
+            .find(|(_, s)| **s == t)
+            .map(|(m, _)| m)
+            .unwrap_or_else(|| panic!("storage returned unknown state {t:?}"))
     }
 
     /// Forgets the storage ids of edges that no longer exist in the model.
@@ -509,6 +519,89 @@ where
     Ts: Sproutable<Alphabet = CharAlphabet, StateColor = u8, EdgeColor = u8>
         + Shrinkable
         + PredecessorIterable
+        + States,
+{
+    /// The components of a decomposition in the vocabulary of the model, sorted.
+    fn model_sccs(&self, decomposition: &SccDecomposition<'_, Ts>) -> Vec<Vec<usize>> {
+        let mut sccs: Vec<Vec<usize>> = decomposition
+            .sccs_iter()
+            .map(|scc| {
+                let mut states: Vec<_> = scc
+                    .state_indices()
+                    .map(|&q| self.reverse_state(q))
+                    .collect();
+                states.sort();
+                states
+            })
+            .collect();
+        sccs.sort();
+        sccs
+    }
+
+    /// Compares the SCC decompositions of the storage (Tarjan iterative and recursive, and the
+    /// variants restricted to what is reachable from a state, also Kosaraju) with the model.
+    pub fn assert_sccs_agree(&self) {
+        let expected = self.model.sccs();
+        let all = self.ts.sccs();
+        assert_eq!(expected, self.model_sccs(&all), "sccs() differs");
+        assert_eq!(
+            expected,
+            self.model_sccs(&self.ts.sccs_recursive()),
+            "sccs_recursive() differs"
+        );
+
+        let mut transient: Vec<_> = all
+            .transient_states()
+            .map(|q| self.reverse_state(q))
+            .collect();
+        transient.sort();
+        assert_eq!(
+            self.model.transient_states(),
+            transient,
+            "transient states differ"
+        );
+
+        for scc in all.sccs_iter() {
+            for &q in scc.state_indices() {
+                assert_eq!(
+                    all.scc_of(q).map(|s| s.first()),
+                    Some(scc.first()),
+                    "scc_of({q:?}) is not the component containing it"
+                );
+            }
+        }
+
+        for origin in self.model.states() {
+            let expected = self.model.sccs_reachable_from(origin);
+            let sq = self.storage_state(origin);
+            // `reachable_sccs_from` is restricted to the given states, so it is given all that
+            // can be reached (for a set that has edges leaving it, building the decomposition
+            // panics)
+            let reachable: Vec<_> = self
+                .model
+                .reachable_from(origin)
+                .into_iter()
+                .map(|q| self.storage_state(q))
+                .collect();
+            assert_eq!(
+                expected,
+                self.model_sccs(&self.ts.reachable_sccs_from(reachable)),
+                "reachable_sccs_from({origin}) differs"
+            );
+            assert_eq!(
+                expected,
+                self.model_sccs(&self.ts.sccs_kosaraju(sq)),
+                "sccs_kosaraju({origin}) differs"
+            );
+        }
+    }
+}
+
+impl<Ts> Harness<Ts>
+where
+    Ts: Sproutable<Alphabet = CharAlphabet, StateColor = u8, EdgeColor = u8>
+        + Shrinkable
+        + PredecessorIterable
         + Deterministic
         + States,
 {
@@ -554,15 +647,6 @@ where
             self.ts.reached_state_from(missing, vec![symbol_char(0)]),
             None
         );
-    }
-
-    fn reverse_state(&self, t: Ts::StateIndex) -> usize {
-        *self
-            .states
-            .iter()
-            .find(|(_, s)| **s == t)
-            .map(|(m, _)| m)
-            .unwrap_or_else(|| panic!("run reached unknown state {t:?}"))
     }
 }
 
@@ -622,6 +706,24 @@ mod tests {
             Harness::new(ts, Linked::check_consistency)
                 .with_compaction(compact_linked)
                 .run(&ops);
+        }
+
+        #[test]
+        fn linked_ts_sccs_agree_with_model(ops in proptest::collection::vec(op(), 0..80)) {
+            let ts = Linked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new(ts, Linked::check_consistency)
+                .with_compaction(compact_linked)
+                .run(&ops)
+                .assert_sccs_agree();
+        }
+
+        #[test]
+        fn det_linked_ts_sccs_agree_with_model(ops in proptest::collection::vec(op(), 0..80)) {
+            let ts = DetLinked::for_alphabet(CharAlphabet::of_size(ALPHABET_SIZE));
+            Harness::new_deterministic(ts, DetLinked::check_consistency)
+                .with_compaction(compact_det)
+                .run(&ops)
+                .assert_sccs_agree();
         }
 
         #[test]

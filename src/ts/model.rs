@@ -199,6 +199,53 @@ impl<Q: Clone, C: Clone> Model<Q, C> {
         }
     }
 
+    /// The strongly connected components: two states are in the same one iff each is reachable
+    /// from the other. Every component is sorted, and the components are sorted by their smallest
+    /// state.
+    pub fn sccs(&self) -> Vec<Vec<usize>> {
+        let mut sccs: Vec<Vec<usize>> = Vec::new();
+        for q in self.states() {
+            if sccs.iter().any(|scc| scc.contains(&q)) {
+                continue;
+            }
+            let scc = self
+                .reachable_from(q)
+                .into_iter()
+                .filter(|&p| self.reachable_from(p).contains(&q))
+                .collect();
+            sccs.push(scc);
+        }
+        sccs
+    }
+
+    /// The strongly connected components that contain a state reachable from `origin`.
+    pub fn sccs_reachable_from(&self, origin: usize) -> Vec<Vec<usize>> {
+        let reachable = self.reachable_from(origin);
+        self.sccs()
+            .into_iter()
+            .filter(|scc| reachable.contains(&scc[0]))
+            .collect()
+    }
+
+    /// The states that cannot reach themselves by reading a non-empty word, in ascending order.
+    pub fn transient_states(&self) -> Vec<usize> {
+        self.states()
+            .into_iter()
+            .filter(|&q| {
+                !self
+                    .edges_from(q)
+                    .expect("state exists")
+                    .iter()
+                    .any(|e| self.reach_any(e.target, q))
+            })
+            .collect()
+    }
+
+    /// Whether `to` is reachable from `from` by reading a (possibly empty) word.
+    fn reach_any(&self, from: usize, to: usize) -> bool {
+        self.reachable_from(from).contains(&to)
+    }
+
     /// Removes every state that is not reachable from `origin` and returns them with their colors
     /// in ascending order.
     ///
@@ -365,6 +412,26 @@ mod tests {
         assert_eq!(m.reach(q[0], &[0, 1]), vec![q[0]]);
         assert_eq!(m.reach(q[0], &[1]), vec![]);
         assert_eq!(m.reach(9, &[]), vec![]);
+    }
+
+    #[test]
+    fn sccs_and_transient_states() {
+        let mut m = Model::<(), ()>::new();
+        let q: Vec<_> = (0..5).map(|_| m.add_state(())).collect();
+        m.add_edge(q[0], 0, (), q[1]);
+        m.add_edge(q[1], 0, (), q[0]);
+        m.add_edge(q[1], 1, (), q[2]);
+        m.add_edge(q[2], 0, (), q[2]);
+        m.add_edge(q[3], 0, (), q[0]);
+        assert_eq!(
+            m.sccs(),
+            vec![vec![q[0], q[1]], vec![q[2]], vec![q[3]], vec![q[4]]]
+        );
+        assert_eq!(
+            m.sccs_reachable_from(q[1]),
+            vec![vec![q[0], q[1]], vec![q[2]]]
+        );
+        assert_eq!(m.transient_states(), vec![q[3], q[4]]);
     }
 
     #[test]
