@@ -1,11 +1,12 @@
 use std::{borrow::Cow, sync::OnceLock};
 
 use super::csr::ReverseCsr;
+use crate::representation::{FromTransitions, IntoTransitions, Parts, sprout_from_parts};
 use crate::{
     Color, TransitionSystem, Void,
     alphabet::{CharAlphabet, IndexedAlphabet},
     ts::{
-        DefaultIdType, Dense, Deterministic, EdgeColor, EdgeId, EdgeOf, EdgeRef, EdgeTuple,
+        DefaultIdType, Dense, Deterministic, IdType, EdgeColor, EdgeId, EdgeOf, EdgeRef, EdgeTuple,
         ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable, StateColor, StateIndex, States,
         SymbolOf, predecessors::PredecessorIterable,
     },
@@ -627,5 +628,99 @@ mod tests {
 
         ts.complete_with_colors(Void, 7);
         assert_eq!(ts.state_count(), 3);
+    }
+}
+
+/// Iterator over the edges of a table-based system ([`DenseTs`], [`CsrTs`](crate::ts::CsrTs)) that
+/// is consumed, in the order of the slots.
+pub struct TableIntoEdges<A: IndexedAlphabet, C> {
+    alphabet: A,
+    /// The state and the symbol index of the next slot.
+    next: (DefaultIdType, usize),
+    slots: std::iter::Zip<std::vec::IntoIter<DefaultIdType>, std::vec::IntoIter<Option<C>>>,
+}
+
+impl<A: IndexedAlphabet, C> TableIntoEdges<A, C> {
+    pub(super) fn new(alphabet: A, targets: Vec<DefaultIdType>, colors: Vec<Option<C>>) -> Self {
+        Self {
+            alphabet,
+            next: (0, 0),
+            slots: targets.into_iter().zip(colors),
+        }
+    }
+}
+
+impl<A: IndexedAlphabet, C> Iterator for TableIntoEdges<A, C> {
+    type Item = (DefaultIdType, A::Expression, C, DefaultIdType);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let k = self.alphabet.size();
+        for (target, color) in self.slots.by_ref() {
+            let (source, symbol_index) = self.next;
+            self.next = if symbol_index + 1 == k {
+                (source + 1, 0)
+            } else {
+                (source, symbol_index + 1)
+            };
+            if target != NONE {
+                let expression = self.alphabet.expression_ref(symbol_index).clone();
+                return Some((source, expression, color.expect("edge has a color"), target));
+            }
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, self.slots.size_hint().1)
+    }
+}
+
+/// Iterator over the states of a [`DenseTs`] that is consumed, skipping removed states.
+pub struct DenseIntoStates<Q> {
+    states: std::iter::Enumerate<std::vec::IntoIter<Option<Q>>>,
+}
+
+impl<Q> Iterator for DenseIntoStates<Q> {
+    type Item = (DefaultIdType, Q);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.states
+            .find_map(|(i, color)| color.map(|c| (i as DefaultIdType, c)))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, self.states.size_hint().1)
+    }
+}
+
+impl<A: IndexedAlphabet, Q: Color, C: Color> IntoTransitions for DenseTs<A, Q, C> {
+    type Initial = ();
+    type IntoStates = DenseIntoStates<Q>;
+    type IntoEdges = TableIntoEdges<A, C>;
+
+    fn into_transitions(self) -> Parts<A, Self::IntoStates, Self::IntoEdges, ()> {
+        Parts {
+            edges: TableIntoEdges::new(self.alphabet.clone(), self.targets, self.colors),
+            states: DenseIntoStates {
+                states: self.states.into_iter().enumerate(),
+            },
+            alphabet: self.alphabet,
+            initial: (),
+        }
+    }
+}
+
+impl<A: IndexedAlphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I, Init>
+    for DenseTs<A, Q, C>
+{
+    /// Edges that leave the same state on the same symbol replace each other.
+    fn from_transitions<S, E>(parts: Parts<A, S, E, Init>) -> Self
+    where
+        S: Iterator<Item = (I, Q)>,
+        E: Iterator<Item = (I, A::Expression, C, I)>,
+    {
+        sprout_from_parts(parts)
     }
 }

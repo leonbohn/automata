@@ -38,9 +38,10 @@ pub use semantics::Semantics;
 mod deterministic;
 
 mod priority_mapping;
+use crate::representation::{FromTransitions, IntoTransitions, Parts};
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{
-    Builder, Deterministic, EdgeExpression, ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable,
+    Builder, DenseId, Deterministic, EdgeExpression, ForAlphabet, IdType, IntoEdgeTuple, Shrinkable, Sproutable,
     StateColor, StateIndex,
 };
 use crate::{Congruence, DTS, Pointed, TransitionSystem};
@@ -226,6 +227,71 @@ impl<T: Deterministic, Sem> Automaton<T, Sem> {
 impl<T: TransitionSystem, Sem> AsRef<Automaton<T, Sem>> for Automaton<T, Sem> {
     fn as_ref(&self) -> &Automaton<T, Sem> {
         self
+    }
+}
+
+impl<T, Sem> IntoTransitions for Automaton<T, Sem>
+where
+    T: IntoTransitions<Initial = ()>,
+{
+    type Initial = T::StateIndex;
+    type IntoStates = T::IntoStates;
+    type IntoEdges = T::IntoEdges;
+
+    fn into_transitions(
+        self,
+    ) -> Parts<T::Alphabet, Self::IntoStates, Self::IntoEdges, T::StateIndex> {
+        let Parts {
+            alphabet,
+            states,
+            edges,
+            ..
+        } = self.ts.into_transitions();
+        Parts {
+            alphabet,
+            states,
+            edges,
+            initial: self.initial,
+        }
+    }
+}
+
+impl<I, T, Sem> FromTransitions<I, I> for Automaton<T, Sem>
+where
+    I: IdType,
+    T: FromTransitions<I, ()>,
+    T::StateIndex: DenseId,
+    Sem: Default,
+{
+    /// The result has the acceptance condition `Sem::default()`.
+    ///
+    /// # Panics
+    /// Panics if the initial state is not among the states.
+    fn from_transitions<S, E>(parts: Parts<T::Alphabet, S, E, I>) -> Self
+    where
+        S: Iterator<Item = (I, T::StateColor)>,
+        E: Iterator<Item = (I, EdgeExpression<T>, T::EdgeColor, I)>,
+    {
+        let Parts {
+            alphabet,
+            states,
+            edges,
+            initial,
+        } = parts;
+        let mut new_initial = None;
+        let ts = T::from_transitions(Parts {
+            alphabet,
+            states: states.enumerate().map(|(n, (q, color))| {
+                if q == initial {
+                    new_initial = Some(n);
+                }
+                (q, color)
+            }),
+            edges,
+            initial: (),
+        });
+        let initial = new_initial.expect("the initial state is not among the states");
+        Self::from_parts(ts, T::StateIndex::from_usize(initial))
     }
 }
 

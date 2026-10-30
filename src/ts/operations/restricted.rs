@@ -1,3 +1,4 @@
+use crate::representation::{IntoTransitions, Parts};
 use crate::ts::EdgeOf;
 use crate::ts::SymbolOf;
 
@@ -8,6 +9,7 @@ use crate::{Congruence, Pointed, TransitionSystem};
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 /// Abstracts the filtering of a transition system's state indices. This trait is implemented by
 /// functions which take a state index and return a boolean value indicating whether the state index
@@ -127,6 +129,72 @@ where
 
     fn contains_state(&self, index: StateIndex<Self>) -> bool {
         self.filter.is_unmasked(index) && self.ts().contains_state(index)
+    }
+}
+
+/// Iterator over the states of a [`RestrictByStateIndex`] that is consumed.
+pub struct RestrictedIntoStates<I, F> {
+    it: I,
+    filter: Arc<F>,
+}
+
+impl<Idx: IdType, Q, I: Iterator<Item = (Idx, Q)>, F: StateIndexFilter<Idx>> Iterator
+    for RestrictedIntoStates<I, F>
+{
+    type Item = (Idx, Q);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.it.find(|(q, _)| self.filter.is_unmasked(*q))
+    }
+}
+
+/// Iterator over the edges of a [`RestrictByStateIndex`] that is consumed, it only yields edges
+/// between unmasked states.
+pub struct RestrictedIntoEdges<I, F> {
+    it: I,
+    filter: Arc<F>,
+}
+
+impl<Idx: IdType, E, C, I: Iterator<Item = (Idx, E, C, Idx)>, F: StateIndexFilter<Idx>> Iterator
+    for RestrictedIntoEdges<I, F>
+{
+    type Item = (Idx, E, C, Idx);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.it
+            .find(|(p, _, _, r)| self.filter.is_unmasked(*p) && self.filter.is_unmasked(*r))
+    }
+}
+
+impl<Ts: IntoTransitions, F> IntoTransitions for RestrictByStateIndex<Ts, F>
+where
+    F: StateIndexFilter<Ts::StateIndex>,
+{
+    type Initial = Ts::Initial;
+    type IntoStates = RestrictedIntoStates<Ts::IntoStates, F>;
+    type IntoEdges = RestrictedIntoEdges<Ts::IntoEdges, F>;
+
+    fn into_transitions(
+        self,
+    ) -> Parts<Self::Alphabet, Self::IntoStates, Self::IntoEdges, Self::Initial> {
+        let Parts {
+            alphabet,
+            states,
+            edges,
+            initial,
+        } = self.ts.into_transitions();
+        let filter = Arc::new(self.filter);
+        Parts {
+            alphabet,
+            states: RestrictedIntoStates {
+                it: states,
+                filter: filter.clone(),
+            },
+            edges: RestrictedIntoEdges { it: edges, filter },
+            initial,
+        }
     }
 }
 

@@ -21,6 +21,10 @@ use crate::{
     alphabet::{Alphabet, CharAlphabet, Matcher},
     math,
 };
+use crate::representation::{
+    FromTransitions, IntoTransitions, Parts, Renumbering, sprout_from_parts,
+};
+use crate::ts::IdType;
 use linked_edge::{LinkedEdge, NONE};
 use tracing::{trace, warn};
 
@@ -1233,5 +1237,120 @@ mod tests {
         assert_eq!(size_of::<LinkedEdge<(), ()>>(), 24);
         assert_eq!(size_of::<LinkedEdge<char, ()>>(), 28);
         assert_eq!(size_of::<LinkedEdge<char, u32>>(), 32);
+    }
+}
+
+/// Iterator over the states of a [`LinkedTs`] that is consumed, skipping removed states.
+pub struct LinkedIntoStates<Q> {
+    states: std::iter::Enumerate<std::vec::IntoIter<LinkedState<Q>>>,
+}
+
+impl<Q> Iterator for LinkedIntoStates<Q> {
+    type Item = (DefaultIdType, Q);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.states.find_map(|(i, state)| match state {
+            LinkedState::Occupied(color, _, _) => Some((i as DefaultIdType, color)),
+            LinkedState::Vacant => None,
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, self.states.size_hint().1)
+    }
+}
+
+/// Iterator over the edges of a [`LinkedTs`] that is consumed, in the order of their ids and
+/// skipping removed edges.
+pub struct LinkedIntoEdges<E, C> {
+    edges: std::vec::IntoIter<LinkedEdge<E, C>>,
+}
+
+impl<E, C> Iterator for LinkedIntoEdges<E, C> {
+    type Item = (DefaultIdType, E, C, DefaultIdType);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.edges
+            .find(LinkedEdge::is_live)
+            .map(|e| (e.source, e.expression, e.color, e.target))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, self.edges.size_hint().1)
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color> IntoTransitions for LinkedTs<A, Q, C> {
+    type Initial = ();
+    type IntoStates = LinkedIntoStates<Q>;
+    type IntoEdges = LinkedIntoEdges<A::Expression, C>;
+
+    fn into_transitions(
+        self,
+    ) -> Parts<A, Self::IntoStates, Self::IntoEdges, ()> {
+        Parts {
+            alphabet: self.alphabet,
+            states: LinkedIntoStates {
+                states: self.states.into_iter().enumerate(),
+            },
+            edges: LinkedIntoEdges {
+                edges: self.edges.into_iter(),
+            },
+            initial: (),
+        }
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color> IntoTransitions for Det<LinkedTs<A, Q, C>> {
+    type Initial = ();
+    type IntoStates = LinkedIntoStates<Q>;
+    type IntoEdges = LinkedIntoEdges<A::Expression, C>;
+
+    fn into_transitions(
+        self,
+    ) -> Parts<A, Self::IntoStates, Self::IntoEdges, ()> {
+        self.0.into_transitions()
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I, Init>
+    for LinkedTs<A, Q, C>
+{
+    fn from_transitions<S, E>(parts: Parts<A, S, E, Init>) -> Self
+    where
+        S: Iterator<Item = (I, Q)>,
+        E: Iterator<Item = (I, A::Expression, C, I)>,
+    {
+        let Parts {
+            alphabet,
+            states,
+            edges,
+            ..
+        } = parts;
+        let mut out = LinkedTs::with_capacity(alphabet, edges.size_hint().0);
+        let mut numbering = Renumbering::new();
+        for (q, color) in states {
+            numbering.push(q);
+            out.add_state(color);
+        }
+        for (p, expression, color, r) in edges {
+            out.insert_edge(numbering.get(p), expression, color, numbering.get(r));
+        }
+        out
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I, Init>
+    for Det<LinkedTs<A, Q, C>>
+{
+    /// Edges that overlap with an earlier edge replace it, see [`Sproutable::add_edge`].
+    fn from_transitions<S, E>(parts: Parts<A, S, E, Init>) -> Self
+    where
+        S: Iterator<Item = (I, Q)>,
+        E: Iterator<Item = (I, A::Expression, C, I)>,
+    {
+        sprout_from_parts(parts)
     }
 }

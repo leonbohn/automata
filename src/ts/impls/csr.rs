@@ -1,11 +1,13 @@
 use std::borrow::Cow;
 
+use super::dense::TableIntoEdges;
+use crate::representation::{FromTransitions, IntoTransitions, Parts, Renumbering};
 use crate::{
     Color, TransitionSystem, Void,
     alphabet::{CharAlphabet, IndexedAlphabet},
     math,
     ts::{
-        DefaultIdType, Deterministic, EdgeId, EdgeOf, EdgeRef, StateIndex, States, SymbolOf,
+        DefaultIdType, Deterministic, EdgeId, IdType, EdgeOf, EdgeRef, StateIndex, States, SymbolOf,
         predecessors::PredecessorIterable,
     },
 };
@@ -435,5 +437,90 @@ mod tests {
 
         linked.add_edge((q0, 'a', Void, q0));
         assert!(<Csr as Storage<_>>::try_from_linked(linked).is_err());
+    }
+}
+
+/// Iterator over the states of a [`CsrTs`] that is consumed.
+pub struct CsrIntoStates<Q> {
+    states: std::iter::Enumerate<std::vec::IntoIter<Q>>,
+}
+
+impl<Q> Iterator for CsrIntoStates<Q> {
+    type Item = (DefaultIdType, Q);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.states.next().map(|(i, c)| (i as DefaultIdType, c))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.states.size_hint()
+    }
+}
+
+impl<A: IndexedAlphabet, Q: Color, C: Color> IntoTransitions for CsrTs<A, Q, C> {
+    type Initial = ();
+    type IntoStates = CsrIntoStates<Q>;
+    type IntoEdges = TableIntoEdges<A, C>;
+
+    fn into_transitions(self) -> Parts<A, Self::IntoStates, Self::IntoEdges, ()> {
+        Parts {
+            edges: TableIntoEdges::new(self.alphabet.clone(), self.targets, self.colors),
+            states: CsrIntoStates {
+                states: self.states.into_iter().enumerate(),
+            },
+            alphabet: self.alphabet,
+            initial: (),
+        }
+    }
+}
+
+impl<A: IndexedAlphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I, Init>
+    for CsrTs<A, Q, C>
+{
+    /// Edges that leave the same state on the same symbol replace each other.
+    ///
+    /// # Panics
+    /// Panics if there are too many states or edge slots for 32 bit ids.
+    fn from_transitions<S, E>(parts: Parts<A, S, E, Init>) -> Self
+    where
+        S: Iterator<Item = (I, Q)>,
+        E: Iterator<Item = (I, A::Expression, C, I)>,
+    {
+        let Parts {
+            alphabet,
+            states: colored,
+            edges,
+            ..
+        } = parts;
+        let k = alphabet.size();
+        let mut numbering = Renumbering::new();
+        let mut states = Vec::with_capacity(colored.size_hint().0);
+        for (q, color) in colored {
+            numbering.push(q);
+            states.push(color);
+        }
+        let n = states.len();
+        DefaultIdType::try_from(n * k)
+            .ok()
+            .filter(|slots| *slots != NONE)
+            .expect("too many edge slots for 32 bit ids");
+
+        let mut targets = vec![NONE; n * k];
+        let mut colors = Vec::new();
+        colors.resize_with(n * k, || None);
+        for (p, expression, color, r) in edges {
+            let slot = numbering.get(p) as usize * k + alphabet.expression_to_index(&expression);
+            targets[slot] = numbering.get(r);
+            colors[slot] = Some(color);
+        }
+        let incoming = ReverseCsr::build(&targets, n);
+        Self {
+            alphabet,
+            states,
+            targets,
+            colors,
+            incoming,
+        }
     }
 }
