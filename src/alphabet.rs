@@ -67,8 +67,19 @@ pub trait Alphabet: Clone + Debug {
     /// The type of expressions in this alphabet.
     type Expression: Expression<S = Self::Symbol>;
 
+    /// Creates an expression from a single symbol, or returns `None` if the symbol does not
+    /// belong to this alphabet.
+    fn try_make_expression(&self, symbol: Self::Symbol) -> Option<Self::Expression>;
+
     /// Creates an expression from a single symbol.
-    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression;
+    ///
+    /// # Panics
+    /// Panics if the symbol does not belong to this alphabet. Use
+    /// [`Self::try_make_expression`] for symbols that are not known to be valid.
+    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
+        self.try_make_expression(symbol)
+            .expect("symbol does not belong to the alphabet")
+    }
 
     /// Returns a map from each symbol in the alphabet to the corresponding expression.
     fn expression_map(&self) -> std::collections::BTreeMap<Self::Symbol, Self::Expression> {
@@ -167,8 +178,8 @@ impl<A: Alphabet> Alphabet for &A {
     fn universe(&self) -> Self::Universe<'_> {
         A::universe(self)
     }
-    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
-        A::make_expression(self, symbol)
+    fn try_make_expression(&self, symbol: Self::Symbol) -> Option<Self::Expression> {
+        A::try_make_expression(self, symbol)
     }
     fn search_edge<X>(
         map: &std::collections::BTreeMap<Self::Expression, X>,

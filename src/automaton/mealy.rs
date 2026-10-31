@@ -52,7 +52,12 @@ where
         EdgeColor<Self>: Clone + Hash + Eq,
     {
         self.reachable_state_indices_from(self.initial)
-            .flat_map(|o| self.edges_from(o).unwrap().map(|e| e.color().clone()))
+            .flat_map(|o| {
+                self.edges_from(o)
+                    .into_iter()
+                    .flatten()
+                    .map(|e| e.color().clone())
+            })
             .unique()
     }
 
@@ -75,7 +80,7 @@ where
         for rep in prod.minimal_representatives_iter_from(ProductIndex(self.initial, other.initial))
         {
             let (mut rep, ProductIndex(l, r)) = rep.decompose();
-            'edges: for edge in self.edges_from(l).unwrap() {
+            'edges: for edge in self.edges_from(l).into_iter().flatten() {
                 let Some(sym) = edge.expression().symbols().next() else {
                     continue 'edges;
                 };
@@ -120,6 +125,15 @@ mod tests {
     use crate::Void;
     use crate::automaton::MealyMachine;
     use crate::ts::Builder;
+
+    #[test]
+    fn empty_word_has_no_output() {
+        let mm: MealyMachine = Builder::without_state_colors()
+            .with_transitions([(0, 'a', 1, 0)])
+            .into_mealy(0);
+        assert_eq!(mm.transform(""), None);
+        assert_eq!(mm.transform("aa"), Some(1));
+    }
 
     #[test]
     fn mealy_equivalence() {

@@ -261,9 +261,14 @@ pub trait Shrinkable: States {
     /// ts.add_edge((q1, 'a', q1));
     ///
     /// assert_eq!(ts.trim_from(q0), vec![(q2, false)]);
+    /// // a state that does not exist reaches nothing and nothing is removed
+    /// assert_eq!(ts.trim_from(17), vec![]);
     /// ```
     fn trim_from(&mut self, source: StateIndex<Self>) -> Vec<(StateIndex<Self>, StateColor<Self>)> {
-        assert!(self.contains_state(source));
+        if !self.contains_state(source) {
+            // nothing is reachable from a state that does not exist, keep the system as it is
+            return Vec::new();
+        }
         let reachable = self
             .reachable_state_indices_from(source)
             .collect::<Vec<_>>();

@@ -116,19 +116,17 @@ pub trait Dottable: States {
         });
 
         let transitions = self.states().flat_map(|q| {
-            self.edges_from(q)
-                .expect("edges_from may not return none for state that exists")
-                .map(move |t| {
-                    format!(
-                        "{} -> {} [{}]",
-                        sanitize_dot_ident(&self.dot_state_ident(q)),
-                        sanitize_dot_ident(&self.dot_state_ident(t.target())),
-                        self.dot_transition_attributes(t)
-                            .into_iter()
-                            .map(|attr| attr.to_string())
-                            .join(", ")
-                    )
-                })
+            self.edges_from(q).into_iter().flatten().map(move |t| {
+                format!(
+                    "{} -> {} [{}]",
+                    sanitize_dot_ident(&self.dot_state_ident(q)),
+                    sanitize_dot_ident(&self.dot_state_ident(t.target())),
+                    self.dot_transition_attributes(t)
+                        .into_iter()
+                        .map(|attr| attr.to_string())
+                        .join(", ")
+                )
+            })
         });
 
         let mut lines = header
@@ -233,7 +231,7 @@ fn sanitize_dot_ident(name: &str) -> String {
             ':' => Some('_'),
             ',' => Some('_'),
             w if w.is_whitespace() => None,
-            u => panic!("unexpected symbol {u} in identifier \"{name}\""),
+            _ => Some('_'),
         })
         .join("")
 }

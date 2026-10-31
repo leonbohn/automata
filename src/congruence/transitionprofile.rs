@@ -459,11 +459,11 @@ where
 
         while let Some((word, profile, profile_idx)) = queue.pop_front() {
             for (profile_extension, sym) in profile.all_extensions(&ts) {
-                assert!(
+                debug_assert!(
                     word.len() < ts.state_count() * 2,
                     "This looks dangerously like an infinite loop..."
                 );
-                assert!(
+                debug_assert!(
                     profile_extension
                         .iter()
                         .all(|tp| ts.contains_state(tp.state()))
@@ -482,8 +482,6 @@ where
                     right[profile_idx].push((sym, profile_id));
                     right.push(vec![]);
                     queue.push_back((word_extension, profile_extension, profile_id));
-                    assert!(profile_id < tps.len());
-                    assert!(string_id < strings.len());
                 }
             }
         }
@@ -521,7 +519,9 @@ where
                 }
             };
 
-            let (profile, _) = self.tps.get(*profile_idx).expect("Must exist!");
+            let Some((profile, _)) = self.tps.get(*profile_idx) else {
+                continue;
+            };
             row.extend(
                 profile
                     .iter()

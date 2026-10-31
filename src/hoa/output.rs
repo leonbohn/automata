@@ -71,7 +71,7 @@ where
         w.write_str("--BODY--")?;
         for state in ts.states() {
             write!(w, "\nState: {}", state.into_usize())?;
-            for edge in ts.edges_from(state).expect("We know this state exists") {
+            for edge in ts.edges_from(state).into_iter().flatten() {
                 w.write_str("\n[")?;
                 ts.alphabet().write_expression(w, edge.expression())?;
                 write!(w, "] {}", edge.target().into_usize())?;

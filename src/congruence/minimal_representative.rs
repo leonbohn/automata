@@ -161,6 +161,9 @@ impl<T: TransitionSystem> LazyMinimalRepresentatives<T> {
 
     /// Gets access to the underlying minimal representatives. If the cache has not been
     /// initialized yet, this will panic.
+    ///
+    /// # Panics
+    /// Panics if the cache has not been initialized, see [`Self::ensure`].
     pub fn get(&self) -> &BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>> {
         self.0.get().expect("Cache not initialized")
     }

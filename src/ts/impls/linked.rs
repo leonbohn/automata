@@ -414,6 +414,9 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
     /// - tombstones are in no list and states that are vacant have no edges,
     /// - every live edge is in the out-list of its source and in the in-list of its target,
     /// - the number of live edges is correct.
+    ///
+    /// # Panics
+    /// Panics if one of the invariants is violated.
     pub fn check_consistency(&self) {
         let live = |i: u32| {
             assert!(
@@ -536,6 +539,9 @@ impl<A: Alphabet, Q: Color, C: Color> Det<LinkedTs<A, Q, C>> {
 
     /// Checks the invariants of the data structure and that the system is deterministic, and
     /// panics if one is violated, see [`LinkedTs::check_consistency`].
+    ///
+    /// # Panics
+    /// Panics if the system is nondeterministic or an invariant is violated.
     pub fn check_consistency(&self) {
         self.0.check_consistency();
         assert!(

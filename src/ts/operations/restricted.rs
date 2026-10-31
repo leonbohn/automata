@@ -227,6 +227,8 @@ impl<Ts: TransitionSystem + Pointed, F> Pointed for RestrictByStateIndex<Ts, F>
 where
     F: StateIndexFilter<Ts::StateIndex>,
 {
+    /// # Panics
+    /// Panics if the filter excludes the initial state of the underlying system.
     fn initial(&self) -> Self::StateIndex {
         let initial = self.ts.initial();
         assert!(

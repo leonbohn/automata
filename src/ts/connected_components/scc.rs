@@ -66,6 +66,10 @@ impl<Ts: TransitionSystem> std::hash::Hash for Scc<'_, Ts> {
 
 impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     /// Creates a new strongly connected component from a transition system and some state indices.
+    ///
+    /// # Panics
+    /// Panics if `indices` is empty. The indices are not checked to be states of `ts` and to be
+    /// strongly connected, see [`Self::state_colors`].
     pub fn new<I: IntoIterator<Item = Ts::StateIndex>>(ts: &'a Ts, indices: I) -> Self {
         let mut states: Vec<_> = indices.into_iter().collect();
         states.sort_unstable();
@@ -100,6 +104,11 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     }
 
     /// Returns an iterator over the state colors of the states in the SCC.
+    ///
+    /// # Panics
+    /// The iterator panics if the SCC contains an index that is not a state of the transition
+    /// system. This cannot happen for an SCC from a decomposition, only for one built by
+    /// [`Self::new`] from bogus indices.
     pub fn state_colors(&self) -> impl Iterator<Item = Ts::StateColor> + '_ {
         self.iter().map(|q| {
             self.ts
@@ -190,9 +199,12 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
 
     /// Attempts to compute a maximal word (i.e. a word visiting all states in the scc). If such a
     /// word exists, it is returned, otherwise the function returns `None`.
-    /// This ensures that the word ends back in the state that it started from.
+    /// This ensures that the word ends back in the state that it started from. Also returns
+    /// `None` if `from` is not a state of the SCC.
     pub fn maximal_loop_from(&self, from: Ts::StateIndex) -> Option<Vec<SymbolOf<Ts>>> {
-        assert!(self.contains(&from));
+        if !self.contains(&from) {
+            return None;
+        }
         let ts = self.ts;
 
         let mut queue = BTreeMap::default();
@@ -204,10 +216,9 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
                     .insert((a, edge.target()));
             }
         }
-        if queue.is_empty() {
+        if !queue.contains_key(&from) {
             return None;
         }
-        assert!(queue.contains_key(&from));
 
         let mut current = from;
         let mut word = Vec::new();

@@ -28,7 +28,7 @@ pub trait Observer<T: TransitionSystem>: Sized {
     /// directly follows the part observed by `self`. A run on an infinite word observes each pass
     /// through the cycle of the word with its own observer and merges those of the loop.
     fn merge(&mut self, later: Self);
-    /// Creates an observer for a run that starts in `state`.
+    /// Creates an observer for a run that starts in `state`, which must be a state of `ts`.
     fn begin(ts: &T, state: StateIndex<T>) -> Self;
     /// Observes a transition on `sym` taken from `state` and returns the state that is reached, or
     /// `None` if there is no such transition (the run escapes the transition system).
@@ -46,7 +46,7 @@ pub struct NoObserver;
 /// Observes the state that is reached.
 #[derive(Debug, Clone, Copy)]
 pub struct ReachedState<Idx>(Idx);
-/// Observes the color of the last edge that was taken.
+/// Observes the color of the last edge that was taken, which is `None` if no edge was taken.
 #[derive(Debug, Clone)]
 pub struct ReachedEdgeColor<T: TransitionSystem>(Option<EdgeColor<T>>);
 /// Observes the color of the state that is reached.
@@ -212,6 +212,10 @@ impl<'ts, T: Deterministic, W: Word<Symbol = SymbolOf<T>>> Run<'ts, T, W> {
     /// Executes the run. It either completes, with what the observer `O` has collected (for
     /// an infinite word that is the cycle of the run), or it escapes the transition system on a
     /// symbol for which no transition exists.
+    ///
+    /// # Panics
+    /// Panics if the run starts in a state that does not exist and the observer looks at the
+    /// state. [`Self::observe`] has no such precondition.
     pub fn evaluate<O: Observer<T>>(self) -> RunOutput<W, O::Current>
     where
         W::Kind: RunKind<T, W>,
@@ -265,14 +269,11 @@ impl<T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>> Run<'_, T, W> {
     pub fn reached_state_color(self) -> Option<StateColor<T>> {
         self.observe::<ReachedStateColor<T>>()
     }
-    /// Returns the color of the last edge that is taken, or `None` if the run escapes.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the word is empty, as there is no such edge then.
+    /// Returns the color of the last edge that is taken, or `None` if the run escapes or the
+    /// word is empty, as no edge is taken then.
     #[inline]
     pub fn last_edge_color(self) -> Option<EdgeColor<T>> {
-        self.observe::<ReachedEdgeColor<T>>()
+        self.observe::<ReachedEdgeColor<T>>().flatten()
     }
 }
 
@@ -319,7 +320,11 @@ impl<W: Word> EscapePrefix<W> {
         self.len() == 0
     }
     /// Sets the length of the prefix, which includes the escape symbol.
+    ///
+    /// # Panics
+    /// Panics if `len` is zero, as the escape symbol is part of the prefix.
     pub fn with_length(self, len: usize) -> Self {
+        assert!(len > 0, "the prefix includes the escape symbol");
         Self {
             word: self.word,
             shortest_escaping_length: len,
@@ -334,8 +339,14 @@ impl<W: Word> EscapePrefix<W> {
     }
 
     /// Returns the symbol on which the transition system is left.
+    ///
+    /// # Panics
+    /// Panics if the word is shorter than the prefix, which can only happen if the word was
+    /// replaced with [`Self::with_word`] or the length changed with [`Self::with_length`].
     pub fn escape_symbol(&self) -> W::Symbol {
-        self.word.nth(self.shortest_escaping_length - 1).unwrap()
+        self.word
+            .nth(self.shortest_escaping_length - 1)
+            .expect("the word contains the escape symbol")
     }
 }
 
@@ -542,10 +553,10 @@ mod impls {
         fn merge(&mut self, later: Self) {
             self.0 = later.0.or(self.0.take());
         }
-        type Current = EdgeColor<T>;
+        type Current = Option<EdgeColor<T>>;
         #[inline(always)]
         fn into_current(self) -> Self::Current {
-            self.0.unwrap()
+            self.0
         }
         #[inline(always)]
         fn begin(_ts: &T, _state: StateIndex<T>) -> Self {

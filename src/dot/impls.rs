@@ -42,7 +42,7 @@ impl<T: States<StateColor = bool>> DotStyle<T> for ReachabilityCondition {
     }
 
     fn dot_state_attributes(&self, ts: &T, q: StateIndex<T>) -> Vec<DotStateAttribute> {
-        let shape = if *ts.state_color(q).unwrap() {
+        let shape = if ts.state_color(q).is_some_and(|accepting| *accepting) {
             "doublecircle"
         } else {
             "circle"
@@ -126,9 +126,11 @@ where
         idx: Self::StateIndex,
     ) -> impl IntoIterator<Item = DotStateAttribute> {
         vec![DotStateAttribute::Label(format!(
-            "{}|{:?}",
+            "{}|{}",
             self.dot_state_ident(idx),
-            self.state_color(idx).unwrap()
+            self.state_color(idx)
+                .map(|c| format!("{c:?}"))
+                .unwrap_or_default()
         ))]
     }
 }

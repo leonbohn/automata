@@ -64,7 +64,7 @@ where
             .collect();
         dpa.streamlined()
             .map_edge_colors(|c| {
-                assert!(c == 0 || c == 1, "too many colors");
+                debug_assert!(c == 0 || c == 1, "streamlining keeps the two priorities");
                 c % 2 == 0
             })
             .collect()

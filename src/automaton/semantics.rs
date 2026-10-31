@@ -90,10 +90,11 @@ impl<T: Deterministic, W: FiniteWord<Symbol = SymbolOf<T>>> Semantics<T, W> for 
         initial: StateIndex<T>,
         word: W,
     ) -> Option<<Self::Observer as Observer<T>>::Current> {
-        observe_finite::<T, W, Self::Observer>(ts, initial, word)
+        // the empty word takes no edge and has no output
+        observe_finite::<T, W, Self::Observer>(ts, initial, word).filter(Option::is_some)
     }
     fn evaluate(&self, observed: <Self::Observer as Observer<T>>::Current) -> Self::Output {
-        observed
+        observed.expect("`observe` only returns observations of words that take an edge")
     }
 }
 

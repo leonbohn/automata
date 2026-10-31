@@ -508,9 +508,7 @@ impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
 
     /// Returns the number of symbols of the alphabet, `2^n` for `n` atomic propositions.
     pub fn size(&self) -> usize {
-        2u32.saturating_pow(self.aps() as u32)
-            .try_into()
-            .expect("Cannot fit value into usize")
+        2usize.saturating_pow(self.aps() as u32)
     }
     /// Returns the names of the atomic propositions.
     pub fn apnames(&self) -> &[String] {
@@ -566,7 +564,10 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
 
     type Expression = PropExpression<RawTy>;
 
-    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
+    fn try_make_expression(&self, symbol: Self::Symbol) -> Option<Self::Expression> {
+        if symbol.num_aps as usize != self.aps.len() {
+            return None;
+        }
         let expr = PropExpression {
             bdd: Bdd::from(symbol.as_bdd_valuation()),
             num_aps: symbol.num_aps,
@@ -574,7 +575,7 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
         };
         let mut expressions = self.expressions.lock().unwrap();
         expressions.insert(expr.clone());
-        expr
+        Some(expr)
     }
 
     fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {

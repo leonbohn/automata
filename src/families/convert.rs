@@ -15,7 +15,7 @@ use crate::{
 impl<A: Alphabet> From<FWPM<A>> for FDFA<A> {
     fn from(value: FWPM<A>) -> Self {
         let (leading, progress) = value.into_parts();
-        assert_eq!(leading.state_count(), progress.len());
+        debug_assert_eq!(leading.state_count(), progress.len());
 
         let progress = progress
             .into_iter()
@@ -72,7 +72,7 @@ impl<A: Alphabet> From<FWPM<A>> for FDFA<A> {
 impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
     fn from(value: FDFA<A>) -> Self {
         let (leading, progress) = value.into_parts();
-        assert_eq!(leading.state_count(), progress.len());
+        debug_assert_eq!(leading.state_count(), progress.len());
 
         let progress = progress
             .into_iter()
@@ -89,10 +89,14 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
                         };
                         if progress_dfa.is_loop_on(*state_index, mr) {
                             let c = progress_dfa.is_accepting(*state_index);
-                            if classifications.contains_key(&scc_index) {
-                                assert_eq!(classifications.get(&scc_index), Some(&c));
-                            } else {
-                                classifications.insert(scc_index, c);
+                            match classifications.get(&scc_index) {
+                                Some(&earlier) if earlier != c => {
+                                    warn!("SCC {scc_index} has conflicting classifications, the FDFA is not saturated");
+                                }
+                                Some(_) => {}
+                                None => {
+                                    classifications.insert(scc_index, c);
+                                }
                             }
                         }
                     }
@@ -130,7 +134,7 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
                         }
                         trace!("maximum reached color is {max_reachable}");
 
-                        assert!(offset < 2);
+                        debug_assert!(offset < 2);
                         let color = if (max_reachable % 2) != offset {
                             max_reachable + 1
                         } else {

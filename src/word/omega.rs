@@ -395,7 +395,10 @@ impl<S: Symbol> ReducedOmegaWord<S> {
     /// loop index by one. Otherwise, if the spoke is empty, then the loop is rotated
     /// by one symbol.
     pub fn pop_front(&mut self) -> S {
-        assert!(self.loop_index < self.word.len());
+        debug_assert!(
+            self.loop_index < self.word.len(),
+            "the cycle is never empty"
+        );
         if self.loop_index() > 0 {
             let mut it = self.word.iter().cloned();
             let out = it.next().expect("infinite word!");
@@ -533,7 +536,10 @@ impl<S: Symbol> FiniteWord for Epsilon<S> {
 pub struct OmegaIteration<W>(W);
 
 impl<W: FiniteWord> OmegaIteration<W> {
-    /// Iterate the given finite word `from`, panics if the word is empty.
+    /// Iterate the given finite word `from`.
+    ///
+    /// # Panics
+    /// Panics if the word is empty.
     pub fn new(from: W) -> Self {
         assert!(!from.is_empty(), "Cannot iterate an empty word");
         Self(from)

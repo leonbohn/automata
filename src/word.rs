@@ -83,6 +83,9 @@ pub trait Word: Hash + Eq {
     }
 
     /// Removes the first symbol of `self` and returns it together with the remaining suffix.
+    ///
+    /// # Panics
+    /// Panics if `self` is empty.
     fn pop_first(&self) -> (Self::Symbol, skip::Skip<'_, Self>)
     where
         Self: Sized,

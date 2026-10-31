@@ -13,6 +13,9 @@ where
     Self: Alphabet<Expression = <Self as Alphabet>::Symbol>,
 {
     /// Returns the expression that matches exactly the given symbol.
+    ///
+    /// # Panics
+    /// Panics if the symbol does not belong to the alphabet.
     fn express(&self, sym: Self::Symbol) -> &Self::Expression;
     /// Returns the `pos`-th symbol of the alphabet, or `None` if `pos` is out of range.
     fn try_nth(&self, pos: usize) -> Option<Self::Symbol>;
@@ -182,12 +185,8 @@ impl Alphabet for CharAlphabet {
         map.get_key_value(&sym)
     }
 
-    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
-        *self
-            .0
-            .iter()
-            .find(|c| c == &&symbol)
-            .expect("symbol does not exist")
+    fn try_make_expression(&self, symbol: Self::Symbol) -> Option<Self::Expression> {
+        self.0.iter().find(|c| c == &&symbol).copied()
     }
 }
 
@@ -339,12 +338,8 @@ impl<S: Symbol + Matcher<S> + Expression<S = S>, const N: usize> Alphabet for Fi
         self.0.contains(&symbol)
     }
 
-    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
-        *self
-            .0
-            .iter()
-            .find(|c| c == &&symbol)
-            .expect("symbol does not exist")
+    fn try_make_expression(&self, symbol: Self::Symbol) -> Option<Self::Expression> {
+        self.0.iter().find(|c| c == &&symbol).copied()
     }
 }
 
@@ -500,12 +495,8 @@ impl Alphabet for Directional {
         self.0.contains(&symbol)
     }
 
-    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
-        *self
-            .0
-            .iter()
-            .find(|c| c == &&symbol)
-            .expect("symbol does not exist")
+    fn try_make_expression(&self, symbol: Self::Symbol) -> Option<Self::Expression> {
+        self.0.iter().find(|c| c == &&symbol).copied()
     }
 }
 
@@ -515,6 +506,13 @@ mod tests {
     use super::{CharAlphabet, Directional, Fixed};
     use crate::alphabet::IndexedAlphabet;
     use itertools::Itertools;
+
+    #[test]
+    fn make_expression_rejects_foreign_symbols() {
+        let alph = CharAlphabet::from_iter(['a', 'b']);
+        assert_eq!(alph.try_make_expression('a'), Some('a'));
+        assert_eq!(alph.try_make_expression('z'), None);
+    }
 
     #[test]
     fn bialphabet() {

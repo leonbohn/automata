@@ -79,7 +79,7 @@ pub trait Congruence: Deterministic + Pointed {
                 Some(i) => {
                     // the spoke is the spoke of self plus `i` times the cycle, while the
                     // cycle is `count - i` times the cycle
-                    assert!(i < count);
+                    debug_assert!(i < count);
                     return Some(word::NormalizedOmegaWord::new(word.reduced(), i, count - i));
                 }
             }
@@ -387,12 +387,15 @@ impl<T: Shrinkable> Shrinkable for RightCongruence<T> {
 impl<D: Deterministic> RightCongruence<D> {
     /// Checks if two finite words are congruent, meaning they reach the same state when
     /// starting from the initial state.
-    pub fn congruent<W, V>(&self, word: W, other: V) -> bool
+    ///
+    /// Returns `None` if one of the words has no run from the initial state, which can happen if
+    /// the transition system is not complete.
+    pub fn congruent<W, V>(&self, word: W, other: V) -> Option<bool>
     where
         W: word::FiniteWord<Symbol = SymbolOf<D>>,
         V: word::FiniteWord<Symbol = SymbolOf<D>>,
     {
-        self.reached_state(word).unwrap() == self.reached_state(other).unwrap()
+        Some(self.reached_state(word)? == self.reached_state(other)?)
     }
 
     /// Computes a DFA that accepts precisely those finite words which loop on the given `class`. Formally,

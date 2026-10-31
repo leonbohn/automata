@@ -116,6 +116,9 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
     /// - a slot has a color exactly if it has a target,
     /// - the source and the target of every edge are live states,
     /// - if the incoming edges have been collected, they are those that lead to each state.
+    ///
+    /// # Panics
+    /// Panics if one of the invariants is violated.
     pub fn check_consistency(&self) {
         let k = self.alphabet.size();
         let n = self.states.len();

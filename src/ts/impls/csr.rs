@@ -120,6 +120,9 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
     /// Checks the invariants of the data structure and panics if one is violated: the sizes of
     /// the vectors, that a slot has a color exactly if it has a target, that all targets exist,
     /// and that the incoming slots of every state are those that lead to it, in increasing order.
+    ///
+    /// # Panics
+    /// Panics if one of the invariants is violated.
     pub fn check_consistency(&self) {
         let k = self.alphabet.size();
         let n = self.states.len();

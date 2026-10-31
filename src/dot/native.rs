@@ -7,7 +7,9 @@ pub(super) fn dot_to_svg(dot: &str) -> Result<String, RenderError> {
     tracing::trace!("rendering DOT representation\n{}", dot);
 
     let mut parser = layout::gv::parser::DotParser::new(dot);
-    let graph = parser.process().map_err(RenderError::RenderToSvgError)?;
+    let graph = parser
+        .process()
+        .map_err(|e| RenderError::RenderToSvgError(e.into()))?;
 
     let mut builder = layout::gv::GraphBuilder::new();
     builder.visit_graph(&graph);
@@ -38,7 +40,7 @@ pub(super) fn svg_to_png(svg: &str) -> Result<Vec<u8>, RenderError> {
 
     pixmap
         .encode_png()
-        .map_err(|e| RenderError::PngEncodingError(format!("{:?}", e)))
+        .map_err(|e| RenderError::PngEncodingError(Box::new(e)))
 }
 
 #[cfg(test)]

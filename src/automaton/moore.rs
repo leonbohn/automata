@@ -92,11 +92,7 @@ where
         StateColor<Self>: Color + Eq + std::hash::Hash,
     {
         self.reachable_state_indices_from(self.initial)
-            .map(|o| {
-                self.state_color(o)
-                    .expect("We know it is reachable and it must be colored")
-                    .into_owned()
-            })
+            .filter_map(|o| self.state_color(o).map(|c| c.into_owned()))
             .unique()
             .collect()
     }
@@ -124,7 +120,9 @@ where
         let prod = self.ts_product(other);
         for mr in prod.minimal_representatives_iter_from(ProductIndex(self.initial, other_initial))
         {
-            let colors = prod.state_color(mr.state_index()).unwrap();
+            let Some(colors) = prod.state_color(mr.state_index()) else {
+                continue;
+            };
             let (c, d) = &*colors;
             if c != d {
                 return Some(mr.decompose().0);

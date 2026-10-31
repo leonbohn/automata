@@ -94,19 +94,19 @@ pub trait Deterministic: TransitionSystem {
     }
 
     /// Returns the color of an edge starting in the given `state` and labeled with the given
-    /// `expression`, if it exists. Otherwise, `None` is returned.
+    /// `expression`, if it exists. Otherwise, `None` is returned. This includes expressions
+    /// that match no symbol or more than one symbol.
     fn edge_color(
         &self,
         state: StateIndex<Self>,
         expression: &EdgeExpression<Self>,
     ) -> Option<EdgeColor<Self>> {
         let mut symbols = expression.symbols();
-        let sym = symbols.next().unwrap();
-        assert_eq!(
-            symbols.next(),
-            None,
-            "There are multiple symbols for this expression"
-        );
+        let sym = symbols.next()?;
+        if symbols.next().is_some() {
+            // the expression stands for several transitions, which may have different colors
+            return None;
+        }
         Some(self.edge(state, sym)?.color().clone())
     }
 
@@ -200,15 +200,10 @@ pub trait Deterministic: TransitionSystem {
                 .chain(self.alphabet().universe().map(|s| format!("{:?}", s))),
         );
         for id in states.into_iter().sorted() {
-            let mut row = vec![
-                state_decorator(
-                    id,
-                    self.state_color(id)
-                        .expect("Every state should be colored!")
-                        .into_owned(),
-                )
-                .to_string(),
-            ];
+            let Some(color) = self.state_color(id) else {
+                continue;
+            };
+            let mut row = vec![state_decorator(id, color.into_owned()).to_string()];
             for sym in self.alphabet().universe() {
                 if let Some(edge) = self.edge(id, sym) {
                     row.push(edge_decorator(edge));
