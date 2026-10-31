@@ -508,9 +508,7 @@ impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
 
     /// Returns the number of symbols of the alphabet, `2^n` for `n` atomic propositions.
     pub fn size(&self) -> usize {
-        2u32.saturating_pow(self.aps() as u32)
-            .try_into()
-            .expect("Cannot fit value into usize")
+        2usize.saturating_pow(self.aps() as u32)
     }
     /// Returns the names of the atomic propositions.
     pub fn apnames(&self) -> &[String] {

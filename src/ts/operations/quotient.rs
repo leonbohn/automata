@@ -63,6 +63,8 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
     }
 
     /// Indexes into the underlying partition and tries to get a representative for the indexed class.
+    ///
+    /// # Panics
     /// Panics if the class does not exist or is empty.
     pub fn unwrap_class_representative(&self, id: usize) -> Ts::StateIndex {
         *self

@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Breaking:** `Automaton::congruent` and `RightCongruence::congruent` return `Option<bool>`, `None` if one of the words has no run. `DFA::separate` returns `None` if one of the states does not exist. `PropAlphabet::size` no longer has a panicking conversion. `# Panics` sections for `is_accepting`, `LazyMinimalRepresentatives::get`, `Quotient::unwrap_class_representative`, `OmegaIteration::new`; invariants that do not depend on the input are `debug_assert`s (#7).
 - **Breaking:** `Path::reached_state_color` returns an `Option`, and `Path::empty_in` and `Path::empty_in_with_capacity` return `None` for a state that is not colored in the system; `Path::extend_in` no longer panics (and leaves the path unchanged) if the target is not colored. `Scc::maximal_loop_from` returns `None` for a state outside the SCC. `# Panics` sections for `Scc::new`, `Scc::state_colors`, `SccDecomposition::{first, singleton_nontrivial}`, `Path::extend_with`, `EscapePrefix::{with_length, escape_symbol}` (#7).
 - **Breaking:** `Alphabet::make_expression` is a provided method on top of the new required `Alphabet::try_make_expression`, which returns `None` for a symbol outside the alphabet (#7).
 - **Breaking:** `Color::reduce` returns `None` for an empty iterator instead of panicking (#7).

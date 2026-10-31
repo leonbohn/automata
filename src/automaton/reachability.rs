@@ -88,7 +88,10 @@ where
     D: Deterministic<StateColor = bool> + States,
 {
     /// Returns true if and only if the given state is accepting, i.e.
-    /// colored with `true`. Panics if no state with the given index exists.
+    /// colored with `true`.
+    ///
+    /// # Panics
+    /// Panics if no state with the given index exists.
     pub fn is_accepting(&self, state: StateIndex<Self>) -> bool {
         *self
             .state_color(state)
@@ -141,7 +144,8 @@ where
 
     /// Attempts to separate the state `left` from the state `right` by finding a word that leads to different colors.
     /// For a [`DFA`], this means that the returned word is in the symmetric difference of
-    /// the languages accepted by the two states.
+    /// the languages accepted by the two states. Also returns `None` if one of the states does
+    /// not exist.
     pub fn separate(
         &self,
         left: StateIndex<Self>,
@@ -156,7 +160,7 @@ where
             .minimal_representatives_iter()
             .find_map(|rep| {
                 let ProductIndex(l, r) = rep.state_index();
-                if self.state_color(l).unwrap() != self.state_color(r).unwrap() {
+                if self.state_color(l)? != self.state_color(r)? {
                     Some(rep.into_inner())
                 } else {
                     None

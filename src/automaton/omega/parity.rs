@@ -113,7 +113,7 @@ where
     /// ```
     pub fn is_informative_right_congruent(&self) -> bool {
         self.prefix_partition().iter().all(|c| {
-            assert!(!c.is_empty(), "Should not have empty classes");
+            debug_assert!(!c.is_empty(), "classes are never empty");
             c.len() == 1
         })
     }
@@ -299,7 +299,7 @@ where
     pub fn prefix_partition(&self) -> Partition<D::StateIndex> {
         let states: math::FxIndexSet<_> = self.reachable_state_indices().collect();
         let n = states.len();
-        assert_eq!(states.get_index(0), Some(&self.initial()));
+        debug_assert_eq!(states.get_index(0), Some(&self.initial()));
         let id = |ProductIndex(p, q): ProductIndex<_, _>| {
             states.get_index_of(&p).expect("reachable") * n
                 + states.get_index_of(&q).expect("reachable")
@@ -392,7 +392,7 @@ where
     /// Returns an iterator over all colors that appear on edges of `self`.
     pub fn colors(&self) -> impl Iterator<Item = Int> + '_ {
         self.states()
-            .flat_map(|q| self.edges_from(q).unwrap().map(|e| *e.color()))
+            .flat_map(|q| self.edges_from(q).into_iter().flatten().map(|e| *e.color()))
             .unique()
     }
 
@@ -401,6 +401,10 @@ where
     /// "Computing the rabin index of a finite automaton". The procedure that this implementation actually uses
     /// is outlined by Schewe and Ehlers in [Natural Colors of Infinite Words](https://arxiv.org/pdf/2207.11000.pdf)
     /// in Section 4.1, Definition 2.
+    ///
+    /// The `expect`s and assertions in the implementation check invariants of the procedure (for
+    /// example that the edges of the shrinking copy of the system are the ones that were
+    /// collected) and do not depend on the input.
     pub fn normalized(&self) -> DPA<DTS<D::Alphabet, Void, Int>>
     where
         EdgeColor<Self>: Eq + Hash + Clone + Ord,
@@ -752,8 +756,8 @@ mod tests {
         let cong = RightCongruence::from_pointed(dpa.prefix_congruence());
         assert_eq!(cong.state_count(), 2);
         assert_eq!(cong.initial(), cong.reached_state("aa").unwrap());
-        assert!(cong.congruent("", "aa"));
-        assert!(cong.congruent("ab", "baaba"));
+        assert!(cong.congruent("", "aa") == Some(true));
+        assert!(cong.congruent("ab", "baaba") == Some(true));
 
         let dpa = DTS::builder()
             .with_transitions([
