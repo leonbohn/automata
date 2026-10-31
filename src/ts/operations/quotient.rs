@@ -8,14 +8,8 @@ use crate::{
     representation::CollectPointed,
     ts::{Deterministic, EdgeExpression, Pointed, StateIndex, SymbolOf, TransitionSystem},
 };
-use crate::{
-    alphabet::{Alphabet, Matcher},
-    math,
-};
-use itertools::Itertools;
+use crate::{alphabet::Alphabet, math};
 use std::borrow::Cow;
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 
 /// A quotient takes a transition system and merges states which are in the same
 /// congruence class of some [`Partition`]. We assume that the [`Partition`] is
@@ -31,9 +25,23 @@ use std::collections::BTreeSet;
 #[derive(Debug, Clone)]
 pub struct Quotient<Ts: TransitionSystem> {
     ts: Ts,
-    expressions: BTreeMap<SymbolOf<Ts>, EdgeExpression<Ts>>,
+    /// The symbols of the alphabet in ascending order with their expressions.
+    expressions: Vec<(SymbolOf<Ts>, EdgeExpression<Ts>)>,
     partition: Partition<Ts::StateIndex>,
     class_of: math::FxIndexMap<Ts::StateIndex, usize>,
+    /// The edge of each class on each symbol, class-major: the entry of class `c` and the symbol
+    /// at position `i` of `expressions` is `table[c * expressions.len() + i]`. Computed once in
+    /// the constructor.
+    table: Vec<Option<ClassEdge<Ts>>>,
+    /// The state colors of the states in each class.
+    state_colors: Vec<Vec<Ts::StateColor>>,
+}
+
+/// The target class and the edge colors of the states of a class for one symbol.
+#[derive(Debug, Clone)]
+struct ClassEdge<Ts: TransitionSystem> {
+    target: usize,
+    colors: Vec<Ts::EdgeColor>,
 }
 
 impl<Ts: Deterministic + Pointed> Pointed for Quotient<Ts> {
@@ -88,21 +96,57 @@ impl<Ts: TransitionSystem> Quotient<Ts> {
             .erase_edge_colors()
             .collect_right_congruence()
     }
+}
 
-    /// Creates a new quotient of the given transition system by the give [`Partition`].
+impl<Ts: Deterministic> Quotient<Ts> {
+    /// Creates a new quotient of the given transition system by the give [`Partition`]. The edges
+    /// and state colors of all classes are computed here, so that looking them up later does
+    /// not allocate. A class that has different targets on a symbol is not a congruence, in that
+    /// case the target of the first state of the class is used.
     pub fn new(ts: Ts, partition: Partition<Ts::StateIndex>) -> Self {
-        let class_of = partition
+        let class_of: math::FxIndexMap<_, _> = partition
             .iter()
             .enumerate()
             .flat_map(|(i, class)| class.iter().map(move |q| (*q, i)))
             .collect();
+        let mut expressions: Vec<_> = ts
+            .alphabet()
+            .universe()
+            .map(|sym| (sym, ts.alphabet().make_expression(sym)))
+            .collect();
+        expressions.sort_by_key(|(sym, _)| *sym);
+
+        let mut table = Vec::with_capacity(partition.len() * expressions.len());
+        let mut state_colors = Vec::with_capacity(partition.len());
+        for class in partition.iter() {
+            state_colors.push(
+                class
+                    .iter()
+                    .filter_map(|q| ts.state_color(*q).map(Cow::into_owned))
+                    .collect(),
+            );
+            for (sym, _) in &expressions {
+                let mut target = None;
+                let mut colors = Vec::new();
+                for e in class.iter().filter_map(|q| ts.edge(*q, *sym)) {
+                    let Some(&t) = class_of.get(&e.target()) else {
+                        continue;
+                    };
+                    debug_assert!(
+                        target.is_none_or(|u| u == t),
+                        "partition is not a congruence"
+                    );
+                    target.get_or_insert(t);
+                    colors.push(e.color().clone());
+                }
+                table.push(target.map(|target| ClassEdge { target, colors }));
+            }
+        }
         Self {
             class_of,
-            expressions: ts
-                .alphabet()
-                .universe()
-                .map(|sym| (sym, ts.alphabet().make_expression(sym).clone()))
-                .collect(),
+            expressions,
+            table,
+            state_colors,
             ts,
             partition,
         }
@@ -162,10 +206,7 @@ impl<Ts: Deterministic> TransitionSystem for Quotient<Ts> {
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
-        let it = self.class_iter_by_id(state)?;
-        it.map(|o| self.ts.state_color(o).map(Cow::into_owned))
-            .collect::<Option<Vec<_>>>()
-            .map(Cow::Owned)
+        self.state_colors.get(state).map(Cow::Borrowed)
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
@@ -201,55 +242,20 @@ impl<Ts: Deterministic> States for Quotient<Ts> {
 }
 impl<D: Deterministic> Deterministic for Quotient<D> {
     fn edge(&self, origin: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
-        let (states, colors): (BTreeSet<_>, Vec<_>) = self
-            .class_iter_by_id(origin)?
-            .filter_map(|q| {
-                self.ts.edge(q, symbol).map(|tt| {
-                    (
-                        self.find_id_by_state(tt.target()).expect("Unknown state"),
-                        tt.color().clone(),
-                    )
-                })
-            })
-            .unzip();
-
-        match states.len() {
-            0 => None,
-            1 => {
-                let expression = self
-                    .expressions
-                    .iter()
-                    .find_map(|(_, expr)| {
-                        if symbol.matches(expr) {
-                            Some(expr)
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap();
-                Some(EdgeRef::owned(
-                    origin,
-                    expression,
-                    colors,
-                    states.into_iter().next().unwrap(),
-                ))
-            }
-            _ => {
-                let string = format!(
-                    "{{{}}}",
-                    states.iter().map(|idx| idx.to_string()).join(", ")
-                );
-                panic!(
-                    "From {origin}|{} on symbol {:?}, we reach {} while precisely one state should be reached!",
-                    self.class_iter_by_id(origin)
-                        .unwrap()
-                        .map(|c| format!("{c:?}"))
-                        .join(", "),
-                    symbol,
-                    string
-                )
-            }
-        }
+        let i = self
+            .expressions
+            .binary_search_by_key(&symbol, |(sym, _)| *sym)
+            .ok()?;
+        let edge = self
+            .table
+            .get(origin * self.expressions.len() + i)?
+            .as_ref()?;
+        Some(EdgeRef::borrowed(
+            origin,
+            &self.expressions[i].1,
+            &edge.colors,
+            edge.target,
+        ))
     }
 }
 
@@ -271,6 +277,27 @@ mod tests {
             let sym = ['a', 'b'][i % 2];
             assert_eq!(a.successor(q, sym), Some(p));
         }
+    }
+
+    #[test]
+    fn quotient_collects_colors_of_the_class() {
+        use crate::TransitionSystem;
+        let dfa = wiki_dfa();
+        let a = dfa
+            .clone()
+            .quotient(Partition::new([vec![0, 1], vec![5], vec![2, 3, 4]]));
+        for (class, members) in [vec![0, 1], vec![5], vec![2, 3, 4]].into_iter().enumerate() {
+            let expected: Vec<_> = members
+                .iter()
+                .map(|q| *dfa.state_color(*q).unwrap())
+                .collect();
+            assert_eq!(a.state_color(class).unwrap().into_owned(), expected);
+            for sym in ['a', 'b'] {
+                assert_eq!(a.edge(class, sym).unwrap().color().len(), members.len());
+            }
+        }
+        assert!(a.edge(3, 'a').is_none());
+        assert!(a.edge(0, 'z').is_none());
     }
 
     #[test]

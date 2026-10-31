@@ -11,12 +11,11 @@ use crate::ts::States;
 use std::{collections::BTreeSet, time::Instant};
 
 use crate::automaton::{MealyMachine, MooreMachine};
-use crate::representation::CollectPointed;
 use crate::ts::{Deterministic, EdgeColor, StateColor};
+use crate::ts::{ForAlphabet, Sproutable};
 use crate::{Color, math, partition::Partition};
 use crate::{Congruence, TransitionSystem};
-use itertools::Itertools;
-use tracing::{debug, trace};
+use tracing::debug;
 
 /// Predecessor lists for one symbol in compressed form, each entry is a `(source, label)` pair.
 struct Predecessors {
@@ -195,6 +194,57 @@ pub(crate) type MinimizedMealy<D> = MealyMachine<
     DTS<<D as TransitionSystem>::Alphabet, Vec<StateColor<D>>, <D as TransitionSystem>::EdgeColor>,
 >;
 
+/// Builds the transition system of the quotient of `ts` by `partition` directly, without going
+/// through a [`Quotient`](crate::ts::operations::Quotient). The states of the result are the
+/// classes of `partition`, a class has the edges of one of its states (all states of a class
+/// agree on them) and the state color `state_color(colors)` computed from the colors of its
+/// states. Returns the system and the state of the class containing the initial state.
+fn from_partition<D, Q, C>(
+    ts: &D,
+    partition: &Partition<D::StateIndex>,
+    state_color: impl Fn(Vec<StateColor<D>>) -> Q,
+    edge_color: impl Fn(&EdgeColor<D>) -> C,
+) -> (DTS<D::Alphabet, Q, C>, u32)
+where
+    D: Congruence + States,
+    Q: Color,
+    C: Color,
+{
+    let class_of: math::FxIndexMap<D::StateIndex, usize> = partition
+        .iter()
+        .enumerate()
+        .flat_map(|(i, class)| class.iter().map(move |q| (*q, i)))
+        .collect();
+    let mut colors = vec![Vec::new(); partition.len()];
+    for (q, c) in ts.states_with_color() {
+        if let Some(&class) = class_of.get(&q) {
+            colors[class].push(c);
+        }
+    }
+    let mut out = DTS::for_alphabet(ts.alphabet().clone());
+    let ids: Vec<u32> = colors
+        .into_iter()
+        .map(|c| out.add_state(state_color(c)))
+        .collect();
+    for (class, members) in partition.iter().enumerate() {
+        let Some(&rep) = members.iter().next() else {
+            continue;
+        };
+        for e in ts.edges_from(rep).into_iter().flatten() {
+            if let Some(&target) = class_of.get(&e.target()) {
+                out.add_edge((
+                    ids[class],
+                    e.expression().clone(),
+                    edge_color(e.color()),
+                    ids[target],
+                ));
+            }
+        }
+    }
+    let initial = class_of.get(&ts.initial()).map_or(0, |&c| ids[c]);
+    (out, initial)
+}
+
 /// Partition refinement algorithm for deterministic finite automata that have outputs on the edges.
 /// Runs in O(n log n) time, where n is the number of states of the automaton and returns the unique
 /// minimal automaton that is bisimilar to the input.
@@ -204,28 +254,13 @@ where
     EdgeColor<D>: Color + Eq + std::hash::Hash,
 {
     let partition = mealy_greatest_bisimulation(&mm);
-    trace!(
-        "Building quotient with partition {{{}}}",
-        partition
-            .iter()
-            .map(|set| format!("{{{}}}", set.iter().map(|c| format!("{c:?}")).join(", ")))
-            .join(", ")
-    );
-
     let start = Instant::now();
-
-    let out = mm
-        .quotient(partition)
-        .map_edge_colors(|c| {
-            // assert!(c.iter().all_equal());
-            c[0].clone()
-        })
-        .collect_mealy();
+    let (ts, initial) = from_partition(&mm, &partition, |c| c, EdgeColor::<D>::clone);
     debug!(
-        "Collecting into Mealy machine took {} microseconds",
+        "Building the minimal Mealy machine took {} microseconds",
         start.elapsed().as_micros()
     );
-    out
+    MealyMachine::from_parts(ts, initial)
 }
 
 /// Computes the maximal bisimulation for a given Moore machine. This is mainly used for
@@ -290,32 +325,19 @@ where
     StateColor<D>: Color + Eq + std::hash::Hash,
 {
     let partition = moore_greatest_bisimulation(&mm);
-    trace!(
-        "Building quotient with partition {{{}}}",
-        partition
-            .iter()
-            .map(|set| format!("{{{}}}", set.iter().map(|c| format!("{c:?}")).join(", ")))
-            .join(", ")
-    );
-
     let start = Instant::now();
-
-    // The edge colors are irrelevant for a Moore machine. Erasing them before taking the
-    // quotient avoids collecting the edge colors of every class, the quotient then only
-    // carries (zero-sized) `Void` colors that are dropped when collecting.
-    let moore = mm
-        .erase_edge_colors()
-        .quotient(partition)
-        .map_state_colors(|c| {
-            // assert!(c.iter().all_equal());
-            c[0].clone()
-        })
-        .collect_moore();
+    // All states of a class have the same color, so any of them represents the class.
+    let (ts, initial) = from_partition(
+        &mm,
+        &partition,
+        |c| c.into_iter().next().expect("classes are not empty"),
+        |_| Void,
+    );
     debug!(
-        "Collecting into Moore machine took {} microseconds",
+        "Building the minimal Moore machine took {} microseconds",
         start.elapsed().as_micros()
     );
-    moore
+    MooreMachine::from_parts(ts, initial)
 }
 
 #[cfg(test)]

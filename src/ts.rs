@@ -587,7 +587,7 @@ pub trait States: TransitionSystem {
     #[inline(always)]
     fn quotient(self, partition: Partition<Self::StateIndex>) -> operations::Quotient<Self>
     where
-        Self: Sized,
+        Self: Deterministic,
     {
         operations::Quotient::new(self, partition)
     }
