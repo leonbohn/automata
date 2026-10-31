@@ -3,9 +3,9 @@
 mod common;
 
 use automata::alphabet::CharAlphabet;
-use automata::automaton::{DFA, MooreMachine};
+use automata::automaton::{DFA, Disjointness, Emptiness, Equivalence, MooreMachine};
 use automata::representation::IntoTransitions;
-use automata::{DTS, States, TransitionSystem};
+use automata::{DTS, Pointed, States, TransitionSystem};
 use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
 
@@ -80,21 +80,21 @@ fn minimize_moore_with_edge_colors(mm: MooreMachine<DTS<CharAlphabet, bool, u32>
 #[bench::scrambled_100(args = (100), setup = two_scrambled)]
 #[bench::scrambled_200(args = (200), setup = two_scrambled)]
 fn union((a, b): (DFA, DFA)) -> usize {
-    black_box(a.union(&b).state_count())
+    black_box(a.union(&b).reachable_part().state_count())
 }
 
 #[library_benchmark]
 #[bench::scrambled_100(args = (100), setup = two_scrambled)]
 #[bench::scrambled_200(args = (200), setup = two_scrambled)]
 fn intersection((a, b): (DFA, DFA)) -> usize {
-    black_box(a.intersection(&b).state_count())
+    black_box(a.intersection(&b).reachable_part().state_count())
 }
 
 #[library_benchmark]
 #[bench::empty_100(args = (100), setup = with_empty)]
 #[bench::empty_200(args = (200), setup = with_empty)]
 fn intersection_is_empty((a, b): (DFA, DFA)) -> bool {
-    black_box(a.intersection_is_empty(&b))
+    black_box(Disjointness::of(&a).and(&b).holds())
 }
 
 #[library_benchmark]
@@ -120,14 +120,14 @@ fn far(n: usize) -> DFA {
 #[bench::far_1000(args = (1_000), setup = far)]
 #[bench::far_4000(args = (4_000), setup = far)]
 fn give_word(dfa: DFA) -> bool {
-    black_box(dfa.give_word().is_some())
+    black_box(Emptiness::of(&dfa).witness().is_some())
 }
 
 #[library_benchmark]
 #[bench::empty_1000(args = (1_000), setup = empty)]
 #[bench::empty_4000(args = (4_000), setup = empty)]
 fn is_empty_language(dfa: DFA) -> bool {
-    black_box(dfa.is_empty_language())
+    black_box(Emptiness::of(&dfa).holds())
 }
 
 #[library_benchmark]
@@ -138,7 +138,7 @@ fn is_empty_language(dfa: DFA) -> bool {
 #[bench::different_100(args = (100), setup = two_scrambled)]
 #[bench::different_400(args = (400), setup = two_scrambled)]
 fn equivalent((a, b): (DFA, DFA)) -> bool {
-    black_box(a.equivalent(&b))
+    black_box(Equivalence::of(&a).and(&b).holds())
 }
 
 // ---- running words -----------------------------------------------------------------------------

@@ -4,7 +4,7 @@
 mod common;
 
 use automata::alphabet::CharAlphabet;
-use automata::automaton::DPA;
+use automata::automaton::{DPA, Emptiness, Equivalence, Inclusion};
 use automata::hoa::WriteHoa;
 use automata::representation::IntoTransitions;
 use automata::ts::Sccs;
@@ -82,7 +82,7 @@ fn complement_fixtures(dpas: Vec<FixtureDpa>) -> usize {
 #[bench::chain_100(args = (100), setup = chain)]
 #[bench::chain_400(args = (400), setup = chain)]
 fn accepted_word(dpa: DPA) -> bool {
-    black_box(dpa.give_accepted_word().is_some())
+    black_box(Emptiness::of(&dpa).witness().is_some())
 }
 
 #[library_benchmark]
@@ -100,7 +100,7 @@ fn rejected_word(dpa: DPA) -> bool {
 fn witnesses_fixtures(dpas: Vec<FixtureDpa>) -> usize {
     black_box(
         dpas.iter()
-            .filter(|dpa| dpa.give_accepted_word().is_some())
+            .filter(|&dpa| Emptiness::of(dpa).witness().is_some())
             .count()
             + dpas
                 .iter()
@@ -148,7 +148,7 @@ fn with_complement(n: usize) -> (DPA, DPA) {
 #[bench::complement_50(args = (50), setup = with_complement)]
 #[bench::complement_100(args = (100), setup = with_complement)]
 fn language_equivalent((a, b): (DPA, DPA)) -> bool {
-    black_box(a.language_equivalent(&b))
+    black_box(Equivalence::of(&a).and(&b).holds())
 }
 
 #[library_benchmark]
@@ -159,7 +159,7 @@ fn language_equivalent((a, b): (DPA, DPA)) -> bool {
 #[bench::complement_50(args = (50), setup = with_complement)]
 #[bench::complement_100(args = (100), setup = with_complement)]
 fn included_in((a, b): (DPA, DPA)) -> bool {
-    black_box(a.included_in(&b))
+    black_box(Inclusion::of(&a).within(&b).holds())
 }
 
 #[library_benchmark]
@@ -170,7 +170,7 @@ fn included_in((a, b): (DPA, DPA)) -> bool {
 #[bench::complement_50(args = (50), setup = with_complement)]
 #[bench::complement_100(args = (100), setup = with_complement)]
 fn witness_not_subset_of((a, b): (DPA, DPA)) -> bool {
-    black_box(a.witness_not_subset_of(&b).is_some())
+    black_box(Inclusion::of(&a).within(&b).counterexample().is_some())
 }
 
 #[library_benchmark]
@@ -178,7 +178,7 @@ fn witness_not_subset_of((a, b): (DPA, DPA)) -> bool {
 #[bench::complement_50(args = (50), setup = with_complement)]
 #[bench::complement_100(args = (100), setup = with_complement)]
 fn witness_inequivalence((a, b): (DPA, DPA)) -> bool {
-    black_box(a.witness_inequivalence(&b).is_some())
+    black_box(Equivalence::of(&a).and(&b).counterexample().is_some())
 }
 
 // ---- structure ---------------------------------------------------------------------------------

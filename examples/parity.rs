@@ -2,7 +2,11 @@
 //!
 //! Run with `cargo run --example parity`.
 
-use automata::{ts::Builder, upw};
+use automata::{
+    automaton::{Emptiness, Equivalence},
+    ts::Builder,
+    upw,
+};
 
 fn main() {
     // The edges are labeled with priorities, the automaton accepts a word if the smallest
@@ -33,11 +37,17 @@ fn main() {
     for (_, word) in &words {
         assert_ne!(dpa.accepts(word), complement.accepts(word));
     }
-    assert!(dpa.language_equivalent(&complement.clone().complement()));
-    assert!(!dpa.language_equivalent(&complement));
+    assert!(
+        Equivalence::of(&dpa)
+            .and(&complement.clone().complement())
+            .holds()
+    );
+    assert!(!Equivalence::of(&dpa).and(&complement).holds());
 
     // If the language is not empty, we can ask for a word that is accepted.
-    let witness = dpa.give_accepted_word().expect("the language is not empty");
+    let witness = Emptiness::of(&dpa)
+        .witness()
+        .expect("the language is not empty");
     println!("an accepted word: {witness:?}");
     assert!(dpa.accepts(&witness));
 }

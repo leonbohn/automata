@@ -69,7 +69,7 @@ assert!(!zero_mod_three.accepts("ab"));
 Automata can be combined with boolean operations, and compared:
 
 ```rust
-use automata::ts::Builder;
+use automata::{automaton::{Emptiness, Equivalence}, ts::Builder};
 
 fn mod_three(accepting: usize) -> automata::automaton::DFA {
     Builder::without_edge_colors()
@@ -91,12 +91,12 @@ assert!(!zero_or_one.accepts("aa"));
 assert!(zero_or_one.negation().accepts("aa"));
 
 // the two languages are disjoint and different
-assert!(zero.intersection(&one).is_empty_language());
-assert!(!zero.equivalent(&one));
+assert!(Emptiness::of(&zero.intersection(&one)).holds());
+assert!(!Equivalence::of(&zero).and(&one).holds());
 
 // minimization (this DFA is already minimal)
 let minimized = zero.clone().minimize();
-assert!(zero.equivalent(&minimized));
+assert!(Equivalence::of(&zero).and(&minimized).holds());
 ```
 
 Moore and Mealy machines can be minimized as well.
@@ -106,7 +106,7 @@ Moore and Mealy machines can be minimized as well.
 Automata over infinite words read *ultimately periodic words* `u v^ω`, which consist of a finite prefix `u` (the spoke) and a finite loop `v` that is repeated forever. They are written with the `upw!` macro. A word is accepted depending on which edges are taken infinitely often. The deterministic parity automaton (DPA) below labels its edges with priorities and accepts if the smallest priority that is seen infinitely often is even.
 
 ```rust
-use automata::{upw, ts::Builder};
+use automata::{automaton::{Emptiness, Equivalence}, upw, ts::Builder};
 
 let dpa = Builder::without_state_colors()
     // transitions are given as (source, symbol, priority, target)
@@ -126,11 +126,11 @@ assert!(!dpa.accepts(upw!("bb", "a")));
 // DPAs can be complemented and compared
 let complement = dpa.clone().complement();
 assert!(complement.accepts(upw!("bb", "a")));
-assert!(dpa.language_equivalent(&dpa.clone().complement().complement()));
-assert!(!dpa.language_equivalent(&complement));
+assert!(Equivalence::of(&dpa).and(&dpa.clone().complement().complement()).holds());
+assert!(!Equivalence::of(&dpa).and(&complement).holds());
 
 // and we can ask for a word that is accepted
-let word = dpa.give_accepted_word().expect("the language is not empty");
+let word = Emptiness::of(&dpa).witness().expect("the language is not empty");
 assert!(dpa.accepts(&word));
 ```
 

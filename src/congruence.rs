@@ -401,7 +401,7 @@ impl<D: Deterministic> RightCongruence<D> {
     ///
     /// # Example
     /// ```
-    /// use automata::ts::Builder;
+    /// use automata::{automaton::Equivalence, ts::Builder};
     ///
     /// let ts = Builder::without_colors()
     ///     .with_transitions([(0, 'a', 1), (1, 'a', 0), (0, 'b', 0), (1, 'b', 1)])
@@ -410,7 +410,7 @@ impl<D: Deterministic> RightCongruence<D> {
     /// assert!(dfa.accepts("aa"));
     /// assert!(!dfa.accepts("a"));
     /// assert!(dfa.accepts("b"));
-    /// assert!(dfa.equivalent(ts.looping_words(0)));
+    /// assert!(Equivalence::of(&dfa).and(&ts.looping_words(0)).holds());
     /// ```
     pub fn looping_words(&self, idx: StateIndex<Self>) -> DFA<DTS<D::Alphabet, bool, Void>>
     where
