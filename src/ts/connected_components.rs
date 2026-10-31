@@ -200,12 +200,19 @@ impl<'a, Ts: TransitionSystem> SccDecomposition<'a, Ts> {
 
     /// Gives the first [`Scc`] in the decomposition. This must exist as we only allow
     /// non-empty decompositions.
+    ///
+    /// # Panics
+    /// Panics if the decomposition is empty, which cannot happen for a decomposition computed by
+    /// this crate.
     pub fn first(&self) -> &Scc<'a, Ts> {
         assert!(!self.dag.is_empty(), "At least one SCC must exist!");
         &self.dag[0]
     }
 
     /// Tries to find a nontrivial SCC and if it finds one, asserts that it is the only one.
+    ///
+    /// # Panics
+    /// Panics if there is more than one nontrivial SCC.
     pub fn singleton_nontrivial(&self) -> Option<&Scc<'a, Ts>> {
         for i in 0..self.dag.size() {
             if self.dag[i].is_trivial() || self.dag[i].is_transient() {

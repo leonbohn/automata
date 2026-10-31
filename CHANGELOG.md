@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Breaking:** `Path::reached_state_color` returns an `Option`, and `Path::empty_in` and `Path::empty_in_with_capacity` return `None` for a state that is not colored in the system; `Path::extend_in` no longer panics (and leaves the path unchanged) if the target is not colored. `Scc::maximal_loop_from` returns `None` for a state outside the SCC. `# Panics` sections for `Scc::new`, `Scc::state_colors`, `SccDecomposition::{first, singleton_nontrivial}`, `Path::extend_with`, `EscapePrefix::{with_length, escape_symbol}` (#7).
 - **Breaking:** `Alphabet::make_expression` is a provided method on top of the new required `Alphabet::try_make_expression`, which returns `None` for a symbol outside the alphabet (#7).
 - **Breaking:** `Color::reduce` returns `None` for an empty iterator instead of panicking (#7).
 - **Breaking:** `math::FxIndexMap` no longer implements `ProvidesStateColor`, as it panicked for states without an entry. Wrap the map in `DefaultIfMissing` (#7).

@@ -319,7 +319,11 @@ impl<W: Word> EscapePrefix<W> {
         self.len() == 0
     }
     /// Sets the length of the prefix, which includes the escape symbol.
+    ///
+    /// # Panics
+    /// Panics if `len` is zero, as the escape symbol is part of the prefix.
     pub fn with_length(self, len: usize) -> Self {
+        assert!(len > 0, "the prefix includes the escape symbol");
         Self {
             word: self.word,
             shortest_escaping_length: len,
@@ -334,8 +338,14 @@ impl<W: Word> EscapePrefix<W> {
     }
 
     /// Returns the symbol on which the transition system is left.
+    ///
+    /// # Panics
+    /// Panics if the word is shorter than the prefix, which can only happen if the word was
+    /// replaced with [`Self::with_word`] or the length changed with [`Self::with_length`].
     pub fn escape_symbol(&self) -> W::Symbol {
-        self.word.nth(self.shortest_escaping_length - 1).unwrap()
+        self.word
+            .nth(self.shortest_escaping_length - 1)
+            .expect("the word contains the escape symbol")
     }
 }
 

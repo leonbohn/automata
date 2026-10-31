@@ -67,13 +67,10 @@ impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
         self.transitions.len()
     }
 
-    /// Returns the color of the state that is reached by the path.
-    pub fn reached_state_color(&self) -> Q {
-        assert!(!self.state_colors.is_empty());
-        self.state_colors
-            .last()
-            .cloned()
-            .expect("At least one color must exist")
+    /// Returns the color of the state that is reached by the path, or `None` if the path was
+    /// built with [`Self::from_parts`] from an empty list of state colors.
+    pub fn reached_state_color(&self) -> Option<Q> {
+        self.state_colors.last().cloned()
     }
 
     /// Returns the color of the last transition if `self` is viewed as a path in the given `ts`, if it exists.
@@ -92,66 +89,56 @@ impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Path<A, Idx, Q, C> {
         self.state_colors.into_iter()
     }
 
-    /// Returns true if the path is empty/trivial, meaning it consists of only one state.
+    /// Creates a new empty path that starts in the given `state`. Returns `None` if `state` is
+    /// not colored in `ts`, i.e. not a state of `ts`.
     pub fn empty_in<
         D: Deterministic<StateColor = Q, EdgeColor = C, StateIndex = Idx, Alphabet = A>,
     >(
         ts: D,
         state: Idx,
-    ) -> Self {
-        Self {
-            state_colors: vec![
-                ts.state_color(state)
-                    .expect("Origin state must be colored")
-                    .into_owned(),
-            ],
-            end: state,
-            transitions: Vec::new(),
-        }
+    ) -> Option<Self> {
+        Self::empty_in_with_capacity(ts, state, 0)
     }
 
     /// Creates a new empty path that starts in the given `state` and has the given `capacity`.
-    pub fn empty_in_with_capacity<D>(ts: D, state: Idx, capacity: usize) -> Self
+    /// Returns `None` if `state` is not colored in `ts`, i.e. not a state of `ts`.
+    pub fn empty_in_with_capacity<D>(ts: D, state: Idx, capacity: usize) -> Option<Self>
     where
         D: Deterministic<StateColor = Q, EdgeColor = C, StateIndex = Idx, Alphabet = A>,
     {
-        Self {
-            state_colors: vec![
-                ts.state_color(state)
-                    .expect("Origin state must be colored")
-                    .into_owned(),
-            ],
+        Some(Self {
+            state_colors: vec![ts.state_color(state)?.into_owned()],
             end: state,
             transitions: Vec::with_capacity(capacity),
-        }
+        })
     }
 
     /// Attempts to extend the path in the given `ts` by the given `symbol`. If the path can be extended,
-    /// the transition is returned. Otherwise, `None` is returned.
+    /// the transition is returned. Otherwise, `None` is returned and the path is unchanged.
     pub fn extend_in<'a, D>(&mut self, ts: &'a D, symbol: SymbolOf<D>) -> Option<EdgeOf<'a, D>>
     where
         D: Deterministic<StateColor = Q, EdgeColor = C, StateIndex = Idx, Alphabet = A>,
     {
         let transition = ts.edge(self.end, symbol)?;
+        let target_color = ts.state_color(transition.target())?.into_owned();
         self.transitions
             .push((self.end, symbol, transition.color().clone()));
         self.end = transition.target();
-        self.state_colors.push(
-            ts.state_color(self.end)
-                .expect("The state must be colored")
-                .into_owned(),
-        );
+        self.state_colors.push(target_color);
         Some(transition)
     }
 
     /// Extends self with the given `other` path.
+    ///
+    /// # Panics
+    /// Panics if `other` does not start in the state that `self` ends in.
     pub fn extend_with(&mut self, other: Path<A, Idx, Q, C>) {
         assert_eq!(self.reached(), other.origin(), "Start and end must match!");
         self.transitions.extend(other.transitions);
         self.state_colors
             .extend(other.state_colors.into_iter().skip(1));
 
-        assert_eq!(self.state_colors.len() - 1, self.transitions.len());
+        debug_assert_eq!(self.state_colors.len() - 1, self.transitions.len());
         self.end = other.end;
     }
 
