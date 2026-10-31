@@ -57,6 +57,18 @@ fn operations(c: &mut Criterion) {
         })
     });
 
+    group.bench_function("nfa/determinize/nth_from_end_12", |b| {
+        let nts = nts.clone().with_initial(0);
+        b.iter(|| {
+            black_box(
+                automata::ts::operations::Determinize::on(&nts)
+                    .run()
+                    .ts()
+                    .state_count(),
+            )
+        })
+    });
+
     let texts = common::fixture_texts(common::LTL);
     group.bench_function("hoa/parse/ltl", |b| {
         b.iter(|| {
