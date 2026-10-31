@@ -3,7 +3,7 @@
 mod common;
 
 use automata::alphabet::CharAlphabet;
-use automata::automaton::{DFA, Emptiness, Equivalence, MooreMachine};
+use automata::automaton::{DFA, Disjointness, Emptiness, Equivalence, MooreMachine};
 use automata::representation::IntoTransitions;
 use automata::{DTS, Pointed, States, TransitionSystem};
 use gungraun::{Dhat, prelude::*};
@@ -94,7 +94,7 @@ fn intersection((a, b): (DFA, DFA)) -> usize {
 #[bench::empty_100(args = (100), setup = with_empty)]
 #[bench::empty_200(args = (200), setup = with_empty)]
 fn intersection_is_empty((a, b): (DFA, DFA)) -> bool {
-    black_box(Emptiness::of(&a.intersection(&b)).holds())
+    black_box(Disjointness::of(&a).and(&b).holds())
 }
 
 #[library_benchmark]

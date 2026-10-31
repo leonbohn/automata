@@ -18,7 +18,10 @@ mod mealy;
 pub use mealy::{MealyLike, MealyMachine, MealySemantics};
 
 pub mod problems;
-pub use problems::{Emptiness, Equivalence, EquivalenceCheck, Inclusion, InclusionCheck};
+pub use problems::{
+    Disjointness, DisjointnessCheck, Emptiness, Equivalence, EquivalenceCheck, Inclusion,
+    InclusionCheck,
+};
 
 mod reachability;
 pub use reachability::{DFA, ReachabilityCondition};

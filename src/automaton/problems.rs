@@ -21,6 +21,8 @@
 //! run is not taken into account.
 
 use super::{Automaton, DBA, DFA, DPA};
+use crate::alphabet::Expression;
+use crate::ts::States;
 use crate::ts::connected_components::Scc;
 use crate::ts::operations::{Product, ProductIndex};
 use crate::ts::{Deterministic, EdgeOf, Pointed, Sccs, StateIndex, SymbolOf, TransitionSystem};
@@ -90,6 +92,35 @@ impl<'a, A> Equivalence<'a, A> {
 /// A fully stated [`Equivalence`] problem, see [`Equivalence::and`].
 #[derive(Debug, Clone, Copy)]
 pub struct EquivalenceCheck<'a, 'b, A, B> {
+    left: &'a A,
+    right: &'b B,
+}
+
+/// The problem of deciding whether the languages of two automata have no word in common. Created
+/// with [`Disjointness::of`] and completed with [`Disjointness::and`].
+///
+/// Unlike [`Emptiness`] of an intersection, this does not build a product automaton first.
+#[derive(Debug, Clone, Copy)]
+pub struct Disjointness<'a, A>(&'a A);
+
+impl<'a, A> Disjointness<'a, A> {
+    /// Starts the problem for the first automaton.
+    pub fn of(automaton: &'a A) -> Self {
+        Self(automaton)
+    }
+
+    /// Completes the problem with the second automaton.
+    pub fn and<'b, B>(self, other: &'b B) -> DisjointnessCheck<'a, 'b, A, B> {
+        DisjointnessCheck {
+            left: self.0,
+            right: other,
+        }
+    }
+}
+
+/// A fully stated [`Disjointness`] problem, see [`Disjointness::and`].
+#[derive(Debug, Clone, Copy)]
+pub struct DisjointnessCheck<'a, 'b, A, B> {
     left: &'a A,
     right: &'b B,
 }
@@ -172,6 +203,23 @@ where
     }
 }
 
+impl<D, O> DisjointnessCheck<'_, '_, DFA<D>, DFA<O>>
+where
+    D: Deterministic<StateColor = bool>,
+    O: Deterministic<Alphabet = D::Alphabet, StateColor = bool>,
+{
+    /// Returns a length-lexicographically minimal word that is accepted by both automata, or
+    /// `None` if there is none. The search stops at the first such word.
+    pub fn witness(&self) -> Option<Vec<SymbolOf<DFA<D>>>> {
+        product_witness(self.left, self.right, |a, b| a && b)
+    }
+
+    /// Returns true if and only if no word is accepted by both automata.
+    pub fn holds(&self) -> bool {
+        self.witness().is_none()
+    }
+}
+
 /// Finds a length-lexicographically minimal word leading to a reachable pair of states in the
 /// product of `left` and `right` whose colors satisfy `pred`. A missing edge leads to a rejecting
 /// sink, so words that only one of the automata can read are taken into account.
@@ -235,7 +283,7 @@ impl<D: Deterministic<EdgeColor = Int>> Emptiness<'_, DPA<D>> {
     /// A single decomposition into strongly connected components is analysed, instead of one for
     /// each priority.
     pub fn witness(&self) -> Option<ReducedOmegaWord<SymbolOf<DPA<D>>>> {
-        lasso(self.0, self.0.initial(), |&c| (c, 0), (true, true))
+        single_lasso(self.0, |&c| c)
     }
 
     /// Returns true if and only if the language is empty.
@@ -247,7 +295,7 @@ impl<D: Deterministic<EdgeColor = Int>> Emptiness<'_, DPA<D>> {
 impl<D: Deterministic<EdgeColor = bool>> Emptiness<'_, DBA<D>> {
     /// Returns an ultimately periodic word that is accepted, or `None` if the language is empty.
     pub fn witness(&self) -> Option<ReducedOmegaWord<SymbolOf<DBA<D>>>> {
-        lasso(self.0, self.0.initial(), |&c| (buchi(c), 0), (true, true))
+        single_lasso(self.0, |&c| buchi(c))
     }
 
     /// Returns true if and only if the language is empty.
@@ -258,8 +306,8 @@ impl<D: Deterministic<EdgeColor = bool>> Emptiness<'_, DBA<D>> {
 
 impl<D, O> InclusionCheck<'_, '_, DPA<D>, DPA<O>>
 where
-    D: Deterministic<EdgeColor = Int>,
-    O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>,
+    D: Deterministic<EdgeColor = Int> + States,
+    O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States,
 {
     /// Returns an ultimately periodic word that is accepted by the first but not by the second
     /// automaton, or `None` if the inclusion holds. This uses one product and decomposes it into
@@ -277,8 +325,8 @@ where
 
 impl<D, O> EquivalenceCheck<'_, '_, DPA<D>, DPA<O>>
 where
-    D: Deterministic<EdgeColor = Int>,
-    O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int>,
+    D: Deterministic<EdgeColor = Int> + States,
+    O: Deterministic<Alphabet = D::Alphabet, EdgeColor = Int> + States,
 {
     /// Returns an ultimately periodic word that is accepted by exactly one of the two automata,
     /// or `None` if they are equivalent.
@@ -295,8 +343,8 @@ where
 
 impl<D, O> InclusionCheck<'_, '_, DBA<D>, DBA<O>>
 where
-    D: Deterministic<EdgeColor = bool>,
-    O: Deterministic<Alphabet = D::Alphabet, EdgeColor = bool>,
+    D: Deterministic<EdgeColor = bool> + States,
+    O: Deterministic<Alphabet = D::Alphabet, EdgeColor = bool> + States,
 {
     /// Returns an ultimately periodic word that is accepted by the first but not by the second
     /// automaton, or `None` if the inclusion holds.
@@ -312,8 +360,8 @@ where
 
 impl<D, O> EquivalenceCheck<'_, '_, DBA<D>, DBA<O>>
 where
-    D: Deterministic<EdgeColor = bool>,
-    O: Deterministic<Alphabet = D::Alphabet, EdgeColor = bool>,
+    D: Deterministic<EdgeColor = bool> + States,
+    O: Deterministic<Alphabet = D::Alphabet, EdgeColor = bool> + States,
 {
     /// Returns an ultimately periodic word that is accepted by exactly one of the two automata,
     /// or `None` if they are equivalent.
@@ -335,6 +383,41 @@ fn buchi(accepting: bool) -> Int {
 
 type Priorities = (Int, Int);
 
+/// An edge of a transition system, given by its source, a symbol that takes it and its target.
+pub(super) type Through<T> = (StateIndex<T>, SymbolOf<T>, StateIndex<T>);
+
+/// The least priority of the given parity that occurs on an edge of `ts`. No cycle can have a
+/// least priority of that parity that is smaller, so edges below it can be ignored right away.
+fn least_priority<T: States>(
+    ts: &T,
+    priority: impl Fn(&T::EdgeColor) -> Int,
+    even: bool,
+) -> Option<Int> {
+    ts.states()
+        .filter_map(|q| ts.edges_from(q))
+        .flatten()
+        .map(|edge| priority(edge.color()))
+        .filter(|p| p.is_multiple_of(2) == even)
+        .min()
+}
+
+/// An accepted word of an automaton, see [`lasso`].
+fn single_lasso<L, S>(
+    automaton: &Automaton<L, S>,
+    priority: impl Fn(&L::EdgeColor) -> Int,
+) -> Option<ReducedOmegaWord<SymbolOf<L>>>
+where
+    L: Deterministic,
+{
+    lasso(
+        automaton,
+        automaton.initial(),
+        |c| (priority(c), 0),
+        (true, true),
+        (0, 0),
+    )
+}
+
 /// Looks for a word whose run in the product of `left` and `right` has the given acceptance (as
 /// seen by the min-even parity condition on `priority`) in both automata.
 fn product_lasso<L, R, S>(
@@ -344,21 +427,32 @@ fn product_lasso<L, R, S>(
     accepted: (bool, bool),
 ) -> Option<ReducedOmegaWord<SymbolOf<L>>>
 where
-    L: Deterministic,
-    R: Deterministic<Alphabet = L::Alphabet, EdgeColor = L::EdgeColor>,
+    L: Deterministic + States,
+    R: Deterministic<Alphabet = L::Alphabet, EdgeColor = L::EdgeColor> + States,
 {
-    let product = left.ts_product(right);
+    let floors = (
+        least_priority(left, priority, accepted.0)?,
+        least_priority(right, priority, accepted.1)?,
+    );
+    // Only edges above the floors are explored, which is often much less than the full product.
+    let left_priorities = move |c: &L::EdgeColor| (priority(c), 0);
+    let right_priorities = move |c: &R::EdgeColor| (priority(c), 0);
+    let initial = ProductIndex(left.initial(), right.initial());
+    let product = Masked::new(left, &left_priorities, (floors.0, 0))
+        .ts_product(Masked::new(right, &right_priorities, (floors.1, 0)))
+        .with_initial(initial);
     lasso(
         &product,
-        ProductIndex(left.initial(), right.initial()),
+        initial,
         |(l, r)| (priority(l), priority(r)),
         accepted,
+        (0, 0),
     )
 }
 
 /// An ultimately periodic word that leads from `initial` into a cycle of `ts` such that the least
 /// first priority on the cycle is even if and only if `accepted.0` and the least second priority
-/// is even if and only if `accepted.1`.
+/// is even if and only if `accepted.1`. Edges with priorities below `floor` are ignored.
 ///
 /// This decomposes `ts` into strongly connected components. If all edges of a component (which
 /// can be traversed in one cycle) fit, we are done. Otherwise, a cycle must avoid the edges that
@@ -369,19 +463,38 @@ fn lasso<T>(
     initial: T::StateIndex,
     priorities: impl Fn(&T::EdgeColor) -> Priorities,
     accepted: (bool, bool),
+    floor: Priorities,
 ) -> Option<ReducedOmegaWord<SymbolOf<T>>>
 where
     T: TransitionSystem,
 {
     let mut found = None;
-    search(ts, vec![initial], &priorities, accepted, |scc| {
-        let first = scc.first();
-        let cycle = scc.maximal_loop_from(first)?;
-        found = Some((first, cycle));
-        Some(())
-    });
-    let (first, cycle) = found?;
-    let spoke = ts.word_from_to(initial, first)?;
+    search(
+        ts,
+        vec![initial],
+        &priorities,
+        accepted,
+        floor,
+        |scc, through| {
+            // A cycle through the edges with the least priorities has exactly these least priorities,
+            // as all edges of the component are at least that large. This is much shorter than a
+            // cycle that visits the whole component.
+            let view = scc.ts();
+            let [(from_l, symbol_l, to_l), (from_r, symbol_r, to_r)] = *through;
+            let mut cycle = vec![symbol_l];
+            if (from_l, symbol_l, to_l) == (from_r, symbol_r, to_r) {
+                cycle.extend(view.word_from_to(to_l, from_l)?);
+            } else {
+                cycle.extend(view.word_from_to(to_l, from_r)?);
+                cycle.push(symbol_r);
+                cycle.extend(view.word_from_to(to_r, from_l)?);
+            }
+            found = Some((from_l, cycle));
+            Some(())
+        },
+    );
+    let (start, cycle) = found?;
+    let spoke = ts.word_from_to(initial, start)?;
     Some(ReducedOmegaWord::ultimately_periodic(spoke, cycle))
 }
 
@@ -393,7 +506,8 @@ pub(super) fn search<T, P>(
     roots: Vec<T::StateIndex>,
     priorities: &P,
     accepted: (bool, bool),
-    mut visit: impl for<'v> FnMut(&Scc<'v, Masked<'v, T, P>>) -> Option<()>,
+    floor: Priorities,
+    mut visit: impl for<'v> FnMut(&Scc<'v, Masked<'v, T, P>>, &[Through<T>; 2]) -> Option<()>,
 ) where
     T: TransitionSystem,
     P: Fn(&T::EdgeColor) -> Priorities,
@@ -401,32 +515,48 @@ pub(super) fn search<T, P>(
     struct Task<I> {
         floor: Priorities,
         roots: Vec<I>,
-        inside: Option<math::FxIndexSet<I>>,
+        restrict: bool,
     }
     let mut tasks = vec![Task {
-        floor: (0, 0),
+        floor,
         roots,
-        inside: None,
+        restrict: false,
     }];
     while let Some(task) = tasks.pop() {
+        // built only for tasks that are actually looked at
+        let inside: Option<math::FxIndexSet<_>> =
+            task.restrict.then(|| task.roots.iter().copied().collect());
         let view = Masked {
             ts,
             priorities,
             floor: task.floor,
-            inside: task.inside.as_ref(),
+            inside: inside.as_ref(),
         };
         let sccs = Sccs::on(&view).from(task.roots).compute();
+        let mut good = Vec::new();
         for scc in sccs.sccs_iter().filter(|scc| scc.is_nontransient()) {
             let (mut low_l, mut low_r) = (Int::MAX, Int::MAX);
-            for (l, r) in scc.interior_edge_colors().map(|c| priorities(&c)) {
-                low_l = low_l.min(l);
-                low_r = low_r.min(r);
+            let (mut through_l, mut through_r) = (None, None);
+            for edge in scc.interior_edges() {
+                let (l, r) = priorities(edge.color());
+                let through = |edge: &EdgeOf<'_, Masked<'_, T, P>>| {
+                    let symbol = edge.expression().symbols().next()?;
+                    Some((edge.source(), symbol, edge.target()))
+                };
+                if l < low_l {
+                    low_l = l;
+                    through_l = through(&edge);
+                }
+                if r < low_r {
+                    low_r = r;
+                    through_r = through(&edge);
+                }
             }
             let good_l = low_l.is_multiple_of(2) == accepted.0;
             let good_r = low_r.is_multiple_of(2) == accepted.1;
             if good_l && good_r {
-                if visit(scc).is_some() {
-                    return;
+                if let (Some(l), Some(r)) = (through_l, through_r) {
+                    good.push((scc, [l, r]));
                 }
                 continue;
             }
@@ -445,12 +575,18 @@ pub(super) fn search<T, P>(
                 };
                 floor.1 = next;
             }
-            let states: Vec<_> = scc.state_indices().copied().collect();
             tasks.push(Task {
                 floor,
-                inside: Some(states.iter().copied().collect()),
-                roots: states,
+                roots: scc.state_indices().copied().collect(),
+                restrict: true,
             });
+        }
+        // the smallest components have the shortest cycles
+        good.sort_by_key(|(scc, _)| scc.size());
+        for (scc, through) in &good {
+            if visit(scc, through).is_some() {
+                return;
+            }
         }
     }
 }
@@ -486,6 +622,17 @@ where
             let (l, r) = priorities(edge.color());
             floor.0 <= l && floor.1 <= r && inside.is_none_or(|set| set.contains(&edge.target()))
         })
+    }
+}
+
+impl<'a, T: TransitionSystem, P> Masked<'a, T, P> {
+    fn new(ts: &'a T, priorities: &'a P, floor: Priorities) -> Self {
+        Self {
+            ts,
+            priorities,
+            floor,
+            inside: None,
+        }
     }
 }
 

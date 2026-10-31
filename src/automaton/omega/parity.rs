@@ -320,12 +320,19 @@ where
         let mut separated = vec![false; n * n];
         let mut todo = Vec::new();
         for accepted in [(true, false), (false, true)] {
-            search(&product, pairs.clone(), &|&c| c, accepted, |scc| {
-                for &pair in scc.state_indices() {
-                    todo.push(id(pair));
-                }
-                None
-            });
+            search(
+                &product,
+                pairs.clone(),
+                &|&c| c,
+                accepted,
+                (0, 0),
+                |scc, _| {
+                    for &pair in scc.state_indices() {
+                        todo.push(id(pair));
+                    }
+                    None
+                },
+            );
         }
         while let Some(pair) = todo.pop() {
             if !std::mem::replace(&mut separated[pair], true) {
