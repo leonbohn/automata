@@ -143,20 +143,14 @@ where
 /// the output color is given by the associated type `Color`.
 ///
 /// Naturally, a color itself provides a state color, namely by
-/// associating each state with itself. Similarly, a [`math::FxIndexMap`]
-/// using `Idx` as key and `Color` as value provides a color for
-/// each state, provided it is complete (in the sense that it has
-/// an entry for each state index). Finally, it is possible to
-/// extend an incomplete Map by providing a default color for
-/// missing entries through the [`DefaultIfMissing`] struct.
+/// associating each state with itself. A [`math::FxIndexMap`] does not
+/// implement the trait, as it may have no entry for a state. Wrap it in a
+/// [`DefaultIfMissing`] to provide a default color for missing entries.
 pub trait ProvidesStateColor<Idx> {
     /// The output color given to each state.
     type Color: Color;
-    /// Returns the color assigned to the given `state`. Note,
-    /// that the trait is assumed to provide a complete coloring,
-    /// which means the method must return a color for every
-    /// possible `Idx` that is provided. Consequently, it may
-    /// panic if the coloring is not complete.
+    /// Returns the color assigned to the given `state`. The coloring is
+    /// assumed to be complete, i.e. there is a color for every possible `Idx`.
     fn state_color(&self, state: Idx) -> Self::Color;
 }
 
@@ -170,16 +164,6 @@ impl<Idx, C: Color> ProvidesStateColor<Idx> for UniformColor<C> {
     type Color = C;
     fn state_color(&self, _state: Idx) -> Self::Color {
         self.0.clone()
-    }
-}
-
-impl<Idx: Hash + Eq, C: Color> ProvidesStateColor<Idx> for math::FxIndexMap<Idx, C> {
-    type Color = C;
-
-    fn state_color(&self, state: Idx) -> Self::Color {
-        self.get(&state)
-            .cloned()
-            .expect("Need a color for this state!")
     }
 }
 

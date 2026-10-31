@@ -17,12 +17,13 @@ impl std::fmt::Debug for Void {
 
 /// A color is simply a type that can be used to color states or transitions.
 pub trait Color: Clone + std::fmt::Debug {
-    /// Reduces a sequence of colors (of type `Self`) to a single color of type `Self`.
-    fn reduce<I: IntoIterator<Item = Self>>(iter: I) -> Self
+    /// Reduces a sequence of colors (of type `Self`) to a single color of type `Self`, which is
+    /// the least one. Returns `None` if the sequence is empty.
+    fn reduce<I: IntoIterator<Item = Self>>(iter: I) -> Option<Self>
     where
         Self: Sized + Ord,
     {
-        iter.into_iter().min().unwrap()
+        iter.into_iter().min()
     }
 }
 
@@ -117,3 +118,14 @@ macro_rules! impl_with_limits {
 impl_with_limits!(
     u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize
 );
+
+#[cfg(test)]
+mod tests {
+    use super::Color;
+
+    #[test]
+    fn reduce_is_the_least_color() {
+        assert_eq!(<u8 as Color>::reduce([3, 1, 2]), Some(1));
+        assert_eq!(<u8 as Color>::reduce([]), None);
+    }
+}

@@ -37,6 +37,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Breaking:** `Alphabet::make_expression` is a provided method on top of the new required `Alphabet::try_make_expression`, which returns `None` for a symbol outside the alphabet (#7).
+- **Breaking:** `Color::reduce` returns `None` for an empty iterator instead of panicking (#7).
+- **Breaking:** `math::FxIndexMap` no longer implements `ProvidesStateColor`, as it panicked for states without an entry. Wrap the map in `DefaultIfMissing` (#7).
 - `RenderError::PngEncodingError` and `RenderError::RenderToSvgError` carry a boxed error instead of a `String` (#7).
 - `Quotient::new` computes the edges and state colors of all classes once, so `edge` and `state_color` do not allocate. `Quotient::new` and `TransitionSystem::quotient` now require `Deterministic`; a partition that is not a congruence no longer panics when an edge is looked up, the target of the first state of the class is used (#57).
 - Inclusion and equivalence of DPAs decompose one product into strongly connected components (and only the components that cannot be used right away again) instead of one decomposition per pair of priorities (#56).

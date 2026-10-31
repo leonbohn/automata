@@ -7,7 +7,9 @@ pub(super) fn dot_to_svg(dot: &str) -> Result<String, RenderError> {
     tracing::trace!("rendering DOT representation\n{}", dot);
 
     let mut parser = layout::gv::parser::DotParser::new(dot);
-    let graph = parser.process().map_err(|e| RenderError::RenderToSvgError(e.into()))?;
+    let graph = parser
+        .process()
+        .map_err(|e| RenderError::RenderToSvgError(e.into()))?;
 
     let mut builder = layout::gv::GraphBuilder::new();
     builder.visit_graph(&graph);

@@ -566,7 +566,10 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
 
     type Expression = PropExpression<RawTy>;
 
-    fn make_expression(&self, symbol: Self::Symbol) -> Self::Expression {
+    fn try_make_expression(&self, symbol: Self::Symbol) -> Option<Self::Expression> {
+        if symbol.num_aps as usize != self.aps.len() {
+            return None;
+        }
         let expr = PropExpression {
             bdd: Bdd::from(symbol.as_bdd_valuation()),
             num_aps: symbol.num_aps,
@@ -574,7 +577,7 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
         };
         let mut expressions = self.expressions.lock().unwrap();
         expressions.insert(expr.clone());
-        expr
+        Some(expr)
     }
 
     fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
