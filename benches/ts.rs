@@ -279,6 +279,20 @@ fn subset_construction(nts: automata::NTS<CharAlphabet, bool, Void>) -> usize {
     )
 }
 
+#[library_benchmark]
+#[bench::nth_from_end_8(args = (8), setup = nth_from_end)]
+#[bench::nth_from_end_10(args = (10), setup = nth_from_end)]
+#[bench::nth_from_end_12(args = (12), setup = nth_from_end)]
+fn determinize(nts: automata::NTS<CharAlphabet, bool, Void>) -> usize {
+    let nts = nts.with_initial(0);
+    black_box(
+        automata::ts::operations::Determinize::on(&nts)
+            .run()
+            .ts()
+            .state_count(),
+    )
+}
+
 library_benchmark_group!(
     name = ts;
     benchmarks = add_edges_in_order, add_edges_in_reverse, builder_with_edges,
@@ -286,7 +300,7 @@ library_benchmark_group!(
         reachable_states, minimal_representatives, scc_minimal_representatives,
         minimal_representative_of_all_states, canonical_naming, predecessors_of_all_states,
         clone, collect_dts, map_edge_colors_collect, erase_state_colors_collect, into_dfa,
-        remove_edges_from_matching, remove_state, subset_construction
+        remove_edges_from_matching, remove_state, subset_construction, determinize
 );
 
 main!(

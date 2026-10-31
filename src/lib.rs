@@ -72,7 +72,6 @@ pub mod representation;
 pub mod congruence;
 pub use congruence::{Class, Congruence, RightCongruence};
 
-/// Contains implementations different minimization algorithms.
 pub mod minimization;
 
 /// Implements the generation of random transition systems.

@@ -1,5 +1,6 @@
-use crate::ts::EdgeOf;
+use crate::DTS;
 use crate::ts::SymbolOf;
+use crate::ts::{EdgeOf, ForAlphabet, Sproutable};
 use std::borrow::Cow;
 use std::{cell::RefCell, fmt::Debug};
 
@@ -233,11 +234,181 @@ impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
     }
 }
 
+/// The problem of determinizing a transition system with the subset construction:
+/// [`Determinize::on`] states it for a [`Pointed`] system and [`run`](Determinize::run) explores
+/// all reachable subsets eagerly. In contrast to the lazy [`SubsetConstruction`] the result is
+/// a stored [`DTS`]. Like in the lazy version, state and edge colors of a subset are the lists of
+/// the colors of its members, and a symbol without successors leads to the empty subset, so that
+/// the result is complete.
+///
+/// ```
+/// use automata::ts::{Builder, States, operations::Determinize};
+///
+/// let nts = Builder::default()
+///     .default_color(false)
+///     .with_transitions([(0, 'a', 0), (0, 'a', 1), (0, 'b', 1), (1, 'b', 1), (1, 'a', 0)])
+///     .into_nts_with_initial(0);
+/// let determinized = Determinize::on(&nts).run();
+/// assert_eq!(determinized.ts().state_count(), 3);
+/// assert_eq!(determinized.subsets()[0], vec![0]);
+/// ```
+#[derive(Debug, Clone, Copy)]
+pub struct Determinize<'a, Ts>(&'a Ts);
+
+impl<'a, Ts> Determinize<'a, Ts> {
+    /// States the problem for the given transition system.
+    pub fn on(ts: &'a Ts) -> Self {
+        Self(ts)
+    }
+}
+
+/// The transition system built by [`Determinize`].
+pub type DeterminizedTs<Ts> = DTS<
+    <Ts as TransitionSystem>::Alphabet,
+    Vec<<Ts as TransitionSystem>::StateColor>,
+    Vec<<Ts as TransitionSystem>::EdgeColor>,
+>;
+
+/// The result of [`Determinize::run`]: the deterministic system, whose initial state is `0`, and
+/// the subset of original states that each of its states stands for.
+#[derive(Debug, Clone)]
+pub struct Determinized<Ts: TransitionSystem> {
+    ts: DeterminizedTs<Ts>,
+    subsets: Vec<Vec<Ts::StateIndex>>,
+}
+
+impl<Ts: TransitionSystem> Determinized<Ts> {
+    /// The deterministic transition system, its initial state is `0`.
+    pub fn ts(&self) -> &DeterminizedTs<Ts> {
+        &self.ts
+    }
+
+    /// For each state of [`Self::ts`], the sorted subset of original states it stands for.
+    pub fn subsets(&self) -> &[Vec<Ts::StateIndex>] {
+        &self.subsets
+    }
+
+    /// Discards the subsets and returns the deterministic transition system.
+    pub fn into_dts(self) -> DeterminizedTs<Ts> {
+        self.ts
+    }
+
+    /// Splits into the deterministic transition system and the subset of each state.
+    pub fn into_parts(self) -> (DeterminizedTs<Ts>, Vec<Vec<Ts::StateIndex>>) {
+        (self.ts, self.subsets)
+    }
+}
+
+impl<Ts: Pointed> Determinize<'_, Ts> {
+    /// Runs the subset construction from the initial state of the system.
+    pub fn run(self) -> Determinized<Ts> {
+        let ts = self.0;
+        let alphabet = ts.alphabet();
+        let symbols: Vec<_> = alphabet
+            .universe()
+            .map(|sym| (sym, alphabet.make_expression(sym)))
+            .collect();
+
+        let mut out = DTS::for_alphabet(alphabet.clone());
+        let mut subsets: Vec<Vec<Ts::StateIndex>> = Vec::new();
+        let mut ids: math::FxIndexMap<Vec<Ts::StateIndex>, u32> = math::FxIndexMap::default();
+        let mut discover = |out: &mut DTS<_, _, _>,
+                            subsets: &mut Vec<Vec<Ts::StateIndex>>,
+                            subset: Vec<Ts::StateIndex>| {
+            if let Some(&id) = ids.get(&subset) {
+                return id;
+            }
+            let colors = subset
+                .iter()
+                .filter_map(|q| ts.state_color(*q).map(Cow::into_owned))
+                .collect();
+            let id = out.add_state(colors);
+            ids.insert(subset.clone(), id);
+            subsets.push(subset);
+            id
+        };
+        discover(&mut out, &mut subsets, vec![ts.initial()]);
+
+        // Targets and colors per symbol of the current subset, reused between subsets.
+        let mut targets = vec![Vec::new(); symbols.len()];
+        let mut colors = vec![Vec::new(); symbols.len()];
+        let mut next = 0;
+        while next < subsets.len() {
+            for i in 0..symbols.len() {
+                targets[i].clear();
+                colors[i].clear();
+            }
+            for q in &subsets[next] {
+                for e in ts.edges_from(*q).into_iter().flatten() {
+                    for (i, (sym, _)) in symbols.iter().enumerate() {
+                        if sym.matches(e.expression()) {
+                            targets[i].push(e.target());
+                            colors[i].push(e.color().clone());
+                        }
+                    }
+                }
+            }
+            for (i, (_, expression)) in symbols.iter().enumerate() {
+                let mut subset = std::mem::take(&mut targets[i]);
+                subset.sort_unstable();
+                subset.dedup();
+                let target = discover(&mut out, &mut subsets, subset);
+                out.add_edge((
+                    next as u32,
+                    expression.clone(),
+                    std::mem::take(&mut colors[i]),
+                    target,
+                ));
+            }
+            next += 1;
+        }
+        Determinized { ts: out, subsets }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::alphabet::Matcher;
     use crate::representation::IntoTransitions;
+    use crate::ts::Deterministic;
     use crate::{NTS, TransitionSystem};
     use crate::{Pointed, States};
+
+    #[test]
+    fn determinize_agrees_with_lazy_subset_construction() {
+        let nts = NTS::builder()
+            .default_color(false)
+            .with_transitions([
+                (0, 'a', 0),
+                (0, 'a', 1),
+                (0, 'b', 1),
+                (1, 'b', 1),
+                (1, 'a', 0),
+            ])
+            .into_nts_with_initial(0);
+        let lazy = (&nts).subset_construction().reachable_part();
+        let eager = super::Determinize::on(&nts).run();
+        assert_eq!(eager.ts().state_count(), lazy.state_count());
+        assert_eq!(eager.subsets().len(), lazy.state_count());
+        for (q, subset) in eager.subsets().iter().enumerate() {
+            for sym in ['a', 'b'] {
+                let expected: std::collections::BTreeSet<_> = subset
+                    .iter()
+                    .flat_map(|p| nts.edges_from(*p).unwrap())
+                    .filter(|e| e.expression().matches(&sym))
+                    .map(|e| e.target())
+                    .collect();
+                let target = eager.ts().successor(q as u32, sym).unwrap();
+                assert_eq!(
+                    eager.subsets()[target as usize]
+                        .iter()
+                        .copied()
+                        .collect::<std::collections::BTreeSet<_>>(),
+                    expected
+                );
+            }
+        }
+    }
 
     #[test]
     fn subset_construction() {
