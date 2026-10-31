@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- `RenderError::PngEncodingError` and `RenderError::RenderToSvgError` carry a boxed error instead of a `String` (#7).
 - `Quotient::new` computes the edges and state colors of all classes once, so `edge` and `state_color` do not allocate. `Quotient::new` and `TransitionSystem::quotient` now require `Deterministic`; a partition that is not a congruence no longer panics when an edge is looked up, the target of the first state of the class is used (#57).
 - Inclusion and equivalence of DPAs decompose one product into strongly connected components (and only the components that cannot be used right away again) instead of one decomposition per pair of priorities (#56).
 - `DPA::prefix_partition` no longer copies the automaton and does not run an equivalence check per pair of states: it decomposes the product of the automaton with itself once and finds all inequivalent pairs by a backwards search. `DPA::separate` no longer collects its arguments (#56).

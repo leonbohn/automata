@@ -14,12 +14,12 @@ pub enum RenderError {
     PixmapAllocationError,
     /// The rendered image could not be encoded as a PNG (feature `render`).
     #[cfg(feature = "render")]
-    #[error("could not encode PNG: \"{0:?}\"")]
-    PngEncodingError(String),
+    #[error("could not encode PNG: {0}")]
+    PngEncodingError(Box<dyn std::error::Error + Send + Sync>),
     /// The DOT representation could not be rendered to SVG (feature `render`).
     #[cfg(feature = "render")]
-    #[error("could not render to SVG: \"{0}\"")]
-    RenderToSvgError(String),
+    #[error("could not render to SVG: {0}")]
+    RenderToSvgError(Box<dyn std::error::Error + Send + Sync>),
     /// A file could not be written or a viewer could not be started.
     #[error("I/O error while rendering or displaying: \"{0}\"")]
     Io(#[from] std::io::Error),
