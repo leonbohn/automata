@@ -127,6 +127,15 @@ mod tests {
     use crate::ts::Builder;
 
     #[test]
+    fn empty_word_has_no_output() {
+        let mm: MealyMachine = Builder::without_state_colors()
+            .with_transitions([(0, 'a', 1, 0)])
+            .into_mealy(0);
+        assert_eq!(mm.transform(""), None);
+        assert_eq!(mm.transform("aa"), Some(1));
+    }
+
+    #[test]
     fn mealy_equivalence() {
         let mm1: MealyMachine = Builder::without_state_colors()
             .with_transitions([
