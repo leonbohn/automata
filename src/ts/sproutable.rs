@@ -179,7 +179,7 @@ pub trait Sproutable: States {
         let mut seen = FixedBitSet::with_capacity(self.alphabet().size());
         for state in self.states().collect_vec() {
             seen.clear();
-            for edge in self.edges_from(state).unwrap() {
+            for edge in self.edges_from(state).into_iter().flatten() {
                 seen.insert(self.alphabet().expression_to_index(edge.expression()));
             }
             for missing in (0..self.alphabet().size()).filter(|i| !seen.contains(*i)) {
@@ -217,9 +217,11 @@ pub trait Sproutable: States {
         iter.into_iter().map(move |color| self.add_state(color))
     }
 
-    /// Sets the color of the state with the given index. If the state does not exist, the method
-    /// panics. Usually, we would like to avoid recoloring states individually, and instead
+    /// Sets the color of the state with the given index. Usually, we would like to avoid recoloring states individually, and instead
     /// use the [`TransitionSystem::map_state_colors`] method.
+    ///
+    /// # Panics
+    /// Panics if the state does not exist.
     fn set_state_color(&mut self, index: StateIndex<Self>, color: StateColor<Self>) {
         match self.state_color_mut(index) {
             Some(slot) => *slot = color,
