@@ -22,12 +22,13 @@ use crate::automaton::semantics::observe_omega;
 use crate::representation::IntoTransitions;
 use crate::ts::States;
 use crate::ts::run::{self, Observer as _};
-use crate::ts::{Builder, DefaultIdType, DenseId, ForAlphabet, Sproutable};
+use crate::ts::{Builder, DefaultIdType, ForAlphabet, Sproutable};
 use crate::ts::{Det, Linked, Storage};
 use crate::ts::{Deterministic, StateIndex, SymbolOf};
 use crate::word::OmegaWord;
 use crate::{DTS, NTS, Pointed, TransitionSystem};
 pub use acceptance_mask::{AcceptanceError, AcceptanceMask};
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 /// Type alias for an omega automaton (i.e. an automaton over infinite words) that is guaranteed to be
@@ -312,19 +313,29 @@ impl<A: Alphabet> Automaton<DTS<A, Int, AcceptanceMask>, OmegaAcceptanceConditio
 
 impl From<DeterministicOmegaAutomaton<PropAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
     fn from(value: DeterministicOmegaAutomaton<PropAlphabet>) -> Self {
-        let size = value.state_count().into_id();
+        // the states are numbered consecutively, in the order of `states`
+        let ids: BTreeMap<_, DefaultIdType> = value
+            .states()
+            .enumerate()
+            .map(|(n, q)| (q, n as DefaultIdType))
+            .collect();
         let ts = Builder::default()
-            .with_state_colors((0..size).map(|i| value.state_color(i).unwrap().into_owned()))
+            .with_state_colors(
+                value
+                    .states()
+                    .filter_map(|q| Some(value.state_color(q)?.into_owned())),
+            )
             .with_transitions(value.states().flat_map(|q| {
-                assert!(q < size);
-                value.edges_from(q).unwrap().flat_map(|edge| {
+                value.edges_from(q).into_iter().flatten().flat_map(|edge| {
+                    let (source, target) = (ids[&edge.source()], ids[&edge.target()]);
                     edge.expression()
                         .chars_iter()
-                        .map(move |sym| (edge.source(), sym, edge.color().clone(), edge.target()))
+                        .map(move |sym| (source, sym, edge.color().clone(), target))
                 })
             }))
             .into_dts();
-        DeterministicOmegaAutomaton::new(ts, value.initial, value.acceptance)
+        let initial = ids[&value.initial()];
+        DeterministicOmegaAutomaton::new(ts, initial, value.acceptance)
     }
 }
 
@@ -335,33 +346,39 @@ impl TryFrom<DeterministicOmegaAutomaton<CharAlphabet>>
     /// is not a power of 2 and cannot be mapped immediately into AP combinations.
     type Error = PropAlphabetError;
     fn try_from(value: DeterministicOmegaAutomaton<CharAlphabet>) -> Result<Self, Self::Error> {
-        let size = value.state_count();
         let mut ts = DTS::for_alphabet(PropAlphabet::try_from_char_alphabet(value.alphabet())?);
 
+        // the states are numbered consecutively, in the order of `states`
+        let mut ids = BTreeMap::new();
         for q in value.states() {
-            assert!(
-                q.into_usize() < size,
-                "The state indices must be contiguous for this!"
-            );
-            ts.add_state(value.state_color(q).unwrap().into_owned());
+            if let Some(color) = value.state_color(q) {
+                ids.insert(q, ts.add_state(color.into_owned()));
+            }
         }
 
         for q in value.states() {
-            for edge in value.edges_from(q).unwrap() {
+            for edge in value.edges_from(q).into_iter().flatten() {
+                let (Some(&source), Some(&target)) =
+                    (ids.get(&edge.source()), ids.get(&edge.target()))
+                else {
+                    continue;
+                };
                 ts.add_edge((
-                    edge.source(),
+                    source,
                     ts.alphabet()
                         .make_expression(ts.alphabet().char_to_symbol(*edge.expression())),
                     edge.color().clone(),
-                    edge.target(),
+                    target,
                 ));
             }
         }
 
-        assert!(value.initial().into_usize() < size);
+        let initial = *ids
+            .get(&value.initial())
+            .expect("the initial state of an automaton is one of its states");
         Ok(DeterministicOmegaAutomaton::new(
             ts,
-            value.initial,
+            initial,
             value.acceptance,
         ))
     }

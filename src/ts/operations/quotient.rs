@@ -45,6 +45,8 @@ struct ClassEdge<Ts: TransitionSystem> {
 }
 
 impl<Ts: Deterministic + Pointed> Pointed for Quotient<Ts> {
+    /// # Panics
+    /// Panics if the partition does not contain the initial state of the underlying system.
     fn initial(&self) -> usize {
         self.find_id_by_state(self.ts.initial())
             .expect("Initial class must exist")

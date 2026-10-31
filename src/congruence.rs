@@ -79,7 +79,7 @@ pub trait Congruence: Deterministic + Pointed {
                 Some(i) => {
                     // the spoke is the spoke of self plus `i` times the cycle, while the
                     // cycle is `count - i` times the cycle
-                    assert!(i < count);
+                    debug_assert!(i < count);
                     return Some(word::NormalizedOmegaWord::new(word.reduced(), i, count - i));
                 }
             }

@@ -51,14 +51,14 @@ pub trait Show {
     fn show(&self) -> String;
     /// Show a collection of the thing, for a collection of states this should be {q0, q1, q2, ...}
     /// and for a collection of transitions it should be {(q0, a, q1), (q1, b, q2), ...}.
-    /// By default this is unimplemented.
-    fn show_collection<'a, I>(_iter: I) -> String
+    /// By default this shows the elements separated by commas, in curly braces.
+    fn show_collection<'a, I>(iter: I) -> String
     where
         Self: 'a,
         I: IntoIterator<Item = &'a Self>,
         I::IntoIter: DoubleEndedIterator,
     {
-        unimplemented!("This operation makes no sense.")
+        format!("{{{}}}", iter.into_iter().map(Show::show).join(", "))
     }
 }
 
