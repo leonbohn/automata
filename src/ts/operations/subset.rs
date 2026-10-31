@@ -119,20 +119,21 @@ impl<Ts: TransitionSystem> Deterministic for SubsetConstruction<Ts> {
             .get(source)?
             .iter()
             .flat_map(|q| {
-                self.ts.edges_from(*q).into_iter().flatten().filter_map(|tt| {
-                    if symbol.matches(tt.expression()) {
-                        Some((tt.color().clone(), tt.target()))
-                    } else {
-                        None
-                    }
-                })
+                self.ts
+                    .edges_from(*q)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|tt| {
+                        if symbol.matches(tt.expression()) {
+                            Some((tt.color().clone(), tt.target()))
+                        } else {
+                            None
+                        }
+                    })
             })
             .unzip();
         stateset.normalize();
-        let expression = self
-            .expressions
-            .iter()
-            .find(|e| symbol.matches(*e))?;
+        let expression = self.expressions.iter().find(|e| symbol.matches(*e))?;
 
         if let Some(&id) = self.ids.borrow().get(&stateset) {
             return Some(EdgeRef::owned(source, expression, colorset, id));

@@ -230,7 +230,7 @@ impl<A: Alphabet, Idx: IdType, Q: std::fmt::Debug, C: std::fmt::Debug> std::fmt:
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}[{:?}|{:?}]",
+            "{}[{:?}|{}]",
             self.transitions
                 .iter()
                 .enumerate()
@@ -245,7 +245,7 @@ impl<A: Alphabet, Idx: IdType, Q: std::fmt::Debug, C: std::fmt::Debug> std::fmt:
             self.end,
             self.state_colors
                 .last()
-                .expect("Must have color for last state")
+                .map_or_else(|| "?".to_string(), |c| format!("{c:?}"))
         )
     }
 }
