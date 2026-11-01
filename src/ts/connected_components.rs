@@ -330,4 +330,13 @@ mod tests {
         assert_eq!(scc2.maximal_word(), Some(vec!['a', 'b']));
         assert_eq!(scc3.maximal_word(), Some(vec!['b', 'a', 'a', 'b']))
     }
+
+    #[test]
+    #[should_panic(expected = "same SCC")]
+    fn maximal_loop_from_a_bogus_scc() {
+        // {0, 1} is not strongly connected in `ts`: state 0 cannot be reached from 1
+        let cong = ts();
+        let bogus = Scc::new(&cong, vec![0, 1]);
+        bogus.maximal_loop_from(0);
+    }
 }

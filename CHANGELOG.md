@@ -5,6 +5,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `Scc::maximal_loop_from` no longer relies on `unwrap`s for its bookkeeping: the queue of the
+  remaining interior transitions is read through one `match`, and the states whose transitions
+  are exhausted are dropped there. The remaining `expect`s check the precondition that the states
+  of the SCC are mutually reachable and are documented with a `# Panics` section, as are the
+  invariant checks of `DPA::prefix_partition`, `DPA::witness_color` and `DPA::normalized`
+  (whose note moved from prose into the `# Panics` section). `Scc::new` now points at
+  `maximal_loop_from` in addition to `state_colors` (#108).
+- Panic audit, completed (#108): every remaining `panic!`, `assert!`, `unwrap` and `expect` in
+  a public function is either documented with a `# Panics` section (programmer-error
+  preconditions such as empty alphabets, empty cycles, incomplete transition systems, states
+  outside the system), a `debug_assert` or the guard of an internal invariant whose message
+  names the invariant (storages, Hopcroft refinement, `compact`, `Scc::state_colors`, the
+  normalization procedure). No signature changes were needed: of the panics reachable from
+  public API, only `Scc::maximal_loop_from` on an SCC assembled with `Scc::new` from indices
+  that are not strongly connected can fire, and panicking is the documented choice there.
+
 ### Added
 
 - `minimization::Minimize`: `Minimize::on(&machine).run()` minimizes a `DFA`, `MooreMachine` or `MealyMachine`. The result is built directly from the Hopcroft partition, without a `Quotient` and without collecting `Vec` colors. `DFA::minimize`, `MooreMachine::minimize` and `MealyMachine::minimize` remain as wrappers (#57).

@@ -296,6 +296,10 @@ where
     /// pairs are found for all pairs at once: first the cycles are located by decomposing the
     /// product into strongly connected components, then everything that reaches one of them is
     /// marked by a backwards search.
+    ///
+    /// # Panics
+    /// The `expect`s of the implementation check invariants of the procedure (that the states of
+    /// the product are the reachable pairs of states) and do not depend on the input.
     pub fn prefix_partition(&self) -> Partition<D::StateIndex> {
         let states: math::FxIndexSet<_> = self.reachable_state_indices().collect();
         let n = states.len();
@@ -365,6 +369,10 @@ where
     /// Attempts to find an omega-word that witnesses the given `color`, meaning the least color that
     /// appears infinitely often during the run of the returned word is equal to `color`. If no such
     /// word exists, `None` is returned.
+    ///
+    /// # Panics
+    /// The `expect` of the implementation checks an invariant of the procedure (that a maximal
+    /// loop exists in a non-transient SCC) and does not depend on the input.
     pub fn witness_color(&self, color: Int) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         let restrict = self.edge_color_restricted(color, Int::MAX);
         let sccs = Sccs::on(&restrict).compute();
@@ -402,7 +410,8 @@ where
     /// is outlined by Schewe and Ehlers in [Natural Colors of Infinite Words](https://arxiv.org/pdf/2207.11000.pdf)
     /// in Section 4.1, Definition 2.
     ///
-    /// The `expect`s and assertions in the implementation check invariants of the procedure (for
+    /// # Panics
+    /// The `expect`s and assertions of the implementation check invariants of the procedure (for
     /// example that the edges of the shrinking copy of the system are the ones that were
     /// collected) and do not depend on the input.
     pub fn normalized(&self) -> DPA<DTS<D::Alphabet, Void, Int>>
