@@ -1,3 +1,5 @@
+use std::ops::Rem;
+
 use crate::alphabet::Symbol;
 
 use super::{FiniteWord, OmegaWord, PeriodicOmegaWord, Word};
@@ -46,14 +48,14 @@ pub trait Rotate: Word {
     fn rotations(&self) -> Rotations<Self::Symbol>;
 }
 
-impl<S: Symbol> Rotate for PeriodicOmegaWord<Vec<S>> {
+impl<S: Symbol> Rotate for PeriodicOmegaWord<S> {
     fn rotate_left(&mut self, number: usize) {
-        let mid = number % self.cycle_len();
-        self.cycle.0.rotate_left(mid)
+        let mid = number.rem(number);
+        self.representation_mut().rotate_left(mid)
     }
     fn rotate_right(&mut self, number: usize) {
-        let mid = number % self.cycle_len();
-        self.cycle.0.rotate_right(mid)
+        let mid = number.rem(number);
+        self.representation_mut().rotate_right(mid)
     }
     fn rotations(&self) -> Rotations<S> {
         Rotations {

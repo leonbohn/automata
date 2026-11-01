@@ -79,8 +79,12 @@ pub trait FiniteWord: Word<Kind = super::Finite> {
     /// Builds the [`PeriodicOmegaWord`] word that is the omega power of this word, i.e. if
     /// `self` is the word `u`, then the result is the word `u^ω` = `u u u u ...`.
     /// Panics if `self` is empty as the operation is not defined in that case.
-    fn omega_power(&self) -> PeriodicOmegaWord<Vec<Self::Symbol>> {
-        PeriodicOmegaWord::new(self).expect("Omega iteration of an empty word is undefined!")
+    fn omega_power(&self) -> PeriodicOmegaWord<Self::Symbol> {
+        assert!(
+            !self.is_empty(),
+            "Omega iteration of an empty word is undefined!"
+        );
+        PeriodicOmegaWord::new(self)
     }
 
     /// Provides a thin wrapper around a finite word that represents the omega (infinite)

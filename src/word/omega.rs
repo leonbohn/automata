@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::alphabet::Symbol;
 
-use super::{EmptyWordError, FiniteWord, Infix, NonEmpty, Word};
+use super::{FiniteWord, Word};
 
 /// An omega word is an infinite word that can be indexed by a `usize`. We assume that all
 /// omega words can be represented as a concatenation of a finite prefix which we call spoke
@@ -170,12 +170,11 @@ fn deduplicate<S: Eq>(input: Vec<S>) -> Vec<S> {
     input
 }
 
-/// A periodic omega word has no finite prefix and consists only of a finite, non-empty loop
-/// that is repeated infinitely often. The loop is stored as a [`NonEmpty`] finite word of type
-/// `W`.
+/// A periodic omega word has no finite prefix and consists only of a finite loop that is
+/// repeated infinitely often. Note, that the loop cannot be empty.
 #[derive(Clone, Eq, PartialEq, Hash)]
-pub struct PeriodicOmegaWord<W> {
-    pub(super) cycle: NonEmpty<W>,
+pub struct PeriodicOmegaWord<S> {
+    representation: Vec<S>,
 }
 
 /// Returned when converting a [`ReducedOmegaWord`] with a non-empty finite prefix into a
@@ -184,28 +183,27 @@ pub struct PeriodicOmegaWord<W> {
 #[error("the word has a non-empty prefix and is therefore not purely periodic")]
 pub struct NotPeriodicError;
 
-impl<S: Symbol> TryFrom<ReducedOmegaWord<S>> for PeriodicOmegaWord<Vec<S>> {
+impl<S: Symbol> TryFrom<ReducedOmegaWord<S>> for PeriodicOmegaWord<S> {
     type Error = NotPeriodicError;
     fn try_from(value: ReducedOmegaWord<S>) -> Result<Self, Self::Error> {
         if value.loop_index() > 0 {
             Err(NotPeriodicError)
         } else {
-            // a reduced word always has a non-empty cycle
             Ok(Self {
-                cycle: NonEmpty(value.word),
+                representation: value.word,
             })
         }
     }
 }
 
-impl<W: FiniteWord> From<PeriodicOmegaWord<W>> for ReducedOmegaWord<W::Symbol> {
-    fn from(value: PeriodicOmegaWord<W>) -> Self {
-        Self::periodic(value.cycle.as_inner().collect_vec())
+impl<S: Symbol> From<PeriodicOmegaWord<S>> for ReducedOmegaWord<S> {
+    fn from(value: PeriodicOmegaWord<S>) -> Self {
+        Self::periodic(value.representation)
     }
 }
-impl<W: FiniteWord> From<&PeriodicOmegaWord<W>> for ReducedOmegaWord<W::Symbol> {
-    fn from(value: &PeriodicOmegaWord<W>) -> Self {
-        Self::periodic(value.cycle.as_inner().collect_vec())
+impl<S: Symbol> From<&PeriodicOmegaWord<S>> for ReducedOmegaWord<S> {
+    fn from(value: &PeriodicOmegaWord<S>) -> Self {
+        Self::periodic(value.representation.clone())
     }
 }
 
@@ -215,69 +213,70 @@ impl<S: Symbol> From<&ReducedOmegaWord<S>> for ReducedOmegaWord<S> {
     }
 }
 
-impl<S: Symbol> PeriodicOmegaWord<Vec<S>> {
-    /// Creates a new periodic omega word from a finite word, which is deduplicated.
-    /// Fails if the word is empty.
+impl<S: Symbol> PeriodicOmegaWord<S> {
+    /// Creates a new periodic omega word from a finite word. The word must not be empty and
+    /// it is deduplicated.
+    ///
+    /// # Panics
+    /// Panics if `word` is empty.
     ///
     /// # Example
     /// ```
-    /// use automata::word::{FiniteWord, OmegaWord, PeriodicOmegaWord};
+    /// use automata::{upw, word::{FiniteWord, OmegaWord}};
     ///
-    /// let word = PeriodicOmegaWord::new("abcabcabc").unwrap();
+    /// let word = upw!("abcabcabc");
     /// assert_eq!(word.cycle_len(), 3);
     /// assert_eq!(word.loop_index(), 0);
     /// assert!(word.spoke().is_empty());
     /// assert!(word.cycle().finite_word_equals("abc"));
-    /// assert!(PeriodicOmegaWord::new("").is_err());
     /// ```
-    pub fn new<W: FiniteWord<Symbol = S>>(word: W) -> Result<Self, EmptyWordError> {
-        let mut representation = NonEmpty::new(word.collect_vec())?.into_inner();
+    pub fn new<W: FiniteWord<Symbol = S>>(word: W) -> Self {
+        let mut representation = word.collect_vec();
         deduplicate_inplace(&mut representation);
-        Ok(Self::from_non_empty(NonEmpty(representation)))
+        Self { representation }
+    }
+
+    /// Gives a reference to the underlying representation of the word.
+    pub fn representation(&self) -> &[S] {
+        &self.representation
+    }
+
+    /// Gives a mutable reference to the underlying representation of the word.
+    pub fn representation_mut(&mut self) -> &mut [S] {
+        &mut self.representation
     }
 }
 
-impl<W: FiniteWord> PeriodicOmegaWord<W> {
-    /// Creates a periodic omega word from an already non-empty cycle. In contrast to
-    /// [`PeriodicOmegaWord::new`], the cycle is not deduplicated.
-    pub fn from_non_empty(cycle: NonEmpty<W>) -> Self {
-        Self { cycle }
-    }
-
-    /// Gives a reference to the underlying cycle of the word.
-    pub fn representation(&self) -> &NonEmpty<W> {
-        &self.cycle
-    }
-}
-
-impl<W: FiniteWord> Word for PeriodicOmegaWord<W> {
-    type Symbol = W::Symbol;
+impl<S: Symbol> Word for PeriodicOmegaWord<S> {
+    type Symbol = S;
     type Kind = crate::word::Omega;
-    fn nth(&self, position: usize) -> Option<W::Symbol> {
-        self.cycle.nth(position % self.cycle.len())
+    fn nth(&self, position: usize) -> Option<S> {
+        self.representation
+            .get(position % self.representation.len())
+            .copied()
     }
 }
-impl<W: FiniteWord> OmegaWord for PeriodicOmegaWord<W> {
+impl<S: Symbol> OmegaWord for PeriodicOmegaWord<S> {
     fn loop_index(&self) -> usize {
         0
     }
 
     type Spoke<'this>
-        = Infix<'this, NonEmpty<W>>
+        = &'this [S]
     where
         Self: 'this;
 
     type Cycle<'this>
-        = Infix<'this, NonEmpty<W>>
+        = &'this [S]
     where
         Self: 'this;
 
     fn spoke(&self) -> Self::Spoke<'_> {
-        self.cycle.prefix(0)
+        self.representation[..self.loop_index()].as_ref()
     }
 
     fn cycle(&self) -> Self::Cycle<'_> {
-        self.cycle.prefix(self.cycle.len())
+        self.representation[self.loop_index()..].as_ref()
     }
 }
 
@@ -593,9 +592,16 @@ impl<S: Display> Debug for ReducedOmegaWord<S> {
     }
 }
 
-impl<W: FiniteWord> Debug for PeriodicOmegaWord<W> {
+impl<S: Display> Debug for PeriodicOmegaWord<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({})𝜔", self.cycle.as_string())
+        write!(
+            f,
+            "({})𝜔",
+            self.representation
+                .iter()
+                .map(|sym| sym.to_string())
+                .join("")
+        )
     }
 }
 

@@ -22,9 +22,6 @@ pub use omega::{
 mod repeat;
 pub use repeat::Repeat;
 
-mod non_empty;
-pub use non_empty::{EmptyWordError, NonEmpty};
-
 mod rotate;
 pub use rotate::Rotate;
 
