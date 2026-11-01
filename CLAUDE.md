@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Guidance for working in this repository. `PLAN.md` has the roadmap, `PERFORMANCE.md` the ranked
-performance opportunities, `PANIC-AUDIT.md` (untracked) the panic-removal status. Read this file
+performance opportunities. Read this file
 before touching the code; follow `.md` cross-references when a task leads elsewhere.
 
 ## What this is
@@ -21,15 +21,9 @@ Sibling crates that stay elsewhere:
 
 ## Commands
 
+To ensure code quality, run the following before committing:
 ```shell
-cargo build --all-targets
-cargo test                              # 224 unit + 61 doctests + 1 integration test
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings          # also: --no-default-features, --all-features
-RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
 ./scripts/check                         # everything CI runs, incl. cargo-hack per-feature check,
-                                         # MSRV check, examples, and the tools/bench crate
-cargo bench                              # gungraun instruction counts (needs valgrind + gungraun-runner)
 ```
 
 - Examples in `examples/` (`dfa`, `parity`, `transition_system`, `dot`, `hoa`) are run by CI;

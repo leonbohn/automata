@@ -69,7 +69,7 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     ///
     /// # Panics
     /// Panics if `indices` is empty. The indices are not checked to be states of `ts` and to be
-    /// strongly connected, see [`Self::state_colors`].
+    /// strongly connected, see [`Self::state_colors`] and [`Self::maximal_loop_from`].
     pub fn new<I: IntoIterator<Item = Ts::StateIndex>>(ts: &'a Ts, indices: I) -> Self {
         let mut states: Vec<_> = indices.into_iter().collect();
         states.sort_unstable();
@@ -201,6 +201,11 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
     /// word exists, it is returned, otherwise the function returns `None`.
     /// This ensures that the word ends back in the state that it started from. Also returns
     /// `None` if `from` is not a state of the SCC.
+    ///
+    /// # Panics
+    /// Panics if the states of `self` are not mutually reachable in the transition system,
+    /// which cannot happen for an SCC of a decomposition, only for one assembled with
+    /// [`Scc::new`] from bogus indices.
     pub fn maximal_loop_from(&self, from: Ts::StateIndex) -> Option<Vec<SymbolOf<Ts>>> {
         if !self.contains(&from) {
             return None;
@@ -224,55 +229,51 @@ impl<'a, Ts: TransitionSystem> Scc<'a, Ts> {
         let mut word = Vec::new();
 
         while !queue.is_empty() {
-            if queue.contains_key(&current) {
-                if queue.get(&current).unwrap().is_empty() {
-                    queue.remove(&current);
-                    continue;
-                } else {
-                    let (symbol, target) = *queue
-                        .get(&current)
-                        .unwrap()
-                        .iter()
-                        .find_or_first(|(_, p)| *p == current)
-                        .expect("We know this is non-empty");
-                    debug_assert!(ts.has_transition(current, symbol, target));
-
-                    queue.get_mut(&current).unwrap().remove(&(symbol, target));
-                    word.push(symbol);
-                    current = target;
-                }
-            } else {
+            if !queue.contains_key(&current) {
+                // `current` has no interior transitions left to take, so we move to a state that
+                // has some (preferring a direct successor of `current`)
                 let q = self
                     .ts
                     .edges_from(current)
-                    .and_then(|mut x| {
-                        x.find_map(|e| {
-                            if queue.contains_key(&e.target()) {
-                                Some(e.target())
-                            } else {
-                                None
-                            }
-                        })
+                    .and_then(|mut edges| {
+                        edges.find_map(|e| queue.contains_key(&e.target()).then_some(e.target()))
                     })
-                    .unwrap_or_else(|| *queue.keys().next().unwrap());
+                    .unwrap_or_else(|| *queue.keys().next().expect("the queue is not empty"));
                 debug_assert!(queue.contains_key(&q));
-                if queue.get(&q).unwrap().is_empty() {
+                if queue.get(&q).is_some_and(BTreeSet::is_empty) {
                     queue.remove(&q);
                     continue;
                 }
-
                 word.extend(
                     ts.word_from_to(current, q)
-                        .expect("Such a word must exist as both states are in the same SCC"),
+                        .expect("such a word must exist as both states are in the same SCC"),
                 );
                 current = q;
+            }
+            match queue.get_mut(&current) {
+                Some(transitions) if !transitions.is_empty() => {
+                    let &(symbol, target) = transitions
+                        .iter()
+                        .find_or_first(|(_, p)| *p == current)
+                        .expect("the transitions are not empty");
+                    debug_assert!(ts.has_transition(current, symbol, target));
+
+                    transitions.remove(&(symbol, target));
+                    word.push(symbol);
+                    current = target;
+                }
+                // the state is done: its entry is removed and the next round picks a new state
+                Some(_) => {
+                    queue.remove(&current);
+                }
+                None => {}
             }
         }
 
         if current != from {
             word.extend(
                 ts.word_from_to(current, from)
-                    .expect("they are in the same scc!"),
+                    .expect("such a word must exist as both states are in the same SCC"),
             );
         }
 
