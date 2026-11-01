@@ -1,5 +1,4 @@
 use crate::{
-    Show,
     alphabet::Symbol,
     word::{FiniteWord, Word},
 };
@@ -10,12 +9,6 @@ use itertools::Itertools;
 /// for the underlying alphabet.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Class<S>(pub Vec<S>);
-
-impl<S: Show> Show for Class<S> {
-    fn show(&self) -> String {
-        format!("[{}]", self.0.iter().map(|s| s.show()).join(""))
-    }
-}
 
 impl<S> Class<S> {
     /// Creates an instance of the empty class
@@ -36,7 +29,7 @@ impl<S> Class<S> {
         if self.is_empty() {
             "ε".to_string()
         } else {
-            self.0.iter().map(|sym| sym.show()).join("")
+            self.0.iter().map(|sym| sym.to_string()).join("")
         }
     }
 }
@@ -55,7 +48,7 @@ impl<S: Symbol> std::fmt::Display for Class<S> {
             if self.0.is_empty() {
                 "ε".to_string()
             } else {
-                self.0.iter().map(|sym| sym.show()).join("")
+                self.0.iter().map(|sym| sym.to_string()).join("")
             }
         )
     }

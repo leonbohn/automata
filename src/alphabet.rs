@@ -1,4 +1,7 @@
-use std::{fmt::Debug, hash::Hash};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 mod simple;
 pub use simple::*;
@@ -6,15 +9,13 @@ pub use simple::*;
 mod propositional;
 pub use propositional::*;
 
-use crate::show::Show;
-
 /// A symbol of an alphabet, which is also the type of the symbols in a word. We consider different types
 /// of alphabets:
 /// - [`CharAlphabet`] alphabets, which are just a set of symbols.
 /// - Propositional alphabets, where a symbol is a valuation of all propositional variables. This is for example
 ///   implemented in the `hoars` crate.
-pub trait Symbol: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show {}
-impl<S: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Show> Symbol for S {}
+pub trait Symbol: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Display {}
+impl<S: PartialEq + Eq + Debug + Copy + Ord + PartialOrd + Hash + Display> Symbol for S {}
 
 /// Encapsulates that an [`Expression`] can be matched by some [`Symbol`], or by another expression.
 /// For simple [`CharAlphabet`]s, where expressions are single symbols, this is just equality.
@@ -32,7 +33,7 @@ impl<E, M: Matcher<E>> Matcher<E> for &M {
 /// An expression is used to label edges of a transition system/automaton. For [`CharAlphabet`]
 /// alphabets, an expression is simply a single symbol, whereas for a propositional alphabet, an expression
 /// is a propositional formula over the atomic propositions. See propositional for more details.
-pub trait Expression: Hash + Clone + Debug + Eq + Ord + Show + Matcher<Self> {
+pub trait Expression: Hash + Clone + Debug + Eq + Ord + Display + Matcher<Self> {
     /// The type of symbols that this expression matches.
     type S: Symbol + Matcher<Self>;
     /// Type of iterator over the concrete symbols matched by this expression.

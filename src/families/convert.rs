@@ -4,7 +4,7 @@ use itertools::Itertools;
 use tracing::{trace, warn};
 
 use crate::{
-    Show, TransitionSystem,
+    TransitionSystem,
     alphabet::Alphabet,
     families::{FDFA, FWPM},
     math,
@@ -83,7 +83,7 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
 
                 for (scc_index, scc) in scc_dag.dag().iter() {
                     for state_index in scc.iter() {
-                        let Some(mr) = minimal_representatives.get_by_left(state_index) else {
+                        let Some(mr) = minimal_representatives.get(state_index) else {
                             warn!("should have minimal representative for state {state_index}, unreachable?");
                             continue;
                         };
@@ -113,7 +113,7 @@ impl<A: Alphabet> From<FDFA<A>> for FWPM<A> {
                     'inner: for (scc_index, scc) in dag.iter() {
                         trace!(
                             "considering SCC {scc_index} with states {}",
-                            scc.iter().map(|q| q.show()).take(2).join(", ")
+                            scc.iter().map(|q| format!("{q:?}")).take(2).join(", ")
                         );
                         if coloring.contains_key(&scc_index) {
                             continue 'inner;

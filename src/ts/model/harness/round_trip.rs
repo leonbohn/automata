@@ -2,7 +2,7 @@
 //! states, colors and edges up to the renumbering of the states, and keeps the language of the
 //! automaton at every state.
 
-use bimap::BiBTreeMap;
+use std::collections::BTreeMap;
 
 use super::*;
 use crate::representation::{FromTransitions, IntoTransitions};
@@ -31,7 +31,7 @@ fn dfa_at<T: Snapshot>(ts: &T, state: T::StateIndex) -> DFA<crate::DTS<CharAlpha
 }
 
 /// The numbering that collecting applied, as a bijection between the old and the new state indices.
-fn bijection<I: IdType, J: DenseId>(map: CompactIdMap<I>) -> BiBTreeMap<I, J> {
+fn bijection<I: IdType, J: DenseId>(map: CompactIdMap<I>) -> BTreeMap<I, J> {
     map.states()
         .iter()
         .enumerate()
@@ -53,12 +53,13 @@ where
     fn assert_snapshot_agrees<O: Snapshot>(
         &self,
         other: &O,
-        renaming: &BiBTreeMap<Ts::StateIndex, O::StateIndex>,
+        renaming: &BTreeMap<Ts::StateIndex, O::StateIndex>,
         what: &str,
     ) {
         let to_model = |o: O::StateIndex| {
             let original = renaming
-                .get_by_right(&o)
+                .iter()
+                .find_map(|(original, renamed)| (*renamed == o).then_some(original))
                 .unwrap_or_else(|| panic!("{what}: state {o:?} does not come from the original"));
             self.reverse_state(*original)
         };
@@ -74,7 +75,7 @@ where
 
         for q in self.model.states() {
             let renamed = *renaming
-                .get_by_left(&self.storage_state(q))
+                .get(&self.storage_state(q))
                 .unwrap_or_else(|| panic!("{what}: state {q} was lost"));
             assert_eq!(
                 self.model.state_color(q),
@@ -134,7 +135,7 @@ where
     fn assert_languages_preserved<O: Snapshot>(
         &self,
         other: &O,
-        renaming: &BiBTreeMap<Ts::StateIndex, O::StateIndex>,
+        renaming: &BTreeMap<Ts::StateIndex, O::StateIndex>,
         what: &str,
     ) {
         if !self.model.is_deterministic() {
@@ -142,7 +143,7 @@ where
         }
         for q in self.model.states() {
             let original = self.storage_state(q);
-            let renamed = *renaming.get_by_left(&original).expect("state was kept");
+            let renamed = *renaming.get(&original).expect("state was kept");
             assert!(
                 Equivalence::of(&dfa_at(&self.ts, original))
                     .and(&dfa_at(other, renamed))
@@ -182,10 +183,10 @@ where
 
             let (back, backward) = (&copy).collect_with_map::<Ts>();
             let backward = bijection(backward);
-            let composed: BiBTreeMap<_, _> = forward
+            let composed: BTreeMap<_, _> = forward
                 .iter()
                 .map(|(original, middle)| {
-                    let back = *backward.get_by_left(middle).expect("state was kept");
+                    let back = *backward.get(middle).expect("state was kept");
                     (*original, back)
                 })
                 .collect();
@@ -210,7 +211,7 @@ where
     pub fn assert_frozen_agrees<O: Snapshot>(&self, freeze: impl FnOnce(&Ts) -> O) {
         self.reported(|| {
             let frozen = freeze(&self.ts);
-            let renaming: BiBTreeMap<_, _> = self.ts.states().zip(frozen.states()).collect();
+            let renaming: BTreeMap<_, _> = self.ts.states().zip(frozen.states()).collect();
             assert_eq!(
                 renaming.len(),
                 self.ts.state_count(),

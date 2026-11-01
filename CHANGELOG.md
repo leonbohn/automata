@@ -34,6 +34,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Deterministic benchmarks that count instructions with gungraun (`scc`, `ts`, `runs`, `dfa`, `dpa`; `cargo bench`, needs valgrind) on closed-form inputs and on 22 DPAs generated with Spot (`benches/fixtures`, `scripts/generate_benchmark_fixtures.sh`), and a criterion target for wall-clock times. There is no randomness in the benchmarks.
 - Benchmark tracking (see `docs/benchmarking.md`): `tools/bench` runs and compares the benchmarks (one execution per revision, 2 % threshold on instruction counts), a Nix flake provides it and a NixOS module that benchmarks `main` and pull requests labelled `performance` on a dedicated machine.
 - README: table of the rendering functions, a recommendation of `graphviz`, and the prerequisites; crates.io and docs.rs badges.
+- Cargo feature `families` (not a default feature) for the module `families` (FDFA, FWPM and their conversions) (#17, #58).
+- `Display` for `InvertibleChar`, `PropSymbol`, `PropExpression`, `MinimalRepresentative`, `AcceptanceMask` and `TransitionMonoid` (replaces `Show`).
+- `ts::WordKind`, which lets `WordTs` read finite and omega words with the same implementations.
 
 ### Changed
 
@@ -111,6 +114,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - `Deterministic::build_transition_table` takes the states to print as first argument so that it works for implicit systems.
   - `contains_state` is constant time for the linked list, `Automaton`, `RightCongruence`, `ReachablePart`, `Quotient`, `Cayley`, `RightCayley`, `WordTs` and all adapters (they forward to the wrapped system; `RestrictByStateIndex` also checks its filter).
   - `Deterministic::successor`, `edge_color` and `is_loop_on` no longer check `contains_state_index` (`edges_from` already returns `None` for unknown states); `is_loop_on` and `is_reachable_from` no longer panic on unknown states.
+- **Breaking:** `Symbol` and `Expression` require `Display` instead of `Show`. `FiniteWord::as_string` needs no extra bound anymore. `Debug` of `ReducedOmegaWord` and `PeriodicOmegaWord` is available for `Display` symbols.
+- **Breaking:** `ts::WordTs` lost its `const FINITE: bool` parameter (`WordTs<A, W>`); finite and omega words share one implementation. The predecessors of the first state of a purely periodic word now contain the edge that closes the loop.
+- **Breaking:** `congruence::StateNaming` and `LazyMinimalRepresentatives` dereference to a `BTreeMap` instead of a `BiBTreeMap` (the dependency `bimap` is gone). `RightCongruence::mr_to_state` looks the state up through the index stored in the representative.
+- `math::{almost_equal, continuous_bernoulli_*, sample_continuous_bernoulli}` need the feature `random`, which is now the only feature that pulls in `rand`.
+- Plain-text tables (`Debug` of `SubsetConstruction`, `Display` of `TransitionMonoid`) are rendered by a small internal helper; the `tabled` and `owo-colors` dependencies are gone and the tables are no longer colored or drawn with box characters.
 
 ### Removed
 
@@ -129,5 +137,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - `visited_edge_colors(w)` is `ts.run(w).observe::<EdgeColorSequence<_>>()`
 - **Breaking:** `TransitionSystem::maybe_initial_state` (use `Dottable::dot_initial_state`), `hint_size` (it was never overridden; use `state_bound`), `make_expression` (use `alphabet().make_expression`), `edges_matching`, `all_accepting_dfa` (use `map_state_colors(|_| true)`), `is_reachable`, `reachable_states`, `reachable_states_from` and `reachable_state_colors` (use `reachable_state_indices*`, which return the same `Bfs`), and `IntoTs for MatchingProduct` (#44).
 - **Breaking:** `Dottable::try_open_svg_in_firefox`, use `display_rendered` or `display_rendered_graphviz`.
+- **Breaking:** the trait `Show` (and `show`, `show_collection`) is removed; use `Display`. This includes the `Show` impls for `Path`, `Lasso`, `RunProfile`, `ProductIndex`, `Class`, `PeriodicOmegaWord`, `ReducedOmegaWord`, tuples, `Vec` and primitive types.
+- Unused dependencies `bimap`, `tabled`, `owo-colors` and `rand_distr`.
 
 [Unreleased]: https://github.com/leonbohn/automata/compare/v0.1.0...HEAD

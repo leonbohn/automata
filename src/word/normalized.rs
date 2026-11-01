@@ -111,8 +111,8 @@ impl<S: Symbol> OmegaWord for NormalizedOmegaWord<S> {
 
 impl<S: Symbol> Debug for NormalizedOmegaWord<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let base = self.base_iter().map(|s| s.show()).join("");
-        let rec = self.rec_iter().map(|s| s.show()).join("");
+        let base = self.base_iter().map(|s| s.to_string()).join("");
+        let rec = self.rec_iter().map(|s| s.to_string()).join("");
         write!(f, "{base}·{rec}~{base}")
     }
 }

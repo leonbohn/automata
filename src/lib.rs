@@ -35,10 +35,8 @@ pub mod partition;
 pub mod dag;
 
 mod color;
+mod table;
 pub use color::{Color, Int, Lattice, Void};
-
-mod show;
-pub use show::Show;
 
 /// The default deterministic transition system: a [`ts::LinkedTs`] wrapped in [`ts::Det`], which
 /// replaces overlapping edges when an edge is added.
@@ -52,6 +50,8 @@ pub mod hoa;
 
 /// Families of objects that are indexed by the classes of a right congruence, for example
 /// families of DFAs (`FDFA`) or of weak priority mappings (`FWPM`), and conversions between them.
+/// Needs the feature `families`.
+#[cfg(feature = "families")]
 pub mod families;
 
 /// This module defines transition systems and successor functions and such.

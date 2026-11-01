@@ -5,7 +5,7 @@ use crate::automaton::{
     OmegaAcceptanceCondition, ReachabilityCondition,
 };
 use crate::ts::{EdgeOf, StateIndex, States};
-use crate::{Color, Pointed, Show, TransitionSystem, alphabet::Alphabet};
+use crate::{Color, Pointed, TransitionSystem, alphabet::Alphabet};
 
 /// All automata are drawn through the [`DotStyle`] of their acceptance condition.
 impl<T: States, Z: DotStyle<T>> Dottable for Automaton<T, Z> {
@@ -54,7 +54,7 @@ impl<T: States<StateColor = bool>> DotStyle<T> for ReachabilityCondition {
     }
 
     fn dot_transition_attributes(&self, _ts: &T, t: EdgeOf<'_, T>) -> Vec<DotTransitionAttribute> {
-        vec![DotTransitionAttribute::Label(t.expression().show())]
+        vec![DotTransitionAttribute::Label(t.expression().to_string())]
     }
 }
 
@@ -72,7 +72,7 @@ impl<T: States> DotStyle<T> for MooreSemantics {
     }
 
     fn dot_transition_attributes(&self, _ts: &T, t: EdgeOf<'_, T>) -> Vec<DotTransitionAttribute> {
-        vec![DotTransitionAttribute::Label(t.expression().show())]
+        vec![DotTransitionAttribute::Label(t.expression().to_string())]
     }
 }
 
@@ -95,7 +95,7 @@ edge_colored_style!(
 
 impl<A: Alphabet, Q: Color, C: Color> Dottable for crate::RightCongruence<DTS<A, Q, C>>
 where
-    StateIndex<Self>: Show,
+    StateIndex<Self>: std::fmt::Display,
 {
     fn dot_name(&self) -> Option<String> {
         Some("Congruence".into())
@@ -106,7 +106,7 @@ where
     }
 
     fn dot_state_ident(&self, idx: Self::StateIndex) -> String {
-        format!("c{}", idx.show())
+        format!("c{}", idx)
     }
 
     fn dot_transition_attributes<'a>(

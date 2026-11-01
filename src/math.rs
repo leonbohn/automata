@@ -1,3 +1,4 @@
+#[cfg(feature = "random")]
 pub use probability::{
     almost_equal, continuous_bernoulli_inverse_cumulative_density_function,
     continuous_bernoulli_mean, sample_continuous_bernoulli,
@@ -17,6 +18,7 @@ pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 /// see [`FxIndexMap`].
 pub type FxIndexSet<T> = indexmap::IndexSet<T, FxBuildHasher>;
 
+#[cfg(feature = "random")]
 mod probability {
     /// Computes the inverse cumulative density function of the continuous bernoulli distribution
     /// as described in [10.3390/fractalfract7050386](https://www.mdpi.com/2504-3110/7/5/386).

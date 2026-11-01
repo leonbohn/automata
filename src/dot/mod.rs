@@ -8,7 +8,6 @@
 //!
 //! Both can hand images to the viewer of the system (`open_in_viewer`).
 
-use crate::Show;
 use crate::ts::{EdgeOf, StateIndex, States};
 use itertools::Itertools;
 
@@ -46,7 +45,7 @@ pub trait DotStyle<T: States> {
     ) -> Vec<DotTransitionAttribute> {
         vec![DotTransitionAttribute::Label(format!(
             "{}|{:?}",
-            edge.expression().show(),
+            edge.expression(),
             edge.color()
         ))]
     }
