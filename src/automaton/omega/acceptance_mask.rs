@@ -1,4 +1,4 @@
-use crate::{Int, Show};
+use crate::Int;
 
 use fixedbitset::FixedBitSet;
 use itertools::Itertools;
@@ -94,9 +94,9 @@ impl FromIterator<Int> for AcceptanceMask {
     }
 }
 
-impl Show for AcceptanceMask {
-    fn show(&self) -> String {
-        self.iter().map(|i| format!("{{{i}}}")).join(", ")
+impl std::fmt::Display for AcceptanceMask {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.iter().map(|i| format!("{{{i}}}")).join(", "))
     }
 }
 

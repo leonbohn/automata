@@ -1,7 +1,7 @@
 use crate::TransitionSystem;
+use crate::alphabet::Alphabet;
 use crate::ts::EdgeOf;
 use crate::ts::{Deterministic, IdType, SymbolOf};
-use crate::{Show, alphabet::Alphabet};
 use itertools::{Either, Itertools};
 
 /// Represents a path through a transition system. Note, that the path itself is decoupled from the
@@ -236,29 +236,13 @@ impl<A: Alphabet, Idx: IdType, Q: std::fmt::Debug, C: std::fmt::Debug> std::fmt:
                 .enumerate()
                 .map(|(i, (p, a, c))| format!(
                     "[{:?}|{:?}] -{}|{:?}-> ",
-                    p,
-                    self.state_colors[i],
-                    a.show(),
-                    c
+                    p, self.state_colors[i], a, c
                 ))
                 .join(""),
             self.end,
             self.state_colors
                 .last()
                 .map_or_else(|| "?".to_string(), |c| format!("{c:?}"))
-        )
-    }
-}
-
-impl<A: Alphabet, Idx: IdType, Q: Show, C: Show> Show for Path<A, Idx, Q, C> {
-    fn show(&self) -> String {
-        format!(
-            "{}{:?}",
-            self.transitions
-                .iter()
-                .map(|(p, a, c)| format!("{p:?} -{}|{}-> ", a.show(), c.show()))
-                .join(""),
-            self.end
         )
     }
 }
@@ -332,12 +316,6 @@ impl<A: Alphabet, Idx: IdType, Q: Clone, C: Clone> Lasso<A, Idx, Q, C> {
     /// that are taken infinitely often.
     pub fn into_recurrent_triggers(self) -> impl Iterator<Item = (Idx, A::Symbol)> {
         self.cycle.into_triggers()
-    }
-}
-
-impl<A: Alphabet, Idx: IdType, Q: Show, C: Show> Show for Lasso<A, Idx, Q, C> {
-    fn show(&self) -> String {
-        format!("{}({})", self.base.show(), self.cycle.show())
     }
 }
 

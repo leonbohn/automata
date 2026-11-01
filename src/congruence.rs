@@ -448,13 +448,15 @@ impl<D: Deterministic> RightCongruence<D> {
     /// Returns the [`Class`] that is referenced by `index`.
     #[inline(always)]
     pub fn state_to_mr(&self, idx: StateIndex<Self>) -> Option<&MinimalRepresentative<D>> {
-        self.minimal_representatives().get_by_left(&idx)
+        self.minimal_representatives().get().get(&idx)
     }
 
     #[inline(always)]
     /// Returns the index of the class containing the given word.
     pub fn mr_to_state(&self, class: &MinimalRepresentative<D>) -> Option<StateIndex<Self>> {
-        self.minimal_representatives().get_by_right(class).cloned()
+        // a representative carries the index of its state, so no reverse lookup is needed
+        let idx = class.state_index();
+        (self.state_to_mr(idx)? == class).then_some(idx)
     }
 
     /// Returns an iterator which yields pairs `(c, idx)` consisting of a reference `c` to the class name together

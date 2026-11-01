@@ -13,7 +13,7 @@ use crate::ts::{Deterministic, EdgeColor, Shrinkable, StateIndex, SymbolOf, oper
 use crate::word::OmegaWord;
 use crate::{DTS, Pointed, TransitionSystem, ts::run};
 use crate::{
-    Int, Show, Void,
+    Int, Void,
     alphabet::CharAlphabet,
     partition::Partition,
     word::{FiniteWord, ReducedOmegaWord},
@@ -468,8 +468,8 @@ where
                         for edge in ts.edges_from(*state).unwrap() {
                             trace!(
                                 "recoloring and removing {state:?} --{}|{}--> {:?} with priority {}",
-                                edge.expression().show(),
-                                edge.color().show(),
+                                edge.expression(),
+                                edge.color(),
                                 edge.target(),
                                 priority
                             );
@@ -493,7 +493,7 @@ where
                         } else {
                             trace!(
                                 "recoloring border edge {q} --{}--> {} with prio {priority}",
-                                edge.expression().show(),
+                                edge.expression(),
                                 edge.target()
                             );
                             recoloring[id_of(&edge)] = Some(priority);
@@ -518,8 +518,8 @@ where
                         {
                             trace!(
                                 "recolouring and removing {q:?} --{}|{}--> {:?} with priority {}",
-                                edge.expression().show(),
-                                edge.color().show(),
+                                edge.expression(),
+                                edge.color(),
                                 edge.target(),
                                 priority
                             );

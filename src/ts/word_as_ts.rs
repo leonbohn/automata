@@ -1,99 +1,84 @@
-use crate::ts::EdgeOf;
-use crate::ts::States;
-use crate::{
-    alphabet::SimpleAlphabet,
-    word::{FiniteWord, OmegaWord, Word},
-};
 use std::borrow::Cow;
 
 use crate::TransitionSystem;
-use crate::ts::{StateIndex, predecessors::PredecessorIterable};
+use crate::alphabet::SimpleAlphabet;
+use crate::ts::{EdgeOf, StateIndex, States, predecessors::PredecessorIterable};
+use crate::word::{Finite, FiniteWord, Omega, OmegaWord, Word};
 
 use super::EdgeRef;
 
 /// Treats a word as if it was a transition system.
 ///
-/// For a finite word, this is equivalent to a transition system that is a chain.
+/// For a finite word, this is equivalent to a transition system that is a chain. The last edge
+/// leads to the state `word.len()`, which does not belong to the system.
 ///
 /// For an infinite word, this is a transition system consisting of a spoke and
 /// an attached loop.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct WordTs<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>, const FINITE: bool> {
+pub struct WordTs<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>> {
     alphabet: A,
     word: W,
 }
 
-impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> PredecessorIterable
-    for WordTs<A, W, false>
-{
-    type EdgesToIter<'this>
-        = std::iter::Once<EdgeOf<'this, Self>>
-    where
-        Self: 'this;
-
-    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
-        if state as usize >= self.word.len() || state == 0 {
-            return None;
-        }
-        let sym = self.word.nth((state - 1) as usize).unwrap();
-        Some(std::iter::once(EdgeRef::owned(
-            state - 1,
-            self.alphabet.express(sym),
-            sym,
-            state,
-        )))
-    }
+/// The shape of the system that a kind of word ([`Finite`] or [`Omega`]) is read as. This lets
+/// [`WordTs`] have the same implementations for finite and infinite words.
+pub trait WordKind<W> {
+    /// The number of states, i.e. the number of positions of `word` that are stored.
+    fn len(word: &W) -> usize;
+    /// The state that the last edge leads back to, `None` if the word does not loop.
+    fn loop_start(word: &W) -> Option<usize>;
 }
-impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> PredecessorIterable
-    for WordTs<A, W, true>
-{
-    type EdgesToIter<'this>
-        = itertools::Either<
-        std::iter::Once<EdgeOf<'this, Self>>,
-        std::iter::Chain<
-            std::iter::Once<EdgeOf<'this, Self>>,
-            std::iter::Once<EdgeOf<'this, Self>>,
-        >,
-    >
-    where
-        Self: 'this;
 
-    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
-        if state as usize >= self.word.combined_len() || state == 0 {
-            return None;
-        }
-        let sym = self.word.nth((state - 1) as usize).unwrap();
+impl<W: FiniteWord> WordKind<W> for Finite {
+    fn len(word: &W) -> usize {
+        word.len()
+    }
 
-        let direct_pred = std::iter::once(EdgeRef::owned(
-            state - 1,
-            self.alphabet.express(sym),
-            sym,
-            state,
-        ));
-        if state as usize != self.word.loop_index() {
-            Some(itertools::Either::Left(direct_pred))
-        } else {
-            Some(itertools::Either::Right(direct_pred.chain(
-                std::iter::once(EdgeRef::owned(
-                    (self.word.combined_len() - 1) as u32,
-                    self.alphabet.express(sym),
-                    sym,
-                    state,
-                )),
-            )))
-        }
+    fn loop_start(_word: &W) -> Option<usize> {
+        None
     }
 }
 
-impl<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>, const FINITE: bool> WordTs<A, W, FINITE> {
+impl<W: OmegaWord> WordKind<W> for Omega {
+    fn len(word: &W) -> usize {
+        word.combined_len()
+    }
+
+    fn loop_start(word: &W) -> Option<usize> {
+        Some(word.loop_index())
+    }
+}
+
+impl<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>> WordTs<A, W> {
     /// Creates a new instance from a given alphabet and a word.
     pub fn new(alphabet: A, word: W) -> Self {
         Self { alphabet, word }
     }
 }
 
-impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
-    for WordTs<A, W, false>
+impl<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>> WordTs<A, W>
+where
+    W::Kind: WordKind<W>,
+{
+    fn len(&self) -> usize {
+        <W::Kind as WordKind<W>>::len(&self.word)
+    }
+
+    /// The edge that reads position `source` of the word and leads to `target`.
+    fn edge(&self, source: u32, target: u32) -> Option<EdgeOf<'_, Self>> {
+        let sym = self.word.nth(source as usize)?;
+        Some(EdgeRef::owned(
+            source,
+            self.alphabet.express(sym),
+            sym,
+            target,
+        ))
+    }
+}
+
+impl<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>> TransitionSystem for WordTs<A, W>
+where
+    W::Kind: WordKind<W>,
 {
     type Alphabet = A;
 
@@ -104,87 +89,21 @@ impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> TransitionSystem
     type EdgeColor = A::Symbol;
 
     type EdgesFromIter<'this>
-        = std::iter::Once<EdgeOf<'this, Self>>
+        = std::option::IntoIter<EdgeOf<'this, Self>>
     where
         Self: 'this;
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        if state as usize >= self.word.len() {
+        let len = self.len();
+        if state as usize >= len {
             return None;
         }
-        let sym = self.word.nth(state as usize).unwrap();
-        Some(std::iter::once(EdgeRef::owned(
-            state,
-            self.alphabet.express(sym),
-            sym,
-            state + 1,
-        )))
-    }
-
-    fn alphabet(&self) -> &Self::Alphabet {
-        &self.alphabet
-    }
-
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
-        if state as usize >= self.word.len() {
-            None
-        } else {
-            Some(Cow::Owned(state))
-        }
-    }
-}
-
-impl<A: SimpleAlphabet, W: FiniteWord<Symbol = A::Symbol>> States for WordTs<A, W, false> {
-    type StatesIter<'this>
-        = std::ops::Range<u32>
-    where
-        Self: 'this;
-
-    fn states(&self) -> Self::StatesIter<'_> {
-        0..(self.word.len().try_into().unwrap())
-    }
-
-    fn state_count(&self) -> usize {
-        self.word.len()
-    }
-
-    fn contains_state(&self, index: StateIndex<Self>) -> bool {
-        (index as usize) < self.word.len()
-    }
-}
-
-impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for WordTs<A, W, true> {
-    type Alphabet = A;
-
-    type StateIndex = u32;
-
-    type StateColor = u32;
-
-    type EdgeColor = A::Symbol;
-
-    type EdgesFromIter<'this>
-        = std::iter::Once<EdgeOf<'this, Self>>
-    where
-        Self: 'this;
-
-    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        if state as usize >= self.word.combined_len() {
-            return None;
-        }
-        let sym = self.word.nth(state as usize).unwrap();
-
-        let target = if (state + 1) as usize >= self.word.combined_len() {
-            self.word.loop_index() as u32
-        } else {
+        let target = if (state as usize) + 1 < len {
             state + 1
+        } else {
+            <W::Kind as WordKind<W>>::loop_start(&self.word).map_or(state + 1, |l| l as u32)
         };
-
-        Some(std::iter::once(EdgeRef::owned(
-            state,
-            self.alphabet.express(sym),
-            sym,
-            target,
-        )))
+        Some(self.edge(state, target).into_iter())
     }
 
     fn alphabet(&self) -> &Self::Alphabet {
@@ -192,30 +111,54 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> TransitionSystem for W
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
-        if state as usize >= self.word.combined_len() {
-            None
-        } else {
-            Some(Cow::Owned(state))
-        }
+        ((state as usize) < self.len()).then_some(Cow::Owned(state))
     }
 }
 
-impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> States for WordTs<A, W, true> {
+impl<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>> States for WordTs<A, W>
+where
+    W::Kind: WordKind<W>,
+{
     type StatesIter<'this>
         = std::ops::Range<u32>
     where
         Self: 'this;
 
     fn states(&self) -> Self::StatesIter<'_> {
-        0..(self.word.combined_len().try_into().unwrap())
+        0..u32::try_from(self.len()).unwrap_or(u32::MAX)
     }
 
     fn state_count(&self) -> usize {
-        self.word.combined_len()
+        self.len()
     }
 
     fn contains_state(&self, index: StateIndex<Self>) -> bool {
-        (index as usize) < self.word.combined_len()
+        (index as usize) < self.len()
+    }
+}
+
+impl<A: SimpleAlphabet, W: Word<Symbol = A::Symbol>> PredecessorIterable for WordTs<A, W>
+where
+    W::Kind: WordKind<W>,
+{
+    type EdgesToIter<'this>
+        = std::iter::Chain<
+        std::option::IntoIter<EdgeOf<'this, Self>>,
+        std::option::IntoIter<EdgeOf<'this, Self>>,
+    >
+    where
+        Self: 'this;
+
+    fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
+        let len = self.len();
+        if state as usize >= len {
+            return None;
+        }
+        let previous = state.checked_sub(1).and_then(|p| self.edge(p, state));
+        let closing = <W::Kind as WordKind<W>>::loop_start(&self.word)
+            .filter(|l| *l == state as usize)
+            .and_then(|_| self.edge(len as u32 - 1, state));
+        Some(previous.into_iter().chain(closing))
     }
 }
 
@@ -223,9 +166,29 @@ impl<A: SimpleAlphabet, W: OmegaWord<Symbol = A::Symbol>> States for WordTs<A, W
 mod tests {
     use super::*;
     use crate::alphabet::CharAlphabet;
+
     #[test]
-    fn word_as_ts() {
+    fn finite_word_is_a_chain() {
         let w = WordTs::new(CharAlphabet::of_size(2), "abba");
         assert_eq!(w.states().collect::<Vec<_>>(), vec![0, 1, 2, 3]);
+        assert_eq!(w.predecessors(0).unwrap().count(), 0);
+        assert_eq!(w.predecessors(3).unwrap().count(), 1);
+        assert!(w.predecessors(4).is_none());
+    }
+
+    #[test]
+    fn omega_word_loops_back() {
+        let w = WordTs::new(CharAlphabet::of_size(2), upw!("a", "ab"));
+        assert_eq!(w.state_count(), 3);
+        let last = w.edges_from(2).unwrap().next().unwrap();
+        assert_eq!(last.target(), 1);
+        assert_eq!(w.predecessors(1).unwrap().count(), 2);
+        assert_eq!(w.predecessors(2).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn periodic_word_closes_at_the_first_state() {
+        let w = WordTs::new(CharAlphabet::of_size(2), upw!("ab"));
+        assert_eq!(w.predecessors(0).unwrap().count(), 1);
     }
 }

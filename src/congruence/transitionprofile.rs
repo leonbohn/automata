@@ -4,8 +4,11 @@ use std::{collections::VecDeque, fmt::Debug, hash::Hash};
 
 use crate::ts::{Deterministic, EdgeColor, IdType, StateColor, SymbolOf};
 use crate::{Pointed, TransitionSystem};
-use crate::{Show, Void, alphabet::Alphabet, word::FiniteWord};
+use crate::{Void, alphabet::Alphabet, word::FiniteWord};
 use itertools::Itertools;
+
+type ProfileOf<Ts> =
+    RunProfile<<Ts as TransitionSystem>::StateIndex, StateColor<Ts>, EdgeColor<Ts>>;
 
 /// Represents the monoid of transition profiles of a transition system.
 ///
@@ -31,11 +34,7 @@ use itertools::Itertools;
 pub struct TransitionMonoid<Ts: TransitionSystem> {
     ts: Ts,
     strings: Vec<(Vec<SymbolOf<Ts>>, ProfileEntry)>,
-    #[allow(clippy::type_complexity)]
-    tps: Vec<(
-        RunProfile<Ts::StateIndex, Ts::StateColor, Ts::EdgeColor>,
-        usize,
-    )>,
+    tps: Vec<(ProfileOf<Ts>, usize)>,
     /// For each profile, the index of the profile obtained by appending a symbol.
     right: Vec<Vec<(SymbolOf<Ts>, usize)>>,
 }
@@ -214,25 +213,6 @@ impl<Idx, Q, C> RunProfile<Idx, Q, C> {
     }
 }
 
-impl<Idx: IdType, Q: Accumulates, C: Accumulates> Show for RunProfile<Idx, Q, C>
-where
-    Q: Show,
-    C: Show,
-{
-    fn show(&self) -> String {
-        let mut out = String::new();
-        for (i, rs) in self.0.iter().enumerate() {
-            out.push_str(&format!(
-                "{i} -{}|{}-> {:?}",
-                rs.sc().show(),
-                rs.ec().show(),
-                rs.state()
-            ))
-        }
-        out
-    }
-}
-
 impl<Idx: IdType, Q: Accumulates, C: Accumulates> RunProfile<Idx, Q, C> {
     /// Creates a profile from tuples `(state, state color, edge color)`, one for each start state.
     pub fn new<I: IntoIterator<Item = (Idx, Q, C)>>(iter: I) -> Self {
@@ -363,14 +343,7 @@ where
     EdgeColor<Ts>: Accumulates,
 {
     /// Returns the profile with the given index, together with the shortest word that produces it.
-    #[allow(clippy::type_complexity)]
-    pub fn get_profile(
-        &self,
-        idx: usize,
-    ) -> Option<(
-        &RunProfile<Ts::StateIndex, StateColor<Ts>, EdgeColor<Ts>>,
-        &[SymbolOf<Ts>],
-    )> {
+    pub fn get_profile(&self, idx: usize) -> Option<(&ProfileOf<Ts>, &[SymbolOf<Ts>])> {
         let (tp, string_idx) = self.tps.get(idx)?;
         let (word, _) = self.strings.get(*string_idx)?;
         Some((tp, word))
@@ -495,42 +468,39 @@ where
     }
 }
 
-impl<Ts> Show for TransitionMonoid<Ts>
+/// Renders one row per word with the profile it induces: for each state the reached state and
+/// the state and edge color accumulated on the way. Words that only redirect to an existing
+/// profile are marked with a trailing `*`.
+impl<Ts> std::fmt::Display for TransitionMonoid<Ts>
 where
     Ts: TransitionSystem,
     StateColor<Ts>: Accumulates,
     EdgeColor<Ts>: Accumulates,
-    for<'b> (&'b Ts::StateColor, &'b Ts::EdgeColor): Show,
 {
-    fn show(&self) -> String {
-        use owo_colors::OwoColorize;
-        let mut b = tabled::builder::Builder::default();
-
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut rows = vec![];
         for (word, entry) in &self.strings {
-            let mut row = vec![];
-            let profile_idx = match entry {
-                ProfileEntry::Profile(profile) => {
-                    row.push(word.show().bold().to_string());
-                    profile
-                }
-                ProfileEntry::Redirect(redirect) => {
-                    row.push(word.show().dimmed().to_string());
-                    redirect
-                }
+            let (profile_idx, mark) = match entry {
+                ProfileEntry::Profile(profile) => (profile, ""),
+                ProfileEntry::Redirect(redirect) => (redirect, "*"),
             };
-
             let Some((profile, _)) = self.tps.get(*profile_idx) else {
                 continue;
             };
+            let word = if word.is_empty() {
+                "ε".to_string()
+            } else {
+                word.iter().join("")
+            };
+            let mut row = vec![format!("{word}{mark}")];
             row.extend(
                 profile
                     .iter()
-                    .map(|tp| format!("{:?}|{}", tp.state(), (tp.sc(), tp.ec()).show().purple(),)),
+                    .map(|tp| format!("{:?}|{:?}|{:?}", tp.state(), tp.sc(), tp.ec())),
             );
-            b.push_record(row);
+            rows.push(row);
         }
-
-        b.build().with(tabled::settings::Style::ascii()).to_string()
+        f.write_str(&crate::table::render(&rows))
     }
 }
 

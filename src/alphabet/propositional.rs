@@ -1,5 +1,5 @@
 use std::{
-    fmt::Display,
+    fmt::{Display, Write as _},
     hash::Hash,
     marker::PhantomData,
     sync::{Arc, Mutex},
@@ -10,7 +10,6 @@ use itertools::Itertools;
 use thiserror::Error;
 use tracing::trace;
 
-use crate::show::Show;
 use std::collections::BTreeSet;
 
 use super::{Alphabet, CharAlphabet, Expression, Matcher};
@@ -168,21 +167,11 @@ impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
     }
 }
 
-impl<RawTy: RawSymbolRepr> Show for PropSymbol<RawTy> {
-    fn show(&self) -> String {
-        let chr = |b| {
-            if b { '1' } else { '0' }
-        };
-        assert!(
-            self.num_aps as usize <= 8usize.saturating_pow(std::mem::size_of::<RawTy>() as u32)
-        );
-        (0..self.num_aps).rev().fold(
-            String::with_capacity(self.num_aps as usize),
-            |mut acc, x| {
-                acc.push(chr(self.raw.bit(x as usize)));
-                acc
-            },
-        )
+impl<RawTy: RawSymbolRepr> Display for PropSymbol<RawTy> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (0..self.num_aps)
+            .rev()
+            .try_for_each(|x| f.write_char(if self.raw.bit(x as usize) { '1' } else { '0' }))
     }
 }
 
@@ -354,10 +343,14 @@ impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
     }
 }
 
-impl<RawTy: RawSymbolRepr> Show for PropExpression<RawTy> {
-    /// Renders the expression over the letters `a`, `b`, ... instead of the proposition indices.
-    fn show(&self) -> String {
-        bdd_to_string(&self.bdd, |i| ((b'a' + i as u8) as char).to_string(), "&")
+/// Renders the expression over the letters `a`, `b`, ... instead of the proposition indices.
+impl<RawTy: RawSymbolRepr> Display for PropExpression<RawTy> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&bdd_to_string(
+            &self.bdd,
+            |i| ((b'a' + i as u8) as char).to_string(),
+            "&",
+        ))
     }
 }
 
@@ -608,7 +601,7 @@ mod tests {
     fn expressions_are_rendered_over_indices_for_hoa_and_letters_for_humans() {
         let both = PropExpression::<u32>::new(2, "x_0 & !x_1");
         assert_eq!(both.to_hoa_label(), "0 & !1");
-        assert_eq!(both.show(), "a&!b");
+        assert_eq!(both.to_string(), "a&!b");
 
         let either = PropExpression::<u32>::new(2, "x_0 | x_1");
         let label = either.to_hoa_label();
@@ -622,7 +615,7 @@ mod tests {
         assert_eq!(always.to_hoa_label(), "t");
         let never = PropExpression::<u32>::new(2, "x_0 & !x_0");
         assert_eq!(never.to_hoa_label(), "f");
-        assert_eq!(never.show(), "f");
+        assert_eq!(never.to_string(), "f");
     }
 
     #[test]
@@ -684,7 +677,7 @@ mod tests {
             num_aps: 5,
             raw: 19u32,
         };
-        assert_eq!(ps.show(), "10011".to_string());
+        assert_eq!(ps.to_string(), "10011".to_string());
     }
 
     #[test]

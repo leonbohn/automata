@@ -194,11 +194,11 @@ pub trait Deterministic: TransitionSystem {
         SD: Fn(Self::StateIndex, StateColor<Self>) -> String,
         ED: Fn(EdgeOf<'a, Self>) -> String,
     {
-        let mut builder = tabled::builder::Builder::default();
-        builder.push_record(
+        let mut rows = vec![
             std::iter::once("State".to_string())
-                .chain(self.alphabet().universe().map(|s| format!("{:?}", s))),
-        );
+                .chain(self.alphabet().universe().map(|s| format!("{:?}", s)))
+                .collect(),
+        ];
         for id in states.into_iter().sorted() {
             let Some(color) = self.state_color(id) else {
                 continue;
@@ -211,13 +211,10 @@ pub trait Deterministic: TransitionSystem {
                     row.push("-".to_string());
                 }
             }
-            builder.push_record(row);
+            rows.push(row);
         }
 
-        builder
-            .build()
-            .with(tabled::settings::Style::rounded())
-            .to_string()
+        crate::table::render(&rows)
     }
 
     /// Returns true if `self` is accessible, meaning every state is reachable from the initial state.

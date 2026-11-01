@@ -21,7 +21,7 @@ use crate::ts::IdType;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{Det, Linked, SproutableStorage, Storage};
 use crate::{
-    Color, Show, Void,
+    Color, Void,
     alphabet::{Alphabet, CharAlphabet, Matcher},
     math,
 };
@@ -868,13 +868,7 @@ impl<A: Alphabet + std::fmt::Debug, Q: Color, C: Color> std::fmt::Debug for Link
                 continue;
             };
             for e in it {
-                write!(
-                    f,
-                    " {}/{:?}->{}",
-                    e.expression().show(),
-                    e.color(),
-                    e.target()
-                )?;
+                write!(f, " {}/{:?}->{}", e.expression(), e.color(), e.target())?;
             }
             writeln!(f)?;
         }

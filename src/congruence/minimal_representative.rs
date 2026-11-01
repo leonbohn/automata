@@ -1,17 +1,12 @@
 use std::{cell::OnceCell, hash::Hash};
 
 use crate::ts::{StateIndex, SymbolOf};
+use crate::word::{FiniteWord, Word};
 use crate::{Pointed, TransitionSystem};
-use crate::{
-    Show,
-    word::{FiniteWord, Word},
-};
-use bimap::BiBTreeMap;
-use itertools::Itertools;
+use std::collections::BTreeMap;
 
-/// Represents a bijection between state indices of a transition
-/// system and the minimal representative word.
-pub struct StateNaming<T: TransitionSystem>(BiBTreeMap<StateIndex<T>, Vec<SymbolOf<T>>>);
+/// Maps the state indices of a transition system to their minimal representative word.
+pub struct StateNaming<T: TransitionSystem>(BTreeMap<StateIndex<T>, Vec<SymbolOf<T>>>);
 
 impl<T: TransitionSystem> FromIterator<(StateIndex<T>, Vec<SymbolOf<T>>)> for StateNaming<T> {
     fn from_iter<I: IntoIterator<Item = (StateIndex<T>, Vec<SymbolOf<T>>)>>(iter: I) -> Self {
@@ -29,7 +24,7 @@ impl<T: TransitionSystem> FromIterator<MinimalRepresentative<T>> for StateNaming
 }
 
 impl<T: TransitionSystem> std::ops::Deref for StateNaming<T> {
-    type Target = BiBTreeMap<StateIndex<T>, Vec<SymbolOf<T>>>;
+    type Target = BTreeMap<StateIndex<T>, Vec<SymbolOf<T>>>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -135,13 +130,12 @@ impl<T: TransitionSystem> FiniteWord for MinimalRepresentative<T> {
     }
 }
 
-impl<T: TransitionSystem + Show> Show for MinimalRepresentative<T> {
-    fn show(&self) -> String {
+impl<T: TransitionSystem> std::fmt::Display for MinimalRepresentative<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_empty() {
-            "ε".to_string()
-        } else {
-            self.0.iter().map(|sym| sym.show()).join("")
+            return f.write_str("ε");
         }
+        self.0.iter().try_for_each(|sym| write!(f, "{sym}"))
     }
 }
 
@@ -149,13 +143,13 @@ impl<T: TransitionSystem + Show> Show for MinimalRepresentative<T> {
 /// to avoid recomputing the minimal representatives of a congruence multiple times.
 #[derive(Clone, Debug)]
 pub struct LazyMinimalRepresentatives<T: TransitionSystem>(
-    OnceCell<BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>>,
+    OnceCell<BTreeMap<StateIndex<T>, MinimalRepresentative<T>>>,
 );
 
 impl<T: TransitionSystem> LazyMinimalRepresentatives<T> {
     /// Tries to get access to the underlying minimal representatives. If the cache
     /// has not been initialized yet, this will return `None`.
-    pub fn try_get(&self) -> Option<&BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>> {
+    pub fn try_get(&self) -> Option<&BTreeMap<StateIndex<T>, MinimalRepresentative<T>>> {
         self.0.get()
     }
 
@@ -164,12 +158,12 @@ impl<T: TransitionSystem> LazyMinimalRepresentatives<T> {
     ///
     /// # Panics
     /// Panics if the cache has not been initialized, see [`Self::ensure`].
-    pub fn get(&self) -> &BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>> {
+    pub fn get(&self) -> &BTreeMap<StateIndex<T>, MinimalRepresentative<T>> {
         self.0.get().expect("Cache not initialized")
     }
 
     /// Ensures that the minimal representatives are computed and stored in the cache.
-    pub fn ensure(&self, ts: &T) -> &BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>
+    pub fn ensure(&self, ts: &T) -> &BTreeMap<StateIndex<T>, MinimalRepresentative<T>>
     where
         T: Pointed,
     {
@@ -182,9 +176,9 @@ impl<T: TransitionSystem> LazyMinimalRepresentatives<T> {
         &self,
         ts: &T,
         initial: StateIndex<T>,
-    ) -> &BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>> {
+    ) -> &BTreeMap<StateIndex<T>, MinimalRepresentative<T>> {
         self.0.get_or_init(|| {
-            let mut map = BiBTreeMap::new();
+            let mut map = BTreeMap::new();
             for mr in ts.minimal_representatives_iter_from(initial) {
                 map.insert(mr.state_index(), mr);
             }
@@ -196,7 +190,7 @@ impl<T: TransitionSystem> LazyMinimalRepresentatives<T> {
 }
 
 impl<T: TransitionSystem> std::ops::Deref for LazyMinimalRepresentatives<T> {
-    type Target = BiBTreeMap<StateIndex<T>, MinimalRepresentative<T>>;
+    type Target = BTreeMap<StateIndex<T>, MinimalRepresentative<T>>;
 
     fn deref(&self) -> &Self::Target {
         self.get()

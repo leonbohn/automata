@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use itertools::Itertools;
 
-use crate::{alphabet::Symbol, show::Show};
+use crate::alphabet::Symbol;
 
 use super::{Concat, PeriodicOmegaWord, Repeat, Word, omega::OmegaIteration};
 
@@ -128,13 +128,9 @@ pub trait FiniteWord: Word<Kind = super::Finite> {
         self.len() == 0
     }
 
-    /// Converts the word to a string. This is only possible if the the symbols implement
-    /// the [`Show`] trait.
-    fn as_string(&self) -> String
-    where
-        Self::Symbol: Show,
-    {
-        let out = self.symbols().map(|a| a.show()).join("");
+    /// Converts the word to a string, the empty word is rendered as `ε`.
+    fn as_string(&self) -> String {
+        let out = self.symbols().map(|a| a.to_string()).join("");
         if out.is_empty() { "ε".into() } else { out }
     }
 }

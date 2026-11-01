@@ -1,9 +1,5 @@
 use std::collections::{BTreeSet, VecDeque};
 
-use itertools::Itertools;
-
-use crate::show::Show;
-
 use super::{Alphabet, Expression, IndexedAlphabet, Matcher, Symbol};
 
 /// An alphabet of individual symbols that are their own expressions, i.e. every edge is labeled
@@ -423,17 +419,9 @@ impl Expression for InvertibleChar {
     }
 }
 
-impl Show for InvertibleChar {
-    fn show(&self) -> String {
-        format!("{}{}", self.0, if self.1 { "\u{0303}" } else { "" })
-    }
-
-    fn show_collection<'a, I: IntoIterator<Item = &'a Self>>(iter: I) -> String
-    where
-        Self: 'a,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        format!("'{}'", iter.into_iter().rev().map(|c| c.show()).join(""))
+impl std::fmt::Display for InvertibleChar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.0, if self.1 { "\u{0303}" } else { "" })
     }
 }
 

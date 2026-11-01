@@ -1,8 +1,11 @@
 use itertools::Itertools;
-use std::{fmt::Debug, marker::PhantomData};
+use std::{
+    fmt::{Debug, Display},
+    marker::PhantomData,
+};
 use thiserror::Error;
 
-use crate::{alphabet::Symbol, show::Show};
+use crate::alphabet::Symbol;
 
 use super::{FiniteWord, Word};
 
@@ -170,7 +173,6 @@ fn deduplicate<S: Eq>(input: Vec<S>) -> Vec<S> {
 
 /// A periodic omega word has no finite prefix and consists only of a finite loop that is
 /// repeated infinitely often. Note, that the loop cannot be empty.
-/// TODO: make non-empty word into a new type
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct PeriodicOmegaWord<S> {
     representation: Vec<S>,
@@ -192,12 +194,6 @@ impl<S: Symbol> TryFrom<ReducedOmegaWord<S>> for PeriodicOmegaWord<S> {
                 representation: value.word,
             })
         }
-    }
-}
-
-impl<S: Show> Show for PeriodicOmegaWord<S> {
-    fn show(&self) -> String {
-        self.representation.show()
     }
 }
 
@@ -299,22 +295,6 @@ impl<S: Symbol> OmegaWord for PeriodicOmegaWord<S> {
 pub struct ReducedOmegaWord<S> {
     pub(super) word: Vec<S>,
     pub(super) loop_index: usize,
-}
-
-impl<S: Symbol> Show for ReducedOmegaWord<S> {
-    fn show(&self) -> String {
-        format!(
-            "{},({})",
-            self.word[0..self.loop_index]
-                .iter()
-                .map(|chr| chr.show())
-                .join(""),
-            self.word[self.loop_index..]
-                .iter()
-                .map(|chr| chr.show())
-                .join("")
-        )
-    }
 }
 
 impl<S: Symbol> Word for ReducedOmegaWord<S> {
@@ -589,33 +569,40 @@ pub enum ReducedParseError {
     TooManyCommas,
 }
 
-impl<S: Show> Debug for ReducedOmegaWord<S> {
+impl<S: Display> Debug for ReducedOmegaWord<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.loop_index == 0 {
-            write!(f, "({})𝜔", self.word.iter().map(|sym| sym.show()).join(""))
+            write!(
+                f,
+                "({})𝜔",
+                self.word.iter().map(|sym| sym.to_string()).join("")
+            )
         } else {
             write!(
                 f,
                 "{}, ({})𝜔",
                 self.word[..self.loop_index]
                     .iter()
-                    .map(|sym| sym.show())
+                    .map(|sym| sym.to_string())
                     .join(""),
                 self.word[self.loop_index..]
                     .iter()
-                    .map(|sym| sym.show())
+                    .map(|sym| sym.to_string())
                     .join("")
             )
         }
     }
 }
 
-impl<S: Show> Debug for PeriodicOmegaWord<S> {
+impl<S: Display> Debug for PeriodicOmegaWord<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "({})𝜔",
-            self.representation.iter().map(|sym| sym.show()).join("")
+            self.representation
+                .iter()
+                .map(|sym| sym.to_string())
+                .join("")
         )
     }
 }

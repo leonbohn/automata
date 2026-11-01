@@ -1,8 +1,7 @@
+use crate::alphabet::Alphabet;
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{EdgeExpression, EdgeOf, EdgeRef, IdType, StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
-use crate::{Show, alphabet::Alphabet};
-use itertools::Itertools;
 use std::borrow::Cow;
 
 /// Trait that abstracts the product operation for transition systems.
@@ -36,21 +35,6 @@ impl<L: IdType, R: IdType> IdType for ProductIndex<L, R> {}
 impl<L, R> From<ProductIndex<L, R>> for (L, R) {
     fn from(value: ProductIndex<L, R>) -> Self {
         (value.0, value.1)
-    }
-}
-
-impl<L: Show, R: Show> Show for ProductIndex<L, R> {
-    fn show(&self) -> String {
-        format!("({} | {})", self.0.show(), self.1.show())
-    }
-
-    fn show_collection<'a, I>(iter: I) -> String
-    where
-        Self: 'a,
-        I: IntoIterator<Item = &'a Self>,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        format!("{{{}}}", iter.into_iter().map(|x| x.show()).join(", "))
     }
 }
 

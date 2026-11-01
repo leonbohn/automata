@@ -261,7 +261,7 @@ impl<Q: Color, C: Color, S: Symbol> Builder<Q, C, S> {
                 if let Some(existing_target) = seen.insert((q, e), p) {
                     return Err(BuilderError::OverlappingEdge {
                         source_state: q,
-                        expression: e.show(),
+                        expression: e.to_string(),
                         target: p,
                         existing_target,
                     });

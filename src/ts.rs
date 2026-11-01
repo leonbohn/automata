@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use tracing::trace;
 
 use crate::{
-    Color, Show, Void,
+    Color, Void,
     alphabet::{Alphabet, Expression},
     partition::Partition,
 };
@@ -69,7 +69,7 @@ mod word_as_ts;
 mod model;
 
 pub use crate::ts::predecessors::PredecessorIterable;
-pub use word_as_ts::WordTs;
+pub use word_as_ts::{WordKind, WordTs};
 
 /// Encapsulates the transition function δ of a transition system. This is the main trait that
 /// is used to query a transition system.
@@ -513,9 +513,9 @@ pub trait States: TransitionSystem {
                         trace!(
                             "found overlapping edges from {:?}: on {} to {:?} and on {} to {:?}",
                             l.source(),
-                            l.expression().show(),
+                            l.expression(),
                             l.target(),
-                            r.expression().show(),
+                            r.expression(),
                             r.target(),
                         );
                         return false;
