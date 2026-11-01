@@ -352,7 +352,6 @@ impl<W: Word> EscapePrefix<W> {
 
 impl<W: Word> Word for EscapePrefix<W> {
     type Symbol = W::Symbol;
-    const FINITE: bool = true;
     type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
         if position + 1 >= self.shortest_escaping_length {

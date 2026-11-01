@@ -1,4 +1,4 @@
-use crate::{Color, Void, alphabet::CharAlphabet, math};
+use crate::{Color, Int, Void, alphabet::CharAlphabet, math};
 
 use crate::DTS;
 use crate::automaton::semantics::observe_omega;
@@ -14,7 +14,7 @@ use crate::word::OmegaWord;
 /// that this means if a run is not accepting, then the set of colors it visits infinitely
 /// often is not contained in the [`MullerCondition`]. This allows for easy complementation
 /// of a [`DMA`] by simply taking the complement of the [`MullerCondition`].
-pub type DMA<T = DTS<CharAlphabet, Void, usize>> = Automaton<T, MullerCondition<EdgeColor<T>>>;
+pub type DMA<T = DTS<CharAlphabet, Void, Int>> = Automaton<T, MullerCondition<EdgeColor<T>>>;
 
 /// A Muller condition over some [`Color`] `C` is a set of sets of elements of type `C`. It
 /// is satisfied by a set (usually the set of colors that appear infinitely often in a run),

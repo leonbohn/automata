@@ -28,7 +28,6 @@ pub trait FiniteWord: Word<Kind = super::Finite> {
     /// Checks if the given word is equal to this word. Note, that this operation only makes sense
     /// when both words are finite.
     fn finite_word_equals<W: FiniteWord<Symbol = Self::Symbol>>(&self, other: W) -> bool {
-        assert!(W::FINITE);
         self.len() == other.len() && self.symbols().zip(other.symbols()).all(|(a, b)| a == b)
     }
 
@@ -37,7 +36,6 @@ pub trait FiniteWord: Word<Kind = super::Finite> {
         &self,
         other: W,
     ) -> std::cmp::Ordering {
-        assert!(W::FINITE);
         self.len()
             .cmp(&other.len())
             .then(self.symbols().cmp(other.symbols()))
@@ -152,7 +150,6 @@ impl<S: Symbol, const N: usize> FiniteWord for [S; N] {
 
 impl<S: Symbol, const N: usize> Word for [S; N] {
     type Symbol = S;
-    const FINITE: bool = true;
     type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<S> {
         self.get(position).cloned()
@@ -179,7 +176,6 @@ impl<S: Symbol, Fw: FiniteWord<Symbol = S> + ?Sized> FiniteWord for &Fw {
 
 impl<S: Symbol> Word for VecDeque<S> {
     type Symbol = S;
-    const FINITE: bool = true;
     type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {
@@ -207,7 +203,6 @@ impl<S: Symbol> FiniteWord for VecDeque<S> {
 
 impl Word for str {
     type Symbol = char;
-    const FINITE: bool = true;
     type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<char> {
         self.chars().nth(position)
@@ -231,7 +226,6 @@ impl FiniteWord for str {
 
 impl Word for String {
     type Symbol = char;
-    const FINITE: bool = true;
     type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<char> {
         self.chars().nth(position)
@@ -263,7 +257,6 @@ impl FiniteWord for String {
 
 impl<S: Symbol> Word for Vec<S> {
     type Symbol = S;
-    const FINITE: bool = true;
     type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {
@@ -297,7 +290,6 @@ impl<S: Symbol> FiniteWord for Vec<S> {
 
 impl<S: Symbol> Word for [S] {
     type Symbol = S;
-    const FINITE: bool = true;
     type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<S> {
         if position < self.len() {

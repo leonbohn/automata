@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Breaking:** API consistency (#109).
+  - `DRA` and `DMA` default to `Int` (`u8`) colours instead of `usize`, like `DPA`.
+  - `Word::FINITE` is removed; use `Word::Kind` (`word::Finite`/`word::Omega`) instead. The
+    redundant `assert!(W::FINITE)` checks in `FiniteWord`/`OmegaWord` methods are gone, the types
+    already guarantee it.
 - `Scc::maximal_loop_from` no longer relies on `unwrap`s for its bookkeeping: the queue of the
   remaining interior transitions is read through one `match`, and the states whose transitions
   are exhausted are dropped there. The remaining `expect`s check the precondition that the states

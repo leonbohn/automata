@@ -8,7 +8,6 @@ pub struct Concat<X, Y>(pub X, pub Y);
 
 impl<X: FiniteWord, Y: Word<Symbol = X::Symbol>> Word for Concat<X, Y> {
     type Symbol = X::Symbol;
-    const FINITE: bool = Y::FINITE;
     type Kind = Y::Kind;
     fn nth(&self, position: usize) -> Option<X::Symbol> {
         if position < self.0.len() {

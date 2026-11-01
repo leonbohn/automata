@@ -81,7 +81,6 @@ pub trait OmegaWord: Word<Kind = super::Omega> {
     /// assert!(offset1.omega_word_equals(offset2)); // but they are semantically equal
     /// ```
     fn omega_word_equals<W: OmegaWord<Symbol = Self::Symbol>>(&self, other: W) -> bool {
-        assert!(!W::FINITE);
         self.reduced() == other.reduced()
     }
 
@@ -218,6 +217,9 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
     /// Creates a new periodic omega word from a finite word. The word must not be empty and
     /// it is deduplicated.
     ///
+    /// # Panics
+    /// Panics if `word` is empty.
+    ///
     /// # Example
     /// ```
     /// use automata::{upw, word::{FiniteWord, OmegaWord}};
@@ -247,7 +249,6 @@ impl<S: Symbol> PeriodicOmegaWord<S> {
 
 impl<S: Symbol> Word for PeriodicOmegaWord<S> {
     type Symbol = S;
-    const FINITE: bool = false;
     type Kind = crate::word::Omega;
     fn nth(&self, position: usize) -> Option<S> {
         self.representation
@@ -299,7 +300,6 @@ pub struct ReducedOmegaWord<S> {
 
 impl<S: Symbol> Word for ReducedOmegaWord<S> {
     type Symbol = S;
-    const FINITE: bool = false;
     type Kind = crate::word::Omega;
     fn nth(&self, position: usize) -> Option<S> {
         if position >= self.word.len() {
@@ -485,7 +485,6 @@ pub struct Epsilon<S>(PhantomData<S>);
 
 impl<S: Symbol> Word for Epsilon<S> {
     type Symbol = S;
-    const FINITE: bool = true;
     type Kind = crate::word::Finite;
     fn nth(&self, _position: usize) -> Option<S> {
         None
@@ -528,7 +527,6 @@ impl<W: FiniteWord> OmegaIteration<W> {
 
 impl<W: FiniteWord> Word for OmegaIteration<W> {
     type Symbol = W::Symbol;
-    const FINITE: bool = false;
     type Kind = crate::word::Omega;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
         self.0.nth(position % self.0.len())
