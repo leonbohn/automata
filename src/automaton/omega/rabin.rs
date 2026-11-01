@@ -6,7 +6,7 @@ use crate::automaton::{Automaton, Semantics};
 use crate::ts::run::Observer;
 use crate::ts::{Deterministic, EdgeColor, StateIndex, SymbolOf, run};
 use crate::word::OmegaWord;
-use crate::{Color, Void, alphabet::CharAlphabet};
+use crate::{Color, Int, Void, alphabet::CharAlphabet};
 
 /// A deterministic Rabin automaton (DRA) uses a [`RabinCondition`] to determine acceptance.
 /// Specifically, such a condition consists of a set of [`RabinPair`]s, which in turn are
@@ -14,7 +14,7 @@ use crate::{Color, Void, alphabet::CharAlphabet};
 /// if no color from `fin` is visited infinitely often and at least one color from `inf` is
 /// visited infinitely often. Overall, a Rabin condition is then satisfied if at least one of
 /// its constituent pairs is satisfied.
-pub type DRA<T = DTS<CharAlphabet, Void, usize>> = Automaton<T, RabinCondition<EdgeColor<T>>>;
+pub type DRA<T = DTS<CharAlphabet, Void, Int>> = Automaton<T, RabinCondition<EdgeColor<T>>>;
 
 /// Represents a Rabin condition, which is a set of [`RabinPair`]s. Such a condition is satisfied
 /// if at least one of its pairs is satisfied.

@@ -19,6 +19,9 @@ pub enum Error {
     /// A reduced omega word has a non-empty prefix and cannot be turned into a periodic one.
     #[error(transparent)]
     NotPeriodic(#[from] crate::word::NotPeriodicError),
+    /// A word that has to be non-empty was empty.
+    #[error(transparent)]
+    EmptyWord(#[from] crate::word::EmptyWordError),
     /// An error occurred when reading an automaton in the HOA format.
     #[cfg(feature = "hoa")]
     #[error(transparent)]

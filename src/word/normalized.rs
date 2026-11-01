@@ -82,7 +82,6 @@ impl<S: Symbol> NormalizedOmegaWord<S> {
 
 impl<S: Symbol> Word for NormalizedOmegaWord<S> {
     type Symbol = S;
-    const FINITE: bool = false;
     type Kind = crate::word::Omega;
     fn nth(&self, position: usize) -> Option<S> {
         self.upw.nth(position)

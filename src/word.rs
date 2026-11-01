@@ -22,6 +22,9 @@ pub use omega::{
 mod repeat;
 pub use repeat::Repeat;
 
+mod non_empty;
+pub use non_empty::{EmptyWordError, NonEmpty};
+
 mod rotate;
 pub use rotate::Rotate;
 
@@ -39,9 +42,6 @@ pub struct Omega;
 pub trait Word: Hash + Eq {
     /// Represents the type of symbol making up the word.
     type Symbol: Symbol;
-
-    /// Constant that indicates whether the word is finite or not.
-    const FINITE: bool;
 
     /// Marker type that says whether the word is finite ([`Finite`]) or infinite ([`Omega`]). It
     /// lets APIs such as [`crate::ts::Deterministic::run`] pick the finite or the infinite
@@ -105,7 +105,6 @@ pub trait Word: Hash + Eq {
 
 impl<W: Word + ?Sized> Word for &W {
     type Symbol = W::Symbol;
-    const FINITE: bool = W::FINITE;
     type Kind = W::Kind;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
         W::nth(self, position)
@@ -126,7 +125,6 @@ pub struct ConsumingInfixIterator<'a, W: Word> {
 
 impl<W: Word> Word for ConsumingInfixIterator<'_, W> {
     type Symbol = W::Symbol;
-    const FINITE: bool = true;
     type Kind = crate::word::Finite;
     fn nth(&self, position: usize) -> Option<W::Symbol> {
         self.word.nth(self.start + position)
