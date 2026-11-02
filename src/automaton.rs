@@ -26,6 +26,9 @@ pub use problems::{
 mod reachability;
 pub use reachability::{DFA, ReachabilityCondition};
 
+mod nfa;
+pub use nfa::{NFA, NfaCondition, SomeRunAccepts};
+
 mod omega;
 pub use omega::{
     AcceptanceError, AcceptanceMask, BuchiCondition, DBA, DMA, DPA, DRA,
@@ -209,7 +212,7 @@ impl<T: TransitionSystem, Sem> Automaton<T, Sem> {
     }
 }
 
-impl<T: Deterministic, Sem> Automaton<T, Sem> {
+impl<T: TransitionSystem, Sem> Automaton<T, Sem> {
     /// Returns whether the automaton accepts the given word. The word can be finite or
     /// infinite, depending on which of the two the acceptance condition `Sem` supports.
     pub fn accepts<W>(&self, word: W) -> bool

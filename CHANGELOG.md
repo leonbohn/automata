@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-03
+
 ### Fixed
 
 - `PropSymbol::from_bools` is now the inverse of `as_bools` (it used the opposite bit order, so
@@ -58,6 +60,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `NFA`, a nondeterministic finite automaton over an `NTS` (`Automaton<T, NfaCondition>`): `accepts`
+  checks whether some run ends in an accepting state, `NFA::determinize` returns an equivalent
+  `DFA` (subset construction). `NBA` is left for later. `Automaton::accepts`/`transform` no longer
+  require `T: Deterministic`; the `Semantics` implementations carry that bound where needed.
+- `automata::prelude`: `use automata::prelude::*;` brings the traits (`TransitionSystem`, `States`,
+  `Deterministic`, `Pointed`, `Sproutable`, ...), `Builder`, `q`/`StateId`, `DTS`/`NTS`, the
+  automaton aliases, the language problems, `Minimize`, `Determinize`, `upw!` and `Dottable` (plus the HOA
+  reader/writer with the `hoa` feature) into scope.
+- Crate-level documentation with a tour of the layers (alphabet, word, transition system with
+  storages, traits, adapters and `collect`, automaton and acceptance, problems), all with runnable
+  examples.
 - `ts::StateId` and the shorthand `ts::q(n)` (`q(3)` is the state `q_3`).
 
 - Property tests (`tests/properties.rs`) for DFAs, DPAs, DBAs, Moore and Mealy machines and HOA
@@ -196,4 +209,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Breaking:** the trait `Show` (and `show`, `show_collection`) is removed; use `Display`. This includes the `Show` impls for `Path`, `Lasso`, `RunProfile`, `ProductIndex`, `Class`, `PeriodicOmegaWord`, `ReducedOmegaWord`, tuples, `Vec` and primitive types.
 - Unused dependencies `bimap`, `tabled`, `owo-colors` and `rand_distr`.
 
-[Unreleased]: https://github.com/leonbohn/automata/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/leonbohn/automata/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/leonbohn/automata/compare/v0.1.0...v0.2.0
