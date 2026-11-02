@@ -136,7 +136,8 @@ impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
         trace!("got {out:?} from {self:?}");
         out
     }
-    /// Creates a symbol from a valuation of the atomic propositions.
+    /// Creates a symbol from a valuation of the atomic propositions, the inverse of
+    /// [`Self::as_bools`]: the first proposition is the most significant bit.
     ///
     /// # Panics
     ///
@@ -145,11 +146,13 @@ impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
         assert!(bools.len() <= 8usize.saturating_pow(std::mem::size_of::<RawTy>() as u32));
         let mut raw = RawTy::from_usize(0);
 
-        (0..bools.len()).rev().for_each(|i| {
-            if bools[i] {
-                raw.set(i)
+        // the first proposition is the most significant bit, the inverse of `as_bools`
+        let n = bools.len();
+        for (i, &b) in bools.iter().enumerate() {
+            if b {
+                raw.set(n - 1 - i)
             }
-        });
+        }
         trace!("got {:?} from bools {:?}", raw, bools);
 
         Self {
@@ -678,6 +681,19 @@ mod tests {
             raw: 19u32,
         };
         assert_eq!(ps.to_string(), "10011".to_string());
+    }
+
+    #[test]
+    fn bools_round_trip() {
+        for n in 0..=5u32 {
+            for raw in 0..(1u32 << n) {
+                let symbol = PropSymbol {
+                    num_aps: n as u8,
+                    raw,
+                };
+                assert_eq!(PropSymbol::from_bools(symbol.as_bools()), symbol);
+            }
+        }
     }
 
     #[test]

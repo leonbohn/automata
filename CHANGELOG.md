@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- `PropSymbol::from_bools` is now the inverse of `as_bools` (it used the opposite bit order, so
+  `from_bools(s.as_bools()) != s`). Symbols enumerated from an expression change their raw value
+  accordingly.
 - `Inclusion`/`Equivalence` on `DPA`s and `DBA`s missed counterexamples whose cycle can only be
   reached over edges with a smaller priority than the ones on the cycle.
 - Writing a `DPA` in the HOA format with a least priority above 0 produced an invalid file (edges

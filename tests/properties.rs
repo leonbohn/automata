@@ -405,16 +405,9 @@ mod hoa {
 
     /// Converts a word over `a, b, c, ..` to one over the propositional alphabet read from HOA.
     /// The letter with index `i` is written as the valuation in which only proposition `i` holds.
-    /// Proposition `0` is the most significant bit of a symbol (see `PropSymbol::as_bools`), which
-    /// is why the flags are reversed.
     fn to_prop(aps: usize, w: &ReducedOmegaWord<char>) -> ReducedOmegaWord<PropSymbol> {
         let symbol = |c: char| {
-            PropSymbol::from_bools(
-                (0..aps)
-                    .rev()
-                    .map(|i| i == (c as u8 - b'a') as usize)
-                    .collect(),
-            )
+            PropSymbol::from_bools((0..aps).map(|i| i == (c as u8 - b'a') as usize).collect())
         };
         let mut repr: Vec<_> = w.spoke().iter().map(|&c| symbol(c)).collect();
         let loop_index = repr.len();
