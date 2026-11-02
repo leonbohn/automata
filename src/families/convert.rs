@@ -1,3 +1,4 @@
+use crate::ts::DenseId;
 use crate::ts::Sccs;
 use crate::ts::States;
 use itertools::Itertools;
@@ -46,9 +47,9 @@ impl<A: Alphabet> From<FWPM<A>> for FDFA<A> {
 
                 let pmm = pmm
                     .as_ref()
-                    .with_state_color(|q| {
+                    .with_state_color(|q: crate::ts::StateId| {
                         (*coloring
-                            .get(&(q as usize))
+                            .get(&q.into_usize())
                             .expect("Must have color for each state")
                             % 2)
                             == 0
@@ -175,6 +176,7 @@ mod tests {
     use crate::families::{FDFA, FWPM};
     use crate::ts::Builder;
     use crate::ts::Sccs;
+    use crate::ts::q;
 
     #[test_log::test]
     fn fdfa_to_fwpm() {
@@ -204,7 +206,7 @@ mod tests {
             .into_dfa(0);
 
         let dag = Sccs::on(&prc).compute();
-        let idx = dag.scc_index_of(3).unwrap();
+        let idx = dag.scc_index_of(q(3)).unwrap();
         let scc = dag.scc(idx);
         assert_eq!(scc.interior_edges().count(), 0);
         assert_eq!(scc.border_edges().count(), 3);
@@ -222,7 +224,7 @@ mod tests {
             ("bbac", 1),
             ("ca", 0),
         ] {
-            assert_eq!(fwpm[0].transform(word), Some(expected));
+            assert_eq!(fwpm[q(0)].transform(word), Some(expected));
         }
     }
     #[test]
@@ -249,10 +251,10 @@ mod tests {
 
         let fdfa = FDFA::from(fwpm);
         for no in ["", "bb", "abaabaaaaaaaaaa", "aaaaaabaaaabbbaaaaa"] {
-            assert!(!fdfa[0].accepts(no));
+            assert!(!fdfa[q(0)].accepts(no));
         }
         for yes in ["baaaaa", "baabaabaaaaa", "bbbbbaaaa"] {
-            assert!(fdfa[0].accepts(yes));
+            assert!(fdfa[q(0)].accepts(yes));
         }
     }
 }

@@ -103,6 +103,7 @@ where
 mod tests {
     use super::*;
     use crate::ts::Builder;
+    use crate::ts::q;
 
     #[test]
     fn rabin_pairs() {
@@ -127,7 +128,8 @@ mod tests {
                 (1, 'b', 1, 1),
             ])
             .into_dts();
-        let dra = DRA::from_parts_with_acceptance(ts, 0, [RabinPair::from_iters([], [1])].into());
+        let dra =
+            DRA::from_parts_with_acceptance(ts, q(0), [RabinPair::from_iters([], [1])].into());
         assert!(dra.accepts(upw!("ba")));
         assert!(!dra.accepts(upw!("a")));
         assert!(dra.accepts(upw!("ab")));

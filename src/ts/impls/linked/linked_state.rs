@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use super::linked_edge::{LinkedEdge, NONE};
-use crate::ts::{DefaultIdType, EdgeId, EdgeRef};
+use crate::ts::{EdgeId, EdgeRef, StateId};
 
 /// A state of the linked storage: its color and the heads of its out- and in-list. A removed state
 /// is [`LinkedState::Vacant`] and keeps its slot, so that the ids of all other states stay valid.
@@ -106,7 +106,7 @@ impl<'a, E, C> LinkedEdgesFrom<'a, E, C> {
 }
 
 impl<'a, E, C: Clone> Iterator for LinkedEdgesFrom<'a, E, C> {
-    type Item = EdgeRef<'a, DefaultIdType, E, C>;
+    type Item = EdgeRef<'a, StateId, E, C>;
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.current == NONE {
@@ -135,7 +135,7 @@ impl<'a, E, C> LinkedEdgesTo<'a, E, C> {
 }
 
 impl<'a, E, C: Clone> Iterator for LinkedEdgesTo<'a, E, C> {
-    type Item = EdgeRef<'a, DefaultIdType, E, C>;
+    type Item = EdgeRef<'a, StateId, E, C>;
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.current == NONE {

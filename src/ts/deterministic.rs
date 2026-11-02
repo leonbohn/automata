@@ -27,6 +27,7 @@ pub trait Deterministic: TransitionSystem {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::{
     ///     Void,
     ///     ts::{Deterministic, Builder},
@@ -35,11 +36,11 @@ pub trait Deterministic: TransitionSystem {
     /// let ts = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', Void, 1), (1, 'a', Void, 2), (2, 'a', Void, 0)])
     ///     .into_right_congruence(0);
-    /// assert_eq!(ts.edge(0, 'a').unwrap().target(), 1);
-    /// assert_eq!(ts.edge(1, 'a').unwrap().target(), 2);
-    /// assert_eq!(ts.edge(2, 'a').unwrap().target(), 0);
-    /// assert_eq!(ts.edge(0, 'b'), None);
-    /// assert_eq!(ts.edge(3, 'a'), None);
+    /// assert_eq!(ts.edge(q(0), 'a').unwrap().target(), q(1));
+    /// assert_eq!(ts.edge(q(1), 'a').unwrap().target(), q(2));
+    /// assert_eq!(ts.edge(q(2), 'a').unwrap().target(), q(0));
+    /// assert_eq!(ts.edge(q(0), 'b'), None);
+    /// assert_eq!(ts.edge(q(3), 'a'), None);
     /// ```
     fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>>;
 

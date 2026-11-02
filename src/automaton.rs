@@ -99,6 +99,7 @@ impl<T: TransitionSystem, Sem> Automaton<T, Sem> {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::{
     ///     automaton::{Automaton, DFA},
     ///     alphabet::CharAlphabet,
@@ -107,8 +108,8 @@ impl<T: TransitionSystem, Sem> Automaton<T, Sem> {
     ///
     /// let mut dfa: DFA = Automaton::new_with_initial_color(CharAlphabet::of_size(2), false);
     /// assert_eq!(dfa.state_count(), 1);
-    /// dfa.add_edge((0, 'a', 0));
-    /// dfa.add_edge((0, 'b', 0));
+    /// dfa.add_edge((q(0), 'a', q(0)));
+    /// dfa.add_edge((q(0), 'b', q(0)));
     /// assert!(!dfa.accepts("bbabababbabbba"));
     /// ```
     pub fn new_with_initial_color(alphabet: T::Alphabet, initial_color: T::StateColor) -> Self

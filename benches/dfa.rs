@@ -5,6 +5,7 @@ mod common;
 use automata::alphabet::CharAlphabet;
 use automata::automaton::{DFA, Disjointness, Emptiness, Equivalence, MooreMachine};
 use automata::representation::IntoTransitions;
+use automata::ts::q;
 use automata::{DTS, Pointed, States, TransitionSystem};
 use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
@@ -64,7 +65,7 @@ fn minimize(dfa: DFA) -> usize {
 fn moore_with_edge_colors(n: usize) -> MooreMachine<DTS<CharAlphabet, bool, u32>> {
     let ts: DTS<CharAlphabet, bool, u32> =
         common::scrambled(n, 2).map_edge_colors(|_| 7u32).collect();
-    MooreMachine::from_parts(ts, 0)
+    MooreMachine::from_parts(ts, q(0))
 }
 
 #[library_benchmark]

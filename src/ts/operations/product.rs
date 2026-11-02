@@ -213,6 +213,7 @@ mod tests {
     use crate::automaton::MealyMachine;
     use crate::ts::Deterministic;
     use crate::ts::operations::{Product, ProductIndex};
+    use crate::ts::q;
 
     #[test]
     fn product_subalphabet() {
@@ -272,18 +273,24 @@ mod tests {
             .into_nts();
         let prod = (&l).ts_product(&r);
         let mut targets: Vec<_> = prod
-            .edges_from(ProductIndex(0, 0))
+            .edges_from(ProductIndex(q(0), q(0)))
             .unwrap()
             .map(|e| e.target())
             .collect();
         targets.sort();
-        assert_eq!(targets, vec![ProductIndex(1, 0), ProductIndex(1, 1)]);
+        assert_eq!(
+            targets,
+            vec![ProductIndex(q(1), q(0)), ProductIndex(q(1), q(1))]
+        );
         let mut sources: Vec<_> = prod
-            .predecessors(ProductIndex(0, 0))
+            .predecessors(ProductIndex(q(0), q(0)))
             .unwrap()
             .map(|e| e.source())
             .collect();
         sources.sort();
-        assert_eq!(sources, vec![ProductIndex(1, 0), ProductIndex(1, 1)]);
+        assert_eq!(
+            sources,
+            vec![ProductIndex(q(1), q(0)), ProductIndex(q(1), q(1))]
+        );
     }
 }

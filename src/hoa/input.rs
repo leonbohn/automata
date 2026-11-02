@@ -4,7 +4,7 @@ use crate::automaton::{
     AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
     RabinPair,
 };
-use crate::ts::{Det, ForAlphabet, Linked, LinkedTs, Sproutable, Storage};
+use crate::ts::{DenseId, Det, ForAlphabet, Linked, LinkedTs, Sproutable, StateId, Storage};
 use crate::{
     Int,
     alphabet::{PropAlphabet, PropAlphabetError, PropExpression},
@@ -476,7 +476,7 @@ fn hoa_automaton_parts(aut: HoaRepresentation) -> Result<HoaParts, HoaError> {
             });
         }
         let added = ts.add_state(state.id() as Int);
-        debug_assert_eq!(added as usize, position);
+        debug_assert_eq!(added.into_usize(), position);
     }
 
     for state in aut.body().iter() {
@@ -492,7 +492,12 @@ fn hoa_automaton_parts(aut: HoaRepresentation) -> Result<HoaParts, HoaError> {
                 .map_err(HoaError::InvalidLabel)?;
             let color: AcceptanceMask = edge.acceptance_signature().into();
 
-            ts.add_edge((state.id(), PropExpression::from_bdd(expr), color, target));
+            ts.add_edge((
+                StateId::from(state.id()),
+                PropExpression::from_bdd(expr),
+                color,
+                StateId::from(target),
+            ));
         }
     }
 
@@ -506,7 +511,7 @@ fn hoa_automaton_parts(aut: HoaRepresentation) -> Result<HoaParts, HoaError> {
 
     let acceptance: OmegaAcceptanceCondition = aut.header().try_into()?;
 
-    Ok((ts, initial, acceptance))
+    Ok((ts, StateId::from(initial), acceptance))
 }
 
 #[cfg(test)]

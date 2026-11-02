@@ -29,6 +29,7 @@ mod tests {
     use crate::representation::IntoTransitions;
     use crate::ts::Deterministic;
     use crate::ts::operations::{Product, ProductIndex};
+    use crate::ts::q;
     use crate::{Pointed, TransitionSystem};
 
     #[test]
@@ -44,7 +45,7 @@ mod tests {
             .into_dfa(0);
 
         let xxx = dfa.ts_product(dfb);
-        assert_eq!(xxx.reached_state("abb"), Some(ProductIndex(0, 0)));
+        assert_eq!(xxx.reached_state("abb"), Some(ProductIndex(q(0), q(0))));
         assert_eq!(xxx.run("aa").reached_state_color(), Some((false, true)));
 
         let yyy: DFA = xxx

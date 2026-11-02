@@ -133,12 +133,13 @@ impl<D: Deterministic<StateColor = bool>> Emptiness<'_, DFA<D>> {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::{automaton::{DFA, Emptiness}, ts::Builder};
     ///
     /// let ts = Builder::without_colors()
     ///     .with_edges([(0, 'a', 1), (1, 'a', 1)])
     ///     .into_dts_with_initial(0);
-    /// assert_eq!(Emptiness::of(&DFA::from_ts(&ts, [1])).witness(), Some(vec!['a']));
+    /// assert_eq!(Emptiness::of(&DFA::from_ts(&ts, [q(1)])).witness(), Some(vec!['a']));
     /// assert_eq!(Emptiness::of(&DFA::from_ts(&ts, [])).witness(), None);
     /// ```
     pub fn witness(&self) -> Option<Vec<SymbolOf<DFA<D>>>> {
@@ -165,13 +166,14 @@ where
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::{automaton::{DFA, Inclusion}, ts::Builder};
     ///
     /// let ts = Builder::without_colors()
     ///     .with_edges([(0, 'a', 1), (0, 'b', 0), (1, 'a', 1), (1, 'b', 0)])
     ///     .into_dts_with_initial(0);
-    /// let ends_in_a = DFA::from_ts(&ts, [1]);
-    /// let anything = DFA::from_ts(&ts, [0, 1]);
+    /// let ends_in_a = DFA::from_ts(&ts, [q(1)]);
+    /// let anything = DFA::from_ts(&ts, [q(0), q(1)]);
     /// assert_eq!(Inclusion::of(&anything).within(&ends_in_a).counterexample(), Some(vec![]));
     /// assert_eq!(Inclusion::of(&ends_in_a).within(&anything).counterexample(), None);
     /// ```
@@ -658,14 +660,15 @@ where
 mod tests {
     use super::*;
     use crate::ts::Builder;
+    use crate::ts::q;
 
     #[test]
     fn dfa_problems() {
         let ts = Builder::without_colors()
             .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
             .into_dts_with_initial(0);
-        let all = DFA::from_ts(&ts, [0, 1]);
-        let some = DFA::from_ts(&ts, [0]);
+        let all = DFA::from_ts(&ts, [q(0), q(1)]);
+        let some = DFA::from_ts(&ts, [q(0)]);
         assert!(Equivalence::of(&all).and(&all).holds());
         assert!(!Equivalence::of(&all).and(&some).holds());
         assert_eq!(
@@ -691,8 +694,8 @@ mod tests {
         };
         let looping = from(0);
         let once = from(1);
-        let looping = DFA::from_ts(&looping, [0]);
-        let once = DFA::from_ts(&once, [1, 2]);
+        let looping = DFA::from_ts(&looping, [q(0)]);
+        let once = DFA::from_ts(&once, [q(1), q(2)]);
         assert_eq!(
             Equivalence::of(&looping).and(&once).counterexample(),
             Some(vec!['a', 'a'])

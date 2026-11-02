@@ -103,16 +103,17 @@ pub trait IntoTransitions: TransitionSystem {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::{DTS, ts::{Builder, Shrinkable, States}, representation::IntoTransitions};
     ///
     /// let mut ts = Builder::without_colors()
     ///     .with_edges([(0, 'a', 2), (2, 'a', 0), (1, 'a', 1)])
     ///     .into_dts();
-    /// ts.remove_state(1);
+    /// ts.remove_state(q(1));
     /// let (collected, map) = ts.collect_with_map::<DTS>();
     /// assert_eq!(collected.state_count(), 2);
     /// // the state that had index 2 has index 1 now
-    /// assert_eq!(map.id(&2), Some(1));
+    /// assert_eq!(map.id(&q(2)), Some(1));
     /// ```
     fn collect_with_map<T>(self) -> (T, CompactIdMap<Self::StateIndex>)
     where
@@ -457,6 +458,7 @@ mod collect_tests {
     use super::{IntoTransitions, Parts};
     use crate::alphabet::CharAlphabet;
     use crate::automaton::{DFA, DPA};
+    use crate::ts::q;
     use crate::ts::{
         Builder, CsrTs, DenseTs, Deterministic, Pointed, Shrinkable, Sproutable, States,
         TransitionSystem,
@@ -477,9 +479,9 @@ mod collect_tests {
             .into_dts()
     }
 
-    fn edges<T>(ts: &T) -> Vec<(u32, char, u32, u32)>
+    fn edges<T>(ts: &T) -> Vec<(crate::ts::StateId, char, u32, crate::ts::StateId)>
     where
-        T: States<Alphabet = CharAlphabet, StateIndex = u32, EdgeColor = u32>,
+        T: States<Alphabet = CharAlphabet, StateIndex = crate::ts::StateId, EdgeColor = u32>,
     {
         let mut edges: Vec<_> = ts
             .states()
@@ -492,8 +494,8 @@ mod collect_tests {
 
     fn same_edges<A, B>(a: &A, b: &B)
     where
-        A: States<Alphabet = CharAlphabet, StateIndex = u32, EdgeColor = u32>,
-        B: States<Alphabet = CharAlphabet, StateIndex = u32, EdgeColor = u32>,
+        A: States<Alphabet = CharAlphabet, StateIndex = crate::ts::StateId, EdgeColor = u32>,
+        B: States<Alphabet = CharAlphabet, StateIndex = crate::ts::StateId, EdgeColor = u32>,
     {
         assert_eq!(edges(a), edges(b));
     }
@@ -519,13 +521,13 @@ mod collect_tests {
     #[test]
     fn collecting_renumbers_after_removals() {
         let mut ts = sample();
-        ts.remove_state(1);
+        ts.remove_state(q(1));
         let (collected, map): (DTS<CharAlphabet, bool, u32>, _) = ts.clone().collect_with_map();
         assert_eq!(collected.state_count(), 2);
-        assert_eq!(map.states(), &[0, 2]);
-        assert_eq!(map.id(&2), Some(1));
-        assert_eq!(collected.successor(1, 'a'), Some(1));
-        assert_eq!(collected.successor(1, 'b'), None);
+        assert_eq!(map.states(), &[q(0), q(2)]);
+        assert_eq!(map.id(&q(2)), Some(1));
+        assert_eq!(collected.successor(q(1), 'a'), Some(q(1)));
+        assert_eq!(collected.successor(q(1), 'b'), None);
         // the borrowed version renumbers in the same way
         let (by_ref, by_ref_map): (DTS<CharAlphabet, bool, u32>, _) = (&ts).collect_with_map();
         same_edges(&collected, &by_ref);
@@ -539,23 +541,23 @@ mod collect_tests {
             .map_edge_colors(|c| c % 2 == 0)
             .collect();
         assert_eq!(collected.state_count(), 3);
-        assert!(!collected.edge(0, 'a').unwrap().color());
-        assert!(collected.edge(0, 'b').unwrap().color());
+        assert!(!collected.edge(q(0), 'a').unwrap().color());
+        assert!(collected.edge(q(0), 'b').unwrap().color());
     }
 
     #[test]
     fn automata_keep_their_initial_state() {
         let mut ts = sample();
-        ts.remove_state(0);
+        ts.remove_state(q(0));
         // state 2 becomes state 1
         let dfa: DFA<DTS<CharAlphabet, bool, Void>> =
-            ts.clone().erase_edge_colors().with_initial(2).collect();
-        assert_eq!(dfa.initial(), 1);
+            ts.clone().erase_edge_colors().with_initial(q(2)).collect();
+        assert_eq!(dfa.initial(), q(1));
         assert!(!dfa.accepts("a"));
         assert!(dfa.accepts("b"));
         let dpa: DPA<DTS<CharAlphabet, Void, u32>> =
-            ts.erase_state_colors().with_initial(1).collect();
-        assert_eq!(dpa.initial(), 0);
+            ts.erase_state_colors().with_initial(q(1)).collect();
+        assert_eq!(dpa.initial(), q(0));
         // and from an automaton to a plain system
         let back: DTS<CharAlphabet, Void, u32> = dpa.collect();
         assert_eq!(back.state_count(), 2);
@@ -565,7 +567,7 @@ mod collect_tests {
     #[should_panic(expected = "initial state")]
     fn missing_initial_state_panics() {
         let _: DFA<DTS<CharAlphabet, bool, Void>> =
-            sample().erase_edge_colors().with_initial(7).collect();
+            sample().erase_edge_colors().with_initial(q(7)).collect();
     }
 
     #[test]
@@ -579,7 +581,8 @@ mod collect_tests {
     fn reachable_part_collects_only_reachable_states() {
         let mut ts = sample();
         ts.add_state(false);
-        let reachable: DTS<CharAlphabet, bool, u32> = ts.with_initial(0).reachable_part().collect();
+        let reachable: DTS<CharAlphabet, bool, u32> =
+            ts.with_initial(q(0)).reachable_part().collect();
         assert_eq!(reachable.state_count(), 3);
     }
 }

@@ -11,7 +11,7 @@ use crate::{DTS, congruence::StateNaming};
 use std::{collections::BTreeSet, hash::Hash};
 
 mod state_index;
-pub use state_index::{DenseId, EdgeId, IdType};
+pub use state_index::{DenseId, EdgeId, IdType, StateId, q};
 
 mod id_collections;
 pub use id_collections::{CompactIdMap, StateMap, StateSet, StateSetIter};
@@ -789,6 +789,8 @@ use self::operations::ProvidesStateColor;
 #[cfg(test)]
 mod tests {
     use crate::TransitionSystem;
+    use crate::ts::DenseId;
+    use crate::ts::q;
 
     #[test]
     fn linked_list_ts_answers_none_for_unknown_states() {
@@ -802,8 +804,8 @@ mod tests {
         let p = ts.add_state(false);
         assert!(ts.edges_from(q).is_some());
         assert_eq!(ts.state_color(p).as_deref(), Some(&false));
-        assert!(ts.edges_from(17).is_none());
-        assert_eq!(ts.state_color(17), None);
+        assert!(ts.edges_from(crate::ts::q(17)).is_none());
+        assert_eq!(ts.state_color(crate::ts::q(17)), None);
         // a removed state no longer exists
         use crate::ts::Shrinkable;
         ts.remove_state(p);
@@ -819,23 +821,23 @@ mod tests {
 
         let dfa = crate::tests::wiki_dfa();
         let n = dfa.state_count();
-        assert!(dfa.contains_state(0));
-        assert!(!dfa.contains_state(n as u32 + 5));
+        assert!(dfa.contains_state(q(0)));
+        assert!(!dfa.contains_state(crate::ts::StateId::from_usize(n + 5)));
 
         let erased = (&dfa).erase_state_colors();
         assert_eq!(erased.state_count(), n);
-        assert!(erased.contains_state(0));
-        assert!(!erased.contains_state(n as u32 + 5));
+        assert!(erased.contains_state(q(0)));
+        assert!(!erased.contains_state(crate::ts::StateId::from_usize(n + 5)));
 
-        let restricted = (&dfa).restrict_state_indices(|q| q != 0);
-        assert!(!restricted.contains_state(0));
-        assert!(restricted.contains_state(1));
+        let restricted = (&dfa).restrict_state_indices(|q| q != crate::ts::q(0));
+        assert!(!restricted.contains_state(q(0)));
+        assert!(restricted.contains_state(q(1)));
         assert_eq!(restricted.state_count(), n - 1);
 
         let finite = dfa
             .ts()
             .clone()
-            .with_initial(0)
+            .with_initial(q(0))
             .subset_construction()
             .reachable_part();
         assert!(finite.contains_state(0));
@@ -848,7 +850,7 @@ mod tests {
     #[test]
     fn transitions_from_unknown_state_is_none() {
         let dfa = crate::tests::wiki_dfa();
-        assert!(dfa.transitions_from(0).is_some());
-        assert!(dfa.transitions_from(100).is_none());
+        assert!(dfa.transitions_from(q(0)).is_some());
+        assert!(dfa.transitions_from(q(100)).is_none());
     }
 }

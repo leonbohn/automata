@@ -1,6 +1,6 @@
 use crate::DTS;
 use crate::ts::SymbolOf;
-use crate::ts::{EdgeOf, ForAlphabet, Sproutable};
+use crate::ts::{DenseId, EdgeOf, ForAlphabet, Sproutable, StateId};
 use std::borrow::Cow;
 use std::{cell::RefCell, fmt::Debug};
 
@@ -242,6 +242,7 @@ impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
 /// the result is complete.
 ///
 /// ```
+/// use automata::ts::q;
 /// use automata::ts::{Builder, States, operations::Determinize};
 ///
 /// let nts = Builder::default()
@@ -250,7 +251,7 @@ impl<Ts: TransitionSystem> SubsetConstruction<Ts> {
 ///     .into_nts_with_initial(0);
 /// let determinized = Determinize::on(&nts).run();
 /// assert_eq!(determinized.ts().state_count(), 3);
-/// assert_eq!(determinized.subsets()[0], vec![0]);
+/// assert_eq!(determinized.subsets()[0], vec![q(0)]);
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct Determinize<'a, Ts>(&'a Ts);
@@ -311,7 +312,7 @@ impl<Ts: Pointed> Determinize<'_, Ts> {
 
         let mut out = DTS::for_alphabet(alphabet.clone());
         let mut subsets: Vec<Vec<Ts::StateIndex>> = Vec::new();
-        let mut ids: math::FxIndexMap<Vec<Ts::StateIndex>, u32> = math::FxIndexMap::default();
+        let mut ids: math::FxIndexMap<Vec<Ts::StateIndex>, StateId> = math::FxIndexMap::default();
         let mut discover = |out: &mut DTS<_, _, _>,
                             subsets: &mut Vec<Vec<Ts::StateIndex>>,
                             subset: Vec<Ts::StateIndex>| {
@@ -354,7 +355,7 @@ impl<Ts: Pointed> Determinize<'_, Ts> {
                 subset.dedup();
                 let target = discover(&mut out, &mut subsets, subset);
                 out.add_edge((
-                    next as u32,
+                    StateId::from_usize(next),
                     expression.clone(),
                     std::mem::take(&mut colors[i]),
                     target,
@@ -371,6 +372,7 @@ mod tests {
     use crate::alphabet::Matcher;
     use crate::representation::IntoTransitions;
     use crate::ts::Deterministic;
+    use crate::ts::{DenseId, StateId};
     use crate::{NTS, TransitionSystem};
     use crate::{Pointed, States};
 
@@ -398,9 +400,9 @@ mod tests {
                     .filter(|e| e.expression().matches(&sym))
                     .map(|e| e.target())
                     .collect();
-                let target = eager.ts().successor(q as u32, sym).unwrap();
+                let target = eager.ts().successor(StateId::from_usize(q), sym).unwrap();
                 assert_eq!(
-                    eager.subsets()[target as usize]
+                    eager.subsets()[target.into_usize()]
                         .iter()
                         .copied()
                         .collect::<std::collections::BTreeSet<_>>(),

@@ -85,6 +85,7 @@ where
 mod tests {
     use super::*;
     use crate::ts::Builder;
+    use crate::ts::q;
 
     #[test]
     fn muller_automaton() {
@@ -97,7 +98,7 @@ mod tests {
             ])
             .into_dts();
         let dra =
-            DMA::from_parts_with_acceptance(ts, 0, MullerCondition::from_iter_iter([[0], [1]]));
+            DMA::from_parts_with_acceptance(ts, q(0), MullerCondition::from_iter_iter([[0], [1]]));
 
         assert!(dra.accepts(upw!("a")));
         assert!(dra.accepts(upw!("b")));

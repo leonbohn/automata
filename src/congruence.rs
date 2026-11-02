@@ -404,16 +404,17 @@ impl<D: Deterministic> RightCongruence<D> {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::{automaton::Equivalence, ts::Builder};
     ///
     /// let ts = Builder::without_colors()
     ///     .with_transitions([(0, 'a', 1), (1, 'a', 0), (0, 'b', 0), (1, 'b', 1)])
     ///     .into_right_congruence(0);
-    /// let dfa = ts.looping_words(1);
+    /// let dfa = ts.looping_words(q(1));
     /// assert!(dfa.accepts("aa"));
     /// assert!(!dfa.accepts("a"));
     /// assert!(dfa.accepts("b"));
-    /// assert!(Equivalence::of(&dfa).and(&ts.looping_words(0)).holds());
+    /// assert!(Equivalence::of(&dfa).and(&ts.looping_words(q(0))).holds());
     /// ```
     pub fn looping_words(&self, idx: StateIndex<Self>) -> DFA<DTS<D::Alphabet, bool, Void>>
     where
@@ -473,13 +474,14 @@ impl<D: Deterministic> RightCongruence<D> {
 #[cfg(test)]
 mod tests {
     use crate::ts::Builder;
+    use crate::ts::q;
 
     #[test]
     fn is_idempotent_is_none_for_unknown_classes() {
         let rc = Builder::without_colors()
             .with_transitions([(0, 'a', 1), (1, 'a', 0), (0, 'b', 0), (1, 'b', 1)])
             .into_right_congruence(0);
-        assert!(rc.is_idempotent(0).is_some());
-        assert_eq!(rc.is_idempotent(42), None);
+        assert!(rc.is_idempotent(q(0)).is_some());
+        assert_eq!(rc.is_idempotent(q(42)), None);
     }
 }

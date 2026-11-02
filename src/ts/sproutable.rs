@@ -100,13 +100,14 @@ pub trait Sproutable: States {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::ts::{Builder, Sproutable, TransitionSystem};
     ///
     /// let mut ts = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', 1u8, 0), (0, 'b', 2, 0)])
     ///     .into_dts();
     /// ts.map_edge_colors_in_place(|c| *c += 1);
-    /// assert_eq!(ts.edges_from(0).unwrap().map(|e| *e.color()).max(), Some(3));
+    /// assert_eq!(ts.edges_from(q(0)).unwrap().map(|e| *e.color()).max(), Some(3));
     /// ```
     fn map_edge_colors_in_place(&mut self, f: impl FnMut(&mut EdgeColor<Self>));
 
@@ -198,6 +199,7 @@ pub trait Sproutable: States {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::{
     ///     alphabet::CharAlphabet, Void,
     ///     ts::{Deterministic, TransitionSystem, ForAlphabet, Builder, Shrinkable, Sproutable},
@@ -206,7 +208,7 @@ pub trait Sproutable: States {
     ///
     /// let mut ts = DTS::<_, _, Void>::for_alphabet(CharAlphabet::of_size(3));
     /// let states = ts.extend_states([true, false, true]);
-    /// assert_eq!(states.collect::<Vec<_>>(), vec![0, 1, 2]);
+    /// assert_eq!(states.collect::<Vec<_>>(), vec![q(0), q(1), q(2)]);
     /// ```
     /// We need to explicitly give the edge color for the created transition system as we do not
     /// add any edges and the type can therefore not be inferred.
@@ -243,6 +245,7 @@ pub trait Sproutable: States {
 mod tests {
     use crate::States;
     use crate::alphabet::{Alphabet, CharAlphabet};
+    use crate::ts::q;
     use crate::ts::{Deterministic, ForAlphabet, Sproutable};
     use crate::{DTS, TransitionSystem};
 
@@ -279,12 +282,12 @@ mod tests {
                 (1, 'a', 0, 0),
             ])
             .into_dts();
-        assert_eq!(partial.reached_state_from(0, "aaacb"), None);
+        assert_eq!(partial.reached_state_from(q(0), "aaacb"), None);
         assert!(!partial.is_complete());
 
         partial.complete_with_colors((), 2);
         for w in ["abbaccababcab", "bbcca", "cc", "aababbabbabbccbabba"] {
-            if partial.reached_state_from(0, w).unwrap() < 1 {
+            if partial.reached_state_from(q(0), w).unwrap() < q(1) {
                 panic!("Word {} misclassified", w);
             }
         }

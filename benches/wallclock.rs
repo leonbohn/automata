@@ -7,7 +7,7 @@
 
 mod common;
 
-use automata::ts::Sccs;
+use automata::ts::{Sccs, q};
 use automata::{
     DTS, Int, Pointed, States, TransitionSystem, Void, alphabet::CharAlphabet,
     representation::IntoTransitions,
@@ -48,7 +48,7 @@ fn operations(c: &mut Criterion) {
         b.iter(|| {
             black_box(
                 nts.clone()
-                    .with_initial(0)
+                    .with_initial(q(0))
                     .subset_construction()
                     .reachable_part()
                     .collect::<DTS<CharAlphabet, Vec<bool>, Vec<Void>>>()
@@ -58,7 +58,7 @@ fn operations(c: &mut Criterion) {
     });
 
     group.bench_function("nfa/determinize/nth_from_end_12", |b| {
-        let nts = nts.clone().with_initial(0);
+        let nts = nts.clone().with_initial(q(0));
         b.iter(|| {
             black_box(
                 automata::ts::operations::Determinize::on(&nts)

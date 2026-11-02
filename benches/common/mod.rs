@@ -11,12 +11,17 @@ use automata::alphabet::{CharAlphabet, PropAlphabet};
 use automata::automaton::{DFA, DPA};
 use automata::hoa::HoaString;
 use automata::representation::IntoTransitions;
-use automata::ts::{ForAlphabet, Sproutable};
+use automata::ts::{DenseId, ForAlphabet, Sproutable, StateId};
 use automata::word::ReducedOmegaWord;
 use automata::{DTS, Int, NTS, TransitionSystem, Void};
 
 /// A DTS with boolean state colors and no edge colors, the shape a [`DFA`] is made from.
 pub type Dts = DTS<CharAlphabet, bool, Void>;
+
+/// The state with index `n`.
+pub fn at(n: usize) -> StateId {
+    StateId::from_usize(n)
+}
 
 /// The symbols of an alphabet of size `k`.
 pub fn symbols(k: usize) -> Vec<char> {
@@ -37,7 +42,7 @@ pub fn build(
     }
     for q in 0..n {
         for (i, sym) in symbols(k).into_iter().enumerate() {
-            ts.add_edge((q as u32, sym, successor(q, i) as u32));
+            ts.add_edge((at(q), sym, at(successor(q, i))));
         }
     }
     ts
@@ -174,12 +179,12 @@ pub fn nth_from_end(n: usize) -> NTS<CharAlphabet, bool, Void> {
     for q in 0..=n {
         ts.add_state(q == n);
     }
-    ts.add_edge((0, 'a', 0));
-    ts.add_edge((0, 'b', 0));
-    ts.add_edge((0, 'a', 1));
+    ts.add_edge((at(0), 'a', at(0)));
+    ts.add_edge((at(0), 'b', at(0)));
+    ts.add_edge((at(0), 'a', at(1)));
     for q in 1..n {
-        ts.add_edge((q as u32, 'a', q as u32 + 1));
-        ts.add_edge((q as u32, 'b', q as u32 + 1));
+        ts.add_edge((at(q), 'a', at(q + 1)));
+        ts.add_edge((at(q), 'b', at(q + 1)));
     }
     ts
 }
@@ -193,8 +198,8 @@ pub fn scrambled_nts(n: usize) -> NTS<CharAlphabet, bool, Void> {
     }
     for q in 0..n {
         for (i, sym) in ['a', 'b'].into_iter().enumerate() {
-            ts.add_edge((q as u32, sym, ((q * (2 * i + 3) + i + 1) % n) as u32));
-            ts.add_edge((q as u32, sym, ((q * (2 * i + 5) + 3 * i + 2) % n) as u32));
+            ts.add_edge((at(q), sym, at((q * (2 * i + 3) + i + 1) % n)));
+            ts.add_edge((at(q), sym, at((q * (2 * i + 5) + 3 * i + 2) % n)));
         }
     }
     ts
@@ -206,12 +211,12 @@ pub fn scrambled_nts(n: usize) -> NTS<CharAlphabet, bool, Void> {
 
 /// A DFA over `k` symbols with `n` states and the structure of [`scrambled`].
 pub fn dfa(n: usize, k: usize) -> DFA {
-    scrambled(n, k).with_initial(0).collect()
+    scrambled(n, k).with_initial(at(0)).collect()
 }
 
 /// A DFA that is the minimal automaton of [`counter`].
 pub fn counter_dfa(n: usize, k: usize) -> DFA {
-    counter(n, k).with_initial(0).collect()
+    counter(n, k).with_initial(at(0)).collect()
 }
 
 /// A DFA with the structure of [`scrambled`] that accepts nothing, so that searching for an
@@ -229,7 +234,7 @@ pub fn empty_dfa(n: usize, k: usize) -> DFA {
             }
         },
     )
-    .with_initial(0)
+    .with_initial(at(0))
     .collect()
 }
 
@@ -247,7 +252,7 @@ pub fn far_dfa(n: usize, k: usize) -> DFA {
             }
         },
     )
-    .with_initial(0)
+    .with_initial(at(0))
     .collect()
 }
 
@@ -255,13 +260,13 @@ pub fn far_dfa(n: usize, k: usize) -> DFA {
 /// [`counter_dfa`] only on words that lead to the far end of the counter.
 pub fn counter_dfa_with_far_state(n: usize, k: usize) -> DFA {
     build(n, k, |q| q == 0 || q + 1 == n, |q, i| (q + i + 1) % n)
-        .with_initial(0)
+        .with_initial(at(0))
         .collect()
 }
 
 /// A DFA that is not minimal, see [`redundant_counter`].
 pub fn redundant_dfa(n: usize, k: usize) -> DFA {
-    redundant_counter(n, k).with_initial(0).collect()
+    redundant_counter(n, k).with_initial(at(0)).collect()
 }
 
 /// A deterministic parity automaton with `n` states, `k` symbols and priorities `0..priorities`.
@@ -281,10 +286,10 @@ pub fn scrambled_dpa(n: usize, k: usize, priorities: Int) -> DPA {
             } else {
                 (q * (2 * i + 3) + 7 * i + 1) % n
             };
-            ts.add_edge((q as u32, sym, color, target as u32));
+            ts.add_edge((at(q), sym, color, at(target)));
         }
     }
-    ts.with_initial(0).collect()
+    ts.with_initial(at(0)).collect()
 }
 
 /// A parity automaton in which the priority grows along a chain of `n` states that loops back
@@ -297,14 +302,14 @@ pub fn chain_dpa(n: usize, priorities: Int) -> DPA {
     }
     for q in 0..n {
         ts.add_edge((
-            q as u32,
+            at(q),
             'a',
             (q % priorities as usize) as Int,
-            ((q + 1) % n) as u32,
+            at((q + 1) % n),
         ));
-        ts.add_edge((q as u32, 'b', 0, 0u32));
+        ts.add_edge((at(q), 'b', 0, at(0)));
     }
-    ts.with_initial(0).collect()
+    ts.with_initial(at(0)).collect()
 }
 
 // ---------------------------------------------------------------------------------------------

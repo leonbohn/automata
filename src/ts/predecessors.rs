@@ -14,12 +14,13 @@ pub trait PredecessorIterable: TransitionSystem {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::ts::{PredecessorIterable, Builder};
     ///
     /// let ts = Builder::without_state_colors()
     ///     .with_transitions([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (2, 'a', 0)])
     ///     .into_dts();
-    /// assert_eq!(ts.predecessors(0).unwrap().collect::<Vec<_>>().len(), 3);
+    /// assert_eq!(ts.predecessors(q(0)).unwrap().collect::<Vec<_>>().len(), 3);
     /// ```
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>>;
 
@@ -87,17 +88,18 @@ where
 mod tests {
     use crate::ts::Builder;
     use crate::ts::predecessors::PredecessorIterable;
+    use crate::ts::q;
 
     #[test]
     fn predecessor_iterable() {
         let ts = Builder::without_state_colors()
             .with_transitions([(0, 'a', 1), (0, 'b', 0), (1, 'a', 0), (2, 'a', 0)])
             .into_dts();
-        let mut predecessors = ts.predecessors(0).unwrap().collect::<Vec<_>>();
+        let mut predecessors = ts.predecessors(q(0)).unwrap().collect::<Vec<_>>();
         predecessors.sort_by_key(|e| e.source());
         assert_eq!(
             predecessors,
-            vec![(0, 'b', 0), (1, 'a', 0), (2u32, 'a', 0u32)]
+            vec![(q(0), 'b', q(0)), (q(1), 'a', q(0)), (q(2), 'a', q(0))]
         );
     }
 }

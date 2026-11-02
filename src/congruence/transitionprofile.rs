@@ -14,6 +14,7 @@ type ProfileOf<Ts> =
 ///
 /// # Examples
 /// ```
+/// use automata::ts::q;
 /// use automata::{
 ///     Void,
 ///     congruence::{RunProfile, TransitionMonoid},
@@ -28,7 +29,7 @@ type ProfileOf<Ts> =
 /// let m = TransitionMonoid::new(dfa);
 ///
 /// let bb = m.profile(&"bb");
-/// assert_eq!(bb, &RunProfile::new([(0, true, Void), (1, true, Void)]));
+/// assert_eq!(bb, &RunProfile::new([(q(0), true, Void), (q(1), true, Void)]));
 /// ```
 #[derive(Clone)]
 pub struct TransitionMonoid<Ts: TransitionSystem> {

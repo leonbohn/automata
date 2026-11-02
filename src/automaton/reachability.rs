@@ -62,13 +62,13 @@ where
     ///
     /// # Example
     /// ```
-    /// use automata::{automaton::DFA, ts::Builder};
+    /// use automata::{automaton::DFA, ts::{Builder, q}};
     ///
     /// let ts = Builder::without_colors()
     ///     .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
     ///     .into_dts_with_initial(0);
-    /// assert!(DFA::from_ts(&ts, [0]).accepts(""));
-    /// assert!(!DFA::from_ts(&ts, [1]).accepts("a"));
+    /// assert!(DFA::from_ts(&ts, [q(0)]).accepts(""));
+    /// assert!(!DFA::from_ts(&ts, [q(1)]).accepts("a"));
     /// assert!(!DFA::from_ts(ts, []).accepts("a"));
     /// ```
     pub fn from_ts(ts: D, accepting_states: impl IntoIterator<Item = D::StateIndex>) -> Self
@@ -188,6 +188,7 @@ where
 mod tests {
     use crate::automaton::DFA;
     use crate::ts::Builder;
+    use crate::ts::q;
 
     #[test]
     fn dfa_from_ts() {
@@ -195,8 +196,8 @@ mod tests {
             .with_edges([(0, 'a', 0), (0, 'b', 1), (1, 'a', 0), (1, 'b', 1)])
             .into_dts_with_initial(0);
 
-        assert!(DFA::from_ts(&ts, [0]).accepts(""));
-        assert!(!DFA::from_ts(&ts, [1]).accepts("a"));
+        assert!(DFA::from_ts(&ts, [q(0)]).accepts(""));
+        assert!(!DFA::from_ts(&ts, [q(1)]).accepts("a"));
         assert!(!DFA::from_ts(ts, []).accepts("a"));
     }
 }
