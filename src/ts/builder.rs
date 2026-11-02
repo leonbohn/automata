@@ -2,7 +2,7 @@ use super::{ForAlphabet, Sproutable, StateId, Storage};
 use crate::TransitionSystem;
 use crate::alphabet::{FromSymbols, Symbol, WrongAlphabetSize};
 use crate::automaton::WithInitial;
-use crate::automaton::{Automaton, DBA, DFA, DPA, MealyMachine, MooreMachine};
+use crate::automaton::{Automaton, DBA, DFA, DPA, MealyMachine, MooreMachine, NFA, NfaCondition};
 use crate::automaton::{
     BuchiCondition, MealySemantics, MinEvenParityCondition, MooreSemantics, ReachabilityCondition,
 };
@@ -519,6 +519,29 @@ impl Builder<bool, Void> {
         initial: u32,
     ) -> Result<DFA<DTS<CharAlphabet, bool, Void>>, BuilderError> {
         self.try_into_automaton(initial, ReachabilityCondition)
+    }
+}
+
+impl Builder<bool, Void> {
+    /// Turns `self` into a nondeterministic finite automaton. Edges may overlap.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_build`].
+    #[track_caller]
+    pub fn into_nfa(self, initial: u32) -> NFA<NTS<CharAlphabet, bool, Void>> {
+        or_panic(self.try_into_nfa(initial))
+    }
+
+    /// Fallible version of [`Self::into_nfa`].
+    pub fn try_into_nfa(
+        self,
+        initial: u32,
+    ) -> Result<NFA<NTS<CharAlphabet, bool, Void>>, BuilderError> {
+        Ok(Automaton::from_parts_with_acceptance(
+            self.try_build()?,
+            initial.into(),
+            NfaCondition,
+        ))
     }
 }
 

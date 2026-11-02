@@ -38,7 +38,7 @@ pub use crate::{Color, Int, Lattice, Void};
 // Automata, acceptance and the language problems
 pub use crate::automaton::{
     Automaton, DBA, DFA, DMA, DPA, DRA, Disjointness, Emptiness, Equivalence, Inclusion,
-    MealyMachine, MooreMachine, Semantics,
+    MealyMachine, MooreMachine, NFA, Semantics,
 };
 pub use crate::minimization::Minimize;
 

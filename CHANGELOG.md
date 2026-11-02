@@ -58,6 +58,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `NFA`, a nondeterministic finite automaton over an `NTS` (`Automaton<T, NfaCondition>`): `accepts`
+  checks whether some run ends in an accepting state, `NFA::determinize` returns an equivalent
+  `DFA` (subset construction). `NBA` is left for later. `Automaton::accepts`/`transform` no longer
+  require `T: Deterministic`; the `Semantics` implementations carry that bound where needed.
 - `automata::prelude`: `use automata::prelude::*;` brings the traits (`TransitionSystem`, `States`,
   `Deterministic`, `Pointed`, `Sproutable`, ...), `Builder`, `q`/`StateId`, `DTS`/`NTS`, the
   automaton aliases, the language problems, `Minimize`, `Determinize`, `upw!` and `Dottable` (plus the HOA
