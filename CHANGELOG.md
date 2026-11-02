@@ -58,6 +58,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `automata::prelude`: `use automata::prelude::*;` brings the traits (`TransitionSystem`, `States`,
+  `Deterministic`, `Pointed`, `Sproutable`, ...), `Builder`, `q`/`StateId`, `DTS`/`NTS`, the
+  automaton aliases, the language problems, `Minimize`, `Determinize`, `upw!` and `Dottable` (plus the HOA
+  reader/writer with the `hoa` feature) into scope.
+- Crate-level documentation with a tour of the layers (alphabet, word, transition system with
+  storages, traits, adapters and `collect`, automaton and acceptance, problems), all with runnable
+  examples.
 - `ts::StateId` and the shorthand `ts::q(n)` (`q(3)` is the state `q_3`).
 
 - Property tests (`tests/properties.rs`) for DFAs, DPAs, DBAs, Moore and Mealy machines and HOA
