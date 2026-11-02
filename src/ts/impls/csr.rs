@@ -240,14 +240,34 @@ impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for CsrEdgesFrom<'ts,
     }
 }
 
+/// Iterates over the indices of the states of a [`CsrTs`].
+#[derive(Clone, Debug)]
+pub struct CsrStateIndices(std::ops::Range<u32>);
+
+impl Iterator for CsrStateIndices {
+    type Item = StateId;
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<StateId> {
+        self.0.next().map(StateId::from)
+    }
+
+    #[inline(always)]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl ExactSizeIterator for CsrStateIndices {}
+
 impl<A: IndexedAlphabet, Q: Color, C: Color> States for CsrTs<A, Q, C> {
     type StatesIter<'this>
-        = std::iter::Map<std::ops::Range<u32>, fn(u32) -> StateId>
+        = CsrStateIndices
     where
         Self: 'this;
 
     fn states(&self) -> Self::StatesIter<'_> {
-        (0..self.states.len() as u32).map(StateId::from as fn(u32) -> StateId)
+        CsrStateIndices(0..self.states.len() as u32)
     }
 
     fn contains_state(&self, index: StateIndex<Self>) -> bool {
