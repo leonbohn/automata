@@ -83,14 +83,11 @@ use automata::prelude::*;
 // but it duplicates each state, cycling between the copies
 fn mod_three(rem: usize) -> automata::automaton::DFA {
     Builder::without_edge_colors()
-        .with_state_colors((0..3).map(|q| q == rem || q == rem * 2))
+        .with_state_colors((0..3).map(|q| q == rem))
         .with_transitions([
-            (0, 'a', 1), (0, 'b', 3),
-            (1, 'a', 2), (1, 'b', 4),
-            (2, 'a', 0), (2, 'b', 5),
-            (3, 'a', 1), (3, 'b', 0),
-            (4, 'a', 2), (4, 'b', 1),
-            (5, 'a', 0), (5, 'b', 2),
+            (0, 'a', 1), (0, 'b', 0),
+            (1, 'a', 2), (1, 'b', 1),
+            (2, 'a', 0), (2, 'b', 2),
         ])
         .into_dfa(0)
 }
@@ -107,7 +104,7 @@ assert!(zero_or_one.negation().accepts("aa"));
 assert!(Emptiness::of(&zero.intersection(&one)).holds());
 assert!(!Equivalence::of(&zero).and(&one).holds());
 
-// minimization, should collapse [0,3], [1,4], and [2,5]
+// the dfa is already minimized though...
 let minimized = zero.clone().minimize();
 assert_eq!(minimized.state_count(), 3);
 assert!(Equivalence::of(&zero).and(&minimized).holds());
@@ -125,7 +122,7 @@ The DPA we construct below accepts all words which contain `a` infinitely often 
 use automata::prelude::*;
 
 // we do not need state colours because edge-based acceptance
-let inf_a_or_fin_b = Builder::without_state_colours()
+let inf_a_or_fin_b = Builder::without_state_colors()
     // list out transitions as (source, symbol, priority, target)
     .with_transitions([
         (0, 'a', 0, 0),
@@ -142,14 +139,14 @@ assert!(!inf_a_or_fin_b.accepts(upw!("cab", "cb")));
 assert!(inf_a_or_fin_b.accepts(upw!("abba", "c")));
 
 // we can also complement and compare DPAs
-let complement = dpa.clone().complement();
-assert!(complement.accepts(upw!("bb", "a")));
-assert!(Equivalence::of(&dpa).and(&dpa.clone().complement().complement()).holds());
-assert!(!Equivalence::of(&dpa).and(&complement).holds());
+let complement = inf_a_or_fin_b.clone().complement();
+assert!(!complement.accepts(upw!("bb", "a")));
+assert!(Equivalence::of(&inf_a_or_fin_b).and(&inf_a_or_fin_b.clone().complement().complement()).holds());
+assert!(!Equivalence::of(&inf_a_or_fin_b).and(&complement).holds());
 
 // or ask for a word witnessing non-emptiness of the accepted language
-let word = Emptiness::of(&dpa).witness().expect("the language is not empty");
-assert!(dpa.accepts(&word));
+let word = Emptiness::of(&inf_a_or_fin_b).witness().expect("the language is not empty");
+assert!(inf_a_or_fin_b.accepts(&word));
 ```
 Automata using other acceptance conditions are also available through commonly used acronyms.
 However DPAs are the best supported and most used ones.
@@ -251,7 +248,7 @@ For the theory behind all of this, see the chapters on finite automata and $\ome
 
 ## Benchmarks
 
-The code is actively benchmarked, see code under [`benches`].
+The code is actively benchmarked, see code under [`benches/`](https://github.com/leonbohn/automata/tree/main/benches).
 This is run on a VPS and a dashboard with graphs can be viewed [here](https://bench.lnbhn.xyz/).
 
 ## Contributing
