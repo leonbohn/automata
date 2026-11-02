@@ -430,17 +430,12 @@ where
     L: Deterministic + States,
     R: Deterministic<Alphabet = L::Alphabet, EdgeColor = L::EdgeColor> + States,
 {
-    let floors = (
-        least_priority(left, priority, accepted.0)?,
-        least_priority(right, priority, accepted.1)?,
-    );
-    // Only edges above the floors are explored, which is often much less than the full product.
-    let left_priorities = move |c: &L::EdgeColor| (priority(c), 0);
-    let right_priorities = move |c: &R::EdgeColor| (priority(c), 0);
+    // Without an edge of the right parity, no cycle can have the wanted least priority. The edges
+    // below these priorities must not be removed, as they may be needed to reach a good cycle.
+    least_priority(left, priority, accepted.0)?;
+    least_priority(right, priority, accepted.1)?;
     let initial = ProductIndex(left.initial(), right.initial());
-    let product = Masked::new(left, &left_priorities, (floors.0, 0))
-        .ts_product(Masked::new(right, &right_priorities, (floors.1, 0)))
-        .with_initial(initial);
+    let product = left.ts_product(right).with_initial(initial);
     lasso(
         &product,
         initial,
@@ -625,17 +620,6 @@ where
     }
 }
 
-impl<'a, T: TransitionSystem, P> Masked<'a, T, P> {
-    fn new(ts: &'a T, priorities: &'a P, floor: Priorities) -> Self {
-        Self {
-            ts,
-            priorities,
-            floor,
-            inside: None,
-        }
-    }
-}
-
 impl<'a, T, P> TransitionSystem for Masked<'a, T, P>
 where
     T: TransitionSystem,
@@ -720,6 +704,15 @@ mod tests {
         Builder::without_state_colors()
             .with_transitions(edges)
             .into_dpa(0)
+    }
+
+    #[test]
+    fn dpa_inclusion_needs_edges_below_the_cycle_priorities() {
+        // the good cycle is only reachable over an edge whose priority is below the ones on it
+        let rejecting = dpa([(0, 'a', 0, 1), (1, 'a', 1, 1)]);
+        let accepting = dpa([(0, 'a', 1, 1), (1, 'a', 2, 1)]);
+        assert!(!Inclusion::of(&accepting).within(&rejecting).holds());
+        assert!(!Equivalence::of(&accepting).and(&rejecting).holds());
     }
 
     #[test]
