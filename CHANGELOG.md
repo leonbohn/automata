@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-03
+
 ### Fixed
 
 - `PropSymbol::from_bools` is now the inverse of `as_bools` (it used the opposite bit order, so
@@ -207,4 +209,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Breaking:** the trait `Show` (and `show`, `show_collection`) is removed; use `Display`. This includes the `Show` impls for `Path`, `Lasso`, `RunProfile`, `ProductIndex`, `Class`, `PeriodicOmegaWord`, `ReducedOmegaWord`, tuples, `Vec` and primitive types.
 - Unused dependencies `bimap`, `tabled`, `owo-colors` and `rand_distr`.
 
-[Unreleased]: https://github.com/leonbohn/automata/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/leonbohn/automata/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/leonbohn/automata/compare/v0.1.0...v0.2.0

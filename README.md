@@ -11,7 +11,7 @@ It aims to cover both [finite word automata](https://en.wikipedia.org/wiki/Deter
 On top of primitives and algorithms for their manipulation, the crate also provides some methods for input and output of $\omega$-automata in the [HOA](https://adl.github.io/hoaf/) format.
 It can also produce a [graphviz](https://graphviz.org/) representation and turn that into graphics.
 
-The aim is to have good ergonomics while also beingn conscious of performance.
+The aim is to have good ergonomics while also being conscious of performance, which is [actively measured](https://bench.lnbhn.xyz/).
 To achieve this, the crate follows the style of the standard library, providing lazy adaptors for transition systems, which can be collected into an actual manifestation to avoid the overhead of the indirections this introduces.
 
 > As the version number indicates, this crate is in a very early stage and will might see some drastic breaking changes in the future.
@@ -248,6 +248,11 @@ An **automaton** is a transition system together with an initial state and an ac
 **Capabilities are traits.** `TransitionSystem` is the central trait. `Pointed` adds an initial state, `Deterministic` guarantees at most one transition per state and symbol, `Sproutable` and `Shrinkable` allow growing and shrinking a transition system. The default implementation is `LinkedTs`, a linked-list based transition system with stable edge ids; `NTS` is `LinkedTs` and `DTS` is `Det<LinkedTs>`, where `Det` makes determinism part of the type.
 
 For the theory behind all of this, see the chapters on finite automata and $\omega$-automata in the *Handbook of Automata Theory* (Pin, ed.), the open-access [thesis](https://theses.hal.science/tel-04314678v1/document) on which the design is based, or the semantics description at the bottom of the [HOA page](https://adl.github.io/hoaf/).
+
+## Benchmarks
+
+The code is actively benchmarked, see code under [`benches`].
+This is run on a VPS and a dashboard with graphs can be viewed [here](https://bench.lnbhn.xyz/).
 
 ## Contributing
 
