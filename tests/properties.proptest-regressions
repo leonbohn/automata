@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc ddb44a859fffb7367bd494d01c3e56d5f6aa41f3d02d995a41d06a80f01560d0 # shrinks to (a, b) = (DFA (reach true) Det(0 : true | a/#->0 ), DFA (reach true) Det(0 : true | a/#->0 1 : false | a/#->0 ))
+cc 13700302065a6ddf6eb7b7ddf352d2f4e2cb85e61f91b60945fc7fb9db8502c8 # shrinks to a = DFA (reach true) Det(0 : false | a/#->0 1 : true | a/#->0 ), words = [[]]
+cc 52e88305d7b3d681c515ac5116ca6c3c7c3a8a2788a56ae2cc59ea8141f375b2 # shrinks to a = MinEvenParityCondition Det(0 : # | a/0->1 1 : # | a/1->1 )

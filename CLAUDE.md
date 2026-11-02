@@ -3,6 +3,11 @@
 Guidance for working in this repository. `PLAN.md` has the roadmap, `PERFORMANCE.md` the ranked
 performance opportunities. Read this file
 before touching the code; follow `.md` cross-references when a task leads elsewhere.
+If anything is unclear, you ask before proceeding.
+Any changes are coordinated and you try not to make any bigger decisions on your own.
+The whole crate should be optimized for performance as well as for ergonomics.
+Work is always done in a new branch (off of `main`) and new code only lands upstream as part of a PR.
+Before committing, you confer with me.
 
 ## What this is
 

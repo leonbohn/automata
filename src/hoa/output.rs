@@ -103,8 +103,8 @@ impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for MinEvenParityCondition {
             .flat_map(|q| ts.edges_from(q).into_iter().flatten())
             .map(|edge| *edge.color());
         let first = colors.next().unwrap_or(0);
-        let (low, high) = colors.fold((first, first), |(l, h), c| (l.min(c), h.max(c)));
-        Ok(write_parity_hoa(w, low, high)?)
+        let high = colors.fold(first, Int::max);
+        Ok(write_parity_hoa(w, high)?)
     }
 
     fn write_edge_color<W: Write>(&self, color: &Int, w: &mut W) -> Result<(), HoaError> {
@@ -115,7 +115,7 @@ impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for MinEvenParityCondition {
 impl<T: States<EdgeColor = AcceptanceMask>> HoaAcceptance<T> for OmegaAcceptanceCondition {
     fn write_acceptance<W: Write>(&self, _ts: &T, w: &mut W) -> Result<(), HoaError> {
         match self {
-            OmegaAcceptanceCondition::Parity(low, high) => Ok(write_parity_hoa(w, *low, *high)?),
+            OmegaAcceptanceCondition::Parity(_, high) => Ok(write_parity_hoa(w, *high)?),
             OmegaAcceptanceCondition::MaxParity(_, high) => Ok(write_max_parity_hoa(w, *high)?),
             OmegaAcceptanceCondition::Buchi | OmegaAcceptanceCondition::Reachability => {
                 Ok(write_buchi_hoa(w)?)
@@ -144,14 +144,15 @@ fn write_buchi_hoa<W: Write>(w: &mut W) -> std::fmt::Result {
     write!(w, "acc-name: Buchi\nAcceptance: 1 Inf(0)\n")
 }
 
-fn write_parity_hoa<W: Write>(w: &mut W, low: Int, high: Int) -> std::fmt::Result {
-    let zero_based_range = high - low + (low % 2);
+fn write_parity_hoa<W: Write>(w: &mut W, high: Int) -> std::fmt::Result {
+    // the edges are labeled with their priorities as they are, so the sets are `0..=high` even if
+    // the sets below the least priority are unused
     write!(
         w,
         "acc-name: parity min even {}\nAcceptance: {} {}\n",
-        zero_based_range + 1,
-        zero_based_range + 1,
-        build_parity_condition_hoa(low, high)
+        high as usize + 1,
+        high as usize + 1,
+        build_parity_condition_hoa(0, high)
     )
 }
 
@@ -473,6 +474,16 @@ State: 1
             hoa,
             "HOA: v1\nAP: 3 \"a\" \"b\" \"c\"\nStates: 1\nStart: 0\nacc-name: parity min even 3\nAcceptance: 3 Inf(0) | (Fin(1) & Inf(2))\n--BODY--\nState: 0\n[0 & !1 & !2] 0 {0}\n[!0 & 1 & !2] 0 {1}\n[!0 & !1 & 2] 0 {2}\n--END--\n"
         );
+    }
+
+    #[test]
+    fn parity_sets_start_at_zero_even_if_unused() {
+        let dpa = Builder::without_state_colors()
+            .with_edges([(0, 'a', 2, 0), (0, 'b', 3, 0)])
+            .into_dpa(0);
+        let hoa = dpa.to_hoa().unwrap();
+        assert!(hoa.contains("Acceptance: 4 "), "{hoa}");
+        assert!(hoa.contains("{2}\n") && hoa.contains("{3}\n"), "{hoa}");
     }
 
     #[test]
