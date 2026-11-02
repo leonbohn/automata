@@ -4,6 +4,7 @@
 
 use automata::States;
 use automata::ts::Sccs;
+use automata::ts::q;
 use automata::{
     DTS, math,
     representation::IntoTransitions,
@@ -32,7 +33,7 @@ fn main() {
 
     let reachable: math::FxIndexSet<_> = dfa.reachable_state_indices().collect();
     println!("reachable from the initial state: {reachable:?}");
-    let from_sink: math::FxIndexSet<_> = dfa.reachable_state_indices_from(3).collect();
+    let from_sink: math::FxIndexSet<_> = dfa.reachable_state_indices_from(q(3)).collect();
     println!("reachable from state 3:           {from_sink:?}");
 
     let sccs = Sccs::on(&dfa).compute();
@@ -44,7 +45,7 @@ fn main() {
 
     // Operations on transition systems do not copy anything, they compute on demand. Here we
     // look at the transition system without the sink.
-    let without_sink = (&dfa).restrict_state_indices(|state| state < 3);
+    let without_sink = (&dfa).restrict_state_indices(|state| state < q(3));
     // `collect` evaluates everything and stores the result in a new transition system.
     let collected: DTS<_, _, _> = without_sink.collect();
     println!("without the sink: {} states", collected.state_count());

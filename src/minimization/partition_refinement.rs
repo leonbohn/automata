@@ -204,7 +204,7 @@ fn from_partition<D, Q, C>(
     partition: &Partition<D::StateIndex>,
     state_color: impl Fn(Vec<StateColor<D>>) -> Q,
     edge_color: impl Fn(&EdgeColor<D>) -> C,
-) -> (DTS<D::Alphabet, Q, C>, u32)
+) -> (DTS<D::Alphabet, Q, C>, crate::ts::StateId)
 where
     D: Congruence + States,
     Q: Color,
@@ -222,7 +222,7 @@ where
         }
     }
     let mut out = DTS::for_alphabet(ts.alphabet().clone());
-    let ids: Vec<u32> = colors
+    let ids: Vec<crate::ts::StateId> = colors
         .into_iter()
         .map(|c| out.add_state(state_color(c)))
         .collect();
@@ -241,7 +241,9 @@ where
             }
         }
     }
-    let initial = class_of.get(&ts.initial()).map_or(0, |&c| ids[c]);
+    let initial = class_of
+        .get(&ts.initial())
+        .map_or(crate::ts::q(0), |&c| ids[c]);
     (out, initial)
 }
 
@@ -347,7 +349,7 @@ mod tests {
     };
     use crate::States;
     use crate::alphabet::CharAlphabet;
-    use crate::ts::{Deterministic, ForAlphabet, Sproutable};
+    use crate::ts::{DenseId, Deterministic, ForAlphabet, Sproutable, StateId};
     use crate::{DTS, TransitionSystem, tests::wiki_dfa};
 
     #[test]
@@ -389,7 +391,12 @@ mod tests {
         for q in 0..n {
             for sym in ['a', 'b'] {
                 if next(10) > 0 {
-                    ts.add_edge((q as u32, sym, next(2) as u8, next(n) as u32));
+                    ts.add_edge((
+                        StateId::from_usize(q),
+                        sym,
+                        next(2) as u8,
+                        StateId::from_usize(next(n)),
+                    ));
                 }
             }
         }
@@ -400,14 +407,14 @@ mod tests {
     fn naive_classes(
         ts: &DTS<CharAlphabet, u8, u8>,
         use_edge_colors: bool,
-    ) -> std::collections::BTreeSet<std::collections::BTreeSet<u32>> {
+    ) -> std::collections::BTreeSet<std::collections::BTreeSet<StateId>> {
         let n = ts.state_count();
         let mut class: Vec<usize> = (0..n)
             .map(|q| {
                 if use_edge_colors {
                     0
                 } else {
-                    *ts.state_color(q as u32).unwrap() as usize
+                    *ts.state_color(StateId::from_usize(q)).unwrap() as usize
                 }
             })
             .collect();
@@ -416,9 +423,9 @@ mod tests {
                 let succ: Vec<_> = ['a', 'b']
                     .iter()
                     .map(|&sym| {
-                        ts.edge(q as u32, sym).map(|e| {
+                        ts.edge(StateId::from_usize(q), sym).map(|e| {
                             (
-                                class[e.target() as usize],
+                                class[e.target().into_usize()],
                                 use_edge_colors.then(|| *e.color()),
                             )
                         })
@@ -442,9 +449,10 @@ mod tests {
             }
             class = new;
         }
-        let mut out = std::collections::BTreeMap::<usize, std::collections::BTreeSet<u32>>::new();
+        let mut out =
+            std::collections::BTreeMap::<usize, std::collections::BTreeSet<StateId>>::new();
         for (q, c) in class.iter().enumerate() {
-            out.entry(*c).or_default().insert(q as u32);
+            out.entry(*c).or_default().insert(StateId::from_usize(q));
         }
         out.into_values().collect()
     }

@@ -97,3 +97,69 @@ impl std::fmt::Display for EdgeId {
         write!(f, "e{}", self.0)
     }
 }
+
+/// Identifies a state of the built-in transition system storages. This is a newtype so that state
+/// ids cannot be mixed up with edge ids, colors or other integers. Use [`q`] or [`From<u32>`] to
+/// create one, and [`DenseId::into_usize`] to index into vectors.
+///
+/// ```
+/// use automata::ts::{q, StateId};
+/// assert_eq!(q(3), StateId::from(3));
+/// assert_eq!(q(3).to_string(), "3");
+/// ```
+#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[repr(transparent)]
+pub struct StateId(u32);
+
+/// Shorthand for creating a [`StateId`], mirroring the usual mathematical notation `q_n`.
+#[inline(always)]
+pub const fn q(n: u32) -> StateId {
+    StateId(n)
+}
+
+impl From<u32> for StateId {
+    #[inline(always)]
+    fn from(n: u32) -> Self {
+        StateId(n)
+    }
+}
+impl From<StateId> for u32 {
+    #[inline(always)]
+    fn from(q: StateId) -> Self {
+        q.0
+    }
+}
+
+impl IdType for StateId {
+    #[inline(always)]
+    fn to_dense(self) -> Option<usize> {
+        Some(self.0 as usize)
+    }
+    #[inline(always)]
+    fn from_dense(n: usize) -> Option<Self> {
+        u32::try_from(n).ok().map(StateId)
+    }
+}
+impl DenseId for StateId {
+    #[inline(always)]
+    fn from_usize(n: usize) -> Self {
+        StateId(n as u32)
+    }
+    #[inline(always)]
+    fn into_usize(self) -> usize {
+        self.0 as usize
+    }
+}
+
+// Both print the bare index so that DOT output, error messages and logs look as they did when
+// states were plain integers.
+impl std::fmt::Display for StateId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
+impl std::fmt::Debug for StateId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}

@@ -239,6 +239,7 @@ fn sanitize_dot_ident(name: &str) -> String {
 mod tests {
     use super::Dottable;
     use crate::ts::Builder;
+    use crate::ts::q;
 
     #[test]
     fn dot_representation_of_a_dfa() {
@@ -276,7 +277,7 @@ mod tests {
             ])
             .into_nts();
         let omega =
-            crate::Automaton::from_parts_with_acceptance(ts, 0, OmegaAcceptanceCondition::Buchi);
+            crate::Automaton::from_parts_with_acceptance(ts, q(0), OmegaAcceptanceCondition::Buchi);
         let dot = omega.dot_representation();
         assert!(dot.contains("q0 -> q1"), "{dot}");
         assert!(dot.contains("init -> q0"), "{dot}");

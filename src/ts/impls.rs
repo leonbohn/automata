@@ -7,5 +7,5 @@ pub use det::Det;
 pub(crate) mod linked;
 pub use linked::{Compaction, LinkedTs};
 
-/// The default type used to index states, `u32`.
-pub type DefaultIdType = u32;
+/// The default type used to index states, [`StateId`](crate::ts::StateId).
+pub type DefaultIdType = crate::ts::StateId;

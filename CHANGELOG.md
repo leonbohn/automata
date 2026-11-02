@@ -17,6 +17,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Breaking:** the default state id of `LinkedTs`, `DenseTs`, `CsrTs` and everything built on them
+  (`DTS`, `NTS`, `DFA`, ...) is now the newtype `ts::StateId` instead of `u32`, so that states
+  cannot be mixed up with edge ids, colors or other integers (#111). `ts::DefaultIdType` is an
+  alias for it. `StateId` prints like the number it wraps (`Display` and `Debug`), so DOT output
+  and error messages are unchanged.
+
+  | Before | After |
+  |---|---|
+  | `ts.successor(0, 'a')` | `ts.successor(q(0), 'a')` |
+  | `ts.add_edge((0, 'a', 1))` | `ts.add_edge((q(0), 'a', q(1)))` |
+  | `let n: u32 = ...; ts.edge(n, a)` | `ts.edge(StateId::from(n), a)` |
+  | `state as usize` | `state.into_usize()` (trait `DenseId`) |
+  | `u32::from(state)`, `StateId::from(n)` | to and from the raw `u32` |
+
+  `Builder` keeps taking plain `u32` literals (`Builder::...with_edges([(0, 'a', 1)])`,
+  `into_dfa(0)`); they are converted when the system is built. Likewise `Compaction::state` and
+  `BuilderError` work with `StateId`.
+
 - **Breaking:** API consistency (#109).
   - `DRA` and `DMA` default to `Int` (`u8`) colours instead of `usize`, like `DPA`.
   - `Word::FINITE` is removed; use `Word::Kind` (`word::Finite`/`word::Omega`) instead. The
@@ -39,6 +57,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   that are not strongly connected can fire, and panicking is the documented choice there.
 
 ### Added
+
+- `ts::StateId` and the shorthand `ts::q(n)` (`q(3)` is the state `q_3`).
 
 - Property tests (`tests/properties.rs`) for DFAs, DPAs, DBAs, Moore and Mealy machines and HOA
   round trips: minimization keeps the language, `A ∪ ¬A` is universal, `A ∩ ¬A` is empty,

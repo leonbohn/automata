@@ -3,6 +3,7 @@
 mod common;
 
 use automata::automaton::{DFA, DPA};
+use automata::ts::DenseId;
 use automata::ts::run::{EdgeColorSequence, EdgeColorSet, StateSet};
 use automata::{Deterministic, TransitionSystem, upw};
 use common::FixtureDpa;
@@ -45,7 +46,10 @@ fn dfa_reached_state((dfa, words): (DFA, Vec<String>)) -> u64 {
     black_box(
         words
             .iter()
-            .map(|w| dfa.reached_state(w.as_str()).unwrap_or(0) as u64)
+            .map(|w| {
+                dfa.reached_state(w.as_str())
+                    .map_or(0, |q| q.into_usize() as u64)
+            })
             .sum(),
     )
 }

@@ -23,6 +23,7 @@ use std::collections::VecDeque;
 /// the start states. A start state that does not exist in the transition system is skipped.
 ///
 /// ```
+/// use automata::ts::q;
 /// use automata::TransitionSystem;
 /// use automata::ts::visit::Bfs;
 /// use automata::automaton::DFA;
@@ -31,7 +32,7 @@ use std::collections::VecDeque;
 ///     .with_state_colors([false, false, true])
 ///     .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 2)])
 ///     .into_dfa(0);
-/// assert_eq!(Bfs::new(&dfa, 1).collect::<Vec<_>>(), vec![1, 2]);
+/// assert_eq!(Bfs::new(&dfa, q(1)).collect::<Vec<_>>(), vec![q(1), q(2)]);
 /// ```
 pub struct Bfs<'a, Ts: TransitionSystem> {
     ts: &'a Ts,
@@ -194,6 +195,7 @@ struct AccessNode<Idx, Sym> {
 /// far, [`AccessWords::word_to`] advances the search until the requested state is discovered.
 ///
 /// ```
+/// use automata::ts::q;
 /// use automata::TransitionSystem;
 /// use automata::ts::visit::AccessWords;
 /// use automata::automaton::DFA;
@@ -202,8 +204,8 @@ struct AccessNode<Idx, Sym> {
 ///     .with_state_colors([false, false, true])
 ///     .with_edges([(0, 'b', 1), (0, 'a', 0), (1, 'a', 2), (1, 'b', 0), (2, 'a', 2), (2, 'b', 2)])
 ///     .into_dfa(0);
-/// let mut words = AccessWords::new(&dfa, 0);
-/// assert_eq!(words.word_to(2), Some(vec!['b', 'a']));
+/// let mut words = AccessWords::new(&dfa, q(0));
+/// assert_eq!(words.word_to(q(2)), Some(vec!['b', 'a']));
 /// ```
 pub struct AccessWords<'a, Ts: TransitionSystem> {
     ts: &'a Ts,
@@ -347,6 +349,7 @@ mod tests {
     use crate::automaton::DFA;
     use crate::congruence::MinimalRepresentative;
     use crate::ts::States;
+    use crate::ts::q;
     use crate::ts::{Builder, Deterministic};
     use itertools::Itertools;
     use std::collections::{BTreeMap, BTreeSet};
@@ -423,16 +426,22 @@ mod tests {
             .into_dfa(0);
 
         assert_eq!(
-            dfa.minimal_representatives_iter_from(0).collect_vec(),
+            dfa.minimal_representatives_iter_from(q(0)).collect_vec(),
             vec![
-                MinimalRepresentative::new(vec![], 0u32),
-                MinimalRepresentative::new(vec!['a'], 1),
-                MinimalRepresentative::new(vec!['a', 'a'], 2)
+                MinimalRepresentative::new(vec![], q(0)),
+                MinimalRepresentative::new(vec!['a'], q(1)),
+                MinimalRepresentative::new(vec!['a', 'a'], q(2))
             ]
         );
-        assert_eq!(dfa.reachable_state_indices().collect_vec(), vec![0, 1, 2]);
-        assert_eq!(dfa.reachable_state_indices_from(2).collect_vec(), vec![2]);
-        assert_eq!(dfa.reachable_edges_from(1).count(), 6);
+        assert_eq!(
+            dfa.reachable_state_indices().collect_vec(),
+            vec![q(0), q(1), q(2)]
+        );
+        assert_eq!(
+            dfa.reachable_state_indices_from(q(2)).collect_vec(),
+            vec![q(2)]
+        );
+        assert_eq!(dfa.reachable_edges_from(q(1)).count(), 6);
     }
 
     #[test]
@@ -441,9 +450,18 @@ mod tests {
             .with_state_colors([false; 4])
             .with_edges([(0, 'a', 1), (0, 'b', 2), (1, 'a', 3), (2, 'a', 3)])
             .into_dfa(0);
-        assert_eq!(Dfs::new(&dfa, 0).collect_vec(), vec![0, 1, 3, 2]);
-        assert_eq!(Bfs::new(&dfa, 0).collect_vec(), vec![0, 1, 2, 3]);
-        assert_eq!(Dfs::from_starts(&dfa, [2, 1]).collect_vec(), vec![2, 3, 1]);
+        assert_eq!(
+            Dfs::new(&dfa, q(0)).collect_vec(),
+            vec![q(0), q(1), q(3), q(2)]
+        );
+        assert_eq!(
+            Bfs::new(&dfa, q(0)).collect_vec(),
+            vec![q(0), q(1), q(2), q(3)]
+        );
+        assert_eq!(
+            Dfs::from_starts(&dfa, [q(2), q(1)]).collect_vec(),
+            vec![q(2), q(3), q(1)]
+        );
     }
 
     #[test]
@@ -452,13 +470,13 @@ mod tests {
             .with_state_colors([false, true])
             .with_edges([(0, 'a', 1), (1, 'a', 1)])
             .into_dfa(0);
-        assert_eq!(Bfs::new(&dfa, 7).count(), 0);
-        assert_eq!(Dfs::new(&dfa, 7).count(), 0);
-        assert_eq!(BfsEdges::new(&dfa, 7).count(), 0);
-        assert_eq!(dfa.minimal_representatives_iter_from(7).count(), 0);
-        assert_eq!(dfa.word_from_to(7, 0), None);
-        assert_eq!(dfa.word_from_to(0, 7), None);
-        assert_eq!(dfa.minimal_representative(7), None);
+        assert_eq!(Bfs::new(&dfa, q(7)).count(), 0);
+        assert_eq!(Dfs::new(&dfa, q(7)).count(), 0);
+        assert_eq!(BfsEdges::new(&dfa, q(7)).count(), 0);
+        assert_eq!(dfa.minimal_representatives_iter_from(q(7)).count(), 0);
+        assert_eq!(dfa.word_from_to(q(7), q(0)), None);
+        assert_eq!(dfa.word_from_to(q(0), q(7)), None);
+        assert_eq!(dfa.minimal_representative(q(7)), None);
     }
 
     #[test]
@@ -467,12 +485,12 @@ mod tests {
             .with_state_colors([false; 4])
             .with_edges([(0, 'b', 1), (0, 'a', 2), (2, 'b', 3), (1, 'a', 3)])
             .into_dfa(0);
-        let mut words = AccessWords::new(&dfa, 0);
-        assert_eq!(words.word_to(1), Some(vec!['b']));
+        let mut words = AccessWords::new(&dfa, q(0));
+        assert_eq!(words.word_to(q(1)), Some(vec!['b']));
         // 'a' sorts before 'b', so 3 is first discovered from 2 via "ab", not from 1 via "ba"
-        assert_eq!(words.word_to(3), Some(vec!['a', 'b']));
-        assert_eq!(dfa.word_from_to(1, 3), Some(vec!['a']));
-        assert_eq!(dfa.word_from_to(3, 0), None);
+        assert_eq!(words.word_to(q(3)), Some(vec!['a', 'b']));
+        assert_eq!(dfa.word_from_to(q(1), q(3)), Some(vec!['a']));
+        assert_eq!(dfa.word_from_to(q(3), q(0)), None);
     }
 
     #[test]
@@ -498,8 +516,8 @@ mod tests {
                 .with_transitions(edges)
                 .into_dts_with_initial(0);
             // states without edges may be missing from the builder; only test existing origins
-            if dts.contains_state(0) {
-                check_against_reference(&dts, 0);
+            if dts.contains_state(q(0)) {
+                check_against_reference(&dts, q(0));
             }
         }
     }
@@ -533,9 +551,9 @@ mod tests {
             let dts = Builder::without_colors()
                 .with_transitions(edges)
                 .into_dts_with_initial(0);
-            assert_eq!(dts.word_from_to(0, 1), Some(vec!['a']));
+            assert_eq!(dts.word_from_to(q(0), q(1)), Some(vec!['a']));
             assert_eq!(
-                dts.minimal_representative(1).unwrap().into_inner(),
+                dts.minimal_representative(q(1)).unwrap().into_inner(),
                 vec!['a']
             );
         }

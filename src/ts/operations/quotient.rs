@@ -269,11 +269,12 @@ mod tests {
     use crate::partition::Partition;
     use crate::tests::wiki_dfa;
     use crate::ts::Deterministic;
+    use crate::ts::q;
 
     #[test]
     fn quotient_test() {
         let dfa = wiki_dfa();
-        let p = Partition::new([vec![0, 1], vec![5], vec![2, 3, 4]]);
+        let p = Partition::new([vec![q(0), q(1)], vec![q(5)], vec![q(2), q(3), q(4)]]);
         let a = dfa.quotient(p);
 
         for (i, p) in [0, 2, 1, 1, 2, 1].into_iter().enumerate() {
@@ -287,10 +288,15 @@ mod tests {
     fn quotient_collects_colors_of_the_class() {
         use crate::TransitionSystem;
         let dfa = wiki_dfa();
-        let a = dfa
-            .clone()
-            .quotient(Partition::new([vec![0, 1], vec![5], vec![2, 3, 4]]));
-        for (class, members) in [vec![0, 1], vec![5], vec![2, 3, 4]].into_iter().enumerate() {
+        let a = dfa.clone().quotient(Partition::new([
+            vec![q(0), q(1)],
+            vec![q(5)],
+            vec![q(2), q(3), q(4)],
+        ]));
+        for (class, members) in [vec![q(0), q(1)], vec![q(5)], vec![q(2), q(3), q(4)]]
+            .into_iter()
+            .enumerate()
+        {
             let expected: Vec<_> = members
                 .iter()
                 .map(|q| *dfa.state_color(*q).unwrap())
@@ -309,7 +315,11 @@ mod tests {
         use crate::TransitionSystem;
         use crate::ts::Deterministic;
         let dfa = wiki_dfa();
-        let a = dfa.quotient(Partition::new([vec![0, 1], vec![5], vec![2, 3, 4]]));
+        let a = dfa.quotient(Partition::new([
+            vec![q(0), q(1)],
+            vec![q(5)],
+            vec![q(2), q(3), q(4)],
+        ]));
         for q in a.states() {
             let edges = a.edges_from(q).unwrap().collect::<Vec<_>>();
             assert_eq!(edges.len(), 2);

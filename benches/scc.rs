@@ -2,7 +2,7 @@
 
 mod common;
 
-use automata::ts::Sccs;
+use automata::ts::{Sccs, q};
 use common::Dts;
 use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
@@ -63,7 +63,7 @@ fn tarjan(ts: Dts) -> usize {
 #[bench::fragmented_1000(args = (1_000), setup = fragmented)]
 #[bench::fragmented_4000(args = (4_000), setup = fragmented)]
 fn tarjan_from(ts: Dts) -> usize {
-    black_box(Sccs::on(&ts).from([0]).compute().size())
+    black_box(Sccs::on(&ts).from([q(0)]).compute().size())
 }
 
 /// Using the result: classify every SCC, as algorithms on top of the decomposition do.

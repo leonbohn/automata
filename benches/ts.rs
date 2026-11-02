@@ -4,11 +4,12 @@ mod common;
 
 use automata::alphabet::CharAlphabet;
 use automata::representation::IntoTransitions;
-use automata::ts::Sccs;
 use automata::ts::operations::{MatchingProduct, ProductIndex};
+use automata::ts::q;
 use automata::ts::{
     Builder, Deterministic, ForAlphabet, PredecessorIterable, Shrinkable, Sproutable,
 };
+use automata::ts::{DenseId, Sccs, StateId};
 use automata::{DTS, Int, Pointed, States, TransitionSystem, Void};
 use common::Dts;
 use gungraun::{Dhat, prelude::*};
@@ -33,7 +34,7 @@ fn nth_from_end(n: usize) -> automata::NTS<CharAlphabet, bool, Void> {
 // ---- building step by step -----------------------------------------------------------------
 
 /// All edges of `scrambled(n, k)` as a list, in the order of the states.
-fn edge_list(n: usize, k: usize) -> (usize, usize, Vec<(u32, char, u32)>) {
+fn edge_list(n: usize, k: usize) -> (usize, usize, Vec<(StateId, char, StateId)>) {
     let ts = common::scrambled(n, k);
     let edges = ts
         .states()
@@ -47,13 +48,13 @@ fn edge_list(n: usize, k: usize) -> (usize, usize, Vec<(u32, char, u32)>) {
     (n, k, edges)
 }
 
-fn reversed_edge_list(n: usize, k: usize) -> (usize, usize, Vec<(u32, char, u32)>) {
+fn reversed_edge_list(n: usize, k: usize) -> (usize, usize, Vec<(StateId, char, StateId)>) {
     let (n, k, mut edges) = edge_list(n, k);
     edges.reverse();
     (n, k, edges)
 }
 
-fn add_edges(n: usize, k: usize, edges: &[(u32, char, u32)]) -> Dts {
+fn add_edges(n: usize, k: usize, edges: &[(StateId, char, StateId)]) -> Dts {
     let mut ts = DTS::<CharAlphabet, bool, Void>::for_alphabet(CharAlphabet::of_size(k));
     for q in 0..n {
         ts.add_state(q % 3 == 0);
@@ -67,22 +68,26 @@ fn add_edges(n: usize, k: usize, edges: &[(u32, char, u32)]) -> Dts {
 #[library_benchmark]
 #[bench::k2_5000(args = (5_000, 2), setup = edge_list)]
 #[bench::k8_5000(args = (5_000, 8), setup = edge_list)]
-fn add_edges_in_order((n, k, edges): (usize, usize, Vec<(u32, char, u32)>)) -> Dts {
+fn add_edges_in_order((n, k, edges): (usize, usize, Vec<(StateId, char, StateId)>)) -> Dts {
     add_edges(n, k, &edges)
 }
 
 #[library_benchmark]
 #[bench::k2_5000(args = (5_000, 2), setup = reversed_edge_list)]
-fn add_edges_in_reverse((n, k, edges): (usize, usize, Vec<(u32, char, u32)>)) -> Dts {
+fn add_edges_in_reverse((n, k, edges): (usize, usize, Vec<(StateId, char, StateId)>)) -> Dts {
     add_edges(n, k, &edges)
 }
 
 #[library_benchmark]
 #[bench::k2_5000(args = (5_000, 2), setup = edge_list)]
-fn builder_with_edges((n, _k, edges): (usize, usize, Vec<(u32, char, u32)>)) -> Dts {
+fn builder_with_edges((n, _k, edges): (usize, usize, Vec<(StateId, char, StateId)>)) -> Dts {
     Builder::without_edge_colors()
         .with_state_colors((0..n).map(|q| q % 3 == 0))
-        .with_edges(edges)
+        .with_edges(
+            edges
+                .into_iter()
+                .map(|(q, c, p)| (u32::from(q), c, u32::from(p))),
+        )
         .into_dts()
 }
 
@@ -96,7 +101,7 @@ fn successor_index_all_pairs((ts, k): (Dts, usize)) -> u64 {
     let mut sum = 0u64;
     for q in ts.states() {
         for &c in &symbols {
-            sum += ts.successor(q, c).unwrap_or(0) as u64;
+            sum += ts.successor(q, c).map_or(0, |p| p.into_usize() as u64);
         }
     }
     black_box(sum)
@@ -113,14 +118,14 @@ fn edges_from_all_states((ts, _k): (Dts, usize)) -> usize {
     )
 }
 
-type ProductQueries = (Dts, Dts, Vec<(ProductIndex<u32, u32>, char)>);
+type ProductQueries = (Dts, Dts, Vec<(ProductIndex<StateId, StateId>, char)>);
 
 fn product_queries(n: usize) -> ProductQueries {
     let (l, r) = (common::scrambled(n, 2), common::counter(n, 2));
     let queries = (0..1_000)
         .map(|i| {
             (
-                ProductIndex(((i * 37) % n) as u32, ((i * 101 + 5) % n) as u32),
+                ProductIndex(common::at((i * 37) % n), common::at((i * 101 + 5) % n)),
                 ['a', 'b'][i % 2],
             )
         })
@@ -146,7 +151,7 @@ fn matching_product_successor_index((l, r, queries): ProductQueries) -> usize {
 #[bench::scrambled_2000(args = (2_000), setup = scrambled)]
 #[bench::scrambled_8000(args = (8_000), setup = scrambled)]
 fn reachable_states(ts: Dts) -> usize {
-    black_box(ts.reachable_state_indices_from(0).count())
+    black_box(ts.reachable_state_indices_from(q(0)).count())
 }
 
 #[library_benchmark]
@@ -157,7 +162,7 @@ fn minimal_representatives(ts: automata::automaton::DFA) -> usize {
 }
 
 fn small_cycles_dfa(n: usize) -> automata::automaton::DFA {
-    common::small_cycles(n).with_initial(0).collect()
+    common::small_cycles(n).with_initial(q(0)).collect()
 }
 
 // The representative of every SCC (used for witnesses, e.g. of a DPA). Chains of 4-cycles give
@@ -236,7 +241,7 @@ fn erase_state_colors_collect(ts: Dts) -> DTS<CharAlphabet, Void, Void> {
 #[library_benchmark]
 #[bench::scrambled_10000(args = (10_000), setup = scrambled)]
 fn into_dfa(ts: Dts) -> automata::automaton::DFA {
-    black_box(ts.with_initial(0).collect())
+    black_box(ts.with_initial(q(0)).collect())
 }
 
 // ---- shrinking ---------------------------------------------------------------------------------
@@ -247,7 +252,7 @@ fn into_dfa(ts: Dts) -> automata::automaton::DFA {
 fn remove_edges_from_matching(mut ts: Dts) -> Dts {
     let n = ts.state_count();
     for i in 0..1_000 {
-        black_box(ts.remove_edges_from_matching((i * (n / 1_000)) as u32, 'a'));
+        black_box(ts.remove_edges_from_matching(common::at(i * (n / 1_000)), 'a'));
     }
     ts
 }
@@ -258,7 +263,7 @@ fn remove_edges_from_matching(mut ts: Dts) -> Dts {
 fn remove_state(mut ts: Dts) -> Dts {
     let n = ts.state_count();
     for i in 0..1_000 {
-        black_box(ts.remove_state((i * (n / 1_000)) as u32));
+        black_box(ts.remove_state(common::at(i * (n / 1_000))));
     }
     ts
 }
@@ -271,7 +276,7 @@ fn remove_state(mut ts: Dts) -> Dts {
 #[bench::nth_from_end_12(args = (12), setup = nth_from_end)]
 fn subset_construction(nts: automata::NTS<CharAlphabet, bool, Void>) -> usize {
     black_box(
-        nts.with_initial(0)
+        nts.with_initial(q(0))
             .subset_construction()
             .reachable_part()
             .collect::<DTS<CharAlphabet, Vec<bool>, Vec<Void>>>()
@@ -284,7 +289,7 @@ fn subset_construction(nts: automata::NTS<CharAlphabet, bool, Void>) -> usize {
 #[bench::nth_from_end_10(args = (10), setup = nth_from_end)]
 #[bench::nth_from_end_12(args = (12), setup = nth_from_end)]
 fn determinize(nts: automata::NTS<CharAlphabet, bool, Void>) -> usize {
-    let nts = nts.with_initial(0);
+    let nts = nts.with_initial(q(0));
     black_box(
         automata::ts::operations::Determinize::on(&nts)
             .run()

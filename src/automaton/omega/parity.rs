@@ -99,6 +99,7 @@ where
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::ts::{Sproutable, Builder};
     ///
     /// let mut dpa = Builder::without_state_colors()
@@ -107,8 +108,8 @@ where
     ///     .into_dpa(0);
     /// assert!(!dpa.is_informative_right_congruent());
     ///
-    /// dpa.add_edge((0, 'c', 2, 0));
-    /// dpa.add_edge((1, 'c', 1, 1));
+    /// dpa.add_edge((q(0), 'c', 2, q(0)));
+    /// dpa.add_edge((q(1), 'c', 1, q(1)));
     /// assert!(dpa.is_informative_right_congruent());
     /// ```
     pub fn is_informative_right_congruent(&self) -> bool {
@@ -571,6 +572,7 @@ mod tests {
     use crate::automaton::{Emptiness, Equivalence, Inclusion};
     use crate::representation::CollectPointed;
     use crate::ts::operations::Product;
+    use crate::ts::q;
     use crate::ts::{Builder, Deterministic};
     use crate::{DTS, Pointed, RightCongruence, TransitionSystem};
 
@@ -653,13 +655,13 @@ mod tests {
     #[test]
     fn dpa_priority_restriction() {
         let dpa = example_dpa();
-        assert_eq!(dpa.edges_from(0).unwrap().count(), 3);
+        assert_eq!(dpa.edges_from(q(0)).unwrap().count(), 3);
         let d05 = dpa.as_ref().edge_color_restricted(0, 5);
         let d13 = dpa.as_ref().edge_color_restricted(1, 3);
-        assert_eq!(d05.edges_from(2).unwrap().count(), 2);
-        assert_eq!(d13.edges_from(1).unwrap().count(), 1);
-        assert_eq!(d13.edges_from(2).unwrap().count(), 1);
-        assert_eq!(d13.edges_from(0).unwrap().count(), 2);
+        assert_eq!(d05.edges_from(q(2)).unwrap().count(), 2);
+        assert_eq!(d13.edges_from(q(1)).unwrap().count(), 1);
+        assert_eq!(d13.edges_from(q(2)).unwrap().count(), 1);
+        assert_eq!(d13.edges_from(q(0)).unwrap().count(), 2);
     }
 
     #[test]
@@ -759,7 +761,7 @@ mod tests {
                 (1, 'b', 0, 1),
             ])
             .into_dpa(0);
-        let a = (&dpa).with_initial(1).collect_dpa();
+        let a = (&dpa).with_initial(q(1)).collect_dpa();
         assert!(!Equivalence::of(&dpa).and(&a).holds());
 
         let cong = RightCongruence::from_pointed(dpa.prefix_congruence());

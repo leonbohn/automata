@@ -55,6 +55,7 @@ pub trait Shrinkable: States {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::{
     ///     alphabet::CharAlphabet,
     ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
@@ -67,7 +68,7 @@ pub trait Shrinkable: States {
     /// let _edge = ts.add_edge((q0, 'a', q1));
     /// assert_eq!(ts.reached_state_from(q0, "a"), Some(q1));
     /// assert_eq!(ts.remove_edges_from_matching(q0, 'a').unwrap().len(), 1);
-    /// assert_eq!(ts.remove_edges_from_matching(2, 'b'), None);
+    /// assert_eq!(ts.remove_edges_from_matching(q(2), 'b'), None);
     /// assert_eq!(ts.reached_state_from(q0, "a"), None);
     /// ```
     fn remove_edges_from_matching(
@@ -92,6 +93,7 @@ pub trait Shrinkable: States {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::{
     ///     alphabet::CharAlphabet,
     ///     ts::{Deterministic, ForAlphabet, Shrinkable, Sproutable},
@@ -113,7 +115,7 @@ pub trait Shrinkable: States {
     ///     ts.remove_edges_between_matching(q0, q0, 'a').unwrap().len(),
     ///     0
     /// );
-    /// assert_eq!(ts.remove_edges_between_matching(2, q0, 'a'), None);
+    /// assert_eq!(ts.remove_edges_between_matching(q(2), q0, 'a'), None);
     /// assert_eq!(ts.reached_state_from(q0, "a"), None);
     /// assert_eq!(ts.reached_state_from(q0, "b"), Some(q1));
     /// ```
@@ -220,6 +222,7 @@ pub trait Shrinkable: States {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::{
     ///     alphabet::CharAlphabet,
     ///     ts::{ForAlphabet, Shrinkable, Sproutable},
@@ -236,7 +239,7 @@ pub trait Shrinkable: States {
     ///
     /// assert_eq!(ts.remove_edges_to(q1).unwrap().len(), 3);
     /// assert_eq!(ts.remove_edges_to(q0).unwrap().len(), 0);
-    /// assert_eq!(ts.remove_edges_to(2), None);
+    /// assert_eq!(ts.remove_edges_to(q(2)), None);
     /// ```
     fn remove_edges_to(&mut self, target: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>>;
 
@@ -245,6 +248,7 @@ pub trait Shrinkable: States {
     ///
     /// # Example
     /// ```
+    /// use automata::ts::q;
     /// use automata::{
     ///     alphabet::CharAlphabet,
     ///     ts::{ForAlphabet, Shrinkable, Sproutable},
@@ -262,7 +266,7 @@ pub trait Shrinkable: States {
     ///
     /// assert_eq!(ts.trim_from(q0), vec![(q2, false)]);
     /// // a state that does not exist reaches nothing and nothing is removed
-    /// assert_eq!(ts.trim_from(17), vec![]);
+    /// assert_eq!(ts.trim_from(q(17)), vec![]);
     /// ```
     fn trim_from(&mut self, source: StateIndex<Self>) -> Vec<(StateIndex<Self>, StateColor<Self>)> {
         if !self.contains_state(source) {

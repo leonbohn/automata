@@ -6,14 +6,14 @@ use crate::{
     Color, TransitionSystem, Void,
     alphabet::{CharAlphabet, IndexedAlphabet},
     ts::{
-        DefaultIdType, Dense, Deterministic, EdgeColor, EdgeId, EdgeOf, EdgeRef, EdgeTuple,
-        ForAlphabet, IdType, IntoEdgeTuple, Shrinkable, Sproutable, StateColor, StateIndex, States,
+        Dense, DenseId, Deterministic, EdgeColor, EdgeId, EdgeOf, EdgeRef, EdgeTuple, ForAlphabet,
+        IdType, IntoEdgeTuple, Shrinkable, Sproutable, StateColor, StateId, StateIndex, States,
         SymbolOf, predecessors::PredecessorIterable,
     },
 };
 
 /// The sentinel that stands for "no edge" in the target slots of [`DenseTs`].
-pub(super) const NONE: DefaultIdType = DefaultIdType::MAX;
+pub(super) const NONE: u32 = u32::MAX;
 
 /// A deterministic transition system over an [`IndexedAlphabet`] that stores the transitions in a
 /// table with one slot per state and symbol.
@@ -43,7 +43,7 @@ pub(super) const NONE: DefaultIdType = DefaultIdType::MAX;
 pub struct DenseTs<A: IndexedAlphabet = CharAlphabet, Q = Void, C = Void> {
     alphabet: A,
     states: Vec<Option<Q>>,
-    targets: Vec<DefaultIdType>,
+    targets: Vec<u32>,
     colors: Vec<Option<C>>,
     /// The incoming edges, built on demand and dropped when edges or states are added. After
     /// removals it is a superset of the incoming edges.
@@ -92,7 +92,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
     #[inline(always)]
     fn edge_in_slot(
         &self,
-        source: DefaultIdType,
+        source: StateId,
         slot: usize,
         symbol_index: usize,
     ) -> Option<EdgeOf<'_, Self>> {
@@ -105,7 +105,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
                 source,
                 self.alphabet.expression_ref(symbol_index),
                 self.colors[slot].as_ref().expect("edge has a color"),
-                target,
+                StateId::from(target),
             )
             .with_id(EdgeId(slot as u32)),
         )
@@ -151,7 +151,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
     }
 
     /// The slots of the edges that lead to `state`.
-    fn slots_into(&self, state: usize) -> Vec<DefaultIdType> {
+    fn slots_into(&self, state: usize) -> Vec<u32> {
         self.incoming()
             .to_state(state)
             .iter()
@@ -161,7 +161,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
     }
 
     /// Writes the edge into `slot`, replacing the edge that was there. Both endpoints must exist.
-    fn set_slot(&mut self, slot: usize, color: C, target: DefaultIdType) -> EdgeId {
+    fn set_slot(&mut self, slot: usize, color: C, target: u32) -> EdgeId {
         let id = EdgeId(slot as u32);
         self.incoming.take();
         self.targets[slot] = target;
@@ -191,7 +191,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> ForAlphabet<A> for DenseTs<A, Q, C>
 
 impl<A: IndexedAlphabet, Q: Color, C: Color> TransitionSystem for DenseTs<A, Q, C> {
     type Alphabet = A;
-    type StateIndex = DefaultIdType;
+    type StateIndex = StateId;
     type StateColor = Q;
     type EdgeColor = C;
     type EdgesFromIter<'this>
@@ -204,7 +204,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> TransitionSystem for DenseTs<A, Q, 
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        let q = state as usize;
+        let q = state.into_usize();
         if !self.is_live(q) {
             return None;
         }
@@ -212,7 +212,10 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> TransitionSystem for DenseTs<A, Q, 
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
-        self.states.get(state as usize)?.as_ref().map(Cow::Borrowed)
+        self.states
+            .get(state.into_usize())?
+            .as_ref()
+            .map(Cow::Borrowed)
     }
 
     fn state_bound(&self) -> Option<usize> {
@@ -223,21 +226,21 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> TransitionSystem for DenseTs<A, Q, 
 /// Iterates over the edges that leave a state of a [`DenseTs`], in the order of the alphabet.
 pub struct DenseEdgesFrom<'ts, A: IndexedAlphabet, Q, C> {
     alphabet: &'ts A,
-    source: DefaultIdType,
+    source: StateId,
     /// The slot of the next edge to look at.
     slot: usize,
     /// The index of the symbol of the next edge to look at.
     symbol_index: usize,
-    targets: std::slice::Iter<'ts, DefaultIdType>,
+    targets: std::slice::Iter<'ts, u32>,
     colors: std::slice::Iter<'ts, Option<C>>,
     _ts: std::marker::PhantomData<fn() -> Q>,
 }
 
 impl<'ts, A: IndexedAlphabet, Q, C> DenseEdgesFrom<'ts, A, Q, C> {
     #[inline(always)]
-    fn new(ts: &'ts DenseTs<A, Q, C>, state: DefaultIdType) -> Self {
+    fn new(ts: &'ts DenseTs<A, Q, C>, state: StateId) -> Self {
         let k = ts.alphabet.size();
-        let slots = state as usize * k..(state as usize + 1) * k;
+        let slots = state.into_usize() * k..(state.into_usize() + 1) * k;
         Self {
             alphabet: &ts.alphabet,
             source: state,
@@ -266,7 +269,7 @@ impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for DenseEdgesFrom<'t
                         self.source,
                         self.alphabet.expression_ref(symbol_index),
                         color,
-                        target,
+                        StateId::from(target),
                     )
                     .with_id(EdgeId(slot as u32)),
                 );
@@ -297,7 +300,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> States for DenseTs<A, Q, C> {
     }
 
     fn contains_state(&self, index: StateIndex<Self>) -> bool {
-        self.is_live(index as usize)
+        self.is_live(index.into_usize())
     }
 
     /// Checks that no slot of a live state is empty, which takes O(n * k) time.
@@ -313,13 +316,13 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> States for DenseTs<A, Q, C> {
 pub struct DenseStateIndices<'ts, Q>(&'ts [Option<Q>], usize);
 
 impl<Q> Iterator for DenseStateIndices<'_, Q> {
-    type Item = DefaultIdType;
+    type Item = StateId;
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(state) = self.0.get(self.1) {
             self.1 += 1;
             if state.is_some() {
-                return Some((self.1 - 1) as DefaultIdType);
+                return Some(StateId::from_usize(self.1 - 1));
             }
         }
         None
@@ -332,7 +335,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Deterministic for DenseTs<A, Q, C> 
     #[inline]
     fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
         let index = self.alphabet.try_symbol_to_index(symbol)?;
-        let slot = self.slot(state as usize, index);
+        let slot = self.slot(state.into_usize(), index);
         if slot >= self.targets.len() {
             return None;
         }
@@ -345,8 +348,15 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Deterministic for DenseTs<A, Q, C> 
         state: StateIndex<Self>,
         symbol: SymbolOf<Self>,
     ) -> Option<StateIndex<Self>> {
-        let slot = self.slot(state as usize, self.alphabet.try_symbol_to_index(symbol)?);
-        self.targets.get(slot).copied().filter(|t| *t != NONE)
+        let slot = self.slot(
+            state.into_usize(),
+            self.alphabet.try_symbol_to_index(symbol)?,
+        );
+        self.targets
+            .get(slot)
+            .copied()
+            .filter(|t| *t != NONE)
+            .map(StateId::from)
     }
 }
 
@@ -355,12 +365,12 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Sproutable for DenseTs<A, Q, C> {
 
     fn add_state(&mut self, color: StateColor<Self>) -> Self::StateIndex {
         let k = self.alphabet.size();
-        let id = DefaultIdType::try_from(self.states.len())
+        let id = u32::try_from(self.states.len())
             .ok()
             .filter(|id| *id != NONE)
             .expect("too many states for 32 bit ids");
         // every slot id must be a valid edge id
-        DefaultIdType::try_from((self.states.len() + 1) * k)
+        u32::try_from((self.states.len() + 1) * k)
             .ok()
             .filter(|slots| *slots != NONE)
             .expect("too many edge slots for 32 bit ids");
@@ -368,7 +378,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Sproutable for DenseTs<A, Q, C> {
         self.targets.resize(self.targets.len() + k, NONE);
         self.colors.resize(self.colors.len() + k, None);
         self.incoming.take();
-        id
+        StateId::from(id)
     }
 
     /// Adds the edge, which replaces the edge that leaves the same state on the same symbol.
@@ -377,11 +387,17 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Sproutable for DenseTs<A, Q, C> {
         E: IntoEdgeTuple<Self>,
     {
         let (q, a, c, p) = t.into_edge_tuple();
-        assert!(self.is_live(q as usize), "source state {q} does not exist");
-        assert!(self.is_live(p as usize), "target state {p} does not exist");
+        assert!(
+            self.is_live(q.into_usize()),
+            "source state {q} does not exist"
+        );
+        assert!(
+            self.is_live(p.into_usize()),
+            "target state {p} does not exist"
+        );
 
-        let slot = self.slot(q as usize, self.alphabet.expression_to_index(&a));
-        self.set_slot(slot, c, p)
+        let slot = self.slot(q.into_usize(), self.alphabet.expression_to_index(&a));
+        self.set_slot(slot, c, p.into())
     }
 
     fn edge_color_mut(&mut self, id: EdgeId) -> Option<&mut EdgeColor<Self>> {
@@ -399,13 +415,13 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Sproutable for DenseTs<A, Q, C> {
         // the sink is the last state and gets all its edges from the loop below
         for slot in 0..self.targets.len() {
             if self.targets[slot] == NONE && self.is_live(slot / k) {
-                self.set_slot(slot, edge_color.clone(), sink);
+                self.set_slot(slot, edge_color.clone(), sink.into());
             }
         }
     }
 
     fn state_color_mut(&mut self, state: StateIndex<Self>) -> Option<&mut StateColor<Self>> {
-        self.states.get_mut(state as usize)?.as_mut()
+        self.states.get_mut(state.into_usize())?.as_mut()
     }
 
     fn map_edge_colors_in_place(&mut self, mut f: impl FnMut(&mut EdgeColor<Self>)) {
@@ -429,15 +445,15 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Shrinkable for DenseTs<A, Q, C> {
         self.targets[slot] = NONE;
         let color = self.colors[slot].take().expect("edge has a color");
         Some((
-            (slot / k) as DefaultIdType,
+            StateId::from_usize(slot / k),
             self.alphabet.expression_from_index(slot % k),
             color,
-            target,
+            StateId::from(target),
         ))
     }
 
     fn remove_state(&mut self, state: StateIndex<Self>) -> Option<Self::StateColor> {
-        let q = state as usize;
+        let q = state.into_usize();
         if !self.is_live(q) {
             return None;
         }
@@ -452,11 +468,11 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Shrinkable for DenseTs<A, Q, C> {
     }
 
     fn remove_edges_to(&mut self, target: StateIndex<Self>) -> Option<Vec<EdgeTuple<Self>>> {
-        if !self.is_live(target as usize) {
+        if !self.is_live(target.into_usize()) {
             return None;
         }
         let mut removed = Vec::new();
-        for slot in self.slots_into(target as usize) {
+        for slot in self.slots_into(target.into_usize()) {
             removed.extend(self.remove_edge(EdgeId(slot)));
         }
         Some(removed)
@@ -470,7 +486,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> PredecessorIterable for DenseTs<A, 
         Self: 'this;
 
     fn predecessors(&self, state: StateIndex<Self>) -> Option<Self::EdgesToIter<'_>> {
-        let q = state as usize;
+        let q = state.into_usize();
         self.is_live(q).then(|| DenseEdgesTo {
             ts: self,
             state,
@@ -482,8 +498,8 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> PredecessorIterable for DenseTs<A, 
 /// Iterates over the edges that enter a state of a [`DenseTs`], ordered by their slot.
 pub struct DenseEdgesTo<'ts, A: IndexedAlphabet, Q, C> {
     ts: &'ts DenseTs<A, Q, C>,
-    state: DefaultIdType,
-    slots: std::slice::Iter<'ts, DefaultIdType>,
+    state: StateId,
+    slots: std::slice::Iter<'ts, u32>,
 }
 
 impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for DenseEdgesTo<'ts, A, Q, C> {
@@ -491,12 +507,12 @@ impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for DenseEdgesTo<'ts,
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let (targets, state) = (&self.ts.targets, self.state);
+        let (targets, state) = (&self.ts.targets, u32::from(self.state));
         let slot = *self.slots.find(|slot| targets[**slot as usize] == state)? as usize;
         let k = self.ts.alphabet.size();
         Some(
             self.ts
-                .edge_in_slot((slot / k) as DefaultIdType, slot, slot % k)
+                .edge_in_slot(StateId::from_usize(slot / k), slot, slot % k)
                 .expect("listed edge exists"),
         )
     }
@@ -508,7 +524,7 @@ impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for DenseEdgesTo<'ts,
 
     #[inline]
     fn count(self) -> usize {
-        let (targets, state) = (&self.ts.targets, self.state);
+        let (targets, state) = (&self.ts.targets, u32::from(self.state));
         self.slots
             .filter(|slot| targets[**slot as usize] == state)
             .count()
@@ -520,12 +536,12 @@ impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for DenseEdgesTo<'ts,
 pub struct TableIntoEdges<A: IndexedAlphabet, C> {
     alphabet: A,
     /// The state and the symbol index of the next slot.
-    next: (DefaultIdType, usize),
-    slots: std::iter::Zip<std::vec::IntoIter<DefaultIdType>, std::vec::IntoIter<Option<C>>>,
+    next: (u32, usize),
+    slots: std::iter::Zip<std::vec::IntoIter<u32>, std::vec::IntoIter<Option<C>>>,
 }
 
 impl<A: IndexedAlphabet, C> TableIntoEdges<A, C> {
-    pub(super) fn new(alphabet: A, targets: Vec<DefaultIdType>, colors: Vec<Option<C>>) -> Self {
+    pub(super) fn new(alphabet: A, targets: Vec<u32>, colors: Vec<Option<C>>) -> Self {
         Self {
             alphabet,
             next: (0, 0),
@@ -535,7 +551,7 @@ impl<A: IndexedAlphabet, C> TableIntoEdges<A, C> {
 }
 
 impl<A: IndexedAlphabet, C> Iterator for TableIntoEdges<A, C> {
-    type Item = (DefaultIdType, A::Expression, C, DefaultIdType);
+    type Item = (StateId, A::Expression, C, StateId);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -549,7 +565,12 @@ impl<A: IndexedAlphabet, C> Iterator for TableIntoEdges<A, C> {
             };
             if target != NONE {
                 let expression = self.alphabet.expression_ref(symbol_index).clone();
-                return Some((source, expression, color.expect("edge has a color"), target));
+                return Some((
+                    StateId::from(source),
+                    expression,
+                    color.expect("edge has a color"),
+                    StateId::from(target),
+                ));
             }
         }
         None
@@ -566,12 +587,12 @@ pub struct DenseIntoStates<Q> {
 }
 
 impl<Q> Iterator for DenseIntoStates<Q> {
-    type Item = (DefaultIdType, Q);
+    type Item = (StateId, Q);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.states
-            .find_map(|(i, color)| color.map(|c| (i as DefaultIdType, c)))
+            .find_map(|(i, color)| color.map(|c| (StateId::from_usize(i), c)))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -613,6 +634,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I,
 mod tests {
     use super::*;
     use crate::ts::Storage;
+    use crate::ts::q;
 
     fn triangle() -> DenseTs<CharAlphabet, Void, u32> {
         let mut ts = DenseTs::new(CharAlphabet::of_size(2));
@@ -628,35 +650,35 @@ mod tests {
     fn lookup_and_edge_ids() {
         let ts = triangle();
         assert_eq!(ts.state_count(), 3);
-        assert_eq!(ts.successor(0, 'a'), Some(1));
-        assert_eq!(ts.successor(2, 'a'), Some(0));
-        assert_eq!(ts.successor(1, 'b'), None);
-        assert_eq!(ts.successor(0, 'z'), None);
-        assert_eq!(ts.successor(7, 'a'), None);
+        assert_eq!(ts.successor(q(0), 'a'), Some(q(1)));
+        assert_eq!(ts.successor(q(2), 'a'), Some(q(0)));
+        assert_eq!(ts.successor(q(1), 'b'), None);
+        assert_eq!(ts.successor(q(0), 'z'), None);
+        assert_eq!(ts.successor(q(7), 'a'), None);
         // slot = q * k + a
-        assert_eq!(ts.edge(1, 'a').unwrap().id(), Some(EdgeId(2)));
-        assert_eq!(*ts.edge(0, 'b').unwrap().color(), 4);
-        assert_eq!(ts.edges_from(0).unwrap().count(), 2);
-        assert_eq!(ts.edges_from(7).map(|_| ()), None);
+        assert_eq!(ts.edge(q(1), 'a').unwrap().id(), Some(EdgeId(2)));
+        assert_eq!(*ts.edge(q(0), 'b').unwrap().color(), 4);
+        assert_eq!(ts.edges_from(q(0)).unwrap().count(), 2);
+        assert_eq!(ts.edges_from(q(7)).map(|_| ()), None);
     }
 
     #[test]
     fn insertion_overwrites_and_updates_predecessors() {
         let mut ts = triangle();
-        let first = ts.edge(0, 'a').unwrap().id().unwrap();
-        let second = ts.add_edge((0, 'a', 9u32, 2));
+        let first = ts.edge(q(0), 'a').unwrap().id().unwrap();
+        let second = ts.add_edge((q(0), 'a', 9u32, q(2)));
         assert_eq!(first, second);
-        assert_eq!(ts.successor(0, 'a'), Some(2));
-        assert_eq!(*ts.edge(0, 'a').unwrap().color(), 9);
-        assert_eq!(ts.predecessors(1).unwrap().count(), 0);
-        assert_eq!(ts.predecessors(2).unwrap().count(), 2);
+        assert_eq!(ts.successor(q(0), 'a'), Some(q(2)));
+        assert_eq!(*ts.edge(q(0), 'a').unwrap().color(), 9);
+        assert_eq!(ts.predecessors(q(1)).unwrap().count(), 0);
+        assert_eq!(ts.predecessors(q(2)).unwrap().count(), 2);
     }
 
     #[test]
     fn colors_are_mutable() {
         let mut ts = triangle();
         *ts.edge_color_mut(EdgeId(0)).unwrap() = 42;
-        assert_eq!(*ts.edge(0, 'a').unwrap().color(), 42);
+        assert_eq!(*ts.edge(q(0), 'a').unwrap().color(), 42);
         assert!(ts.edge_color_mut(EdgeId(2)).is_some());
         assert!(ts.edge_color_mut(EdgeId(3)).is_none());
     }
@@ -668,9 +690,9 @@ mod tests {
         linked.add_edge((q0, 'a', Void, q1));
         linked.add_edge((q1, 'b', Void, q0));
         let dense = <Dense as Storage<_>>::try_from_linked(linked.clone()).unwrap();
-        assert_eq!(dense.successor(0, 'a'), Some(1));
-        assert_eq!(dense.successor(1, 'b'), Some(0));
-        assert_eq!(dense.successor(0, 'b'), None);
+        assert_eq!(dense.successor(q(0), 'a'), Some(q(1)));
+        assert_eq!(dense.successor(q(1), 'b'), Some(q(0)));
+        assert_eq!(dense.successor(q(0), 'b'), None);
 
         linked.add_edge((q0, 'a', Void, q0));
         assert!(<Dense as Storage<_>>::try_from_linked(linked).is_err());
@@ -681,59 +703,59 @@ mod tests {
         let mut ts = triangle();
         let into_zero = |ts: &DenseTs<CharAlphabet, Void, u32>| {
             let mut v: Vec<_> = ts
-                .predecessors(0)
+                .predecessors(q(0))
                 .unwrap()
                 .map(|e| (e.source(), *e.expression(), *e.color()))
                 .collect();
             v.sort();
             v
         };
-        assert_eq!(into_zero(&ts), vec![(0, 'b', 4), (2, 'a', 3)]);
-        assert!(ts.predecessors(7).is_none());
+        assert_eq!(into_zero(&ts), vec![(q(0), 'b', 4), (q(2), 'a', 3)]);
+        assert!(ts.predecessors(q(7)).is_none());
 
-        assert_eq!(ts.remove_edge(EdgeId(4)), Some((2, 'a', 3, 0)));
+        assert_eq!(ts.remove_edge(EdgeId(4)), Some((q(2), 'a', 3, q(0))));
         assert_eq!(ts.remove_edge(EdgeId(4)), None);
-        assert_eq!(into_zero(&ts), vec![(0, 'b', 4)]);
-        assert_eq!(ts.successor(2, 'a'), None);
+        assert_eq!(into_zero(&ts), vec![(q(0), 'b', 4)]);
+        assert_eq!(ts.successor(q(2), 'a'), None);
     }
 
     #[test]
     fn remove_state_removes_incident_edges() {
         let mut ts = triangle();
-        assert_eq!(ts.remove_state(0), Some(Void));
-        assert_eq!(ts.remove_state(0), None);
-        assert!(!ts.contains_state(0));
-        assert_eq!(ts.states().collect::<Vec<_>>(), vec![1, 2]);
-        assert_eq!(ts.successor(2, 'a'), None);
-        assert_eq!(ts.predecessors(1).unwrap().count(), 0);
-        assert_eq!(ts.edges_from(0).map(|_| ()), None);
+        assert_eq!(ts.remove_state(q(0)), Some(Void));
+        assert_eq!(ts.remove_state(q(0)), None);
+        assert!(!ts.contains_state(q(0)));
+        assert_eq!(ts.states().collect::<Vec<_>>(), vec![q(1), q(2)]);
+        assert_eq!(ts.successor(q(2), 'a'), None);
+        assert_eq!(ts.predecessors(q(1)).unwrap().count(), 0);
+        assert_eq!(ts.edges_from(q(0)).map(|_| ()), None);
         // the remaining edge keeps its id
-        assert_eq!(ts.edge(1, 'a').unwrap().id(), Some(EdgeId(2)));
+        assert_eq!(ts.edge(q(1), 'a').unwrap().id(), Some(EdgeId(2)));
     }
 
     #[test]
     fn remove_edges_to_removes_loops_and_incoming() {
         let mut ts = triangle();
-        assert_eq!(ts.remove_edges_to(0).unwrap().len(), 2);
-        assert_eq!(ts.remove_edges_to(7), None);
-        assert_eq!(ts.successor(0, 'b'), None);
-        assert_eq!(ts.successor(0, 'a'), Some(1));
+        assert_eq!(ts.remove_edges_to(q(0)).unwrap().len(), 2);
+        assert_eq!(ts.remove_edges_to(q(7)), None);
+        assert_eq!(ts.successor(q(0), 'b'), None);
+        assert_eq!(ts.successor(q(0), 'a'), Some(q(1)));
     }
 
     #[test]
     fn completion() {
         let mut ts = triangle();
         assert!(!ts.is_complete());
-        ts.remove_state(1);
+        ts.remove_state(q(1));
         ts.complete_with_colors(Void, 7);
         assert!(ts.is_complete());
         // the sink is a new state, the removed state stays removed
-        assert_eq!(ts.states().collect::<Vec<_>>(), vec![0, 2, 3]);
-        assert_eq!(ts.successor(0, 'a'), Some(3));
-        assert_eq!(ts.successor(2, 'b'), Some(3));
-        assert_eq!(ts.successor(3, 'a'), Some(3));
-        assert_eq!(*ts.edge(3, 'b').unwrap().color(), 7);
-        assert_eq!(ts.successor(0, 'b'), Some(0));
+        assert_eq!(ts.states().collect::<Vec<_>>(), vec![q(0), q(2), q(3)]);
+        assert_eq!(ts.successor(q(0), 'a'), Some(q(3)));
+        assert_eq!(ts.successor(q(2), 'b'), Some(q(3)));
+        assert_eq!(ts.successor(q(3), 'a'), Some(q(3)));
+        assert_eq!(*ts.edge(q(3), 'b').unwrap().color(), 7);
+        assert_eq!(ts.successor(q(0), 'b'), Some(q(0)));
 
         ts.complete_with_colors(Void, 7);
         assert_eq!(ts.state_count(), 3);

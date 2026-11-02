@@ -274,15 +274,16 @@ impl<Ts: TransitionSystem> PartialEq for SccDecomposition<'_, Ts> {
 
 #[cfg(test)]
 mod tests {
+    use crate::ts::q;
     #[test]
     fn decomposition_from_roots_covers_the_reachable_part() {
         let ts = ts();
-        let sccs = Sccs::on(&ts).from([0]).compute();
+        let sccs = Sccs::on(&ts).from([q(0)]).compute();
         assert_eq!(sccs.size(), 3);
-        assert_eq!(sccs.scc_of(0).unwrap().size(), 1);
-        let sccs = Sccs::on(&ts).from([2, 3]).compute();
+        assert_eq!(sccs.scc_of(q(0)).unwrap().size(), 1);
+        let sccs = Sccs::on(&ts).from([q(2), q(3)]).compute();
         assert_eq!(sccs.size(), 1);
-        assert_eq!(sccs.scc_of(3).unwrap().size(), 2);
+        assert_eq!(sccs.scc_of(q(3)).unwrap().size(), 2);
     }
     use crate::ts::Sccs;
 
@@ -312,9 +313,9 @@ mod tests {
         let cong = ts();
         let sccs = Sccs::on(&cong).compute();
 
-        let scc1 = Scc::new(&cong, vec![0]);
-        let scc2 = Scc::new(&cong, vec![1]);
-        let scc3 = Scc::new(&cong, vec![2, 3]);
+        let scc1 = Scc::new(&cong, vec![q(0)]);
+        let scc2 = Scc::new(&cong, vec![q(1)]);
+        let scc3 = Scc::new(&cong, vec![q(2), q(3)]);
 
         assert_eq!(
             sccs,
@@ -336,7 +337,7 @@ mod tests {
     fn maximal_loop_from_a_bogus_scc() {
         // {0, 1} is not strongly connected in `ts`: state 0 cannot be reached from 1
         let cong = ts();
-        let bogus = Scc::new(&cong, vec![0, 1]);
-        bogus.maximal_loop_from(0);
+        let bogus = Scc::new(&cong, vec![q(0), q(1)]);
+        bogus.maximal_loop_from(q(0));
     }
 }

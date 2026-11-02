@@ -509,6 +509,7 @@ mod tests {
     use crate::TransitionSystem;
     use crate::representation::IntoTransitions;
     use crate::ts::Builder;
+    use crate::ts::q;
 
     #[test]
     fn restrict_ts_by_state_index() {
@@ -526,7 +527,7 @@ mod tests {
 
         assert!(dfa.accepts("aa"));
 
-        let restricted = dfa.restrict_state_indices(|idx| idx != 2);
+        let restricted = dfa.restrict_state_indices(|idx| idx != q(2));
         assert!(
             !restricted
                 .erase_edge_colors()
@@ -541,11 +542,11 @@ mod tests {
         let ts = Builder::without_colors()
             .with_edges([(0, 'a', 1), (1, 'a', 2), (2, 'a', 0)])
             .into_dts_with_initial(0);
-        let keep: StateSet<u32> = [0, 1].into_iter().collect();
+        let keep: StateSet<crate::ts::StateId> = [q(0), q(1)].into_iter().collect();
         let restricted = (&ts).restrict_state_indices(keep);
-        assert_eq!(restricted.reached_state("a"), Some(1));
+        assert_eq!(restricted.reached_state("a"), Some(q(1)));
         assert_eq!(restricted.reached_state("aa"), None);
-        assert!(restricted.contains_state(1));
-        assert!(!restricted.contains_state(2));
+        assert!(restricted.contains_state(q(1)));
+        assert!(!restricted.contains_state(q(2)));
     }
 }

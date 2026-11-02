@@ -1,4 +1,4 @@
-use super::{DefaultIdType, ForAlphabet, Sproutable, Storage};
+use super::{ForAlphabet, Sproutable, StateId, Storage};
 use crate::TransitionSystem;
 use crate::alphabet::{FromSymbols, Symbol, WrongAlphabetSize};
 use crate::automaton::WithInitial;
@@ -20,20 +20,20 @@ pub enum BuilderError {
     #[error(
         "state {0} has no color: set one with `color` or `with_state_colors`, or provide a `default_color`"
     )]
-    MissingStateColor(DefaultIdType),
+    MissingStateColor(u32),
     /// An added edge overlaps with an edge that was added before.
     #[error(
         "the edge from {source_state} on {expression} to {target} overlaps with an existing edge to {existing_target}"
     )]
     OverlappingEdge {
         /// The source state of the edge that could not be added.
-        source_state: DefaultIdType,
+        source_state: u32,
         /// The expression (symbol) on the edge.
         expression: String,
         /// The target state of the edge that could not be added.
-        target: DefaultIdType,
+        target: u32,
         /// The target of the existing edge with which it overlaps.
-        existing_target: DefaultIdType,
+        existing_target: u32,
     },
     /// The symbols on the edges do not fit the alphabet of the target (an alphabet of fixed size).
     #[error(transparent)]
@@ -44,23 +44,23 @@ pub enum BuilderError {
 /// `(source, symbol, color, target)`, or `(source, symbol, target)` if edges have no color.
 pub trait IntoBuilderEdge<S, C> {
     /// Turns `self` into the tuple `(source, symbol, color, target)`.
-    fn into_builder_edge(self) -> (DefaultIdType, S, C, DefaultIdType);
+    fn into_builder_edge(self) -> (u32, S, C, u32);
 }
 
-impl<S, C> IntoBuilderEdge<S, C> for (DefaultIdType, S, C, DefaultIdType) {
-    fn into_builder_edge(self) -> (DefaultIdType, S, C, DefaultIdType) {
+impl<S, C> IntoBuilderEdge<S, C> for (u32, S, C, u32) {
+    fn into_builder_edge(self) -> (u32, S, C, u32) {
         self
     }
 }
 
-impl<S> IntoBuilderEdge<S, Void> for (DefaultIdType, S, DefaultIdType) {
-    fn into_builder_edge(self) -> (DefaultIdType, S, Void, DefaultIdType) {
+impl<S> IntoBuilderEdge<S, Void> for (u32, S, u32) {
+    fn into_builder_edge(self) -> (u32, S, Void, u32) {
         (self.0, self.1, Void, self.2)
     }
 }
 
 impl<S, C, E: IntoBuilderEdge<S, C> + Clone> IntoBuilderEdge<S, C> for &E {
-    fn into_builder_edge(self) -> (DefaultIdType, S, C, DefaultIdType) {
+    fn into_builder_edge(self) -> (u32, S, C, u32) {
         self.clone().into_builder_edge()
     }
 }
@@ -104,9 +104,9 @@ fn or_panic<T>(result: Result<T, BuilderError>) -> T {
 /// ```
 pub struct Builder<Q = Void, C = Void, S = char> {
     symbols: BTreeSet<S>,
-    edges: Vec<(DefaultIdType, S, C, DefaultIdType)>,
+    edges: Vec<(u32, S, C, u32)>,
     default: Option<Q>,
-    colors: Vec<(DefaultIdType, Q)>,
+    colors: Vec<(u32, Q)>,
 }
 
 impl<C, S> Builder<Void, C, S> {
@@ -181,7 +181,7 @@ impl<Q: Color, C: Color, S: Symbol> Builder<Q, C, S> {
     pub fn with_state_colors<I: IntoIterator<Item = Q>>(self, iter: I) -> Self {
         iter.into_iter()
             .enumerate()
-            .fold(self, |acc, (i, x)| acc.color(i as DefaultIdType, x))
+            .fold(self, |acc, (i, x)| acc.color(i as u32, x))
     }
 
     /// Builds the transition system `T` from `self`. The target type decides about determinism:
@@ -201,7 +201,7 @@ impl<Q: Color, C: Color, S: Symbol> Builder<Q, C, S> {
     #[track_caller]
     pub fn build<T>(self) -> T
     where
-        T: Sproutable<StateIndex = DefaultIdType, StateColor = Q, EdgeColor = C>
+        T: Sproutable<StateIndex = StateId, StateColor = Q, EdgeColor = C>
             + ForAlphabet<<T as TransitionSystem>::Alphabet>,
         <T as TransitionSystem>::Alphabet: FromSymbols<Symbol = S>,
     {
@@ -219,7 +219,7 @@ impl<Q: Color, C: Color, S: Symbol> Builder<Q, C, S> {
     ///   previously added one.
     pub fn try_build<T>(self) -> Result<T, BuilderError>
     where
-        T: Sproutable<StateIndex = DefaultIdType, StateColor = Q, EdgeColor = C>
+        T: Sproutable<StateIndex = StateId, StateColor = Q, EdgeColor = C>
             + ForAlphabet<<T as TransitionSystem>::Alphabet>,
         <T as TransitionSystem>::Alphabet: FromSymbols<Symbol = S>,
     {
@@ -250,13 +250,13 @@ impl<Q: Color, C: Color, S: Symbol> Builder<Q, C, S> {
         for (i, color) in colors.into_iter().enumerate() {
             let color = color
                 .or_else(|| self.default.clone())
-                .ok_or(BuilderError::MissingStateColor(i as DefaultIdType))?;
+                .ok_or(BuilderError::MissingStateColor(i as u32))?;
             ts.add_state(color);
         }
 
         if <<T as Sproutable>::Storage as Storage<<T as TransitionSystem>::Alphabet>>::DETERMINISTIC
         {
-            let mut seen = HashMap::<(DefaultIdType, S), DefaultIdType>::new();
+            let mut seen = HashMap::<(u32, S), u32>::new();
             for &(q, e, _, p) in &self.edges {
                 if let Some(existing_target) = seen.insert((q, e), p) {
                     return Err(BuilderError::OverlappingEdge {
@@ -272,7 +272,8 @@ impl<Q: Color, C: Color, S: Symbol> Builder<Q, C, S> {
         // linked storages iterate the edges of a state in reverse order of insertion, so we insert
         // them back to front to get them in the order in which they were given
         for edge in self.edges.into_iter().rev() {
-            ts.add_edge(edge);
+            let (q, e, c, p) = edge;
+            ts.add_edge((StateId::from(q), e, c, StateId::from(p)));
         }
         Ok(ts)
     }
@@ -282,7 +283,7 @@ impl<Q: Color, C: Color, S: Symbol> Builder<Q, C, S> {
     /// # Panics
     ///
     /// Panics if the state `idx` already has a color.
-    pub fn color(mut self, idx: DefaultIdType, color: Q) -> Self {
+    pub fn color(mut self, idx: u32, color: Q) -> Self {
         assert!(self.colors.iter().all(|(q, _c)| q != &idx));
         self.colors.push((idx, color));
         self
@@ -404,10 +405,7 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_into_dts`].
     #[track_caller]
-    pub fn into_dts_with_initial(
-        self,
-        initial: DefaultIdType,
-    ) -> WithInitial<DTS<CharAlphabet, Q, C>> {
+    pub fn into_dts_with_initial(self, initial: u32) -> WithInitial<DTS<CharAlphabet, Q, C>> {
         or_panic(self.try_into_dts_with_initial(initial))
     }
 
@@ -417,9 +415,9 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// See [`Self::try_into_dts`].
     pub fn try_into_dts_with_initial(
         self,
-        initial: DefaultIdType,
+        initial: u32,
     ) -> Result<WithInitial<DTS<CharAlphabet, Q, C>>, BuilderError> {
-        Ok(self.try_into_dts()?.with_initial(initial))
+        Ok(self.try_into_dts()?.with_initial(initial.into()))
     }
 
     /// Builds an [`NTS`] and sets `initial` as its designated initial state.
@@ -427,10 +425,7 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_into_nts`].
     #[track_caller]
-    pub fn into_nts_with_initial(
-        self,
-        initial: DefaultIdType,
-    ) -> WithInitial<NTS<CharAlphabet, Q, C>> {
+    pub fn into_nts_with_initial(self, initial: u32) -> WithInitial<NTS<CharAlphabet, Q, C>> {
         or_panic(self.try_into_nts_with_initial(initial))
     }
 
@@ -440,9 +435,9 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// See [`Self::try_into_nts`].
     pub fn try_into_nts_with_initial(
         self,
-        initial: DefaultIdType,
+        initial: u32,
     ) -> Result<WithInitial<NTS<CharAlphabet, Q, C>>, BuilderError> {
-        Ok(self.try_into_nts()?.with_initial(initial))
+        Ok(self.try_into_nts()?.with_initial(initial.into()))
     }
 
     /// Turns `self` into a [`RightCongruence`] with the given initial state.
@@ -450,10 +445,7 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_into_dts`].
     #[track_caller]
-    pub fn into_right_congruence(
-        self,
-        initial: DefaultIdType,
-    ) -> RightCongruence<DTS<CharAlphabet, Q, C>> {
+    pub fn into_right_congruence(self, initial: u32) -> RightCongruence<DTS<CharAlphabet, Q, C>> {
         or_panic(self.try_into_right_congruence(initial))
     }
 
@@ -463,7 +455,7 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// See [`Self::try_into_dts`].
     pub fn try_into_right_congruence(
         self,
-        initial: DefaultIdType,
+        initial: u32,
     ) -> Result<RightCongruence<DTS<CharAlphabet, Q, C>>, BuilderError> {
         Ok(self.try_into_dts_with_initial(initial)?.collect())
     }
@@ -488,7 +480,7 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     #[track_caller]
     pub fn into_automaton<Sem>(
         self,
-        initial: DefaultIdType,
+        initial: u32,
         acceptance: Sem,
     ) -> Automaton<DTS<CharAlphabet, Q, C>, Sem> {
         or_panic(self.try_into_automaton(initial, acceptance))
@@ -500,12 +492,12 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// See [`Self::try_build`].
     pub fn try_into_automaton<Sem>(
         self,
-        initial: DefaultIdType,
+        initial: u32,
         acceptance: Sem,
     ) -> Result<Automaton<DTS<CharAlphabet, Q, C>, Sem>, BuilderError> {
         Ok(Automaton::from_parts_with_acceptance(
             self.try_build()?,
-            initial,
+            initial.into(),
             acceptance,
         ))
     }
@@ -517,14 +509,14 @@ impl Builder<bool, Void> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_build`].
     #[track_caller]
-    pub fn into_dfa(self, initial: DefaultIdType) -> DFA<DTS<CharAlphabet, bool, Void>> {
+    pub fn into_dfa(self, initial: u32) -> DFA<DTS<CharAlphabet, bool, Void>> {
         or_panic(self.try_into_dfa(initial))
     }
 
     /// Fallible version of [`Self::into_dfa`].
     pub fn try_into_dfa(
         self,
-        initial: DefaultIdType,
+        initial: u32,
     ) -> Result<DFA<DTS<CharAlphabet, bool, Void>>, BuilderError> {
         self.try_into_automaton(initial, ReachabilityCondition)
     }
@@ -536,14 +528,14 @@ impl Builder<Void, bool> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_build`].
     #[track_caller]
-    pub fn into_dba(self, initial: DefaultIdType) -> DBA<DTS<CharAlphabet, Void, bool>> {
+    pub fn into_dba(self, initial: u32) -> DBA<DTS<CharAlphabet, Void, bool>> {
         or_panic(self.try_into_dba(initial))
     }
 
     /// Fallible version of [`Self::into_dba`].
     pub fn try_into_dba(
         self,
-        initial: DefaultIdType,
+        initial: u32,
     ) -> Result<DBA<DTS<CharAlphabet, Void, bool>>, BuilderError> {
         self.default_color(Void)
             .try_into_automaton(initial, BuchiCondition)
@@ -556,14 +548,14 @@ impl Builder<Void, Int> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_build`].
     #[track_caller]
-    pub fn into_dpa(self, initial: DefaultIdType) -> DPA<DTS<CharAlphabet, Void, Int>> {
+    pub fn into_dpa(self, initial: u32) -> DPA<DTS<CharAlphabet, Void, Int>> {
         or_panic(self.try_into_dpa(initial))
     }
 
     /// Fallible version of [`Self::into_dpa`].
     pub fn try_into_dpa(
         self,
-        initial: DefaultIdType,
+        initial: u32,
     ) -> Result<DPA<DTS<CharAlphabet, Void, Int>>, BuilderError> {
         self.default_color(Void)
             .try_into_automaton(initial, MinEvenParityCondition)
@@ -574,14 +566,14 @@ impl Builder<Void, Int> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_build`].
     #[track_caller]
-    pub fn into_mealy(self, initial: DefaultIdType) -> MealyMachine<DTS<CharAlphabet, Void, Int>> {
+    pub fn into_mealy(self, initial: u32) -> MealyMachine<DTS<CharAlphabet, Void, Int>> {
         or_panic(self.try_into_mealy(initial))
     }
 
     /// Fallible version of [`Self::into_mealy`].
     pub fn try_into_mealy(
         self,
-        initial: DefaultIdType,
+        initial: u32,
     ) -> Result<MealyMachine<DTS<CharAlphabet, Void, Int>>, BuilderError> {
         self.default_color(Void)
             .try_into_automaton(initial, MealySemantics)
@@ -594,14 +586,14 @@ impl Builder<Int, Void> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_build`].
     #[track_caller]
-    pub fn into_moore(self, initial: DefaultIdType) -> MooreMachine<DTS<CharAlphabet, Int, Void>> {
+    pub fn into_moore(self, initial: u32) -> MooreMachine<DTS<CharAlphabet, Int, Void>> {
         or_panic(self.try_into_moore(initial))
     }
 
     /// Fallible version of [`Self::into_moore`].
     pub fn try_into_moore(
         self,
-        initial: DefaultIdType,
+        initial: u32,
     ) -> Result<MooreMachine<DTS<CharAlphabet, Int, Void>>, BuilderError> {
         self.try_into_automaton(initial, MooreSemantics)
     }
@@ -612,6 +604,7 @@ mod tests {
     use super::{Builder, BuilderError};
     use crate::TransitionSystem;
     use crate::alphabet::CharAlphabet;
+    use crate::ts::q;
     use crate::ts::{Pointed, States};
     use crate::{DTS, NTS, Void};
 
@@ -624,8 +617,8 @@ mod tests {
             .try_into_nts()
             .unwrap();
         assert_eq!(ts.states().count(), 6);
-        assert_eq!(ts.state_color(5).as_deref(), Some(&true));
-        assert_eq!(ts.state_color(3).as_deref(), Some(&false));
+        assert_eq!(ts.state_color(q(5)).as_deref(), Some(&true));
+        assert_eq!(ts.state_color(q(3)).as_deref(), Some(&false));
     }
 
     #[test]
@@ -708,15 +701,15 @@ mod tests {
         let dts = Builder::without_colors()
             .with_edges(edges)
             .into_dts_with_initial(1);
-        assert_eq!(dts.initial(), 1);
+        assert_eq!(dts.initial(), q(1));
         let nts = Builder::without_colors()
             .with_edges(edges)
             .into_nts_with_initial(1);
-        assert_eq!(nts.initial(), 1);
+        assert_eq!(nts.initial(), q(1));
         let rc = Builder::without_colors()
             .with_edges(edges)
             .into_right_congruence(0);
-        assert!(rc.is_idempotent(0).is_some());
+        assert!(rc.is_idempotent(q(0)).is_some());
         assert_eq!(
             Builder::without_colors()
                 .with_edges([(0, 'a', 1), (0, 'a', 0)])
@@ -741,8 +734,8 @@ mod tests {
         let ts = builder()
             .try_build::<DTS<Fixed<usize, 2>, Void, Void>>()
             .unwrap();
-        assert_eq!(ts.successor(0, 3), Some(1));
-        assert_eq!(ts.successor(1, 7), Some(1));
+        assert_eq!(ts.successor(q(0), 3), Some(q(1)));
+        assert_eq!(ts.successor(q(1), 7), Some(q(1)));
         // the symbols on the edges and the alphabet of the target must agree in number
         assert_eq!(
             builder()
@@ -769,12 +762,12 @@ mod tests {
         let nts = Builder::without_colors().with_edges(edges).into_nts();
         let dts = Builder::without_colors().with_edges(edges).into_dts();
         let nts: Vec<char> = nts
-            .edges_from(0)
+            .edges_from(q(0))
             .unwrap()
             .map(|e| *e.expression())
             .collect();
         let dts: Vec<char> = dts
-            .edges_from(0)
+            .edges_from(q(0))
             .unwrap()
             .map(|e| *e.expression())
             .collect();

@@ -4,8 +4,8 @@ use std::borrow::Cow;
 use std::{fmt::Debug, hash::Hash};
 
 use crate::ts::{
-    Builder, DefaultIdType, DenseId, Deterministic, EdgeColor, EdgeExpression, EdgeId, EdgeOf,
-    EdgeTuple, ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable, StateColor, StateIndex,
+    Builder, DenseId, Deterministic, EdgeColor, EdgeExpression, EdgeId, EdgeOf, EdgeTuple,
+    ForAlphabet, IntoEdgeTuple, Shrinkable, Sproutable, StateColor, StateId, StateIndex,
 };
 
 mod linked_state;
@@ -55,15 +55,15 @@ pub struct LinkedTs<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
 /// The renaming of states and edges that [`LinkedTs::compact`] performed.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Compaction {
-    states: Vec<Option<DefaultIdType>>,
+    states: Vec<Option<StateId>>,
     edges: Vec<Option<EdgeId>>,
 }
 
 impl Compaction {
     /// The new index of the state that had index `old` before compaction, or `None` if that state
     /// had been removed.
-    pub fn state(&self, old: DefaultIdType) -> Option<DefaultIdType> {
-        self.states.get(old as usize).copied().flatten()
+    pub fn state(&self, old: StateId) -> Option<StateId> {
+        self.states.get(old.into_usize()).copied().flatten()
     }
 
     /// The new id of the edge that had id `old` before compaction, or `None` if that edge had been
@@ -176,19 +176,19 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
 
         let mut edge = LinkedEdge::new(source, expression, color, target);
 
-        let first_out = self.states[source as usize].first_out_edge();
+        let first_out = self.states[source.into_usize()].first_out_edge();
         if first_out != NONE {
             self.edges[first_out as usize].out_prev = id;
             edge.out_next = first_out;
         }
-        self.states[source as usize].set_first_out_edge(id);
+        self.states[source.into_usize()].set_first_out_edge(id);
 
-        let first_in = self.states[target as usize].first_in_edge();
+        let first_in = self.states[target.into_usize()].first_in_edge();
         if first_in != NONE {
             self.edges[first_in as usize].in_prev = id;
             edge.in_next = first_in;
         }
-        self.states[target as usize].set_first_in_edge(id);
+        self.states[target.into_usize()].set_first_in_edge(id);
 
         self.edges.push(edge);
         self.live_edges += 1;
@@ -216,7 +216,7 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
         if out_prev != NONE {
             self.edges[out_prev as usize].out_next = out_next;
         } else {
-            self.states[source as usize].set_first_out_edge(out_next);
+            self.states[source.into_usize()].set_first_out_edge(out_next);
         }
         if out_next != NONE {
             self.edges[out_next as usize].out_prev = out_prev;
@@ -224,7 +224,7 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
         if in_prev != NONE {
             self.edges[in_prev as usize].in_next = in_next;
         } else {
-            self.states[target as usize].set_first_in_edge(in_next);
+            self.states[target.into_usize()].set_first_in_edge(in_next);
         }
         if in_next != NONE {
             self.edges[in_next as usize].in_prev = in_prev;
@@ -267,9 +267,9 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
         ids.sort_unstable();
         ids.dedup();
         self.remove_edge_ids(ids);
-        debug_assert_eq!(self.states[state as usize].first_out_edge(), NONE);
-        debug_assert_eq!(self.states[state as usize].first_in_edge(), NONE);
-        self.states[state as usize].vacate()
+        debug_assert_eq!(self.states[state.into_usize()].first_out_edge(), NONE);
+        debug_assert_eq!(self.states[state.into_usize()].first_in_edge(), NONE);
+        self.states[state.into_usize()].vacate()
     }
 
     /// Removes all edges for which `f` returns `true`, by scanning all of them, and returns
@@ -291,11 +291,11 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
     }
 
     /// The ids of the edges in the out-list of `state` for which `keep` holds, in list order.
-    fn out_edge_ids(&self, state: u32, mut keep: impl FnMut(usize) -> bool) -> Vec<EdgeId> {
+    fn out_edge_ids(&self, state: StateId, mut keep: impl FnMut(usize) -> bool) -> Vec<EdgeId> {
         let mut ids = Vec::new();
         let mut next = self
             .states
-            .get(state as usize)
+            .get(state.into_usize())
             .map_or(NONE, |s| s.first_out_edge());
         while next != NONE {
             if keep(next as usize) {
@@ -307,11 +307,11 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
     }
 
     /// The ids of the edges in the in-list of `state` for which `keep` holds, in list order.
-    fn in_edge_ids(&self, state: u32, mut keep: impl FnMut(usize) -> bool) -> Vec<EdgeId> {
+    fn in_edge_ids(&self, state: StateId, mut keep: impl FnMut(usize) -> bool) -> Vec<EdgeId> {
         let mut ids = Vec::new();
         let mut next = self
             .states
-            .get(state as usize)
+            .get(state.into_usize())
             .map_or(NONE, |s| s.first_in_edge());
         while next != NONE {
             if keep(next as usize) {
@@ -330,8 +330,12 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
             .collect()
     }
 
-    fn out_edge_position(&self, from: u32, matcher: impl Matcher<A::Expression>) -> Option<usize> {
-        let mut idx = self.states.get(from as usize)?.first_out_edge();
+    fn out_edge_position(
+        &self,
+        from: StateId,
+        matcher: impl Matcher<A::Expression>,
+    ) -> Option<usize> {
+        let mut idx = self.states.get(from.into_usize())?.first_out_edge();
         while idx != NONE {
             let edge = &self.edges[idx as usize];
             if matcher.matches(&edge.expression) {
@@ -350,7 +354,7 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
         let mut next = 0;
         for (i, s) in self.states.iter().enumerate() {
             if s.is_occupied() {
-                state_map[i] = Some(next);
+                state_map[i] = Some(StateId::from(next));
                 next += 1;
             }
         }
@@ -371,7 +375,8 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
                     .0
             }
         };
-        let state = |old: u32| state_map[old as usize].expect("edges only touch occupied states");
+        let state =
+            |old: StateId| state_map[old.into_usize()].expect("edges only touch occupied states");
 
         let mut edges = Vec::with_capacity(self.live_edges);
         for mut e in std::mem::take(&mut self.edges) {
@@ -434,7 +439,11 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
             while next != NONE {
                 live(next);
                 let e = &self.edges[next as usize];
-                assert_eq!(e.source as usize, q, "edge {next} is in the wrong out-list");
+                assert_eq!(
+                    e.source.into_usize(),
+                    q,
+                    "edge {next} is in the wrong out-list"
+                );
                 assert_eq!(e.out_prev, prev, "broken out-list at edge {next}");
                 assert!(!seen_out[next as usize], "cycle in out-list of state {q}");
                 seen_out[next as usize] = true;
@@ -444,7 +453,11 @@ impl<A: Alphabet, Q: Color, C: Color> LinkedTs<A, Q, C> {
             while next != NONE {
                 live(next);
                 let e = &self.edges[next as usize];
-                assert_eq!(e.target as usize, q, "edge {next} is in the wrong in-list");
+                assert_eq!(
+                    e.target.into_usize(),
+                    q,
+                    "edge {next} is in the wrong in-list"
+                );
                 assert_eq!(e.in_prev, prev, "broken in-list at edge {next}");
                 assert!(!seen_in[next as usize], "cycle in in-list of state {q}");
                 seen_in[next as usize] = true;
@@ -482,7 +495,7 @@ impl<A: Alphabet, Q: Color, C: Color> Sproutable for LinkedTs<A, Q, C> {
             .filter(|id| *id != NONE)
             .expect("too many states for 32 bit ids");
         self.states.push(LinkedState::new(color));
-        id
+        StateId::from(id)
     }
     fn add_edge<E>(&mut self, t: E) -> EdgeId
     where
@@ -711,7 +724,7 @@ impl<Q, C> Det<LinkedTs<CharAlphabet, Q, C>> {
 }
 
 impl<A: Alphabet, Q: Color, C: Color> TransitionSystem for LinkedTs<A, Q, C> {
-    type StateIndex = DefaultIdType;
+    type StateIndex = StateId;
 
     type StateColor = Q;
 
@@ -768,7 +781,7 @@ impl<A: Alphabet, Q: Color, C: Color> States for LinkedTs<A, Q, C> {
 pub struct LinkedStateIndices<'ts, Q: Color>(&'ts [LinkedState<Q>], usize);
 
 impl<Q: Color> Iterator for LinkedStateIndices<'_, Q> {
-    type Item = DefaultIdType;
+    type Item = StateId;
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(state) = self.0.get(self.1) {
             self.1 += 1;
@@ -812,11 +825,11 @@ impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for LinkedTs<A, Q, C> 
 
 impl<A: Alphabet, Q, C: Clone + Hash + Eq> LinkedTs<A, Q, C> {
     /// The edges leaving `q` as a set, to compare systems regardless of the order of their edges.
-    fn edge_set(&self, q: u32) -> math::FxIndexSet<(&A::Expression, Cow<'_, C>, u32)>
+    fn edge_set(&self, q: usize) -> math::FxIndexSet<(&A::Expression, Cow<'_, C>, StateId)>
     where
         A::Expression: Hash + Eq,
     {
-        LinkedEdgesFrom::new(&self.edges, self.states[q as usize].first_out_edge())
+        LinkedEdgesFrom::new(&self.edges, self.states[q].first_out_edge())
             .map(|e| {
                 let (expression, target) = (e.expression(), e.target());
                 (expression, e.into_color(), target)
@@ -850,7 +863,7 @@ impl<A: Alphabet + PartialEq, Q: Hash + Debug + Eq, C: Clone + Hash + Debug + Eq
                 if x.is_vacant() || y.is_vacant() {
                     return x.is_vacant() && y.is_vacant();
                 }
-                x.color() == y.color() && self.edge_set(q as u32) == other.edge_set(q as u32)
+                x.color() == y.color() && self.edge_set(q) == other.edge_set(q)
             })
     }
 }
@@ -882,12 +895,12 @@ pub struct LinkedIntoStates<Q> {
 }
 
 impl<Q> Iterator for LinkedIntoStates<Q> {
-    type Item = (DefaultIdType, Q);
+    type Item = (StateId, Q);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.states.find_map(|(i, state)| match state {
-            LinkedState::Occupied(color, _, _) => Some((i as DefaultIdType, color)),
+            LinkedState::Occupied(color, _, _) => Some((StateId::from_usize(i), color)),
             LinkedState::Vacant => None,
         })
     }
@@ -904,7 +917,7 @@ pub struct LinkedIntoEdges<E, C> {
 }
 
 impl<E, C> Iterator for LinkedIntoEdges<E, C> {
-    type Item = (DefaultIdType, E, C, DefaultIdType);
+    type Item = (StateId, E, C, StateId);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -968,7 +981,12 @@ impl<A: Alphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I, Init>
             out.add_state(color);
         }
         for (p, expression, color, r) in edges {
-            out.insert_edge(numbering.get(p), expression, color, numbering.get(r));
+            out.insert_edge(
+                StateId::from(numbering.get(p)),
+                expression,
+                color,
+                StateId::from(numbering.get(r)),
+            );
         }
         out
     }
@@ -994,6 +1012,7 @@ mod tests {
     use crate::alphabet::CharAlphabet;
     use crate::ts::DenseId;
     use crate::ts::{Builder, Deterministic, ForAlphabet, Shrinkable, Sproutable};
+    use crate::ts::{StateId, q};
 
     #[test]
     fn is_deterministic_compares_all_edge_pairs() {
@@ -1071,14 +1090,14 @@ mod tests {
         };
         for c in 0..(6 * n) {
             let sym = ['a', 'b'][next(2) as usize];
-            ts.add_edge((next(n), sym, c, next(n)));
+            ts.add_edge((StateId::from(next(n)), sym, c, StateId::from(next(n))));
         }
         ts
     }
 
     fn sorted(
         mut edges: Vec<crate::ts::EdgeTuple<crate::NTS<CharAlphabet, u32, u32>>>,
-    ) -> Vec<(u32, char, u32, u32)> {
+    ) -> Vec<(StateId, char, u32, StateId)> {
         edges.sort();
         edges
     }
@@ -1086,8 +1105,8 @@ mod tests {
     #[test]
     fn list_walking_removal_agrees_with_full_scan() {
         let n = 8;
-        for q in 0..n {
-            for p in 0..n {
+        for q in (0..n).map(StateId::from) {
+            for p in (0..n).map(StateId::from) {
                 let (mut fast, mut slow) = (tangle(n), tangle(n));
                 let a = fast.remove_edges_between(q, p).unwrap();
                 let b = slow.filter_remove_edges(|s, _, _, t| s == q && t == p);
@@ -1132,20 +1151,20 @@ mod tests {
 
         ts.add_state(0);
         ts.add_state(1);
-        ts.add_edge((0, 'a', 1));
-        ts.add_edge((1, 'a', 0));
-        ts.add_edge((0, 'b', 0));
-        ts.add_edge((1, 'b', 1));
+        ts.add_edge((q(0), 'a', q(1)));
+        ts.add_edge((q(1), 'a', q(0)));
+        ts.add_edge((q(0), 'b', q(0)));
+        ts.add_edge((q(1), 'b', q(1)));
 
         assert!(ts.remove_edge(crate::ts::EdgeId(0)).is_some());
         assert!(ts.remove_edge(crate::ts::EdgeId(0)).is_none());
-        assert_eq!(ts.successor(0, 'a'), None);
+        assert_eq!(ts.successor(q(0), 'a'), None);
 
-        ts.add_edge((0, 'a', 0));
-        assert_eq!(ts.successor(0, 'a'), Some(0));
+        ts.add_edge((q(0), 'a', q(0)));
+        assert_eq!(ts.successor(q(0), 'a'), Some(q(0)));
         assert_eq!(
-            ts.reachable_state_indices_from(0).collect::<Vec<_>>(),
-            vec![0]
+            ts.reachable_state_indices_from(q(0)).collect::<Vec<_>>(),
+            vec![q(0)]
         );
     }
 
@@ -1171,7 +1190,7 @@ mod tests {
         assert!(ts.edge_by_id(EdgeId(0)).is_none());
 
         // a new edge never takes the id of a removed one
-        let fresh = ts.insert_edge(0, 'a', 99, 0);
+        let fresh = ts.insert_edge(q(0), 'a', 99, q(0));
         assert_eq!(fresh.into_usize(), ids.len());
         ts.check_consistency();
     }
@@ -1180,11 +1199,11 @@ mod tests {
     fn color_mut_changes_colors() {
         use crate::ts::EdgeId;
         let mut ts = tangle(3);
-        *ts.state_color_mut(1).unwrap() = 77;
-        assert_eq!(ts.state_color(1).unwrap().into_owned(), 77);
+        *ts.state_color_mut(q(1)).unwrap() = 77;
+        assert_eq!(ts.state_color(q(1)).unwrap().into_owned(), 77);
         *ts.edge_color_mut(EdgeId(2)).unwrap() = 55;
         assert_eq!(*ts.edge_by_id(EdgeId(2)).unwrap().color(), 55);
-        assert!(ts.state_color_mut(3).is_none());
+        assert!(ts.state_color_mut(q(3)).is_none());
         assert!(ts.edge_color_mut(EdgeId(10_000)).is_none());
         ts.remove_edge(EdgeId(2));
         assert!(ts.edge_color_mut(EdgeId(2)).is_none());
@@ -1194,7 +1213,7 @@ mod tests {
     fn compact_renumbers_and_keeps_structure() {
         use crate::ts::EdgeId;
         let mut ts = tangle(6);
-        ts.remove_state(2);
+        ts.remove_state(q(2));
         ts.remove_edge(EdgeId(3));
         let reference = ts.clone();
         let edges_before = ts.edge_count();
@@ -1203,8 +1222,8 @@ mod tests {
         assert_eq!(ts.edge_count(), edges_before);
         assert_eq!(ts.edge_bound(), edges_before);
         assert_eq!(ts.state_count(), 5);
-        assert_eq!(map.state(2), None);
-        assert_eq!(map.state(3), Some(2));
+        assert_eq!(map.state(q(2)), None);
+        assert_eq!(map.state(q(3)), Some(q(2)));
         assert_eq!(map.edge(EdgeId(3)), None);
         for q in reference.states() {
             let new = map.state(q).unwrap();
@@ -1229,8 +1248,8 @@ mod tests {
     fn predecessors_after_removal() {
         use crate::ts::PredecessorIterable;
         let mut ts = tangle(4);
-        ts.remove_edges_from(1);
-        ts.remove_state(3);
+        ts.remove_edges_from(q(1));
+        ts.remove_state(q(3));
         ts.check_consistency();
         for q in ts.states().collect::<Vec<_>>() {
             let mut preds: Vec<_> = ts.predecessors(q).unwrap().map(|e| e.source()).collect();
@@ -1248,7 +1267,7 @@ mod tests {
             expected.sort();
             assert_eq!(preds, expected);
         }
-        assert!(ts.predecessors(3).is_none());
+        assert!(ts.predecessors(q(3)).is_none());
     }
 
     #[test]
@@ -1257,20 +1276,20 @@ mod tests {
         let mut ts = crate::DTS::for_alphabet(CharAlphabet::of_size(2));
         ts.add_state(0);
         ts.add_state(1);
-        let first = ts.add_edge((0, 'a', 7u32, 1));
-        let second = ts.add_edge((0, 'a', 8u32, 0));
+        let first = ts.add_edge((q(0), 'a', 7u32, q(1)));
+        let second = ts.add_edge((q(0), 'a', 8u32, q(0)));
         assert_ne!(first, second);
         assert_eq!(ts.edge_count(), 1);
         assert!(ts.edge_by_id(first).is_none());
-        assert_eq!(ts.edge(0, 'a').unwrap().id(), Some(second));
-        assert_eq!(ts.successor(0, 'a'), Some(0));
+        assert_eq!(ts.edge(q(0), 'a').unwrap().id(), Some(second));
+        assert_eq!(ts.successor(q(0), 'a'), Some(q(0)));
         ts.check_consistency();
 
         // the storage family decides determinism
         let mut nts = crate::NTS::<CharAlphabet, u32, u32>::for_alphabet(CharAlphabet::of_size(2));
         nts.add_state(0);
-        nts.add_edge((0, 'a', 1, 0));
-        nts.add_edge((0, 'a', 2, 0));
+        nts.add_edge((q(0), 'a', 1, q(0)));
+        nts.add_edge((q(0), 'a', 2, q(0)));
         assert_eq!(nts.edge_count(), 2);
         assert!(<Linked as Storage<CharAlphabet>>::try_from_linked(nts.clone()).is_ok());
         assert!(<Det<Linked> as Storage<CharAlphabet>>::try_from_linked(nts).is_err());
@@ -1295,13 +1314,13 @@ mod tests {
         });
         ts.check_consistency();
         let total = ts.edge_count();
-        let removed = ts.remove_edges_to(2).unwrap();
+        let removed = ts.remove_edges_to(q(2)).unwrap();
         ts.check_consistency();
         assert_eq!(ts.edge_count(), total - removed.len());
-        let removed = ts.remove_edges_from_matching(0, 'a');
+        let removed = ts.remove_edges_from_matching(q(0), 'a');
         ts.check_consistency();
         assert!(removed.unwrap().len() <= 1);
-        assert!(ts.remove_state(1).is_some());
+        assert!(ts.remove_state(q(1)).is_some());
         ts.check_consistency();
         assert!(ts.remove_edge(EdgeId(1_000_000)).is_none());
     }

@@ -13,6 +13,7 @@ use automata::ts::operations::{MatchingProduct, ProductIndex};
 use automata::ts::{
     CsrTs, DenseTs, Deterministic, ForAlphabet, PredecessorIterable, Shrinkable, Sproutable,
 };
+use automata::ts::{DenseId, StateId};
 use automata::{DTS, States, TransitionSystem, Void};
 use gungraun::{Dhat, prelude::*};
 use std::hint::black_box;
@@ -23,8 +24,12 @@ type Csr = CsrTs<CharAlphabet, bool, Void>;
 
 /// What the operations that only read need from a storage.
 trait ReadOnly:
-    TransitionSystem<Alphabet = CharAlphabet, StateColor = bool, EdgeColor = Void, StateIndex = u32>
-    + Deterministic
+    TransitionSystem<
+        Alphabet = CharAlphabet,
+        StateColor = bool,
+        EdgeColor = Void,
+        StateIndex = StateId,
+    > + Deterministic
     + PredecessorIterable
     + States
     + Clone
@@ -35,7 +40,7 @@ impl<T> ReadOnly for T where
             Alphabet = CharAlphabet,
             StateColor = bool,
             EdgeColor = Void,
-            StateIndex = u32,
+            StateIndex = StateId,
         > + Deterministic
         + PredecessorIterable
         + States
@@ -52,7 +57,7 @@ impl<T> Storage for T where T: ReadOnly + Sproutable + ForAlphabet<CharAlphabet>
 // Every input is made from the same `common` generator and converted, so both storages get the
 // same transition system. Nothing here is measured.
 
-fn convert<T: Storage + FromTransitions<u32>>(ts: &Linked) -> T {
+fn convert<T: Storage + FromTransitions<StateId>>(ts: &Linked) -> T {
     ts.collect()
 }
 
@@ -66,7 +71,7 @@ fn scrambled_csr(n: usize, k: usize) -> Csr {
     common::scrambled(n, k).collect()
 }
 
-type EdgeList = (usize, usize, Vec<(u32, char, u32)>);
+type EdgeList = (usize, usize, Vec<(StateId, char, StateId)>);
 
 /// All edges of `scrambled(n, k)`, in the order of the states.
 fn edge_list(n: usize, k: usize) -> EdgeList {
@@ -146,12 +151,12 @@ fn with_words_dense(n: usize) -> (Dense, Vec<Vec<char>>) {
     (scrambled_dense(n, 2), short_words(1_000))
 }
 
-type Queries = Vec<(ProductIndex<u32, u32>, char)>;
+type Queries = Vec<(ProductIndex<StateId, StateId>, char)>;
 fn product_queries(n: usize) -> Queries {
     (0..1_000)
         .map(|i| {
             (
-                ProductIndex(((i * 37) % n) as u32, ((i * 101 + 5) % n) as u32),
+                ProductIndex(common::at((i * 37) % n), common::at((i * 101 + 5) % n)),
                 ['a', 'b'][i % 2],
             )
         })
@@ -200,9 +205,9 @@ fn add_all<T: Storage>(input: EdgeList) -> T {
 /// place and a linked list replaces by removing and adding.
 fn overwrite_all<T: Storage>(input: EdgeList) -> T {
     let mut ts: T = build(&input);
-    let n = input.0 as u32;
+    let n = input.0;
     for &(q, c, p) in &input.2 {
-        ts.add_edge((q, c, (p + 1) % n));
+        ts.add_edge((q, c, common::at((p.into_usize() + 1) % n)));
     }
     ts
 }
@@ -212,7 +217,7 @@ fn successors<T: ReadOnly>(ts: &T, k: usize) -> u64 {
     let mut sum = 0u64;
     for q in ts.states() {
         for &c in &symbols {
-            sum += ts.successor(q, c).unwrap_or(0) as u64;
+            sum += ts.successor(q, c).map_or(0, |p| p.into_usize() as u64);
         }
     }
     black_box(sum)
@@ -235,18 +240,24 @@ fn predecessors<T: ReadOnly>(ts: &T) -> usize {
 }
 
 fn reachable<T: ReadOnly>(ts: &T) -> usize {
-    black_box(ts.reachable_state_indices_from(0).count())
+    black_box(ts.reachable_state_indices_from(common::at(0)).count())
 }
 
 fn run_one_word<T: ReadOnly>((ts, word): &(T, Vec<char>)) -> u64 {
-    black_box(ts.reached_state_from(0, word.as_slice()).unwrap_or(0) as u64)
+    black_box(
+        ts.reached_state_from(common::at(0), word.as_slice())
+            .map_or(0, |p| p.into_usize() as u64),
+    )
 }
 
 fn run_many_words<T: ReadOnly>((ts, words): &(T, Vec<Vec<char>>)) -> u64 {
     black_box(
         words
             .iter()
-            .map(|w| ts.reached_state_from(0, w.as_slice()).unwrap_or(0) as u64)
+            .map(|w| {
+                ts.reached_state_from(common::at(0), w.as_slice())
+                    .map_or(0, |p| p.into_usize() as u64)
+            })
             .sum(),
     )
 }
@@ -262,7 +273,7 @@ fn product_successors<T: ReadOnly>((l, r, queries): &(T, T, Queries)) -> usize {
 }
 
 fn minimize<T: ReadOnly>(ts: &T) -> usize {
-    black_box(DFA::from_parts(ts, 0).minimize().state_count())
+    black_box(DFA::from_parts(ts, common::at(0)).minimize().state_count())
 }
 
 fn complete<T: Storage>(mut ts: T) -> T {
@@ -273,7 +284,7 @@ fn complete<T: Storage>(mut ts: T) -> T {
 fn remove_states<T: Storage>(mut ts: T) -> T {
     let n = ts.state_count();
     for i in 0..1_000 {
-        black_box(ts.remove_state((i * (n / 1_000)) as u32));
+        black_box(ts.remove_state(common::at(i * (n / 1_000))));
     }
     ts
 }

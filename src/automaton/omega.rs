@@ -314,10 +314,10 @@ impl<A: Alphabet> Automaton<DTS<A, Int, AcceptanceMask>, OmegaAcceptanceConditio
 impl From<DeterministicOmegaAutomaton<PropAlphabet>> for DeterministicOmegaAutomaton<CharAlphabet> {
     fn from(value: DeterministicOmegaAutomaton<PropAlphabet>) -> Self {
         // the states are numbered consecutively, in the order of `states`
-        let ids: BTreeMap<_, DefaultIdType> = value
+        let ids: BTreeMap<_, u32> = value
             .states()
             .enumerate()
-            .map(|(n, q)| (q, n as DefaultIdType))
+            .map(|(n, q)| (q, n as u32))
             .collect();
         let ts = Builder::default()
             .with_state_colors(
@@ -334,7 +334,7 @@ impl From<DeterministicOmegaAutomaton<PropAlphabet>> for DeterministicOmegaAutom
                 })
             }))
             .into_dts();
-        let initial = ids[&value.initial()];
+        let initial = crate::ts::StateId::from(ids[&value.initial()]);
         DeterministicOmegaAutomaton::new(ts, initial, value.acceptance)
     }
 }

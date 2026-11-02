@@ -92,7 +92,7 @@ impl<A: Alphabet, X> Family<RightCongruence<DTS<A, Void, Void>>, X> {
     /// Creates a family whose leading congruence has just a single class, with the given element.
     pub fn trivial(alphabet: A, progress: X) -> Self {
         let leading = RightCongruence::new_trivial_with_initial_color(alphabet, Void, Void);
-        Self::from_parts(leading, [(0, progress)].into_iter().collect())
+        Self::from_parts(leading, [(crate::ts::q(0), progress)].into_iter().collect())
     }
 }
 
@@ -100,11 +100,12 @@ impl<A: Alphabet, X> Family<RightCongruence<DTS<A, Void, Void>>, X> {
 mod tests {
     use super::*;
     use crate::alphabet::CharAlphabet;
+    use crate::ts::q;
     #[test]
     fn family_interaction() {
         let mut fam = Family::trivial(CharAlphabet::of_size(2), 1337);
         assert_eq!(fam.get("abbabbabbabbabbaba"), Some(&1337));
         fam.set("bba", 42);
-        assert_eq!(fam[0], 42);
+        assert_eq!(fam[q(0)], 42);
     }
 }

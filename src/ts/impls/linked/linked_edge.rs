@@ -1,9 +1,11 @@
-use crate::ts::{DefaultIdType, EdgeRef};
+use crate::ts::{EdgeRef, StateId};
 use std::fmt::Debug;
 
 /// The sentinel that stands for "no edge" in the list links of the linked storage and for "no state"
 /// in the endpoints of a removed edge.
 pub(super) const NONE: u32 = u32::MAX;
+/// [`NONE`] in the endpoints of a tombstone.
+const NO_STATE: StateId = crate::ts::q(NONE);
 
 /// An edge of the linked storage. The four links and the two endpoints are `u32`s with [`NONE`] as
 /// the sentinel, which is 24 bytes of bookkeeping per edge.
@@ -12,8 +14,8 @@ pub(super) const NONE: u32 = u32::MAX;
 /// other edges stay valid. A tombstone is not part of any list.
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub(super) struct LinkedEdge<E, C> {
-    pub(super) source: u32,
-    pub(super) target: u32,
+    pub(super) source: StateId,
+    pub(super) target: StateId,
     pub(super) out_prev: u32,
     pub(super) out_next: u32,
     pub(super) in_prev: u32,
@@ -24,7 +26,7 @@ pub(super) struct LinkedEdge<E, C> {
 
 impl<E, C> LinkedEdge<E, C> {
     /// Creates an edge that is not linked into any list yet.
-    pub(super) fn new(source: u32, expression: E, color: C, target: u32) -> Self {
+    pub(super) fn new(source: StateId, expression: E, color: C, target: StateId) -> Self {
         Self {
             source,
             target,
@@ -39,14 +41,14 @@ impl<E, C> LinkedEdge<E, C> {
 
     #[inline(always)]
     pub(super) fn is_live(&self) -> bool {
-        self.source != NONE
+        self.source != NO_STATE
     }
 
     /// Turns the edge into a tombstone. The expression and color stay in place until the storage is
     /// compacted.
     pub(super) fn tombstone(&mut self) {
-        self.source = NONE;
-        self.target = NONE;
+        self.source = NO_STATE;
+        self.target = NO_STATE;
         self.out_prev = NONE;
         self.out_next = NONE;
         self.in_prev = NONE;
@@ -56,7 +58,7 @@ impl<E, C> LinkedEdge<E, C> {
     /// Replaces expression and color, keeping the endpoints and links.
     pub(super) fn map<EE, CC>(
         self,
-        f: impl FnOnce(u32, E, C, u32) -> (EE, CC),
+        f: impl FnOnce(StateId, E, C, StateId) -> (EE, CC),
     ) -> LinkedEdge<EE, CC> {
         let (expression, color) = f(self.source, self.expression, self.color, self.target);
         LinkedEdge {
@@ -75,7 +77,7 @@ impl<E, C> LinkedEdge<E, C> {
 impl<E, C: Clone> LinkedEdge<E, C> {
     /// Returns the edge as the reference that transition systems yield.
     #[inline(always)]
-    pub(super) fn as_edge_ref(&self) -> EdgeRef<'_, DefaultIdType, E, C> {
+    pub(super) fn as_edge_ref(&self) -> EdgeRef<'_, StateId, E, C> {
         EdgeRef::borrowed(self.source, &self.expression, &self.color, self.target)
     }
 }

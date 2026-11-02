@@ -338,7 +338,7 @@ mod tests {
             .flat_map(|e| {
                 e.expression()
                     .symbols()
-                    .map(|a| (e.source(), a, *e.color(), e.target()))
+                    .map(|a| (u32::from(e.source()), a, *e.color(), u32::from(e.target())))
                     .collect::<Vec<_>>()
             })
             .collect();

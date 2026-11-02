@@ -2,7 +2,7 @@ use crate::alphabet::{Alphabet, CharAlphabet};
 use crate::automaton::{DBA, DFA, DPA, MealyMachine, MooreMachine};
 use crate::representation::IntoTransitions;
 use crate::ts::States;
-use crate::ts::{DefaultIdType, ForAlphabet, Shrinkable, Sproutable, StateIndex};
+use crate::ts::{DenseId, ForAlphabet, Shrinkable, Sproutable, StateId, StateIndex, q};
 use crate::word::ReducedOmegaWord;
 use crate::{DTS, TransitionSystem};
 use crate::{Int, Void, math};
@@ -27,7 +27,7 @@ pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, StateIndex<
     let mut rng = rand::rng();
 
     'outer: loop {
-        if current >= (dts.state_count() as DefaultIdType) {
+        if current.into_usize() >= dts.state_count() {
             // we have treated all states, we can exit
             break 'outer;
         }
@@ -35,14 +35,14 @@ pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, StateIndex<
         if symbol_position >= symbols {
             // we have treated all symbols, go to next state
             symbol_position = 0;
-            current += 1;
+            current = StateId::from_usize(current.into_usize() + 1);
             continue 'outer;
         }
 
         let symbol = alphabet[symbol_position];
         symbol_position += 1;
 
-        for target in 0..=current {
+        for target in (0..=current.into_usize()).map(StateId::from_usize) {
             let value: f64 = rng.random_range(0.0..=1.0);
             if value < probability {
                 dts.add_edge((current, symbol, target));
@@ -55,7 +55,7 @@ pub fn generate_random_ts(symbols: usize, probability: f64) -> (DTS, StateIndex<
         dts.add_edge((current, symbol, target));
     }
 
-    (dts, 0)
+    (dts, q(0))
 }
 
 /// Works as [`generate_random_ts`], but returns a [`DFA`] instead by randomly coloring the states.
@@ -115,13 +115,13 @@ pub fn generate_random_ts_sized(symbols: usize, size: usize) -> (DTS, StateIndex
     let mut rng = rand::rng();
     for q in dts.states().collect::<Vec<_>>() {
         for sym in alphabet.universe() {
-            let target = rng.random_range(0..(dts.state_count() as DefaultIdType));
+            let target = StateId::from_usize(rng.random_range(0..dts.state_count()));
             dts.add_edge((q, sym, target));
         }
     }
 
-    assert!(dts.contains_state(0));
-    (dts, 0)
+    assert!(dts.contains_state(q(0)));
+    (dts, q(0))
 }
 
 /// Works as [`generate_random_ts_sized`], but returns a [`DBA`] instead by randomly coloring the edges.

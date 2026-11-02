@@ -119,14 +119,15 @@ impl<T: TransitionSystem> std::ops::Deref for Triggers<T> {
 /// is finite or infinite is determined by its type ([`Word::Kind`]):
 ///
 /// ```
+/// use automata::ts::q;
 /// use automata::{ts::{Builder, Deterministic, run::EdgeColorSet}, upw};
 ///
 /// let ts = Builder::without_state_colors()
 ///     .with_transitions([(0, 'a', 1u8, 1), (1, 'b', 2, 0)])
 ///     .into_dts_with_initial(0);
 ///
-/// assert_eq!(ts.run("ab").reached_state(), Some(0));
-/// let colors = ts.run_from(1, upw!("ba")).observe::<EdgeColorSet<_>>();
+/// assert_eq!(ts.run("ab").reached_state(), Some(q(0)));
+/// let colors = ts.run_from(q(1), upw!("ba")).observe::<EdgeColorSet<_>>();
 /// assert_eq!(colors.unwrap().len(), 2);
 /// assert!(ts.run(upw!("b")).escape_prefix().is_some());
 /// ```
@@ -785,6 +786,7 @@ mod impls {
 
 #[cfg(test)]
 mod tests {
+    use crate::ts::q;
     use crate::ts::run::EscapePrefix;
     use crate::ts::{Builder, Deterministic, TransitionSystem};
 
@@ -809,10 +811,10 @@ mod tests {
             .with_transitions([(0, 'a', 1), (1, 'a', 0)])
             .into_dts_with_initial(0);
 
-        assert_eq!(dts.reached_state_from(0, ""), Some(0));
-        assert_eq!(dts.reached_state_from(7, ""), None);
-        assert_eq!(dts.reached_state_from(7, "a"), None);
-        assert!(!dts.run_from(7, "").is_successful());
+        assert_eq!(dts.reached_state_from(q(0), ""), Some(q(0)));
+        assert_eq!(dts.reached_state_from(q(7), ""), None);
+        assert_eq!(dts.reached_state_from(q(7), "a"), None);
+        assert!(!dts.run_from(q(7), "").is_successful());
     }
 
     #[test]
@@ -895,7 +897,7 @@ mod tests {
             Some(vec![0.5, 1.5, 0.5])
         );
         assert_eq!(
-            TransitionSystem::edges_from(dts.ts(), 0)
+            TransitionSystem::edges_from(dts.ts(), q(0))
                 .unwrap()
                 .next()
                 .unwrap()

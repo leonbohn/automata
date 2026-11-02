@@ -499,7 +499,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::ts::DenseId;
     use crate::ts::operations::UniformColor;
+    use crate::ts::q;
     use crate::ts::{Builder, Deterministic, PredecessorIterable, States};
     use crate::{TransitionSystem, Void};
     use std::cell::Cell;
@@ -520,50 +522,50 @@ mod tests {
     fn edge_colors_are_mapped_for_successors_predecessors_and_lookups() {
         let mapped = ts().map_edge_colors(|c| u32::from(c) * 10);
         let mut out: Vec<_> = mapped
-            .edges_from(0)
+            .edges_from(q(0))
             .unwrap()
             .map(|e| (e.target(), *e.color()))
             .collect();
         out.sort();
-        assert_eq!(out, vec![(0, 40), (1, 10)]);
+        assert_eq!(out, vec![(q(0), 40), (q(1), 10)]);
         let mut preds: Vec<_> = mapped
-            .predecessors(0)
+            .predecessors(q(0))
             .unwrap()
             .map(|e| (e.source(), e.target(), *e.color()))
             .collect();
         preds.sort();
-        assert_eq!(preds, vec![(0, 0, 40), (2, 0, 30)]);
-        assert_eq!(*mapped.edge(1, 'a').unwrap().color(), 20);
+        assert_eq!(preds, vec![(q(0), q(0), 40), (q(2), q(0), 30)]);
+        assert_eq!(*mapped.edge(q(1), 'a').unwrap().color(), 20);
     }
 
     #[test]
     fn full_edge_recoloring_sees_source_expression_and_target() {
         let mapped = ts().map_edge_colors_full(|p, a: &char, c, q| format!("{p}{a}{c}{q}"));
-        assert_eq!(mapped.edge(1, 'a').unwrap().color(), "1a22");
-        let pred = mapped.predecessors(2).unwrap().next().unwrap();
+        assert_eq!(mapped.edge(q(1), 'a').unwrap().color(), "1a22");
+        let pred = mapped.predecessors(q(2)).unwrap().next().unwrap();
         assert_eq!(pred.color(), "1a22");
     }
 
     #[test]
     fn state_colors_are_mapped_or_provided() {
         let mapped = ts().map_state_colors(|c| if c { 1u8 } else { 0 });
-        assert_eq!(mapped.state_color(0).as_deref(), Some(&1));
-        assert_eq!(mapped.state_color(1).as_deref(), Some(&0));
+        assert_eq!(mapped.state_color(q(0)).as_deref(), Some(&1));
+        assert_eq!(mapped.state_color(q(1)).as_deref(), Some(&0));
         let uniform = ts().with_state_color(UniformColor('x'));
         assert!(
             uniform
                 .states()
                 .all(|q| uniform.state_color(q).as_deref() == Some(&'x'))
         );
-        let by_index = ts().with_state_color(|q: u32| q * 2);
-        assert_eq!(by_index.state_color(2).as_deref(), Some(&4));
+        let by_index = ts().with_state_color(|q: crate::ts::StateId| q.into_usize() as u32 * 2);
+        assert_eq!(by_index.state_color(q(2)).as_deref(), Some(&4));
     }
 
     #[test]
     fn erased_colors_are_void() {
         let erased = ts().erase_colors();
-        assert_eq!(erased.state_color(0).as_deref(), Some(&Void));
-        assert_eq!(erased.edge(0, 'a').unwrap().color(), &Void);
+        assert_eq!(erased.state_color(q(0)).as_deref(), Some(&Void));
+        assert_eq!(erased.edge(q(0), 'a').unwrap().color(), &Void);
     }
 
     #[test]
@@ -578,8 +580,8 @@ mod tests {
             0,
             "building the adapter must not run the closure"
         );
-        let _ = mapped.edge(0, 'a');
-        let _ = mapped.edge(0, 'a');
+        let _ = mapped.edge(q(0), 'a');
+        let _ = mapped.edge(q(0), 'a');
         assert_eq!(calls.get(), 2, "every access runs the closure");
     }
 }

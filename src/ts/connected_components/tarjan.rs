@@ -14,6 +14,7 @@ pub struct Roots<I>(Vec<I>);
 /// an iterative version of Tarjan's algorithm (so deep graphs do not overflow the stack).
 ///
 /// ```
+/// use automata::ts::q;
 /// use automata::{DTS, ts::{Sccs, TransitionSystem}};
 ///
 /// let ts = DTS::builder()
@@ -23,7 +24,7 @@ pub struct Roots<I>(Vec<I>);
 /// // all states (needs `States`)
 /// assert_eq!(Sccs::on(&ts).compute().size(), 1);
 /// // only the part that is reachable from the given states
-/// assert_eq!(Sccs::on(&ts).from([1]).compute().size(), 1);
+/// assert_eq!(Sccs::on(&ts).from([q(1)]).compute().size(), 1);
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct Sccs<'a, Ts, R = AllStates> {
@@ -163,6 +164,7 @@ mod tests {
     use super::Sccs;
     use crate::Void;
     use crate::ts::Builder;
+    use crate::ts::q;
 
     #[test]
     fn tarjan_iterative() {
@@ -179,14 +181,14 @@ mod tests {
             .into_right_congruence(0);
 
         let sccs = Sccs::on(&ts).compute();
-        assert_eq!(sccs[0], vec![0]);
-        assert_eq!(sccs[1], vec![1]);
-        assert_eq!(sccs[2], vec![2, 3]);
+        assert_eq!(sccs[0], vec![q(0)]);
+        assert_eq!(sccs[1], vec![q(1)]);
+        assert_eq!(sccs[2], vec![q(2), q(3)]);
 
-        let sccs = Sccs::on(&ts).from([2]).compute();
+        let sccs = Sccs::on(&ts).from([q(2)]).compute();
         assert_eq!(sccs.size(), 1);
-        assert_eq!(sccs[0], vec![2, 3]);
-        assert_eq!(Sccs::on(&ts).from([0]).compute().size(), 3);
+        assert_eq!(sccs[0], vec![q(2), q(3)]);
+        assert_eq!(Sccs::on(&ts).from([q(0)]).compute().size(), 3);
     }
 
     #[test]
@@ -195,6 +197,6 @@ mod tests {
         let ts = Builder::without_colors()
             .with_transitions((0..n - 1).map(|q| (q, 'a', Void, q + 1)))
             .into_right_congruence(0);
-        assert_eq!(Sccs::on(&ts).from([0]).compute().size(), n as usize);
+        assert_eq!(Sccs::on(&ts).from([q(0)]).compute().size(), n as usize);
     }
 }
