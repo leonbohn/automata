@@ -45,6 +45,7 @@ For example the following code could be used to construct a DFA over the alphabe
 | ------- | ------- | ----------- |
 | `hoa` | yes | reading and writing automata in the [HOA format](https://adl.github.io/hoaf/), using the [`hoars`](https://github.com/leonbohn/hoars) crate |
 | `families` | no | families of DFAs and of weak priority mappings (FDFA, FWPM) indexed by a right congruence, and the conversions between them |
+| `learning` | no | experimental: passive (sprout, DPAInf) and active (L\*) learning of automata, see `automata::learning` (implies `families`) |
 | `random` | no | generation of random transition systems and words |
 | `render` | no | rendering automata to SVG/PNG and `data:` URLs without external tools, and displaying them in the viewer of the system (experimental, pulls in `resvg`, `usvg` and `layout-rs`) |
 | `graphviz` | no | the same with an installed [graphviz](https://graphviz.org/) `dot` executable (experimental, independent of `render`, recommended, nicer layouts) |

@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- New opt-in feature `learning` with the module `automata::learning`, which will hold the algorithms of the `automata-learning` crate (passive: sprout, DPAInf; active: L\*). The module is experimental and empty so far; it needs no dependencies besides the feature `families`.
+
 ## [0.2.0] - 2026-11-03
 
 ### Fixed
