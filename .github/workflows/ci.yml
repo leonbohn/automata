@@ -109,7 +109,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # running them needs valgrind and the matching gungraun-runner, which is done on the
       # benchmark machine (see docs/benchmarking.md)
-      - run: cargo bench --no-run
+      - run: cargo bench --no-run --all-features
 
   bench-tools:
     name: Benchmark tooling
