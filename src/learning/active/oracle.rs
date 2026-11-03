@@ -1,5 +1,3 @@
-// use std::cell::RefCell;
-
 use crate::alphabet::Alphabet;
 use crate::automaton::{DFA, MealyLike, MealyMachine, MooreMachine};
 use crate::learning::passive::SetSample;
@@ -8,7 +6,6 @@ use crate::ts::Deterministic;
 use crate::ts::operations::Product;
 use crate::word::{FiniteWord, Word};
 use crate::{Color, DTS, Int, Lattice, Pointed, States, TransitionSystem, Void};
-// use crate::math::FxIndexSet;
 
 use super::Hypothesis;
 use crate::learning::LearningError;
@@ -139,15 +136,12 @@ impl<A: Alphabet, W: FiniteWord<Symbol = A::Symbol>> From<(SetSample<A, W>, bool
 #[derive(Debug, Clone)]
 pub struct DFAOracle<A: Alphabet> {
     automaton: DFA<DTS<A, bool, Void>>,
-    //     negated: DFA<DTS<A, bool, Void>>,
 }
 
 impl<A: Alphabet> DFAOracle<A> {
     /// Creates a new instance of a [`DFAOracle`] from the given automaton.
     pub fn new(automaton: DFA<DTS<A, bool, Void>>) -> Self {
-        //         let negated = automaton.negation().reachable_part().collect_dfa();
         Self { automaton }
-        // Self { negated, automaton }
     }
 }
 
@@ -298,14 +292,6 @@ impl<A: Alphabet, C: Color + Eq + std::hash::Hash + Ord> Oracle for CompletingMe
             let Some(expected) = self.automaton.transform(&mr) else {
                 continue;
             };
-            // .unwrap_or_else(|| {
-            //     let Some(default) = &self.default else {
-            //         panic!("Oracle must be total or provide a default!")
-            //     };
-            // self.missed.borrow_mut().insert(mr.clone());
-            // trace!("returning default for {mr:?}");
-            // default.clone()
-            // });
             let output = hypothesis.output(&mr);
             if output != expected {
                 return Err((mr.to_vec(), expected));

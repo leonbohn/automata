@@ -42,5 +42,4 @@ Everything that a caller can trigger with a wrong input now returns a `LearningE
 | `passive/sprout/consistency.rs` (`to_infinity_sets`) | `expect` on the state reached by an escape prefix | the prefix before the escape symbol has a run by definition |
 | `prefixtree.rs` | `debug_assert!` | only called with the non-empty words of a sample |
 
-`passive/sample/characterize.rs` is not part of the module tree (it does not compile) and was
-not audited.
+`passive/sample/characterize.rs` (dead code, never compiled) was deleted; it stays in `automata-learning`.

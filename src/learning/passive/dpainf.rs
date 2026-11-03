@@ -427,34 +427,6 @@ pub(crate) mod tests {
     use crate::ts::q;
     use crate::{Class, States};
 
-    //     pub fn inf_aba_sample() -> (CharAlphabet, OmegaSample<CharAlphabet>) {
-    //         let Ok(sample) = OmegaSample::try_from_str(
-    //             r#"omega
-    //             alphabet: a,b
-    //             positive:
-    //             abab
-    //             aba
-    //             ababb
-    //             abaa
-    //             abaab
-    //             negative:
-    //             bab
-    //             abba
-    //             bbab
-    //             aaabb
-    //             a
-    //             abb
-    //             aabb
-    //             babb
-    //             b
-    //             abbba
-    //             abbb"#,
-    //         ) else {
-    //             panic!("Cannot parse sample")
-    //         };
-    //         (sample.alphabet.clone(), sample)
-    //     }
-
     pub fn testing_larger_forc_sample() -> (CharAlphabet, OmegaSample<CharAlphabet>) {
         let Ok(sample) = OmegaSample::try_from_str(
             r#"omega

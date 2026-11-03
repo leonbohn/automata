@@ -404,45 +404,6 @@ where
     Some([pos_successful, neg_successful])
 }
 
-// /// Run positive and negative sample words on the given transition system.
-// /// If there is a pair of words escaping with the same escape string from the same state, return None.
-// /// Otherwise return vector of sets of transitions visited infinitely often
-// /// during the runs of positive and negative example words.
-// fn to_infinity_sets<T>(ts: T, sample: &OmegaSample) -> Option<[Vec<EdgeSet>; 2]>
-// where
-//     T: Deterministic<Alphabet = CharAlphabet, StateIndex = StateId> + Pointed + States,
-//     <T as TransitionSystem>::EdgeColor: Eq + std::hash::Hash,
-// {
-//     if let Some([pos_successful, neg_successful]) = successful_runs(ts, sample) {
-//         let pos_sets = pos_successful
-//             .into_iter()
-//             .map(|run| {
-//                 run.into_recurrent_transitions()
-//                     .map(|e| {
-//                         let (src, &sym, _, _) = e.into_tuple();
-//                         (src, sym)
-//                     })
-//                     .collect()
-//             })
-//             .collect();
-//         let neg_sets = neg_successful
-//             .into_iter()
-//             .map(|run| {
-//                 run.into_recurrent_transitions()
-//                     .map(|e| {
-//                         let (src, &sym, _, _) = e.into_tuple();
-//                         (src, sym)
-//                     })
-//                     .collect()
-//             })
-//             .collect();
-
-//         Some([pos_sets, neg_sets])
-//     } else {
-//         None
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;

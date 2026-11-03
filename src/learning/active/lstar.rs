@@ -11,7 +11,6 @@ use tracing::{debug, info, trace};
 
 use super::{Experiment, Hypothesis, oracle::Oracle};
 use crate::learning::LearningError;
-// use super::ObservationTable;
 
 const ITERATION_THRESHOLD: usize = if cfg!(debug_assertions) { 50 } else { 200000 };
 
@@ -159,7 +158,6 @@ impl<D: Hypothesis, T: Oracle<Alphabet = D::Alphabet, Output = D::Output>> LStar
                 for r in todo {
                     self.base.push(r);
                 }
-                // TODO optimize this call!
                 self.update_table();
                 continue 'outer;
             }
@@ -268,13 +266,6 @@ impl<D: Hypothesis, T: Oracle<Alphabet = D::Alphabet, Output = D::Output>> LStar
 
         D::from_transition_system(ts, *state_map.get(&vec![]).unwrap())
     }
-
-    //     fn inconsistent_words(&self) -> Option<Word<D>> {
-    //         for (i, left) in self.base.iter().enumerate() {
-    //             'middle: for right in &self.base[i..] {
-    //                 if self.table.get(left) != self.table.get(right) {
-    //                     continue 'middle;
-    //                 }
 
     //                 for sym in self.alphabet.universe() {
     //                     let left_ext = left

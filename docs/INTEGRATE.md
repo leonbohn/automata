@@ -59,9 +59,9 @@ Legend: `[x]` done, `[-]` skipped on purpose, `[ ]` open. Progress is tracked in
   already for some samples of random DFAs with up to 6 states (threshold `2 * max_word_len`), the
   proptest therefore only checks successful results; the test `split_up_sample` is ignored because
   its sample contradicts itself.
-- Open: freezing the old repo (Phase 0), the MSRV check with 1.88 (no `rustup` on this machine),
-  and the dead file `passive/sample/characterize.rs`, which is not a declared module and still
-  mentions the old `fwpm::FWPM` (revive it or delete it in Phase 6).
+- Open: freezing the old repo (Phase 0) and the MSRV check with 1.88 (no `rustup` on this machine).
+- Phase 9 self-review: the dead file `passive/sample/characterize.rs` and the commented-out code
+  were deleted from this crate (they remain in the history of `automata-learning`).
 
 
 ## Phase 0 — Preconditions

@@ -120,7 +120,7 @@ pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
         };
 
         trace!("found escape prefix {escape_prefix:?}");
-        // WARN TODO should find a way to either pass or globally set timeout
+        // the timeout is fixed, there is no way to configure it yet
         if time_start.elapsed() >= std::time::Duration::from_secs(60 * 30) {
             error!(
                 "task exceeded timeout, aborting with automaton of size {}",
