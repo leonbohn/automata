@@ -1,7 +1,46 @@
 //! Passive and active learning of automata, moved here from the `automata-learning` crate
-//! (imported by plain copy of commit `1ed4171` of its branch `phase1-baseline`).
+//! (imported by plain copy of commit `1ed4171` of its branch `phase1-baseline`). Needs the
+//! feature `learning`.
 //!
 //! **Experimental:** there is no stability promise for this module until the next minor release.
+//!
+//! # Passive learning: [`passive`](crate::learning::passive)
+//!
+//! A passive learner gets a *sample*, a set of words that are classified as positive or negative,
+//! and returns an automaton that is consistent with it.
+//!
+//! | input | function | result |
+//! |-------|----------|--------|
+//! | [`FiniteSample`](crate::learning::passive::FiniteSample) | [`dfa_rpni`](crate::learning::passive::dfa_rpni) | [`DFA`](crate::automaton::DFA) |
+//! | [`OmegaSample`](crate::learning::passive::OmegaSample) | [`sprout`](crate::learning::passive::sprout::sprout) | deterministic Büchi/parity/... automaton, chosen by the acceptance condition that is passed |
+//! | [`OmegaSample`](crate::learning::passive::OmegaSample) | [`dpa_rpni`](crate::learning::passive::dpa_rpni), [`dpainf`](crate::learning::passive::dpainf) | [`DPA`](crate::automaton::DPA), found by combining DFAs |
+//! | [`OmegaSample`](crate::learning::passive::OmegaSample) | [`infer_precise_dpa`](crate::learning::passive::infer_precise_dpa) | [`PreciseDPA`](crate::learning::passive::precise::PreciseDPA) |
+//!
+//! Samples of omega words consist of ultimately periodic words (see [`upw!`](crate::upw)).
+//! The algorithms fail with a [`LearningError`](crate::learning::LearningError) if the sample is inconsistent or if they exceed
+//! their bound on the number of states.
+//!
+//! # Active learning: [`active`](crate::learning::active)
+//!
+//! [`LStar`](crate::learning::active::LStar) learns a [`DFA`](crate::automaton::DFA), a Moore machine or a Mealy
+//! machine by asking an *oracle* ([`DFAOracle`](crate::learning::active::DFAOracle),
+//! [`MooreOracle`](crate::learning::active::MooreOracle), [`MealyOracle`](crate::learning::active::MealyOracle), or your own
+//! implementation of [`Oracle`](crate::learning::active::Oracle)) for outputs and for counterexamples to its
+//! hypotheses.
+//!
+//! # Examples
+//!
+//! `cargo run --example learning --features learning` learns a Büchi automaton from a sample and a
+//! Mealy machine with L\*. The functions above have doctests as well.
+//!
+//! # Literature
+//!
+//! - RPNI: J. Oncina, P. García, *Inferring regular languages in polynomial update time*, 1992.
+//! - L\*: D. Angluin, *Learning regular sets from queries and counterexamples*, 1987.
+//! - Sprout and the extension of RPNI to omega-words: L. Bohn, C. Löding, *Constructing
+//!   deterministic ω-automata from examples by an extension of the RPNI algorithm*, MFCS 2021.
+//! - DPAInf and precise DPAs: L. Bohn, C. Löding, *Constructing deterministic parity automata
+//!   from positive and negative examples*, 2024.
 
 /// The errors that the learning algorithms can return.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

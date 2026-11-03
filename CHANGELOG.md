@@ -7,8 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- New opt-in feature `learning` with the module `automata::learning`: the code of the `automata-learning` crate (passive: sprout, DPAInf, precise DPA; active: L\*), imported by plain copy of its commit `1ed4171` and ported to this crate. The module is experimental, still carries `allow(missing_docs, unused)` and is not yet unified with `families`. It needs no dependencies besides the feature `families` (the dependencies `bimap`, `crossbeam-channel`, `alea`, `either`, `paste`, `tabled` and `owo-colors` of the old crate are not needed). Two L\* tests that use random machines need the feature `random`.
+- New opt-in feature `learning` with the module `automata::learning`: the code of the `automata-learning` crate (passive: sprout, DPAInf, precise DPA; active: L\*), imported by plain copy of its commit `1ed4171` and ported to this crate. The module is experimental. It needs no dependencies besides the feature `families` (the dependencies `bimap`, `crossbeam-channel`, `alea`, `either`, `paste`, `tabled` and `owo-colors` of the old crate are not needed). Two L\* tests that use random machines need the feature `random`.
 - The algorithms of `automata::learning` return typed errors instead of panicking: `LearningError` (convertible into `Error`) for `dfa_rpni`, `infer_precise_dpa`, `dpa_rpni`, `LStar::infer`, `MealyOracle::new`, `MooreOracle::new`, `OmegaSample::split`, `SplitOmegaSample::infer_forc`, `SetSample::insert`, `ConsistencyCheck::consistent_automaton`, `AnnotatedCongruence::canonic_coloring` and `PreciseDPA::new`/`TryFrom<FWPM>`. The remaining panics are listed in `PANIC-AUDIT.md`. Migration from `automata-learning`: add `?`/`unwrap()` to the calls above, `dba_rpni` returns `Error::NotYetImplemented`, `PreciseDPA::from(fwpm)` is `PreciseDPA::try_from(fwpm)`, `OmegaSample::try_from_read` now keeps the lines of the sample (it dropped them).
+- Migration from the crate `automata-learning`:
+
+  | before | after |
+  |--------|-------|
+  | `automata-learning = "0.1"` | `automata = { version = "0.2", features = ["learning"] }` |
+  | `automata_learning::passive::...` | `automata::learning::passive::...` |
+  | `automata_learning::active::...` | `automata::learning::active::...` |
+  | `automata_learning::passive::fwpm::FWPM` | `automata::families::FWPM` |
+  | `fwpm.into_precise_dpa()` | `PreciseDPA::try_from(fwpm)` |
+
+  The crate root of `automata-learning` (its `prefixtree`, `priority_mapping` and so on) is `automata::learning` as well.
 - Example `learning` and benchmark `learning` (both need the feature `learning`).
 - `families::Family::leading` and `Family::iter`, and `families::FWPM::complexity` (the number of distinct priorities of the most complex class). The learning code builds on `families::FWPM` instead of having its own type: the `FWPM` of `automata-learning` (one `MooreMachine` per class) is `families::FWPM` here (one `MealyMachine` per class, whose edge colors are the priorities), and `AnnotatedCongruence::canonic_coloring` returns such a Mealy machine. `into_precise_dpa` is `PreciseDPA::from(fwpm)`.
 

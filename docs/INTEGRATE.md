@@ -235,6 +235,11 @@ Commit hygiene: one commit per module group, message `learning: port <module> to
       `cargo +1.88 check --all-targets --all-features`.
 - [x] `benches` job (`cargo bench --no-run`) builds the new bench; confirm it needs
       `required-features` or `--all-features`.
+
+## Phase 8b - Benchmarks
+- [ ] Add benchmarks for the learning part, update the nix module
+- [ ] Decide on a way to backfill benchmark values as to not make the stacked performance graph go up. See issue #115.
+`graphviz`, `hoa`, `learning`) compile without warnings; `cargo-hack` and `rustup` are not installed
 - [x] Examples loop in `scripts/check` and CI: `learning` is not a default feature, so either run
       the example with `--features learning` or rely on `required-features` skipping it. Add
       `cargo run -q --example learning --features learning` explicitly to both.
@@ -245,7 +250,6 @@ Commit hygiene: one commit per module group, message `learning: port <module> to
 - [-] Add the `performance` label to the PR if benchmark numbers of existing code could change
       (they should not; learning is additive).
 Notes: the single-feature builds (`--no-default-features` and each of `families`, `random`, `render`,
-`graphviz`, `hoa`, `learning`) compile without warnings; `cargo-hack` and `rustup` are not installed
 here, so the MSRV (1.88) check is left to CI. The CI `benches` job now uses `--all-features`, since
 `cargo bench --no-run` skips `benches/learning.rs` (`required-features`). The benchmark service
 (`tools/bench` default list, `nix/module.nix`) is left unchanged, so `learning` is not tracked
@@ -275,6 +279,11 @@ unnecessary, since existing code was not changed apart from additive items in `f
       this crate" with the new status.
 - [ ] `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features` has no broken intra-doc
       links.
+
+## Phase 8b - Benchmarks
+- [ ] Add benchmarks for the learning part, update the nix module
+- [ ] Decide on a way to backfill benchmark values as to not make the stacked performance graph go up. See issue #115.
+
 
 ## Phase 9 — Review and merge
 

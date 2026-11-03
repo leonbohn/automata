@@ -20,9 +20,10 @@ Sibling crates that stay elsewhere:
 
 - `hoars` (crates.io, currently 0.3): HOA format parsing. Optional dependency behind the `hoa`
   feature; its `Bdd` type is shared with `biodivine-lib-bdd` (both must stay on the same major).
-- `automata-learning` (in `leonbohn/frieda`): the main downstream consumer. Not yet ported to
-  this crate; a PR that changes the API should keep the `automata-learning` migration path in
-  mind (see CHANGELOG entries that spell out its migration steps).
+- `automata-learning` (in `leonbohn/frieda`): now lives in this crate as `automata::learning`
+  (feature `learning`); the old crate is to be deprecated. `frieda` still has to migrate. A PR that
+  changes the API should keep the migration path in mind (see CHANGELOG entries that spell out
+  its migration steps).
 
 ## Commands
 
@@ -121,6 +122,11 @@ Two distinctions that recur everywhere:
   `HoaError`. `dot/`: textual DOT output is always available; `render` (native, via
   resvg/layout-rs) and `graphviz` (external `dot` executable) features add images.
 - `families/` (feature `families`): FDFA, FWPM, conversions.
+- `learning/` (feature `learning`, implies `families`; experimental): `passive` (samples, `dfa_rpni`,
+  `sprout`, `dpainf`, `PreciseDPA`) and `active` (`LStar` and the oracles); errors are
+  `learning::LearningError` (converts into `Error`). Remaining panics are listed in
+  `PANIC-AUDIT.md`. Imported from the former crate `automata-learning`; `docs/INTEGRATE.md`
+  records how.
 - `random/` (feature `random`), `partition.rs`, `math.rs` (`FxIndexMap`/`FxIndexSet` —
   deterministic hashing, keeps benchmarks reproducible), `dag.rs`, `color.rs`
   (`Color` is `Clone + Debug`; `Int = u8`, `Void`, `Lattice`), `error.rs` (crate-wide `Error`).
@@ -140,7 +146,7 @@ Two distinctions that recur everywhere:
 - Features must stay independent: code using an optional dependency needs the matching
   `#[cfg(feature = "...")]`. `scripts/check` and CI build `--no-default-features` and
   `--each-feature`. Default features are just `["hoa"]`; opt-in: `families`, `random`,
-  `render`, `graphviz`.
+  `render`, `graphviz`, `learning`.
 - Record every user-visible change (new API, behavior change, breaking change, removal) in
   `CHANGELOG.md` under "Unreleased", in the same commit. The format there matters: breaking
   changes are prefixed **Breaking:**, big rewrites come with migration tables.
