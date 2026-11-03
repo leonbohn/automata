@@ -32,12 +32,12 @@ instead of `println!`, features stay independent, confer before committing/pushi
 
 ## Phase 0 — Preconditions
 
-- [ ] `automata 0.2.0` is published and tagged.
-- [ ] `main` is green (`./scripts/check`).
-- [ ] Decide the public path: `automata::learning::{passive, active}` (recommended; keeps the old
+- [x] `automata 0.2.0` is published and tagged.
+- [x] `main` is green (`./scripts/check`).
+- [x] Decide the public path: `automata::learning::{passive, active}` (recommended; keeps the old
       module names so the migration is `automata_learning::X` -> `automata::learning::X`).
-- [ ] Decide feature name and its dependencies (see Phase 2). Recommended: `learning`.
-- [ ] Open a tracking issue with this checklist.
+- [x] Decide feature name and its dependencies (see Phase 2). Recommended: `learning`.
+- [x] Open a tracking issue with this checklist (#118).
 - [ ] Freeze `automata-learning`: no further feature work in the old repo, only the port.
 
 ## Phase 1 — Baseline the source crate
