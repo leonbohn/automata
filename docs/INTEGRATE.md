@@ -289,14 +289,13 @@ end to end (a `compare` run takes long); the feature handling is unit-tested.
 
 ## Phase 9 — Review and merge
 
-- [ ] Open the PR against `main` (title: `Integrate automata-learning as the learning feature`).
+- [x] Open the PR against `main` (title: `Integrate automata-learning as the learning feature`).
       Large PR, so consider splitting into stacked PRs: (1) import + compile, (2) quality gates,
       (3) families unification. Each must be green on its own.
-- [ ] Self-review the diff for leftover `allow`s, `dbg!`, commented-out code (`lib.rs` of the old
+- [x] Self-review the diff for leftover `allow`s, `dbg!`, commented-out code (`lib.rs` of the old
       crate has some), stale TODOs (triage into issues).
 - [ ] Wait for CI (all jobs including `nix` and `bench-tools`).
-- [ ] Merge (maintainer decides squash vs. merge commit; merge commit keeps the imported history
-      readable).
+- [ ] Merge with a **merge commit** (decided by the maintainer; not squash).
 
 ## Phase 10 — Release and retire the old crate
 
@@ -316,6 +315,25 @@ end to end (a `compare` run takes long); the feature handling is unit-tested.
       - update `use automata_learning::` -> `use automata::learning::`;
       - `cargo build`, run the binaries on a small input as smoke test.
 - [ ] Close the tracking issue; note the release version in it.
+- [ ] Consolidate the repositories, so that GitHub shows the real age of the project: `frieda` is the
+      old `automata` repository (renamed, about 3 years of history), the current `leonbohn/automata`
+      is young. Do this only after the merge, the release and the migration steps above:
+      - verify how the histories relate (`git merge-base` of `frieda` and `automata`); the crate was
+        extracted from `frieda` with history, so the `automata` history may descend from it;
+      - make sure nothing is lost: back up `leonbohn/automata` (a bare mirror clone), move or record
+        the open issues and PRs that are still wanted (issues, PRs and stars are not copied by a
+        rename), and check the repository settings: secrets, webhooks (the benchmark service
+        listens to the webhook of `automata`), branch protection, the `performance` label, the
+        crates.io trusted-publishing or token setup;
+      - put the code of `automata` onto `frieda` (integrating and overwriting its current content;
+        keep its old state on a branch or tag such as `legacy`), via a merge or a force push, as
+        decided then;
+      - delete `leonbohn/automata` (this frees the name; it cannot be undone), then rename
+        `leonbohn/frieda` to `leonbohn/automata`;
+      - afterwards: `repository` and `homepage` in `Cargo.toml` (they stay valid, the URL is the
+        same), the webhook URL and `repo` option of the benchmark service (`nix/module.nix`,
+        `docs/benchmarking.md`), CI badges and the links in README and docs, local clones
+        (`git remote set-url`), and the crates.io page after the next release.
 
 ## Risks and how to handle them
 
