@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- New opt-in feature `learning` with the module `automata::learning`, which will hold the algorithms of the `automata-learning` crate (passive: sprout, DPAInf; active: L\*). The module is experimental and empty so far; it needs no dependencies besides the feature `families`.
+- New opt-in feature `learning` with the module `automata::learning`: the code of the `automata-learning` crate (passive: sprout, DPAInf, precise DPA; active: L\*), imported by plain copy of its commit `1ed4171` and ported to this crate. The module is experimental, still carries `allow(missing_docs, unused)` and is not yet unified with `families`. It needs no dependencies besides the feature `families` (the dependencies `bimap`, `crossbeam-channel`, `alea`, `either`, `paste`, `tabled` and `owo-colors` of the old crate are not needed). Two L\* tests that use random machines need the feature `random`.
 
 ## [0.2.0] - 2026-11-03
 
