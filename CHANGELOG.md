@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - New opt-in feature `learning` with the module `automata::learning`: the code of the `automata-learning` crate (passive: sprout, DPAInf, precise DPA; active: L\*), imported by plain copy of its commit `1ed4171` and ported to this crate. The module is experimental, still carries `allow(missing_docs, unused)` and is not yet unified with `families`. It needs no dependencies besides the feature `families` (the dependencies `bimap`, `crossbeam-channel`, `alea`, `either`, `paste`, `tabled` and `owo-colors` of the old crate are not needed). Two L\* tests that use random machines need the feature `random`.
+- `families::Family::leading` and `Family::iter`, and `families::FWPM::complexity` (the number of distinct priorities of the most complex class). The learning code builds on `families::FWPM` instead of having its own type: the `FWPM` of `automata-learning` (one `MooreMachine` per class) is `families::FWPM` here (one `MealyMachine` per class, whose edge colors are the priorities), and `AnnotatedCongruence::canonic_coloring` returns such a Mealy machine. `into_precise_dpa` is `PreciseDPA::from(fwpm)`.
 
 ## [0.2.0] - 2026-11-03
 

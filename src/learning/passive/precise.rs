@@ -1,9 +1,12 @@
 use std::borrow::Cow;
+use std::collections::VecDeque;
 use std::fmt::Debug;
 
-use super::fwpm::FWPM;
 use crate::alphabet::Alphabet;
 use crate::automaton::{DFA, DPA};
+use crate::families::FWPM;
+use crate::learning::WeakPriorityMapping;
+use crate::math::{FxIndexMap, FxIndexSet};
 use crate::representation::CollectPointed;
 use crate::ts::{
     DenseId, Deterministic, DeterministicEdgesFrom, EdgeOf, EdgeRef, ForAlphabet, IdType,
@@ -294,6 +297,38 @@ fn padding_universal_dfa<A: Alphabet>(alphabet: &A) -> Dfa<A> {
     DFA::from_parts(ts, e)
 }
 
+/// Decomposes a weak priority mapping into a sequence of DFAs, where the i-th DFA accepts all
+/// non-empty words which are mapped to the i-th smallest priority or less. As the priority of a
+/// word is the color of the last edge, the states of the DFAs remember the color of the edge
+/// through which they were entered; the initial state has no such color (it is accepting, but
+/// can only be reached by the empty word).
+fn priority_dfas<A: Alphabet>(pm: &WeakPriorityMapping<A>) -> Vec<Dfa<A>> {
+    let priorities = pm.color_range().collect::<FxIndexSet<_>>();
+    priorities
+        .into_iter()
+        .sorted()
+        .map(|threshold| {
+            let mut ts = DTS::for_alphabet(pm.alphabet().clone());
+            let mut ids = FxIndexMap::default();
+            let initial = ts.add_state(true);
+            ids.insert((pm.initial(), None), initial);
+            let mut queue = VecDeque::from([(pm.initial(), None, initial)]);
+            while let Some((q, prio, source)) = queue.pop_front() {
+                for edge in pm.edges_from(q).into_iter().flatten() {
+                    let key = (edge.target(), Some(*edge.color()));
+                    let target = *ids.entry(key).or_insert_with(|| {
+                        let id = ts.add_state(*edge.color() <= threshold);
+                        queue.push_back((key.0, key.1, id));
+                        id
+                    });
+                    ts.add_edge((source, edge.expression().clone(), Void, target));
+                }
+            }
+            DFA::from_parts(ts, initial).minimize()
+        })
+        .collect()
+}
+
 impl<A: Alphabet, const N: usize> From<FWPM<A>> for PreciseDPA<A, N> {
     fn from(value: FWPM<A>) -> Self {
         let start = std::time::Instant::now();
@@ -301,8 +336,10 @@ impl<A: Alphabet, const N: usize> From<FWPM<A>> for PreciseDPA<A, N> {
         let leading = value.leading().clone();
         let padding_dfa = padding_universal_dfa(leading.alphabet());
         let mut prc_dfas = Vec::with_capacity(leading.state_count());
-        for (idx, mm) in value.pms() {
-            let mut dfas = mm.decompose_dfa();
+        let mut pms = value.iter().collect_vec();
+        pms.sort_by_key(|(idx, _)| *idx);
+        for (idx, mm) in pms {
+            let mut dfas = priority_dfas(mm);
             assert!(dfas.len() <= N);
             while dfas.len() < N {
                 dfas.push(padding_dfa.clone());

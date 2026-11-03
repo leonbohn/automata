@@ -3,7 +3,7 @@ use crate::States;
 use crate::{
     Int, Void,
     alphabet::{Alphabet, CharAlphabet},
-    math::FxIndexMap,
+    math::{FxIndexMap, FxIndexSet},
     word::FiniteWord,
 };
 
@@ -58,6 +58,14 @@ impl<T: Congruence + States, X> Family<T, X> {
     {
         self.progress.get_mut(&self.leading.reached_state(word)?)
     }
+    /// Returns the leading transition system, whose states index the family.
+    pub fn leading(&self) -> &T {
+        &self.leading
+    }
+    /// Iterates over the classes and their elements, in the order in which they were added.
+    pub fn iter(&self) -> impl Iterator<Item = (StateIndex<T>, &X)> + '_ {
+        self.progress.iter().map(|(q, x)| (*q, x))
+    }
     pub(crate) fn into_parts(self) -> (T, FxIndexMap<StateIndex<T>, X>) {
         (self.leading, self.progress)
     }
@@ -93,6 +101,17 @@ impl<A: Alphabet, X> Family<RightCongruence<DTS<A, Void, Void>>, X> {
     pub fn trivial(alphabet: A, progress: X) -> Self {
         let leading = RightCongruence::new_trivial_with_initial_color(alphabet, Void, Void);
         Self::from_parts(leading, [(crate::ts::q(0), progress)].into_iter().collect())
+    }
+}
+
+impl<A: Alphabet, C: crate::Color + Eq + std::hash::Hash> FWPM<A, C> {
+    /// The complexity of the family, i.e. the maximal number of distinct priorities that the
+    /// mapping of one class emits. This is the number of priorities needed for a parity automaton.
+    pub fn complexity(&self) -> usize {
+        self.iter()
+            .map(|(_, pm)| pm.color_range().collect::<FxIndexSet<_>>().len())
+            .max()
+            .unwrap_or(0)
     }
 }
 

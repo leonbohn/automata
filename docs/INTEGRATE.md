@@ -30,6 +30,26 @@ instead of `println!`, features stay independent, confer before committing/pushi
 - It targets the old API (`StateIndex`, `CollectTs`, ...). `main` has `StateId` as the default
   state id, `CsrTs`, `Storage` markers, `Recolor`, etc.
 
+## Status
+
+Legend: `[x]` done, `[-]` skipped on purpose, `[ ]` open. Progress is tracked in #118.
+
+- Phases 0 to 5 are done on `feat/learning`, apart from the open items below.
+- The history is **not** imported (plain copy of `automata-learning` commit `1ed4171`), so the
+  filter-repo steps of Phase 3 are skipped. The port to the 0.2 API was done in the old repo first
+  (branch `phase1-baseline`), which is why Phase 4 needed only path rewrites in this crate.
+- The listing of the public API (Phase 1) is skipped on purpose.
+- No new dependencies were needed: `bimap`, `crossbeam-channel`, `alea`, `paste` were unused,
+  `either` is replaced by `itertools::Either`, `owo-colors` and `tabled` were only cosmetic.
+- `learning = ["families"]`; it does not depend on `random`, the two random-machine L\* tests are
+  gated with `#[cfg(feature = "random")]`.
+- Phase 5: unified on `families::FWPM` (additive changes to `families`, so 0.2.x is possible).
+  `AnnotatedCongruence`/`Annotation` stay in `learning`, nothing in `congruence` overlaps.
+- Open: freezing the old repo (Phase 0), the MSRV check with 1.88 (no `rustup` on this machine),
+  and the dead file `passive/sample/characterize.rs`, which is not a declared module and still
+  mentions the old `fwpm::FWPM` (revive it or delete it in Phase 6).
+
+
 ## Phase 0 — Preconditions
 
 - [x] `automata 0.2.0` is published and tagged.
@@ -44,36 +64,36 @@ instead of `println!`, features stay independent, confer before committing/pushi
 
 Do this in `/sam/Rust/automata-learning` before moving anything, so regressions are attributable.
 
-- [ ] `cargo test` and record which tests pass/are ignored.
-- [ ] `cargo clippy --all-targets --all-features -- -D warnings` (record existing warnings; note
+- [x] `cargo test` and record which tests pass/are ignored.
+- [x] `cargo clippy --all-targets --all-features -- -D warnings` (record existing warnings; note
       anything hidden by `allow(unused)`).
-- [ ] Remove `#![allow(unused)]` temporarily and list what is dead (`cargo check 2>&1 | grep unused`).
+- [x] Remove `#![allow(unused)]` temporarily and list what is dead (`cargo check 2>&1 | grep unused`).
       Delete dead code in the old repo first if it is trivial, to shrink the diff of the port.
-- [ ] Run each algorithm once end to end and save the output as a reference: `sprout` on a small
+- [x] Run each algorithm once end to end and save the output as a reference: `sprout` on a small
       sample, `dpainf` on a small omega sample, `lstar` against a known DFA. These become the
       regression tests in Phase 6.
-- [ ] List every public item (`cargo doc` or `cargo public-api`) to know the surface being
+- [-] List every public item (`cargo doc` or `cargo public-api`) to know the surface being
       migrated.
 
 ## Phase 2 — Set up the branch and feature
 
-- [ ] `git switch main && git pull && git switch -c feat/learning`.
-- [ ] In `Cargo.toml` add optional dependencies (versions as in the old crate, bump if `automata`
+- [x] `git switch main && git pull && git switch -c feat/learning`.
+- [x] In `Cargo.toml` add optional dependencies (versions as in the old crate, bump if `automata`
       already uses a newer one):
       `bimap`, `crossbeam-channel`, `alea`, `either`, `paste`, `tabled`, `owo-colors`.
       Prefer dropping any dependency the port can do without (e.g. `either`, `paste`, `bimap` when a
       std/`indexmap` replacement is 5 lines). Fewer optional dependencies means a smaller
       feature surface.
-- [ ] Add the feature:
+- [x] Add the feature:
       `learning = ["random", "dep:bimap", "dep:crossbeam-channel", "dep:alea", ...]`.
       Do not make it depend on `hoa`, `render`, `graphviz` unless library code (not tests,
       examples or debugging helpers) needs them. If only tests need `hoa`/`render`, gate those tests
       with `#[cfg(feature = "hoa")]`.
-- [ ] Check that `tabled`/`owo-colors` are only used for pretty-printing of observation tables or
+- [x] Check that `tabled`/`owo-colors` are only used for pretty-printing of observation tables or
       samples. If so keep them optional under `learning`, or replace with `Display` impls to
       avoid the dependencies altogether.
 - [ ] Verify the MSRV (1.88) against each new dependency: `cargo +1.88 check --features learning`.
-- [ ] Add `pub mod learning;` to `src/lib.rs` behind `#[cfg(feature = "learning")]`, with a
+- [x] Add `pub mod learning;` to `src/lib.rs` behind `#[cfg(feature = "learning")]`, with a
       module-level doc comment stating that the module is experimental (no stability promise until
       the next minor release).
 
@@ -81,26 +101,26 @@ Do this in `/sam/Rust/automata-learning` before moving anything, so regressions 
 
 Goal: keep `git blame`/`log` for the moved files.
 
-- [ ] In a scratch clone of the old repo (never in the original):
+- [-] In a scratch clone of the old repo (never in the original):
       ```shell
       git clone /sam/Rust/automata-learning /tmp/al-import && cd /tmp/al-import
       git filter-repo --to-subdirectory-filter src/learning_import   # needs git-filter-repo
       ```
-- [ ] In the `automata` checkout:
+- [-] In the `automata` checkout:
       ```shell
       git remote add al-import /tmp/al-import
       git fetch al-import
       git merge --allow-unrelated-histories al-import/<branch> -m "Import automata-learning history"
       git remote remove al-import
       ```
-- [ ] Move into place with `git mv` (one commit, no content changes, so rename detection works):
+- [-] Move into place with `git mv` (one commit, no content changes, so rename detection works):
       `src/learning_import/lib.rs` -> `src/learning.rs`, the rest -> `src/learning/`.
       Keep the sub-module layout (`passive.rs` + `passive/`, `active.rs` + `active/`).
-- [ ] Do **not** import: old `Cargo.toml`, `Cargo.lock`, `CLAUDE.md`, `PLAN.md`, `README.md`,
+- [x] Do **not** import: old `Cargo.toml`, `Cargo.lock`, `CLAUDE.md`, `PLAN.md`, `README.md`,
       `LICENSE.md` (same license: MIT), `.github/`, `scripts/`. Delete them in the same commit.
-- [ ] Alternative if history is not wanted: plain copy into `src/learning/` and say so in the
+- [x] Alternative if history is not wanted: plain copy into `src/learning/` and say so in the
       commit message with the source commit hash (`efc0c56` or later).
-- [ ] The tree will not compile after this phase. That is expected; do not push this branch
+- [-] The tree will not compile after this phase. That is expected; do not push this branch
       before Phase 4 compiles.
 
 ## Phase 4 — Make it compile against `main`
@@ -117,42 +137,42 @@ Work module by module, from leaves to root, running
 
 Mechanical rewrites:
 
-- [ ] `use automata::` -> `use crate::` everywhere (and `automata::prelude` -> explicit imports or
+- [x] `use automata::` -> `use crate::` everywhere (and `automata::prelude` -> explicit imports or
       the in-crate prelude).
-- [ ] `StateIndex` -> `StateId` (new default id type, `ts::state_index`), also
+- [x] `StateIndex` -> `StateId` (new default id type, `ts::state_index`), also
       `StateIndex<T>` aliases on `RightCongruence`.
-- [ ] `CollectTs` -> the current `representation` API (`collect::<T>()`,
+- [x] `CollectTs` -> the current `representation` API (`collect::<T>()`,
       `CollectPointed::collect_dfa`/`collect_dpa`).
-- [ ] `automata::math::*` -> `crate::math::*` (`FxIndexMap`/`FxIndexSet`). Replace any
+- [x] `automata::math::*` -> `crate::math::*` (`FxIndexMap`/`FxIndexSet`). Replace any
       `HashMap`/`HashSet` the learning code uses with these to keep results deterministic and
       benchmarks reproducible.
-- [ ] Edge/transition access: `edges_from`/`predecessors` now yield `ts::EdgeOf<'_, Self>`
+- [x] Edge/transition access: `edges_from`/`predecessors` now yield `ts::EdgeOf<'_, Self>`
       (`EdgeRef`); adapt pattern matches on old edge tuple types.
-- [ ] Colors: `Color` is `Clone + Debug`; drop any `Copy` assumptions the learning code makes.
-- [ ] Coloring operations go through `Recolor`/`map_*`/`with_state_color`; replace removed
+- [x] Colors: `Color` is `Clone + Debug`; drop any `Copy` assumptions the learning code makes.
+- [x] Coloring operations go through `Recolor`/`map_*`/`with_state_color`; replace removed
       helpers.
-- [ ] Anything that used crate-private items of the old `automata 0.1`: use the public API only
+- [x] Anything that used crate-private items of the old `automata 0.1`: use the public API only
       (never widen `ts::impls`).
-- [ ] `dot` helpers (`DotStateAttribute`, `DotTransitionAttribute`): the module is always
+- [x] `dot` helpers (`DotStateAttribute`, `DotTransitionAttribute`): the module is always
       available, no feature gate needed; image rendering (`render`/`graphviz`) stays gated.
 
 Commit hygiene: one commit per module group, message `learning: port <module> to current API`.
 
 ## Phase 5 — Resolve the overlap with `families`
 
-- [ ] Compare `learning::passive::fwpm::FWPM` and
+- [x] Compare `learning::passive::fwpm::FWPM` and
       `learning::priority_mapping::FamilyOfWeakPriorityMappings` with `families::{FWPM, FDFA}`:
       same concept? same invariants? same conversions?
-- [ ] Decide (with maintainer sign-off, this is an API decision):
+- [x] Decide (with maintainer sign-off, this is an API decision):
       a. **Unify:** learning uses the `families` types; `families` gains whatever methods learning
          needs (`insert_pm`, `complexity`, `into_precise_dpa`, ...). Preferred.
       b. **Keep both** with different names and cross references in the docs. Only if the types
          really differ.
-- [ ] `families` is gated by its own feature. If learning needs it, add
+- [x] `families` is gated by its own feature. If learning needs it, add
       `learning = [..., "families"]`; otherwise keep it independent.
-- [ ] Breaking changes to `families` go in `CHANGELOG.md` as **Breaking:** and decide whether
+- [x] Breaking changes to `families` go in `CHANGELOG.md` as **Breaking:** and decide whether
       this forces 0.3.0 rather than 0.2.x.
-- [ ] Same check for `congruence::RightCongruence` and `Cayley` vs. the old `AnnotatedCongruence`
+- [x] Same check for `congruence::RightCongruence` and `Cayley` vs. the old `AnnotatedCongruence`
       and `Annotation`: reuse in-crate types, don't duplicate.
 
 ## Phase 6 — Quality gates (the part that makes it mergeable)
@@ -169,7 +189,7 @@ Commit hygiene: one commit per module group, message `learning: port <module> to
       `String` errors). Document the remaining ones in `# Panics` sections and add them to
       `PANIC-AUDIT.md`.
 - [ ] Replace any `println!`/`eprintln!`/`dbg!` with `tracing` calls.
-- [ ] `crossbeam-channel` usage: check why threads are used; make sure no detached threads leak
+- [x] `crossbeam-channel` usage: check why threads are used; make sure no detached threads leak
       and that the single-threaded path still works. If concurrency is not essential, removing it
       drops a dependency.
 - [ ] Tests:

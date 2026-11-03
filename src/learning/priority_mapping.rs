@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 
 use crate::alphabet::{Alphabet, CharAlphabet};
-use crate::automaton::{MealyMachine, MooreMachine};
+use crate::automaton::MealyMachine;
 use crate::dag::Dag;
-use crate::representation::IntoTransitions;
-use crate::ts::Sccs;
+use crate::representation::{CollectPointed, IntoTransitions};
 use crate::ts::operations::DefaultIfMissing;
+use crate::ts::{Sccs, StateId};
 use crate::word::FiniteWord;
 use crate::{Color, DTS, Int, Pointed, States, Void};
 use crate::{RightCongruence, TransitionSystem};
@@ -87,7 +87,7 @@ impl<A: Alphabet> AnnotatedCongruence<A> {
     /// Computes the canonic coloring on a given annotated congruence. This makes use
     /// of the dag of strongly connected components of the congruence. For more information
     /// on how the computation is done exactly, see [Section 5, Step 2](https://arxiv.org/pdf/2302.11043.pdf).
-    pub fn canonic_coloring(&self) -> MooreMachine<DTS<A, Int, Void>> {
+    pub fn canonic_coloring(&self) -> WeakPriorityMapping<A> {
         // we first need to decompose into sccs and mark them with the color of the
         // idempotent that it contains.
         let tjdag = Sccs::on(&self.0).compute();
@@ -127,7 +127,7 @@ impl<A: Alphabet> AnnotatedCongruence<A> {
             *dag.color_mut(t).expect("This node exists") = Ok(i + offset);
         }
 
-        let state_coloring: crate::math::FxIndexMap<_, _> = self
+        let state_coloring: crate::math::FxIndexMap<StateId, Int> = self
             .0
             .states()
             .map(|i| {
@@ -142,11 +142,13 @@ impl<A: Alphabet> AnnotatedCongruence<A> {
             })
             .collect();
 
+        // the mapping of a word is the color of the SCC that its last state belongs to
         (&self.0)
-            .erase_edge_colors()
-            .with_state_color(DefaultIfMissing::new(state_coloring, 0))
-            .with_initial(self.0.initial())
-            .collect()
+            .erase_state_colors()
+            .map_edge_colors_full(|_p, _e, _c, q| {
+                *state_coloring.get(&q).expect("every state has a color")
+            })
+            .collect_mealy()
     }
 
     /// Takes a reference to a right congruence and a function that classifies idempotents
