@@ -153,6 +153,29 @@ impl Engine {
         Ok(wanted.filter(|b| defined.contains(&b.as_str())).collect())
     }
 
+    /// The features that the given bench targets need (`required-features` in the manifest), so
+    /// that a target such as `learning` is built and not silently skipped by cargo.
+    fn required_features(src: &Path, benches: &[&String]) -> Result<Vec<String>> {
+        let manifest: toml::Table = std::fs::read_to_string(src.join("Cargo.toml"))?.parse()?;
+        let mut features: Vec<String> = manifest
+            .get("bench")
+            .and_then(|b| b.as_array())
+            .into_iter()
+            .flatten()
+            .filter(|b| {
+                b.get("name")
+                    .and_then(|n| n.as_str())
+                    .is_some_and(|n| benches.iter().any(|w| w.as_str() == n))
+            })
+            .filter_map(|b| b.get("required-features")?.as_array())
+            .flatten()
+            .filter_map(|f| f.as_str().map(str::to_string))
+            .collect();
+        features.sort();
+        features.dedup();
+        Ok(features)
+    }
+
     fn cargo(&self, src: &Path, target: &Path, pinned: bool) -> Command {
         let mut cmd = match &self.cpu {
             Some(cpu) if pinned => {
@@ -195,8 +218,16 @@ impl Engine {
         control.note(&format!(
             "{role} {sha}: building {gungraun_benches:?} {wall:?}"
         ));
+        let features = Self::required_features(
+            &src,
+            &gungraun_benches.iter().chain(&wall).collect::<Vec<_>>(),
+        )?
+        .join(",");
         let mut build = self.cargo(&src, &target, false);
         build.args(["bench", "--no-run"]);
+        if !features.is_empty() {
+            build.args(["--features", &features]);
+        }
         for b in gungraun_benches.iter().chain(&wall) {
             build.args(["--bench", b]);
         }
@@ -206,7 +237,11 @@ impl Engine {
         for bench in &gungraun_benches {
             control.note(&format!("{role}: running {bench}"));
             let mut cmd = self.cargo(&src, &target, true);
-            cmd.args(["bench", "--bench", bench, "--", "--output-format=json"]);
+            cmd.args(["bench", "--bench", bench]);
+            if !features.is_empty() {
+                cmd.args(["--features", &features]);
+            }
+            cmd.args(["--", "--output-format=json"]);
             let out = control.run(&mut cmd, &format!("benchmarking {bench} of {role}"))?;
             measured.results.extend(gungraun::parse(&out)?);
         }
@@ -215,8 +250,11 @@ impl Engine {
             let criterion_dir = target.join("criterion");
             let _ = std::fs::remove_dir_all(&criterion_dir);
             let mut cmd = self.cargo(&src, &target, true);
-            cmd.args(["bench", "--bench", bench, "--"])
-                .args(&self.criterion_args);
+            cmd.args(["bench", "--bench", bench]);
+            if !features.is_empty() {
+                cmd.args(["--features", &features]);
+            }
+            cmd.arg("--").args(&self.criterion_args);
             control.run(&mut cmd, &format!("benchmarking {bench} of {role}"))?;
             measured.wall = criterion::collect(&criterion_dir)?;
         }
@@ -263,6 +301,33 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn collects_the_features_of_the_wanted_benches() {
+        let dir = std::env::temp_dir().join(format!("ab-features-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("Cargo.toml"),
+            r#"
+[[bench]]
+name = "a"
+required-features = ["hoa"]
+[[bench]]
+name = "b"
+required-features = ["hoa", "learning"]
+[[bench]]
+name = "c"
+required-features = ["render"]
+"#,
+        )
+        .unwrap();
+        let (a, b) = ("a".to_string(), "b".to_string());
+        assert_eq!(
+            Engine::required_features(&dir, &[&a, &b]).unwrap(),
+            ["hoa", "learning"]
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn a_failing_command_reports_its_log() {

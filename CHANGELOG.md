@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   | `fwpm.into_precise_dpa()` | `PreciseDPA::try_from(fwpm)` |
 
   The crate root of `automata-learning` (its `prefixtree`, `priority_mapping` and so on) is `automata::learning` as well.
-- Example `learning` and benchmark `learning` (both need the feature `learning`).
+- Example `learning` and benchmark `learning` (both need the feature `learning`). The benchmark tool builds the features that the selected bench targets require, runs the target `learning` by default, and the stacked chart of the dashboard backfills benchmarks that were added later with their first value (dashed line at the commit that added them, #115).
 - `families::Family::leading` and `Family::iter`, and `families::FWPM::complexity` (the number of distinct priorities of the most complex class). The learning code builds on `families::FWPM` instead of having its own type: the `FWPM` of `automata-learning` (one `MooreMachine` per class) is `families::FWPM` here (one `MealyMachine` per class, whose edge colors are the priorities), and `AnnotatedCongruence::canonic_coloring` returns such a Mealy machine. `into_precise_dpa` is `PreciseDPA::from(fwpm)`.
 
 ## [0.2.0] - 2026-11-03

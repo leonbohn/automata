@@ -235,11 +235,6 @@ Commit hygiene: one commit per module group, message `learning: port <module> to
       `cargo +1.88 check --all-targets --all-features`.
 - [x] `benches` job (`cargo bench --no-run`) builds the new bench; confirm it needs
       `required-features` or `--all-features`.
-
-## Phase 8b - Benchmarks
-- [ ] Add benchmarks for the learning part, update the nix module
-- [ ] Decide on a way to backfill benchmark values as to not make the stacked performance graph go up. See issue #115.
-`graphviz`, `hoa`, `learning`) compile without warnings; `cargo-hack` and `rustup` are not installed
 - [x] Examples loop in `scripts/check` and CI: `learning` is not a default feature, so either run
       the example with `--features learning` or rely on `required-features` skipping it. Add
       `cargo run -q --example learning --features learning` explicitly to both.
@@ -250,16 +245,15 @@ Commit hygiene: one commit per module group, message `learning: port <module> to
 - [-] Add the `performance` label to the PR if benchmark numbers of existing code could change
       (they should not; learning is additive).
 Notes: the single-feature builds (`--no-default-features` and each of `families`, `random`, `render`,
+`graphviz`, `hoa`, `learning`) compile without warnings; `cargo-hack` and `rustup` are not installed
 here, so the MSRV (1.88) check is left to CI. The CI `benches` job now uses `--all-features`, since
-`cargo bench --no-run` skips `benches/learning.rs` (`required-features`). The benchmark service
-(`tools/bench` default list, `nix/module.nix`) is left unchanged, so `learning` is not tracked
-there yet; add it deliberately if wanted. `nix flake check` passes. The `performance` label is
-unnecessary, since existing code was not changed apart from additive items in `families`.
-
+`cargo bench --no-run` skips `benches/learning.rs` (`required-features`). `nix flake check` passes.
+The `performance` label is unnecessary, since existing code was not changed apart from additive items
+in `families`.
 
 ## Phase 8 — Documentation
 
-- [ ] `CHANGELOG.md` under "Unreleased": "Added: `learning` feature with `automata::learning`
+- [x] `CHANGELOG.md` under "Unreleased": "Added: `learning` feature with `automata::learning`
       (passive: sprout/RPNI, DPAInf, ...; active: L\*), moved from the `automata-learning`
       crate." Include a migration table:
 
@@ -270,19 +264,27 @@ unnecessary, since existing code was not changed apart from additive items in `f
       | `automata_learning::active::...`         | `automata::learning::active::...`                  |
       | `automata_learning::FWPM` (if unified)   | `automata::families::FWPM` (state the real path)   |
 
-- [ ] `README.md`: add the feature to the feature table (README code blocks are doctests that run
+- [x] `README.md`: add the feature to the feature table (README code blocks are doctests that run
       in every configuration, so no learning example in the README itself; link to the module docs).
-- [ ] Module docs for `automata::learning` with a short tour: passive vs. active, which input type
+- [x] Module docs for `automata::learning` with a short tour: passive vs. active, which input type
       each takes, links to examples, citations of the algorithms (RPNI, L\*, DPAInf paper).
-- [ ] `CLAUDE.md`: add `learning/` to the `src/` layout section and to the feature list.
-- [ ] `PLAN.md`: tick/replace the item "Switch `frieda`'s `automata-learning` ... to depend on
+- [x] `CLAUDE.md`: add `learning/` to the `src/` layout section and to the feature list.
+- [x] `PLAN.md`: tick/replace the item "Switch `frieda`'s `automata-learning` ... to depend on
       this crate" with the new status.
-- [ ] `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features` has no broken intra-doc
+- [x] `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features` has no broken intra-doc
       links.
 
 ## Phase 8b - Benchmarks
-- [ ] Add benchmarks for the learning part, update the nix module
-- [ ] Decide on a way to backfill benchmark values as to not make the stacked performance graph go up. See issue #115.
+- [x] Add benchmarks for the learning part, update the nix module
+- [x] Decide on a way to backfill benchmark values as to not make the stacked performance graph go up. See issue #115.
+
+Notes: `benches/learning.rs` exists (Phase 6); `tools/bench` now builds the features named by the
+`required-features` of the selected targets, `learning` is in the default list of `--bench` and of
+`nix/module.nix`. Backfilling is done when the chart is drawn (`charts::align`), not in the database:
+before its first result a benchmark counts with that first value and a dashed line marks the commit
+that added it, so the stored data stays real. Only the stacked chart changes; the per-benchmark charts
+show real points. Not done from #115: smaller charts, `storage` comparison on one axis. Not run
+end to end (a `compare` run takes long); the feature handling is unit-tested.
 
 
 ## Phase 9 — Review and merge
