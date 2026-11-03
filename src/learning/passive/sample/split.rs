@@ -1,10 +1,10 @@
 use crate::DTS;
 use crate::alphabet::Alphabet;
+use crate::learning::LearningError;
 use crate::learning::passive::dpainf::{dpainf, iteration_consistency_conflicts};
 use crate::math;
 use crate::ts::{Deterministic, StateId};
 use crate::{Class, RightCongruence, families::FORC};
-use itertools::Itertools;
 
 use super::{OmegaSample, SetSample};
 
@@ -108,30 +108,25 @@ impl<'a, A: Alphabet> SplitOmegaSample<'a, A> {
 }
 
 impl<A: Alphabet> SplitOmegaSample<'_, A> {
-    /// Infers a family of right congruences bz first constructing a conflict relation which is then used
+    /// Infers a family of right congruences by first constructing a conflict relation which is then used
     /// as a constraint for the sprout/glerc algorithm.
-    pub fn infer_forc(&self) -> FORC<A> {
-        let conflict_relations: std::collections::BTreeMap<_, _> = self
-            .classes()
-            .map(|c| (c.clone(), iteration_consistency_conflicts(self, c.clone())))
-            .collect();
-
-        let progress = conflict_relations
-            .into_iter()
-            .map(|(c, conflicts)| {
-                (
-                    self.cong().reached_state(c).unwrap(),
-                    dpainf(
-                        conflicts,
-                        vec![],
-                        // SeparatesIdempotents::new(split_sample.get(&c).expect("This must exist")),
-                        false,
-                        None,
-                    )
-                    .expect("Unable to infer a FORC!"),
-                )
-            })
-            .collect_vec();
-        FORC::from_iter(self.cong().clone(), progress)
+    ///
+    /// # Errors
+    /// Fails if the sprout algorithm exceeds its threshold, which means that the sample is not
+    /// consistent.
+    pub fn infer_forc(&self) -> Result<FORC<A>, LearningError> {
+        let mut progress = Vec::new();
+        for class in self.classes() {
+            let conflicts = iteration_consistency_conflicts(self, class.clone())?;
+            let state = self
+                .cong()
+                .reached_state(class)
+                .ok_or(LearningError::Incomplete)?;
+            // SeparatesIdempotents::new(split_sample.get(&c).expect("This must exist")),
+            progress.push((state, dpainf(conflicts, vec![], false, None)?));
+        }
+        // sort by class to be independent of the iteration order of the split
+        progress.sort_by_key(|(state, _)| *state);
+        Ok(FORC::from_iter(self.cong().clone(), progress))
     }
 }

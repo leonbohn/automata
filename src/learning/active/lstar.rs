@@ -10,14 +10,37 @@ use itertools::Itertools;
 use tracing::{debug, info, trace};
 
 use super::{Experiment, Hypothesis, oracle::Oracle};
+use crate::learning::LearningError;
 // use super::ObservationTable;
 
 const ITERATION_THRESHOLD: usize = if cfg!(debug_assertions) { 50 } else { 200000 };
 
 type Word<D> = Vec<SymbolOf<D>>;
+/// The experiments (suffixes) that distinguish the rows of the observation table of [`LStar`].
 pub type Experiments<D> = Vec<Experiment<SymbolOf<D>>>;
 
 /// An implementation of the L* algorithm.
+/// # Example
+/// Learning a Mealy machine from an oracle that is given by the target machine.
+/// ```
+/// use automata::States;
+/// use automata::TransitionSystem;
+/// use automata::automaton::MealyMachine;
+/// use automata::learning::active::{LStar, MealyOracle};
+/// use automata::ts::Builder;
+///
+/// let target = Builder::without_state_colors()
+///     .with_edges([
+///         (0, 'a', 0, 0), (0, 'b', 1, 1), (0, 'c', 2, 2),
+///         (1, 'a', 0, 2), (1, 'b', 1, 1), (1, 'c', 2, 2),
+///         (2, 'a', 2, 2), (2, 'b', 0, 0), (2, 'c', 1, 2),
+///     ])
+///     .into_mealy(0);
+/// let alphabet = target.alphabet().clone();
+/// let oracle = MealyOracle::new(target).unwrap();
+/// let learned: MealyMachine = LStar::new(alphabet, oracle).infer().unwrap();
+/// assert_eq!(learned.state_count(), 3);
+/// ```
 pub struct LStar<D: Hypothesis, T: Oracle<Alphabet = D::Alphabet>> {
     // the alphabet of what we are learning
     alphabet: D::Alphabet,
@@ -36,6 +59,7 @@ pub struct LStar<D: Hypothesis, T: Oracle<Alphabet = D::Alphabet>> {
 }
 
 impl<D: Hypothesis, T: Oracle<Alphabet = D::Alphabet, Output = D::Output>> LStar<D, T> {
+    /// Creates a learner for the given alphabet that asks its queries to `oracle`.
     pub fn new(alphabet: D::Alphabet, oracle: T) -> Self {
         Self {
             experiments: D::mandatory_experiments(&alphabet).into_iter().collect(),
@@ -105,13 +129,21 @@ impl<D: Hypothesis, T: Oracle<Alphabet = D::Alphabet, Output = D::Output>> LStar
         trace!("After update the table is\n{:?}", self);
     }
 
-    pub fn infer(&mut self) -> D {
+    /// Runs the algorithm until the oracle accepts the hypothesis and returns it.
+    ///
+    /// The number of iterations is bounded by the environment variable `MAX_ITERATIONS`, which
+    /// defaults to a large constant.
+    ///
+    /// # Errors
+    /// Fails if the iteration threshold is exceeded or if the oracle returns a counterexample on
+    /// which the hypothesis agrees with it.
+    pub fn infer(&mut self) -> Result<D, LearningError> {
         let start = std::time::Instant::now();
         let mut iteration = 0;
         let threshold = std::env::var("MAX_ITERATIONS")
-            .unwrap_or(format!("{ITERATION_THRESHOLD}"))
-            .parse()
-            .unwrap();
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(ITERATION_THRESHOLD);
 
         'outer: while iteration < threshold {
             self.update_table();
@@ -137,13 +169,15 @@ impl<D: Hypothesis, T: Oracle<Alphabet = D::Alphabet, Output = D::Output>> LStar
             let Err((witness, expected_color)) = self.oracle.equivalence(&hypothesis) else {
                 let duration = start.elapsed().as_millis();
                 info!("Execution of LStar took {duration}ms");
-                return hypothesis;
+                return Ok(hypothesis);
             };
-            assert!(hypothesis.output(&witness) != expected_color);
+            if hypothesis.output(&witness) == expected_color {
+                return Err(LearningError::InvalidCounterexample);
+            }
             self.process_counterexample(witness, expected_color);
         }
 
-        panic!("Iteration threshold exceeded!")
+        Err(LearningError::IterationThreshold(threshold))
     }
 
     fn process_counterexample(&mut self, word: Word<D>, _color: D::Output) {
@@ -338,11 +372,25 @@ impl<D: Hypothesis, T: Oracle<Alphabet = D::Alphabet>> std::fmt::Debug for LStar
 mod tests {
     use crate::States;
     use crate::alphabet::CharAlphabet;
+    use crate::automaton::Equivalence;
     use crate::automaton::{MealyMachine, MooreMachine};
-    use crate::learning::active::{MealyOracle, MooreOracle, Oracle};
+    use crate::learning::active::{DFAOracle, MealyOracle, MooreOracle, Oracle};
+    use crate::representation::CollectPointed;
+    use crate::{DTS, Void};
     #[cfg(feature = "random")]
     use rand::RngExt;
     use tracing::trace;
+
+    proptest::proptest! {
+        #[test]
+        fn lstar_learns_equivalent_dfa(target in crate::learning::properties::dfa()) {
+            let oracle = DFAOracle::new(target.clone());
+            let learned: MooreMachine<DTS<CharAlphabet, bool, Void>> =
+                super::LStar::new(CharAlphabet::of_size(2), oracle).infer().unwrap();
+            let learned = learned.collect_dfa();
+            proptest::prop_assert!(Equivalence::of(&target).and(&learned).holds());
+        }
+    }
 
     #[cfg(feature = "random")]
     #[test]
@@ -360,10 +408,12 @@ mod tests {
                 pre_gen.elapsed().as_micros()
             );
 
-            let oracle = MealyOracle::new(&ts);
+            let oracle = MealyOracle::new(&ts).unwrap();
 
             let start = std::time::Instant::now();
-            let mm: MealyMachine = super::LStar::new(oracle.alphabet().clone(), oracle).infer();
+            let mm: MealyMachine = super::LStar::new(oracle.alphabet().clone(), oracle)
+                .infer()
+                .unwrap();
             let duration = start.elapsed().as_millis();
             trace!("learning took {} ms", duration);
 
@@ -392,11 +442,12 @@ mod tests {
                 pre_gen.elapsed().as_micros()
             );
 
-            let oracle = MooreOracle::new(ts.clone());
+            let oracle = MooreOracle::new(ts.clone()).unwrap();
 
             let start = std::time::Instant::now();
-            let mm: MooreMachine =
-                super::LStar::new(CharAlphabet::of_size(symbols), oracle).infer();
+            let mm: MooreMachine = super::LStar::new(CharAlphabet::of_size(symbols), oracle)
+                .infer()
+                .unwrap();
             let duration = start.elapsed().as_millis();
             trace!("learning took {} ms", duration);
 

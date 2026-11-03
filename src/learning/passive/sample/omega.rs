@@ -1,11 +1,13 @@
+use std::collections::btree_map::Entry;
 use std::{collections::VecDeque, io::BufRead};
 
 use crate::alphabet::{Alphabet, CharAlphabet};
+use crate::learning::LearningError;
 use crate::math;
 use crate::representation::CollectPointed;
 use crate::ts::Deterministic;
 use crate::word::{OmegaWord, PeriodicOmegaWord, ReducedOmegaWord, ReducedParseError, Word};
-use crate::{Class, DTS, Pointed, RightCongruence, States, TransitionSystem};
+use crate::{Class, DTS, Pointed, RightCongruence, TransitionSystem};
 use itertools::{Either, Itertools};
 use thiserror::Error;
 use tracing::{debug, trace};
@@ -22,25 +24,35 @@ use super::{OmegaSample, SplitOmegaSample};
 
 /// Abstracts the types of errors that can occur when parsing an `OmegaSample` from a string.
 #[derive(Debug, Clone, Eq, PartialEq, Error)]
-#[allow(missing_docs)]
 pub enum OmegaSampleParseError {
+    /// The first line is not the header `omega`.
     #[error("missing sample header")]
     MissingHeader,
+    /// The line with the alphabet is missing.
     #[error("missing sample alphabet")]
     MissingAlphabet,
+    /// The line `alphabet` is not followed by `:`.
     #[error("alphabet directive not followed by `:`")]
     MissingDelimiter,
+    /// A symbol of the alphabet is not a single character.
     #[error("encountered malformed alphabet symbol `{0}`")]
     MalformedAlphabetSymbol(String),
+    /// A word is both positive and negative.
     #[error("sample is inconsistent: `{0}` is classified as positive and negative")]
     Inconsistent(String),
+    /// The block `positive:` or `negative:` is missing.
     #[error("alphabet is malformed, missing `positive:` or `negative:` block")]
     MalformedSample,
+    /// A word of the sample could not be parsed.
     #[error("could not parse given omega word, reason: {0}")]
     OmegaWordParseError(ReducedParseError),
+    /// The sample could not be read.
+    #[error("could not read the sample: {0}")]
+    Io(String),
 }
 
 impl<A: Alphabet> OmegaSample<A> {
+    /// Builds the prefix tree of all words of the sample, as a right congruence.
     pub fn prefix_tree(&self) -> RightCongruence<DTS<A>> {
         prefix_tree(self.alphabet().clone(), self.words())
             .erase_state_colors()
@@ -48,6 +60,8 @@ impl<A: Alphabet> OmegaSample<A> {
     }
 }
 impl OmegaSample<CharAlphabet> {
+    /// Parses an [`OmegaSample`] from an iterator over lines, in the format described at
+    /// [`Self::try_from_str`].
     pub fn try_from_lines<I: Iterator<Item = String>>(
         mut lines: I,
     ) -> Result<Self, OmegaSampleParseError> {
@@ -67,13 +81,15 @@ impl OmegaSample<CharAlphabet> {
                         .split(',')
                         .try_fold(Vec::new(), |mut acc, x| {
                             let sym = x.trim();
-                            if sym.len() != 1 {
-                                Err(OmegaSampleParseError::MalformedAlphabetSymbol(
+                            let mut chars = sym.chars();
+                            match (chars.next(), chars.next()) {
+                                (Some(c), None) => {
+                                    acc.push(c);
+                                    Ok(acc)
+                                }
+                                _ => Err(OmegaSampleParseError::MalformedAlphabetSymbol(
                                     sym.to_string(),
-                                ))
-                            } else {
-                                acc.push(sym.chars().next().unwrap());
-                                Ok(acc)
+                                )),
                             }
                         })
                         .map(CharAlphabet::new)
@@ -124,26 +140,60 @@ impl OmegaSample<CharAlphabet> {
         Ok(SetSample::new_omega(alphabet, words))
     }
 
+    /// Parses an [`OmegaSample`] from a string. The first line is `omega`, followed by
+    /// `alphabet: a,b` and the blocks `positive:` and `negative:` which contain one word per line.
+    ///
+    /// ```
+    /// use automata::learning::passive::OmegaSample;
+    ///
+    /// let sample = OmegaSample::try_from_str(
+    ///     "omega
+    ///     alphabet: a,b
+    ///     positive:
+    ///     ab
+    ///     negative:
+    ///     b",
+    /// )
+    /// .unwrap();
+    /// assert_eq!(sample.count_words(), 2);
+    /// ```
     pub fn try_from_str(input: &str) -> Result<Self, OmegaSampleParseError> {
         Self::try_from_lines(input.lines().map(|l| l.to_string()))
     }
 
+    /// Parses an [`OmegaSample`] from a reader, see [`Self::try_from_str`] for the format.
+    /// Empty lines and lines that start with `#` are ignored.
     pub fn try_from_read<R: BufRead>(read: R) -> Result<Self, OmegaSampleParseError> {
-        let lines = read.lines().filter_map(|line| {
-            let line = line.expect("unable to parse line!").trim().to_string();
+        let mut lines = Vec::new();
+        for line in read.lines() {
+            let line = line
+                .map_err(|e| OmegaSampleParseError::Io(e.to_string()))?
+                .trim()
+                .to_string();
             if !line.is_empty() && !line.starts_with('#') {
-                None
-            } else {
-                Some(line.to_string())
+                lines.push(line);
             }
-        });
-        Self::try_from_lines(lines)
+        }
+        Self::try_from_lines(lines.into_iter())
     }
 }
 
 impl<A: Alphabet> OmegaSample<A> {
     /// Creates a new `OmegaSample` from an alphabet as well as two iterators, one
     /// over positive words and one over negative words.
+    ///
+    /// ```
+    /// use automata::alphabet::CharAlphabet;
+    /// use automata::learning::passive::OmegaSample;
+    /// use automata::upw;
+    ///
+    /// let sample = OmegaSample::new_omega_from_pos_neg(
+    ///     CharAlphabet::of_size(2),
+    ///     [upw!("a"), upw!("ab")],
+    ///     [upw!("b")],
+    /// );
+    /// assert_eq!((sample.count_positive_words(), sample.count_negative_words()), (2, 1));
+    /// ```
     pub fn new_omega_from_pos_neg<
         W: Into<ReducedOmegaWord<A::Symbol>>,
         I: IntoIterator<Item = W>,
@@ -267,11 +317,13 @@ impl<A: Alphabet> OmegaSample<A> {
     }
 
     /// Splits the sample into a map of [`ClassOmegaSample`]s, one for each class of the underlying [`RightCongruence`].
-    pub fn split<'a>(&self, cong: &'a RightCongruence<DTS<A>>) -> SplitOmegaSample<'a, A> {
-        debug_assert!(
-            cong.state_count() > 0,
-            "Makes only sense for non-empty congruences"
-        );
+    ///
+    /// # Errors
+    /// Fails if the sample contains a word that is both positive and negative from some class.
+    pub fn split<'a>(
+        &self,
+        cong: &'a RightCongruence<DTS<A>>,
+    ) -> Result<SplitOmegaSample<'a, A>, LearningError> {
         let initial = cong.initial();
         // take self as is for epsilon
         let mut split = std::collections::BTreeMap::default();
@@ -287,27 +339,30 @@ impl<A: Alphabet> OmegaSample<A> {
         while let Some((state, word, color)) = queue.pop_front() {
             trace!("Processing word {:?} in state {}", word, state);
             let (sym, suffix) = word.pop_first();
-            // unwrap okay because words are infinite
             if let Some(reached) = cong.successor(state, sym) {
                 trace!("\tReached successor {reached}");
-                if split
-                    .entry(reached)
-                    .or_insert_with(|| {
-                        ClassOmegaSample::empty(
+                let class_sample = match split.entry(reached) {
+                    Entry::Occupied(entry) => entry.into_mut(),
+                    Entry::Vacant(entry) => {
+                        let class = cong
+                            .state_to_mr(reached)
+                            .ok_or(LearningError::Incomplete)?
+                            .clone()
+                            .into_inner();
+                        entry.insert(ClassOmegaSample::empty(
                             cong,
-                            Class::from(cong.state_to_mr(reached).unwrap().clone().into_inner()),
+                            Class::from(class),
                             self.alphabet.clone(),
-                        )
-                    })
-                    .sample_mut()
-                    .insert(suffix.reduced(), color)
-                {
+                        ))
+                    }
+                };
+                if class_sample.sample_mut().insert(suffix.reduced(), color)? {
                     trace!("Added word {:?} to state {}", suffix, reached);
                     queue.push_back((reached, suffix.reduced(), color));
                 }
             }
         }
 
-        SplitOmegaSample::new(cong, split)
+        Ok(SplitOmegaSample::new(cong, split))
     }
 }

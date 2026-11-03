@@ -82,8 +82,12 @@ jobs:
         shell: bash
         run: |
           for example in examples/*.rs; do
-            cargo run --example "$(basename "$example" .rs)" > /dev/null
+            name="$(basename "$example" .rs)"
+            # the example of the opt-in feature `learning` is run below
+            [ "$name" = learning ] && continue
+            cargo run --example "$name" > /dev/null
           done
+          cargo run --example learning --features learning > /dev/null
       - name: No default features
         run: cargo test --no-default-features
 

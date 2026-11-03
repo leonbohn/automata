@@ -13,6 +13,7 @@ pub use hypothesis::*;
 mod observationtable;
 use observationtable::*;
 
+/// The data structures behind the active learners, e.g. the observation table.
 pub mod data {
     pub use super::observationtable::*;
 }
@@ -40,8 +41,8 @@ mod tests {
             .into_mealy(0);
 
         let alphabet = target.alphabet().clone();
-        let oracle = MealyOracle::new(target);
-        let learned: MealyMachine = LStar::new(alphabet, oracle).infer();
+        let oracle = MealyOracle::new(target).unwrap();
+        let learned: MealyMachine = LStar::new(alphabet, oracle).infer().unwrap();
         assert_eq!(learned.state_count(), 3);
     }
 }

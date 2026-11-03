@@ -1,6 +1,7 @@
 use std::{borrow::Borrow, fmt::Debug, hash::Hash};
 
 use crate::alphabet::{Alphabet, CharAlphabet};
+use crate::learning::LearningError;
 use crate::math;
 use crate::word::{ReducedOmegaWord, Word};
 use itertools::Itertools;
@@ -16,22 +17,31 @@ pub use finite::FiniteSampleParseError;
 
 mod canonic_coloring;
 
+/// A sample, i.e. a collection of positive and negative words over the alphabet `A`.
 pub trait Sample<A: Alphabet> {
+    /// The type of the words in the sample.
     type Word: Word<Symbol = A::Symbol>;
+    /// The iterator over the positive words.
     type PositiveIter<'this>: Iterator<Item = &'this Self::Word>
     where
         Self: 'this,
         Self::Word: 'this;
+    /// The iterator over the negative words.
     type NegativeIter<'this>: Iterator<Item = &'this Self::Word>
     where
         Self: 'this,
         Self::Word: 'this;
+    /// True if the words of the sample are finite, false if they are infinite.
     const FINITE: bool;
+    /// Returns an iterator over the positive words.
     fn positive(&self) -> Self::PositiveIter<'_>;
+    /// Returns an iterator over the negative words.
     fn negative(&self) -> Self::NegativeIter<'_>;
+    /// Returns an iterator over all words, alternating between positive and negative ones.
     fn words(&self) -> itertools::Interleave<Self::PositiveIter<'_>, Self::NegativeIter<'_>> {
         self.positive().interleave(self.negative())
     }
+    /// Returns an iterator over all words together with their classification.
     fn classified_words<'a>(&'a self) -> impl Iterator<Item = (&'a Self::Word, bool)>
     where
         Self::Word: 'a,
@@ -44,10 +54,12 @@ pub trait Sample<A: Alphabet> {
 
 /// Represents a finite sample, which is a pair of positive and negative instances.
 #[derive(Clone, Eq, PartialEq)]
-#[allow(missing_docs)]
 pub struct SetSample<A: Alphabet, W: Word<Symbol = A::Symbol> + Hash> {
+    /// The alphabet of the words.
     pub alphabet: A,
+    /// The words that are classified as positive.
     pub positive: math::FxIndexSet<W>,
+    /// The words that are classified as negative.
     pub negative: math::FxIndexSet<W>,
 }
 
@@ -61,14 +73,17 @@ pub type OmegaSample<A = CharAlphabet> = SetSample<A, ReducedOmegaWord<<A as Alp
 impl<A: Alphabet, W: Word<Symbol = A::Symbol>> SetSample<A, W> {}
 
 impl<A: Alphabet, W: Word<Symbol = A::Symbol>> SetSample<A, W> {
+    /// Returns the number of words in the sample.
     pub fn count_words(&self) -> usize {
         self.positive.len() + self.negative.len()
     }
 
+    /// Returns the number of positive words in the sample.
     pub fn count_positive_words(&self) -> usize {
         self.positive.len()
     }
 
+    /// Returns the number of negative words in the sample.
     pub fn count_negative_words(&self) -> usize {
         self.negative.len()
     }
@@ -84,6 +99,14 @@ impl<A: Alphabet, W: Word<Symbol = A::Symbol>> SetSample<A, W> {
     }
 
     /// Create a new empty sample for the given alphabet
+    ///
+    /// ```
+    /// use automata::alphabet::CharAlphabet;
+    /// use automata::learning::passive::OmegaSample;
+    ///
+    /// let sample = OmegaSample::new_for_alphabet(CharAlphabet::of_size(2));
+    /// assert_eq!(sample.count_words(), 0);
+    /// ```
     pub fn new_for_alphabet(alphabet: A) -> Self {
         Self {
             alphabet,
@@ -92,6 +115,7 @@ impl<A: Alphabet, W: Word<Symbol = A::Symbol>> SetSample<A, W> {
         }
     }
 
+    /// Joins two samples (over the same alphabet) into one.
     pub fn into_joined(self, other: SetSample<A, W>) -> SetSample<A, W> {
         let SetSample {
             alphabet,
@@ -107,11 +131,13 @@ impl<A: Alphabet, W: Word<Symbol = A::Symbol>> SetSample<A, W> {
         }
     }
 
+    /// Adds all words of `other` to `self`.
     pub fn append(&mut self, other: SetSample<A, W>) {
         self.positive.extend(other.positive);
         self.negative.extend(other.negative);
     }
 
+    /// Like [`Self::into_joined`], but clones the words and leaves both samples intact.
     pub fn as_joined(&self, other: &SetSample<A, W>) -> SetSample<A, W>
     where
         W: Clone,
@@ -160,16 +186,11 @@ impl<A: Alphabet, W: Word<Symbol = A::Symbol>> SetSample<A, W> {
     {
         let pos = self.positive.contains(word);
         let neg = self.negative.contains(word);
-        assert!(
-            !pos || !neg,
-            "word cannot be positive and negative at the same time!"
-        );
-        if pos {
-            Some(true)
-        } else if neg {
-            Some(false)
-        } else {
-            None
+        match (pos, neg) {
+            (true, false) => Some(true),
+            (false, true) => Some(false),
+            // unknown, or contradicting
+            _ => None,
         }
     }
 
@@ -178,16 +199,21 @@ impl<A: Alphabet, W: Word<Symbol = A::Symbol>> SetSample<A, W> {
         self.positive.contains(word) || self.negative.contains(word)
     }
 
-    /// Inserts given word with given classification. Returns `true` if the word
+    /// Inserts given word with given classification. Returns `Ok(true)` if the word
     /// was not present before.
-    pub fn insert(&mut self, word: W, classification: bool) -> bool {
-        if classification {
-            assert!(!self.negative.contains(&word));
-            self.positive.insert(word)
+    ///
+    /// # Errors
+    /// Fails if the word is already contained with the opposite classification.
+    pub fn insert(&mut self, word: W, classification: bool) -> Result<bool, LearningError> {
+        let (same, opposite) = if classification {
+            (&mut self.positive, &self.negative)
         } else {
-            assert!(!self.positive.contains(&word));
-            self.negative.insert(word)
+            (&mut self.negative, &self.positive)
+        };
+        if opposite.contains(&word) {
+            return Err(LearningError::ConflictingClassification);
         }
+        Ok(same.insert(word))
     }
 
     /// Remove the word-value pair equivalent to word and return the classification
@@ -225,7 +251,6 @@ mod tests {
     use crate::learning::passive::SetSample;
     use crate::representation::CollectPointed;
     use crate::ts::q;
-    use crate::upw;
     use crate::word::{PeriodicOmegaWord, Word};
     use tracing::info;
 
@@ -275,6 +300,8 @@ mod tests {
     }
 
     #[test]
+    // the sample contradicts itself (`abab` and `ab` are the same omega word, once positive and
+    // once negative), so no prefix congruence can be found; the sample needs to be repaired
     #[ignore]
     fn split_up_sample() {
         let alphabet = CharAlphabet::of_size(2);
@@ -290,13 +317,12 @@ mod tests {
             ],
         );
         let cong = sample.infer_prefix_congruence().unwrap();
-        let split = sample.split(&cong);
+        let split = sample.split(&cong).unwrap();
 
         assert!(split.get(q(0)).unwrap().contains(&upw!("b")));
     }
 
     #[test]
-    #[ignore]
     fn omega_prefix_tree() {
         let w = upw!("aba", "b");
         let _x = w.pop_first();

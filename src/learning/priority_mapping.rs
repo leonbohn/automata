@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use crate::alphabet::{Alphabet, CharAlphabet};
 use crate::automaton::MealyMachine;
 use crate::dag::Dag;
+use crate::learning::LearningError;
 use crate::representation::{CollectPointed, IntoTransitions};
 use crate::ts::operations::DefaultIfMissing;
 use crate::ts::{Sccs, StateId};
@@ -62,6 +63,7 @@ pub struct AnnotatedCongruence<A: Alphabet = CharAlphabet>(
 );
 
 impl<A: Alphabet> AnnotatedCongruence<A> {
+    /// Wraps a right congruence whose states are annotated.
     pub fn new(rc: RightCongruence<DTS<A, Annotation, Void>>) -> Self {
         Self(rc)
     }
@@ -87,7 +89,10 @@ impl<A: Alphabet> AnnotatedCongruence<A> {
     /// Computes the canonic coloring on a given annotated congruence. This makes use
     /// of the dag of strongly connected components of the congruence. For more information
     /// on how the computation is done exactly, see [Section 5, Step 2](https://arxiv.org/pdf/2302.11043.pdf).
-    pub fn canonic_coloring(&self) -> WeakPriorityMapping<A> {
+    ///
+    /// # Errors
+    /// Fails if more priorities than [`Int`] can hold are needed.
+    pub fn canonic_coloring(&self) -> Result<WeakPriorityMapping<A>, LearningError> {
         // we first need to decompose into sccs and mark them with the color of the
         // idempotent that it contains.
         let tjdag = Sccs::on(&self.0).compute();
@@ -97,58 +102,55 @@ impl<A: Alphabet> AnnotatedCongruence<A> {
                 (Err(Some(x)), Some(y)) => Err(Some(x || y)),
                 (Err(Some(x)), None) => Err(Some(x)),
                 (Err(None), Some(x)) => Err(Some(x)),
-                (Ok(_), _) => unreachable!(),
+                // the fold starts with an `Err`, so there is no color yet
+                (Ok(i), _) => Ok(i),
             });
 
         let mut seen = std::collections::BTreeSet::default();
-        'outer: loop {
-            if dag.masked_is_empty(&seen) {
-                break 'outer;
+        while !dag.masked_is_empty(&seen) {
+            let t = dag
+                .masked_terminal_nodes(&seen)
+                .next()
+                .ok_or(LearningError::Incomplete)?;
+            seen.insert(t);
+            // the colors of the successors are known as they were processed before
+            let mut i = 0;
+            for immediate in dag.immediate(t) {
+                match dag.color(immediate) {
+                    Some(Ok(color)) => i = i.max(*color),
+                    _ => return Err(LearningError::Incomplete),
+                }
             }
-            let t = dag.masked_terminal_nodes(&seen).next().unwrap();
-            assert!(seen.insert(t), "This must not have been seen before!");
-            let i = dag
-                .immediate(t)
-                .map(|i| {
-                    dag.color(i)
-                        .expect("This node must exist")
-                        .expect("The color of this node must already be known")
-                })
-                .max()
-                .unwrap_or(0);
             let parity = i % 2 == 0;
 
-            let offset = match dag.color(t).expect("We know this node exists") {
+            let color = dag.color_mut(t).ok_or(LearningError::Incomplete)?;
+            let offset = match color {
                 Err(Some(true)) => !parity as usize,
                 Err(Some(false)) => parity as usize,
-                Err(None) => 0,
-                Ok(_) => unreachable!(),
+                _ => 0,
             };
-            *dag.color_mut(t).expect("This node exists") = Ok(i + offset);
+            *color = Ok(i + offset);
         }
 
-        let state_coloring: crate::math::FxIndexMap<StateId, Int> = self
-            .0
-            .states()
-            .map(|i| {
-                let scc = tjdag.scc_index_of(i).expect("Must be in an SCC");
-                let info = dag.color(*scc).expect("Must have worked on that SCC");
-                (
-                    i,
-                    info.expect("Every SCC must have a color")
-                        .try_into()
-                        .unwrap(),
-                )
-            })
-            .collect();
+        let mut state_coloring = crate::math::FxIndexMap::<StateId, Int>::default();
+        for q in self.0.states() {
+            let scc = tjdag.scc_index_of(q).ok_or(LearningError::Incomplete)?;
+            let Some(Ok(color)) = dag.color(*scc) else {
+                return Err(LearningError::Incomplete);
+            };
+            let color = Int::try_from(*color).map_err(|_| LearningError::Priorities {
+                used: *color,
+                max: Int::MAX as usize,
+            })?;
+            state_coloring.insert(q, color);
+        }
 
         // the mapping of a word is the color of the SCC that its last state belongs to
-        (&self.0)
+        Ok((&self.0)
             .erase_state_colors()
-            .map_edge_colors_full(|_p, _e, _c, q| {
-                *state_coloring.get(&q).expect("every state has a color")
-            })
-            .collect_mealy()
+            // every state has a color, as the loop above covers all of them
+            .map_edge_colors_full(|_p, _e, _c, q| state_coloring.get(&q).copied().unwrap_or(0))
+            .collect_mealy())
     }
 
     /// Takes a reference to a right congruence and a function that classifies idempotents
@@ -162,12 +164,12 @@ impl<A: Alphabet> AnnotatedCongruence<A> {
         let annotations: crate::math::FxIndexMap<_, _> = rc
             .states()
             .map(|i| {
-                let cls = rc.state_to_mr(i).unwrap();
-                let out = if !cls.is_empty() && rc.is_idempotent(i) == Some(true) {
-                    let b = f.classify(cls);
-                    Annotation::new(true, b)
-                } else {
-                    Annotation::new(false, None)
+                // states that cannot be reached have no representative and are not idempotent
+                let out = match rc.state_to_mr(i) {
+                    Some(cls) if !cls.is_empty() && rc.is_idempotent(i) == Some(true) => {
+                        Annotation::new(true, f.classify(cls))
+                    }
+                    _ => Annotation::new(false, None),
                 };
                 (i, out)
             })

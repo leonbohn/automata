@@ -11,7 +11,9 @@ use crate::{Color, DTS, Int, Lattice, Pointed, States, TransitionSystem, Void};
 // use crate::math::FxIndexSet;
 
 use super::Hypothesis;
+use crate::learning::LearningError;
 
+/// A counterexample to a hypothesis: a word together with the output that the oracle expects for it.
 pub type Counterexample<A, O> = (Vec<<A as Alphabet>::Symbol>, O);
 
 /// A trait that encapsulates a minimally adequate teacher (MAT) for active learning. This is mainly used by
@@ -23,15 +25,21 @@ pub type Counterexample<A, O> = (Vec<<A as Alphabet>::Symbol>, O);
 /// the `Output` type, but it also enables us to learn a regular language/deterministic finite automaton by using
 /// `bool` as the `Output` type.
 pub trait Oracle {
+    /// The alphabet of the language or mapping that is learned.
     type Alphabet: Alphabet;
+    /// The type of outputs that the oracle produces for a word.
     type Output: Color + Eq + std::hash::Hash;
+    /// Returns the alphabet of the oracle.
     fn alphabet(&self) -> &Self::Alphabet;
 
+    /// Answers a membership query, i.e. returns the output for the given `word`.
     fn output<W: FiniteWord<Symbol = <Self::Alphabet as Alphabet>::Symbol>>(
         &self,
         word: W,
     ) -> Self::Output;
 
+    /// Answers an equivalence query: returns `Ok` if the `hypothesis` agrees with the oracle, otherwise
+    /// a [`Counterexample`].
     fn equivalence<H>(
         &self,
         hypothesis: &H,
@@ -40,6 +48,9 @@ pub trait Oracle {
         H: Hypothesis<Alphabet = Self::Alphabet, Output = Self::Output>;
 }
 
+/// Creates a hypothesis from the alphabet of the oracle.
+///
+/// This is only a stub so far, use [`LStar`](super::LStar) to learn a hypothesis.
 pub fn lstar<H, O>(oracle: O) -> H
 where
     O: Oracle,
@@ -55,8 +66,6 @@ where
 #[derive(Debug, Clone)]
 pub struct SampleOracle<A: Alphabet, W: Word<Symbol = A::Symbol>> {
     sample: SetSample<A, W>,
-    // placeholder: `output` is not implemented yet
-    #[allow(dead_code)]
     default: bool,
 }
 
@@ -67,19 +76,34 @@ impl<A: Alphabet, X: FiniteWord<Symbol = A::Symbol>> Oracle for SampleOracle<A, 
 
     fn output<W: FiniteWord<Symbol = <Self::Alphabet as Alphabet>::Symbol>>(
         &self,
-        _word: W,
+        word: W,
     ) -> Self::Output {
-        todo!()
+        // the words of the sample may have another type than `word`, so compare their symbols
+        let is_in = |mut words: Box<dyn Iterator<Item = &X> + '_>| {
+            words.any(|w| w.symbols().eq(word.symbols()))
+        };
+        if is_in(Box::new(self.sample.positive_words())) {
+            true
+        } else if is_in(Box::new(self.sample.negative_words())) {
+            false
+        } else {
+            self.default
+        }
     }
 
     fn equivalence<H>(
         &self,
-        _hypothesis: &H,
+        hypothesis: &H,
     ) -> Result<(), Counterexample<Self::Alphabet, Self::Output>>
     where
         H: Hypothesis<Alphabet = Self::Alphabet, Output = Self::Output>,
     {
-        todo!()
+        for (word, expected) in self.sample.entries() {
+            if hypothesis.output(word) != expected {
+                return Err((word.symbols().collect(), expected));
+            }
+        }
+        Ok(())
     }
 
     fn alphabet(&self) -> &Self::Alphabet {
@@ -159,16 +183,26 @@ impl<A: Alphabet> Oracle for DFAOracle<A> {
     }
 }
 
+/// An oracle based on a [`MealyMachine`]. It answers membership queries with the last output
+/// of the machine and equivalence queries by comparing it to the hypothesis.
 #[derive(Clone)]
 pub struct MealyOracle<A: Alphabet, C: Color + Lattice = Int> {
     mm: MealyMachine<DTS<A, Void, C>>,
 }
 
 impl<A: Alphabet, C: Color + Lattice> MealyOracle<A, C> {
-    pub fn new(mm: impl MealyLike<Alphabet = A, EdgeColor = C> + States) -> Self {
-        Self {
-            mm: mm.erase_state_colors().collect_mealy(),
+    /// Creates a new [`MealyOracle`] from something that behaves like a Mealy machine.
+    ///
+    /// # Errors
+    /// Fails if the machine is not complete, as the oracle needs an output for every word.
+    pub fn new(
+        mm: impl MealyLike<Alphabet = A, EdgeColor = C> + States,
+    ) -> Result<Self, LearningError> {
+        let mm: MealyMachine<DTS<A, Void, C>> = mm.erase_state_colors().collect_mealy();
+        if !mm.is_complete() {
+            return Err(LearningError::IncompleteOracle);
         }
+        Ok(Self { mm })
     }
 }
 
@@ -185,13 +219,11 @@ impl<A: Alphabet, C: Color + Lattice + Eq + std::hash::Hash> Oracle for MealyOra
         &self,
         word: W,
     ) -> Self::Output {
-        let Some(out) = self.mm.transform(&word) else {
-            panic!(
-                "unable to compute output for {:?}, as underlying Mealy machine is not complete",
-                word.as_string()
-            );
-        };
-        out
+        // the machine is complete, so only the empty word has no output
+        self.mm.transform(&word).unwrap_or_else(|| {
+            tracing::warn!("the Mealy oracle was asked for the output of the empty word");
+            C::bottom()
+        })
     }
 
     fn equivalence<H>(
@@ -235,6 +267,7 @@ impl<A: Alphabet, C: Color> CompletingMealyOracle<A, C> {
             //             missed: RefCell::new(FxIndexSet::default()),
         }
     }
+    /// Returns the alphabet of the underlying machine.
     pub fn alphabet(&self) -> &A {
         self.automaton.alphabet()
     }
@@ -337,10 +370,16 @@ where
     }
 }
 
-impl<D: Deterministic> MooreOracle<MooreMachine<D>> {
+impl<D: Deterministic + States> MooreOracle<MooreMachine<D>> {
     /// Creates a new [`MooreOracle`] based on a `MooreMachine`.
-    pub fn new(automaton: MooreMachine<D>) -> Self {
-        Self { automaton }
+    ///
+    /// # Errors
+    /// Fails if the machine is not complete, as the oracle needs an output for every word.
+    pub fn new(automaton: MooreMachine<D>) -> Result<Self, LearningError> {
+        if !automaton.is_complete() {
+            return Err(LearningError::IncompleteOracle);
+        }
+        Ok(Self { automaton })
     }
 }
 
@@ -371,7 +410,7 @@ mod tests {
         let oracle = CompletingMealyOracle::new(target, 0);
         let alphabet = oracle.alphabet().clone();
         let mut learner = LStar::new(alphabet, oracle);
-        let mm: MealyMachine = learner.infer();
+        let mm: MealyMachine = learner.infer().unwrap();
         assert_eq!(mm.state_count(), 2);
     }
 }

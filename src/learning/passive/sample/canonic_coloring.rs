@@ -21,13 +21,13 @@ mod tests {
     fn classification() {
         let (_alphabet, sample) = testing_larger_forc_sample();
         let cong = sample.infer_prefix_congruence().unwrap();
-        let split = sample.split(&cong);
-        let forc = split.infer_forc();
+        let split = sample.split(&cong).unwrap();
+        let forc = split.infer_forc().unwrap();
         let periodic = split.get(q(0)).unwrap().to_periodic_sample();
 
         let annotated = AnnotatedCongruence::build(&forc[q(0)], &periodic);
 
-        let coloring = annotated.canonic_coloring();
+        let coloring = annotated.canonic_coloring().unwrap();
 
         // words we expect prio 1 from
         for w in ["b", "bbabbbb", "aaaaaaabb", "babb", "baabbaabbaabbaa"] {

@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use crate::alphabet::Alphabet;
 use crate::automaton::{DFA, DPA};
 use crate::families::FWPM;
-use crate::learning::WeakPriorityMapping;
+use crate::learning::{LearningError, WeakPriorityMapping};
 use crate::math::{FxIndexMap, FxIndexSet};
 use crate::representation::CollectPointed;
 use crate::ts::{
@@ -18,51 +18,72 @@ use tracing::debug;
 
 type Dfa<A> = DFA<DTS<A, bool, Void>>;
 
-pub fn build_precise_dpa_for<A: Alphabet>(fwpm: FWPM<A>) -> DPA<DTS<A, Void, Int>> {
-    match fwpm.complexity() {
-        0 => panic!("Precise DPA construction only makes sense if at least one color exists"),
-        1 => PreciseDPA::<A, 1>::from(fwpm)
+/// The maximal number of priorities that [`build_precise_dpa_for`] supports.
+const MAX_PRIORITIES: usize = 8;
+
+/// Builds the minimized precise DPA for the given [`FWPM`]. The size of the arrays in the states of
+/// the intermediate [`PreciseDPA`] is chosen according to the complexity of the family.
+///
+/// # Errors
+/// Fails if the family uses no priority or more than 8 priorities.
+pub fn build_precise_dpa_for<A: Alphabet>(
+    fwpm: FWPM<A>,
+) -> Result<DPA<DTS<A, Void, Int>>, LearningError> {
+    let dpa = match fwpm.complexity() {
+        0 => {
+            return Err(LearningError::Priorities {
+                used: 0,
+                max: MAX_PRIORITIES,
+            });
+        }
+        1 => PreciseDPA::<A, 1>::try_from(fwpm)?
             .reachable_part()
             .collect_mealy()
             .minimize()
             .collect_dpa(),
-        2 => PreciseDPA::<A, 2>::from(fwpm)
+        2 => PreciseDPA::<A, 2>::try_from(fwpm)?
             .reachable_part()
             .collect_mealy()
             .minimize()
             .collect_dpa(),
-        3 => PreciseDPA::<A, 3>::from(fwpm)
+        3 => PreciseDPA::<A, 3>::try_from(fwpm)?
             .reachable_part()
             .collect_mealy()
             .minimize()
             .collect_dpa(),
-        4 => PreciseDPA::<A, 4>::from(fwpm)
+        4 => PreciseDPA::<A, 4>::try_from(fwpm)?
             .reachable_part()
             .collect_mealy()
             .minimize()
             .collect_dpa(),
-        5 => PreciseDPA::<A, 5>::from(fwpm)
+        5 => PreciseDPA::<A, 5>::try_from(fwpm)?
             .reachable_part()
             .collect_mealy()
             .minimize()
             .collect_dpa(),
-        6 => PreciseDPA::<A, 6>::from(fwpm)
+        6 => PreciseDPA::<A, 6>::try_from(fwpm)?
             .reachable_part()
             .collect_mealy()
             .minimize()
             .collect_dpa(),
-        7 => PreciseDPA::<A, 7>::from(fwpm)
+        7 => PreciseDPA::<A, 7>::try_from(fwpm)?
             .reachable_part()
             .collect_mealy()
             .minimize()
             .collect_dpa(),
-        8 => PreciseDPA::<A, 8>::from(fwpm)
+        8 => PreciseDPA::<A, 8>::try_from(fwpm)?
             .reachable_part()
             .collect_mealy()
             .minimize()
             .collect_dpa(),
-        _ => panic!("Too many priorities to construct precise DPA"),
-    }
+        used => {
+            return Err(LearningError::Priorities {
+                used,
+                max: MAX_PRIORITIES,
+            });
+        }
+    };
+    Ok(dpa)
 }
 
 type ClassId = StateId;
@@ -149,6 +170,8 @@ impl<const N: usize> PState<N> {
 
 /// The precise DPA is a construction for going from a specifically colored FORC to a deterministic
 /// parity automaton. It is described <https://arxiv.org/pdf/2302.11043.pdf>[here, below Lemma 15].
+/// A precise DPA is built from a [`FWPM`] with `PreciseDPA::from`. It is an implicit system, so
+/// call `reachable_part` before collecting it, as [`infer_precise_dpa`](super::infer_precise_dpa) shows.
 #[derive(Clone)]
 pub struct PreciseDPA<A: Alphabet, const N: usize = 8> {
     states: Vec<PState<N>>,
@@ -187,7 +210,7 @@ impl<A: Alphabet, const N: usize> TransitionSystem for PreciseDPA<A, N> {
 
 impl<A: Alphabet, const N: usize> Deterministic for PreciseDPA<A, N> {
     fn edge(&self, state: PState<N>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
-        let (i, p) = self.take_precise_transition(&state, symbol);
+        let (i, p) = self.take_precise_transition(&state, symbol)?;
         Some(EdgeRef::owned(state, self.expressions.get(&symbol)?, i, p))
     }
 }
@@ -199,22 +222,30 @@ impl<A: Alphabet, const N: usize> Pointed for PreciseDPA<A, N> {
 }
 
 impl<A: Alphabet, const N: usize> PreciseDPA<A, N> {
-    /// Creates a new precise DPA from the given leading congruence and sequence of sequences of DFAs.
-    pub fn new(cong: RightCongruence<DTS<A>>, dfas: Vec<[Dfa<A>; N]>) -> Self {
+    /// Creates a new precise DPA from the given leading congruence and, for each of its classes, the
+    /// `N` DFAs of the priority levels.
+    ///
+    /// # Errors
+    /// Fails if there is not exactly one array of DFAs for each class of the congruence.
+    pub fn new(
+        cong: RightCongruence<DTS<A>>,
+        dfas: Vec<[Dfa<A>; N]>,
+    ) -> Result<Self, LearningError> {
+        if dfas.len() != cong.state_count() {
+            return Err(LearningError::Incomplete);
+        }
         let e = cong.initial();
-        let initial = PState::from_iters(
-            e,
-            [e; N],
-            (0..dfas.len()).map(|i| dfas[i][e.into_usize()].initial()),
-        );
-        Self {
+        let levels = dfas.get(e.into_usize()).ok_or(LearningError::Incomplete)?;
+        let initial = PState::from_iters(e, [e; N], levels.iter().map(|dfa| dfa.initial()));
+        Ok(Self {
             states: vec![initial],
             expressions: cong.alphabet().expression_map(),
             cong,
             dfas,
-        }
+        })
     }
 
+    /// Returns the DFAs of the given priority level, one for each class of the leading congruence.
     pub fn dfas_level(&self, level: usize) -> impl Iterator<Item = (usize, &'_ Dfa<A>)> + '_ {
         self.dfas.iter().map(move |dfa| &dfa[level]).enumerate()
     }
@@ -232,30 +263,24 @@ impl<A: Alphabet, const N: usize> PreciseDPA<A, N> {
     }
 
     /// Given a [`PState`] and a symbol, returns the index of the least accepting DFA (which is
-    /// the priority of the corresponding edge) and the successor [`PState`].
-    pub fn take_precise_transition(&self, q: &PState<N>, a: A::Symbol) -> (Int, PState<N>) {
-        let d = self
-            .cong()
-            .successor(q.class(), a)
-            .expect("Leading congruence must be complete");
+    /// the priority of the corresponding edge) and the successor [`PState`]. Returns `None` if the
+    /// leading congruence or one of the DFAs is not complete or if no DFA is accepting (the last
+    /// one always is for a family of weak priority mappings).
+    pub fn take_precise_transition(&self, q: &PState<N>, a: A::Symbol) -> Option<(Int, PState<N>)> {
+        let d = self.cong().successor(q.class(), a)?;
 
         let progress = self
             .dfas(q)
             .zip(q.progress_classes())
             .zip(q.progress_states())
             .map(|((dfa, c), q)| {
-                let p = dfa.successor(q, a).expect("all dfas must be complete");
-                let b = *dfa
-                    .state_color(p)
-                    .expect("this state must exist as it is successor");
-                (c, p, b)
+                let p = dfa.successor(q, a)?;
+                let b = *dfa.state_color(p)?;
+                Some((c, p, b))
             })
-            .collect_vec();
+            .collect::<Option<Vec<_>>>()?;
 
-        let least_accepting = progress
-            .iter()
-            .position(|(_, _, b)| *b)
-            .expect("The last DFA must be accepting!");
+        let least_accepting = progress.iter().position(|(_, _, b)| *b)?;
 
         let reached_pstate = PState::from_iters(
             d,
@@ -272,18 +297,16 @@ impl<A: Alphabet, const N: usize> PreciseDPA<A, N> {
             }),
         );
 
-        (
-            least_accepting
-                .try_into()
-                .expect("Should be able to cast to u8"),
-            reached_pstate,
-        )
+        Some((Int::try_from(least_accepting).ok()?, reached_pstate))
     }
 }
 
 impl<A: Alphabet, const N: usize> Debug for PreciseDPA<A, N> {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PreciseDPA")
+            .field("classes", &self.cong.state_count())
+            .field("priorities", &N)
+            .finish()
     }
 }
 
@@ -312,13 +335,13 @@ fn priority_dfas<A: Alphabet>(pm: &WeakPriorityMapping<A>) -> Vec<Dfa<A>> {
             let mut ids = FxIndexMap::default();
             let initial = ts.add_state(true);
             ids.insert((pm.initial(), None), initial);
-            let mut queue = VecDeque::from([(pm.initial(), None, initial)]);
-            while let Some((q, prio, source)) = queue.pop_front() {
+            let mut queue = VecDeque::from([(pm.initial(), initial)]);
+            while let Some((q, source)) = queue.pop_front() {
                 for edge in pm.edges_from(q).into_iter().flatten() {
                     let key = (edge.target(), Some(*edge.color()));
                     let target = *ids.entry(key).or_insert_with(|| {
                         let id = ts.add_state(*edge.color() <= threshold);
-                        queue.push_back((key.0, key.1, id));
+                        queue.push_back((key.0, id));
                         id
                     });
                     ts.add_edge((source, edge.expression().clone(), Void, target));
@@ -329,8 +352,10 @@ fn priority_dfas<A: Alphabet>(pm: &WeakPriorityMapping<A>) -> Vec<Dfa<A>> {
         .collect()
 }
 
-impl<A: Alphabet, const N: usize> From<FWPM<A>> for PreciseDPA<A, N> {
-    fn from(value: FWPM<A>) -> Self {
+impl<A: Alphabet, const N: usize> TryFrom<FWPM<A>> for PreciseDPA<A, N> {
+    type Error = LearningError;
+
+    fn try_from(value: FWPM<A>) -> Result<Self, LearningError> {
         let start = std::time::Instant::now();
 
         let leading = value.leading().clone();
@@ -340,14 +365,19 @@ impl<A: Alphabet, const N: usize> From<FWPM<A>> for PreciseDPA<A, N> {
         pms.sort_by_key(|(idx, _)| *idx);
         for (idx, mm) in pms {
             let mut dfas = priority_dfas(mm);
-            assert!(dfas.len() <= N);
-            while dfas.len() < N {
-                dfas.push(padding_dfa.clone());
+            if dfas.len() > N {
+                return Err(LearningError::Priorities {
+                    used: dfas.len(),
+                    max: N,
+                });
             }
-            let array_dfas = dfas
-                .try_into()
-                .unwrap_or_else(|_v| panic!("LENGTH DOES NOT MATCH {N}"));
-            prc_dfas.insert(idx.into_usize(), array_dfas);
+            dfas.resize(N, padding_dfa.clone());
+            let array_dfas = dfas.try_into().map_err(|_| LearningError::Incomplete)?;
+            // the classes must be numbered consecutively, otherwise a class has no mapping
+            if idx.into_usize() != prc_dfas.len() {
+                return Err(LearningError::Incomplete);
+            }
+            prc_dfas.push(array_dfas);
         }
 
         debug!(
@@ -436,7 +466,7 @@ mod tests {
         let dfas_e = [de0, de1, full.clone()];
         let dfas_a = [da0, full.clone(), full];
 
-        let dpa = PreciseDPA::new(cong, vec![dfas_e, dfas_a]);
+        let dpa = PreciseDPA::new(cong, vec![dfas_e, dfas_a]).unwrap();
         assert_eq!(dpa.reachable_state_indices().count(), 8);
     }
 }

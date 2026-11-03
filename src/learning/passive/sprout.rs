@@ -14,13 +14,28 @@ use crate::word::OmegaWord;
 use std::fmt::Debug;
 
 use super::OmegaSample;
+use crate::learning::LearningError;
 
+/// The ways in which [`sprout`] can fail.
 #[derive(thiserror::Error)]
 pub enum SproutError<A: ConsistencyCheck<WithInitial<DTS>>> {
+    /// The time limit was exceeded.
     #[error("timeout was exceeded, bailing with ts of size {}", aut.state_count())]
-    Timeout { aut: WithInitial<DTS> },
+    Timeout {
+        /// The transition system that was constructed so far.
+        aut: WithInitial<DTS>,
+    },
+    /// The threshold on the length of escape prefixes was exceeded.
     #[error("escape prefix threshold `{thres}` exceeded, bailing with ts of size {}", aut.state_count())]
-    Threshold { thres: usize, aut: A::Aut },
+    Threshold {
+        /// The threshold that was exceeded.
+        thres: usize,
+        /// The default automaton, which accepts precisely the positive words.
+        aut: A::Aut,
+    },
+    /// An internal step failed, which indicates an inconsistent sample.
+    #[error(transparent)]
+    Learning(#[from] LearningError),
 }
 
 impl<A: ConsistencyCheck<WithInitial<DTS>>> Debug for SproutError<A> {
@@ -35,16 +50,39 @@ impl<A: ConsistencyCheck<WithInitial<DTS>>> Debug for SproutError<A> {
                     "exceeded threshold {thres} with automaton of size {}",
                     aut.state_count()
                 ),
+                Learning(error) => error.to_string(),
             }
         )
     }
 }
 
+/// The result of [`sprout`]: the learned automaton or the reason why learning failed.
 #[allow(type_alias_bounds)]
 pub type SproutResult<A: ConsistencyCheck<WithInitial<DTS>>> = Result<A::Aut, SproutError<A>>;
 
 /// gives a deterministic acc_type omega automaton that is consistent with the given sample
 /// implements the sprout passive learning algorithm for omega automata from <https://arxiv.org/pdf/2108.03735.pdf>
+/// # Example
+/// ```
+/// use automata::alphabet::CharAlphabet;
+/// use automata::automaton::BuchiCondition;
+/// use automata::learning::passive::{OmegaSample, sprout::sprout};
+/// use automata::upw;
+///
+/// // all words containing infinitely many `a` are positive
+/// let sample = OmegaSample::new_omega_from_pos_neg(
+///     CharAlphabet::of_size(2),
+///     [upw!("a"), upw!("a", "b")],
+///     [upw!("b")],
+/// );
+/// let dba = sprout(sample.clone(), BuchiCondition).unwrap();
+/// for word in sample.positive_words() {
+///     assert!(dba.accepts(word));
+/// }
+/// for word in sample.negative_words() {
+///     assert!(!dba.accepts(word));
+/// }
+/// ```
 pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
     sample: OmegaSample,
     acc_type: A,
@@ -103,7 +141,9 @@ pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
             });
         }
 
-        let source = ts.reached_state(&escape_prefix).unwrap();
+        let source = ts
+            .reached_state(&escape_prefix)
+            .ok_or(LearningError::Incomplete)?;
         let sym = escape_prefix.escape_symbol();
 
         for q in ts.states().collect_vec() {
@@ -131,7 +171,7 @@ pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
         "completed sprout algorithm after {} microseconds",
         time_start.elapsed().as_micros()
     );
-    Ok(acc_type.consistent_automaton(&ts, &mut_sample, pos_sets, neg_sets))
+    Ok(acc_type.consistent_automaton(&ts, &mut_sample, pos_sets, neg_sets)?)
 }
 
 impl OmegaSample {
@@ -151,11 +191,11 @@ impl OmegaSample {
 mod tests {
     use super::*;
     use crate::DTS;
+    use crate::Void;
     use crate::alphabet::CharAlphabet;
     use crate::automaton::{BuchiCondition, MinEvenParityCondition};
     use crate::learning::passive::OmegaSample;
     use crate::ts::Sproutable;
-    use crate::{Void, upw};
 
     #[test]
     fn sprout_buchi_successful() {

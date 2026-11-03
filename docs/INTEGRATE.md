@@ -45,6 +45,20 @@ Legend: `[x]` done, `[-]` skipped on purpose, `[ ]` open. Progress is tracked in
   gated with `#[cfg(feature = "random")]`.
 - Phase 5: unified on `families::FWPM` (additive changes to `families`, so 0.2.x is possible).
   `AnnotatedCongruence`/`Annotation` stay in `learning`, nothing in `congruence` overlaps.
+- Phase 6 is done: no `allow(missing_docs)`/`allow(unused)` left, all public items are documented
+  and the main algorithms have doctests, the panic audit is in `PANIC-AUDIT.md` (input-reachable
+  panics are now `LearningError`s, see the CHANGELOG), the example `examples/learning.rs` and the
+  benchmark `benches/learning.rs` exist (names: `sprout_parity` with `inf_ab_100`/`inf_ab_400`,
+  `lstar_mealy` with `counting_8`/`counting_16`). Proptests: L\* learns a DFA equivalent to a random
+  target, `dfa_rpni` is consistent with samples of random DFAs.
+- Phase 6, skipped on purpose: the performance and the naming/ergonomics pass beyond replacing the
+  default hashers by `FxIndexMap`. Candidates: the positional arguments of `dpainf` and `sprout` could
+  become `Dpainf::on(..).run()`-style builders, `sprout` clones the infinity sets per candidate edge.
+- Findings: `try_from_read` dropped all content lines (inverted filter, fixed); `PreciseDPA::new`
+  indexed levels and classes the wrong way round (fixed); `dfa_rpni` gives up with `Threshold`
+  already for some samples of random DFAs with up to 6 states (threshold `2 * max_word_len`), the
+  proptest therefore only checks successful results; the test `split_up_sample` is ignored because
+  its sample contradicts itself.
 - Open: freezing the old repo (Phase 0), the MSRV check with 1.88 (no `rustup` on this machine),
   and the dead file `passive/sample/characterize.rs`, which is not a declared module and still
   mentions the old `fwpm::FWPM` (revive it or delete it in Phase 6).
@@ -177,40 +191,40 @@ Commit hygiene: one commit per module group, message `learning: port <module> to
 
 ## Phase 6 — Quality gates (the part that makes it mergeable)
 
-- [ ] Remove `#![allow(missing_docs)]` and `#![allow(unused)]`. If the documentation backlog is
+- [x] Remove `#![allow(missing_docs)]` and `#![allow(unused)]`. If the documentation backlog is
       large, a narrow `#[allow(missing_docs)]` on specific submodules is acceptable only if each
       has a tracked issue; the target is zero.
-- [ ] Every public item has docs; every public algorithm has a doctest (write the doctest first,
+- [x] Every public item has docs; every public algorithm has a doctest (write the doctest first,
       per `CLAUDE.md`): `sprout`, `dpainf`, `lstar`, `PreciseDPA`, `Sample` constructors.
       Doctests must compile under `--features learning` (they are not run without it).
-- [ ] Panic audit of the imported code: `grep -rn 'unwrap()\|expect(\|panic!\|unreachable!\|\[.*\]'`
+- [x] Panic audit of the imported code: `grep -rn 'unwrap()\|expect(\|panic!\|unreachable!\|\[.*\]'`
       in `src/learning/`. Convert input-reachable ones to `Result` with typed errors (add a
       `LearningError` or extend `src/error.rs`; convert it into the crate `Error`; never
       `String` errors). Document the remaining ones in `# Panics` sections and add them to
       `PANIC-AUDIT.md`.
-- [ ] Replace any `println!`/`eprintln!`/`dbg!` with `tracing` calls.
+- [x] Replace any `println!`/`eprintln!`/`dbg!` with `tracing` calls.
 - [x] `crossbeam-channel` usage: check why threads are used; make sure no detached threads leak
       and that the single-threaded path still works. If concurrency is not essential, removing it
       drops a dependency.
-- [ ] Tests:
+- [x] Tests:
       - keep the ~28 inline tests; port the reference outputs from Phase 1 as regression tests;
       - add proptest properties where cheap (e.g. learned automaton is consistent with the sample;
         `lstar` against a random DFA from `random` returns an equivalent DFA, using
         `Equivalence::of(&a).and(&b).holds()`);
       - `#[ignore]` only with a comment saying why.
-- [ ] Examples: add `examples/learning.rs` (sprout from a sample, L\* against a target DFA) with
+- [x] Examples: add `examples/learning.rs` (sprout from a sample, L\* against a target DFA) with
       `required-features = ["learning"]` in `Cargo.toml`. CI runs examples, so make sure the
       `scripts/check` loop and CI job pass the feature (see Phase 7).
-- [ ] Benchmarks (gungraun, deterministic): add `benches/learning.rs` with `sprout` and `lstar`
+- [x] Benchmarks (gungraun, deterministic): add `benches/learning.rs` with `sprout` and `lstar`
       on fixed inputs from `benches/common`; choose the benchmark names deliberately, they are
       tracked over time. Declare with `required-features`.
-- [ ] Performance pass: the crate is optimized for performance. Look for `clone()` of
+- [-] Performance pass: the crate is optimized for performance. Look for `clone()` of
       automata inside loops, `Vec<Vec<_>>` tables that should be dense ids, `HashMap` with default
       hasher, repeated `reachable_part()` calls on lazy adapters.
-- [ ] Naming/ergonomics pass: align with crate conventions (`Foo::on(&x).run()` builders,
+- [-] Naming/ergonomics pass: align with crate conventions (`Foo::on(&x).run()` builders,
       `try_` twins, aliases instead of spelled-out generics, `Sproutable`/`Deterministic` bounds
       instead of concrete `DTS`).
-- [ ] Visibility: nothing from `ts::impls` leaks into learning's public signatures.
+- [x] Visibility: nothing from `ts::impls` leaks into learning's public signatures.
 
 ## Phase 7 — CI and tooling
 

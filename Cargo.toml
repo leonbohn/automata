@@ -57,6 +57,10 @@ all-features = true
 name = "hoa"
 required-features = ["hoa"]
 
+[[example]]
+name = "learning"
+required-features = ["learning"]
+
 
 [[bench]]
 name = "scc"
@@ -87,6 +91,11 @@ required-features = ["hoa"]
 name = "dfa"
 harness = false
 required-features = ["hoa"]
+
+[[bench]]
+name = "learning"
+harness = false
+required-features = ["hoa", "learning"]
 
 [[bench]]
 name = "wallclock"

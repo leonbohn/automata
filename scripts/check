@@ -25,8 +25,12 @@ fi
 cargo test
 cargo test --no-default-features
 for example in examples/*.rs; do
-    cargo run -q --example "$(basename "$example" .rs)" > /dev/null
+    name="$(basename "$example" .rs)"
+    # the example of the opt-in feature `learning` is run below
+    [ "$name" = learning ] && continue
+    cargo run -q --example "$name" > /dev/null
 done
+cargo run -q --example learning --features learning > /dev/null
 echo "examples ran"
 cargo test --all-features
 (cd tools/bench && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test)

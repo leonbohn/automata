@@ -1,5 +1,6 @@
+use crate::math::FxIndexMap;
 use itertools::{Either, Itertools};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::ops::Not;
 
 use crate::Void;
@@ -12,6 +13,8 @@ use crate::ts::{Deterministic, Sproutable, StateId};
 use crate::{DTS, Pointed, States, TransitionSystem};
 
 use super::OmegaSample;
+use crate::Int;
+use crate::learning::LearningError;
 
 type EdgeSet = BTreeSet<(StateId, char)>;
 
@@ -31,13 +34,17 @@ pub trait ConsistencyCheck<T> {
     /// If the transition system is consistent with the sample,
     /// returns an automaton with underlying transition system ts
     /// that is consistent with the sample
+    ///
+    /// # Errors
+    /// Fails with [`LearningError::Inconsistent`] if the transition system is not consistent
+    /// with the sample.
     fn consistent_automaton(
         &self,
         ts: &T,
         sample: &OmegaSample,
         pos_sets: Vec<EdgeSet>,
         neg_sets: Vec<EdgeSet>,
-    ) -> Self::Aut;
+    ) -> Result<Self::Aut, LearningError>;
     /// Automaton that accepts precisely the positive example words
     /// in case no other solution can be found
     fn default_automaton(&self, sample: &OmegaSample) -> Self::Aut;
@@ -77,14 +84,16 @@ where
         sample: &OmegaSample,
         pos_sets: Vec<EdgeSet>,
         neg_sets: Vec<EdgeSet>,
-    ) -> Self::Aut {
+    ) -> Result<Self::Aut, LearningError> {
         // check consistency
-        assert!(self.consistent(ts, sample, pos_sets, neg_sets.clone()).0);
+        if !self.consistent(ts, sample, pos_sets, neg_sets.clone()).0 {
+            return Err(LearningError::Inconsistent);
+        }
 
         // derive acceptance condition: accepting transitions
         // -> all transitions besides the union of negative infinity sets
         let [_, mut neg_sets_new] =
-            to_infinity_sets(ts, sample).expect("ts cannot be consistent with sample");
+            to_infinity_sets(ts, sample).ok_or(LearningError::Inconsistent)?;
         neg_sets_new.extend(neg_sets);
 
         let neg_union: EdgeSet = neg_sets_new.iter().flatten().cloned().collect();
@@ -104,7 +113,7 @@ where
 
         // complete with sink state
         dba.complete_with_colors(Void, false);
-        dba
+        Ok(dba)
     }
 
     fn default_automaton(&self, sample: &OmegaSample) -> Self::Aut {
@@ -174,15 +183,17 @@ where
         sample: &OmegaSample,
         pos_sets: Vec<EdgeSet>,
         neg_sets: Vec<EdgeSet>,
-    ) -> Self::Aut {
+    ) -> Result<Self::Aut, LearningError> {
         // check consistency
-        assert!(
-            self.consistent(ts, sample, pos_sets.clone(), neg_sets.clone())
-                .0
-        );
+        if !self
+            .consistent(ts, sample, pos_sets.clone(), neg_sets.clone())
+            .0
+        {
+            return Err(LearningError::Inconsistent);
+        }
 
         let [mut pos_sets_new, mut neg_sets_new] =
-            to_infinity_sets(ts, sample).expect("ts cannot be consistent with sample");
+            to_infinity_sets(ts, sample).ok_or(LearningError::Inconsistent)?;
 
         pos_sets_new.extend(pos_sets);
         neg_sets_new.extend(neg_sets);
@@ -199,12 +210,14 @@ where
         ) {
             (true, false) => {
                 // set of all transitions is accepting
-                z_path = zielonka_path(pos_sets_new, neg_sets_new, all_transitions, true).unwrap();
+                z_path = zielonka_path(pos_sets_new, neg_sets_new, all_transitions, true)
+                    .ok_or(LearningError::Inconsistent)?;
                 lowest = true;
             }
             (false, true) => {
                 // set of all transitions is non-accepting
-                z_path = zielonka_path(pos_sets_new, neg_sets_new, all_transitions, false).unwrap();
+                z_path = zielonka_path(pos_sets_new, neg_sets_new, all_transitions, false)
+                    .ok_or(LearningError::Inconsistent)?;
                 lowest = false;
             }
             (false, false) => {
@@ -227,39 +240,41 @@ where
                     }
                     (Some(path1), None) => (z_path, lowest) = (path1, false),
                     (None, Some(path2)) => (z_path, lowest) = (path2, true),
-                    _ => panic!("No valid Zielonka Path exists. Not consistent."),
+                    _ => return Err(LearningError::Inconsistent),
                 }
             }
             (true, true) => {
-                // this shouldn't happen, pos and neg induce same infinity set
-                panic!(
-                    "Set of all transitions is both accepting and non-accepting. Transition system not consistent."
-                );
+                // pos and neg induce the same infinity set
+                return Err(LearningError::Inconsistent);
             }
         }
         // build dpa from Zielonka path
 
-        let mut prio_map: HashMap<(StateId, char), u8> = HashMap::new();
-        let mut prio = if lowest { 0 } else { 1 };
-        for i in 0..z_path.len() - 1 {
-            for t in z_path[i].difference(&z_path[i + 1]) {
+        let mut prio_map: FxIndexMap<(StateId, char), Int> = FxIndexMap::default();
+        let mut prio: Int = if lowest { 0 } else { 1 };
+        for (current, next) in z_path.iter().tuple_windows() {
+            for t in current.difference(next) {
                 prio_map.insert(*t, prio);
             }
-            prio += 1;
+            prio = prio.checked_add(1).ok_or(LearningError::Priorities {
+                used: z_path.len(),
+                max: Int::MAX as usize,
+            })?;
         }
+        // every transition is in the first set of the path and removed in some step
         let mut dpa = ts
-            .map_edge_colors_full(move |a, b, _c, _d| {
-                *prio_map
-                    .get(&(a, *b))
-                    .expect("transition missing in Zielonka path")
-            })
+            .map_edge_colors_full(move |a, b, _c, _d| prio_map.get(&(a, *b)).copied().unwrap_or(0))
             .erase_state_colors()
             .collect_dpa();
 
         // complete with sink state
-        let max_prio = if prio % 2 == 0 { prio - 1 } else { prio };
+        let max_prio = if prio & 1 == 0 {
+            prio.saturating_sub(1)
+        } else {
+            prio
+        };
         dpa.complete_with_colors(Void, max_prio);
-        dpa
+        Ok(dpa)
     }
 
     fn default_automaton(&self, sample: &OmegaSample) -> Self::Aut {
@@ -280,10 +295,10 @@ fn has_zielonka_path(
     mut class: bool,
 ) -> bool {
     // check if class of set with all transitions is valid
-    if class {
-        assert!(!neg_sets.contains(all_transitions));
-    } else {
-        assert!(!pos_sets.contains(all_transitions));
+    if (class && neg_sets.contains(all_transitions))
+        || (!class && pos_sets.contains(all_transitions))
+    {
+        return false;
     }
     let mut pos_sets = pos_sets.to_owned();
     let mut neg_sets = neg_sets.to_owned();
@@ -319,10 +334,10 @@ fn zielonka_path(
     mut class: bool,
 ) -> Option<Vec<EdgeSet>> {
     // check if class of set with all transitions is valid
-    if class {
-        assert!(!neg_sets.contains(&all_transitions));
-    } else {
-        assert!(!pos_sets.contains(&all_transitions));
+    if (class && neg_sets.contains(&all_transitions))
+        || (!class && pos_sets.contains(&all_transitions))
+    {
+        return None;
     }
 
     let mut z_path = vec![all_transitions];
@@ -432,11 +447,11 @@ where
 mod tests {
     use super::*;
     use crate::DTS;
+    use crate::Void;
     use crate::alphabet::CharAlphabet;
     use crate::automaton::{BuchiCondition, MinEvenParityCondition, WithInitial};
     use crate::learning::passive::OmegaSample;
     use crate::ts::q;
-    use crate::{Void, upw};
 
     // default alphabet
     fn sigma() -> CharAlphabet {
@@ -556,10 +571,14 @@ mod tests {
             .default_color(Void)
             .into_dba(0);
 
-        let res = BuchiCondition.consistent_automaton(&ts, &sample, vec![], vec![]);
+        let res = BuchiCondition
+            .consistent_automaton(&ts, &sample, vec![], vec![])
+            .unwrap();
         let pos_sets: Vec<EdgeSet> = vec![vec![(q(1), 'b')].into_iter().collect()];
         let neg_sets: Vec<EdgeSet> = vec![vec![(q(0), 'b')].into_iter().collect()];
-        let res2 = BuchiCondition.consistent_automaton(&ts, &sample2, pos_sets, neg_sets);
+        let res2 = BuchiCondition
+            .consistent_automaton(&ts, &sample2, pos_sets, neg_sets)
+            .unwrap();
 
         assert_eq!(res, dba);
         assert_eq!(res2, dba);
@@ -723,10 +742,14 @@ mod tests {
             .default_color(Void)
             .into_dpa(0);
 
-        let res = MinEvenParityCondition.consistent_automaton(&ts, &sample, vec![], vec![]);
+        let res = MinEvenParityCondition
+            .consistent_automaton(&ts, &sample, vec![], vec![])
+            .unwrap();
         assert_eq!(res, dpa);
         // with completion via sink
-        let res2 = MinEvenParityCondition.consistent_automaton(&ts2, &sample2, vec![], vec![]);
+        let res2 = MinEvenParityCondition
+            .consistent_automaton(&ts2, &sample2, vec![], vec![])
+            .unwrap();
         assert_eq!(res2, dpa2);
         // with acceptance condition from infinity sets
         let pos_sets: Vec<EdgeSet> = vec![
@@ -736,7 +759,9 @@ mod tests {
                 .collect(),
         ];
         let neg_sets: Vec<EdgeSet> = vec![];
-        let res3 = MinEvenParityCondition.consistent_automaton(&ts2, &sample2, pos_sets, neg_sets);
+        let res3 = MinEvenParityCondition
+            .consistent_automaton(&ts2, &sample2, pos_sets, neg_sets)
+            .unwrap();
         assert_eq!(res3, dpa2);
     }
 

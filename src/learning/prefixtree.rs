@@ -80,25 +80,22 @@ pub fn prefix_tree<A: Alphabet, W: Into<ReducedOmegaWord<A::Symbol>>, I: IntoIte
 
 #[cfg(test)]
 mod tests {
+    use super::prefix_tree;
+    use crate::alphabet::CharAlphabet;
+    use crate::ts::Deterministic;
 
     #[test]
-    #[ignore]
     fn build_prefix_tree() {
-        todo!()
-        // let words = [upw!("aa"), upw!("aba"), upw!("bbaab"), upw!("bb")];
-        // let alphabet = CharAlphabet::from_iter(['a', 'b']);
-        // let pta = prefix_tree(alphabet, words);
-        // let completed = pta
-        //     .erase_state_colors()
-        //     .collect_complete_with_initial(Void, Void);
-        // let lead_to_sink = ["ba", "bbbbbbbbba", "ababababbbabaababa", "aaaaaaaaaaaaab"];
-        // for w in &lead_to_sink {
-        //     for v in &lead_to_sink {
-        //         assert_eq!(
-        //             completed.reached_state(w),
-        //             completed.reached_state(v)
-        //         );
-        //     }
-        // }
+        let words = [upw!("aa"), upw!("aba"), upw!("bbaab"), upw!("bb")];
+        let alphabet = CharAlphabet::from_iter(['a', 'b']);
+        let pta = prefix_tree(alphabet, words.clone());
+        // all words of the tree have a run that does not leave it
+        for word in &words {
+            assert!(pta.run(word).is_successful());
+        }
+        // everything else leaves the tree
+        for word in ["ba", "bbbbbbbbba", "ababababbbabaababa", "aaaaaaaaaaaaab"] {
+            assert_eq!(pta.reached_state(word), None);
+        }
     }
 }

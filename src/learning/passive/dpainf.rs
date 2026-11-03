@@ -1,5 +1,6 @@
 use std::collections::{BTreeSet, VecDeque};
 
+use crate::learning::LearningError;
 use crate::{
     Class, DTS, Pointed, RightCongruence, States, TransitionSystem, ts::operations::ProductIndex,
 };
@@ -113,8 +114,12 @@ impl<A: Alphabet> ConsistencyCheck<A> for ConflictRelation<A> {
 }
 
 impl<A: Alphabet> std::fmt::Debug for ConflictRelation<A> {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConflictRelation")
+            .field("left", &self.dfas[0].state_count())
+            .field("right", &self.dfas[1].state_count())
+            .field("conflicts", &self.conflicts)
+            .finish()
     }
 }
 
@@ -141,11 +146,12 @@ fn to_congruence<A: Alphabet>(
 pub fn iteration_consistency_conflicts<A: Alphabet>(
     samples: &SplitOmegaSample<'_, A>,
     class: Class<A::Symbol>,
-) -> ConflictRelation<A> {
-    let idx = samples.cong().reached_state(&class).unwrap();
-    let Some(sample) = samples.get(idx) else {
-        panic!("Sample for class {:?} does not exist!", class)
-    };
+) -> Result<ConflictRelation<A>, LearningError> {
+    let idx = samples
+        .cong()
+        .reached_state(&class)
+        .ok_or(LearningError::Incomplete)?;
+    let sample = samples.get(idx).ok_or(LearningError::Incomplete)?;
     let periodic_sample = sample.to_periodic_sample();
 
     trace!(
@@ -187,19 +193,27 @@ pub fn iteration_consistency_conflicts<A: Alphabet>(
             .cartesian_product(right_pta.accepting_states()),
     );
 
-    let mut left_cache: std::collections::HashMap<_, _> = std::collections::HashMap::default();
-    let mut right_cache: std::collections::HashMap<_, _> = std::collections::HashMap::default();
+    let mut left_cache: crate::math::FxIndexMap<_, _> = crate::math::FxIndexMap::default();
+    let mut right_cache: crate::math::FxIndexMap<_, _> = crate::math::FxIndexMap::default();
 
     while let Some((left, right)) = queue.pop_front() {
         if !conflicts.insert((left, right)) {
             continue;
         }
-        let left_pred = left_cache
-            .entry(left)
-            .or_insert_with(|| left_pta.predecessors(left).unwrap().collect_vec());
-        let right_pred = right_cache
-            .entry(right)
-            .or_insert_with(|| right_pta.predecessors(right).unwrap().collect_vec());
+        let left_pred = left_cache.entry(left).or_insert_with(|| {
+            left_pta
+                .predecessors(left)
+                .into_iter()
+                .flatten()
+                .collect_vec()
+        });
+        let right_pred = right_cache.entry(right).or_insert_with(|| {
+            right_pta
+                .predecessors(right)
+                .into_iter()
+                .flatten()
+                .collect_vec()
+        });
 
         for l in left_pred {
             for r in right_pred
@@ -214,16 +228,16 @@ pub fn iteration_consistency_conflicts<A: Alphabet>(
     let (left, left_map) = to_congruence(&left_pta);
     let (right, right_map) = to_congruence(&right_pta);
 
-    let renumber = |map: &CompactIdMap<StateId>, q| StateId::from_usize(map.id(&q).unwrap());
+    let renumber = |map: &CompactIdMap<StateId>, q| map.id(&q).map(StateId::from_usize);
     let conflicts: BTreeSet<_> = conflicts
         .into_iter()
-        .map(|(l, r)| (renumber(&left_map, l), renumber(&right_map, r)))
+        .filter_map(|(l, r)| Some((renumber(&left_map, l)?, renumber(&right_map, r)?)))
         .collect();
 
-    ConflictRelation {
+    Ok(ConflictRelation {
         dfas: [left, right],
         conflicts,
-    }
+    })
 }
 
 /// Computes a conflict relation encoding prefix consistency. For more details on how this works, see
@@ -266,20 +280,6 @@ pub fn prefix_consistency_conflicts<A: Alphabet>(sample: &OmegaSample<A>) -> Con
     }
 }
 
-impl<A: Alphabet> ConsistencyCheck<A> for () {
-    fn consistent(&self, _cong: &RightCongruence<DTS<A>>) -> bool {
-        true
-    }
-
-    fn threshold(&self) -> usize {
-        0
-    }
-
-    fn alphabet(&self) -> &A {
-        unimplemented!("This does not make sense, you should not call this function directly")
-    }
-}
-
 /// This constraint ensures that the learned automaton separates idempotents.
 #[derive(Clone)]
 pub struct SeparatesIdempotents<'a, A: Alphabet> {
@@ -300,15 +300,17 @@ impl<A: Alphabet> ConsistencyCheck<A> for SeparatesIdempotents<'_, A> {
         true
     }
 
+    /// The constraint does not bound the number of states.
     fn threshold(&self) -> usize {
-        todo!()
+        0
     }
 
     fn alphabet(&self) -> &A {
-        todo!()
+        &self.sample.alphabet
     }
 }
 
+/// The ways in which [`dpainf`] can fail.
 #[derive(Debug)]
 pub enum DpaInfError<A: Alphabet> {
     /// The threshold has been exceeded, returns constructed right congruence and threshold value
@@ -317,7 +319,31 @@ pub enum DpaInfError<A: Alphabet> {
     Timeout(RightCongruence<DTS<A>>),
 }
 
+impl<A: Alphabet> From<DpaInfError<A>> for LearningError {
+    fn from(error: DpaInfError<A>) -> Self {
+        match error {
+            DpaInfError::Threshold(_, threshold) => LearningError::Threshold(threshold),
+            DpaInfError::Timeout(_) => LearningError::Timeout,
+        }
+    }
+}
+
 /// Runs the omega-sprout algorithm on a given conflict relation.
+/// # Example
+/// Without further constraints, a finite sample gives the leading right congruence of RPNI.
+/// ```
+/// use automata::alphabet::CharAlphabet;
+/// use automata::learning::passive::{FiniteSample, dpainf::dpainf};
+/// use automata::States;
+///
+/// let word = |w: &str| w.chars().collect::<Vec<_>>();
+/// let sample = FiniteSample::new_finite(
+///     CharAlphabet::of_size(2),
+///     [("", true), ("aa", true), ("a", false)].map(|(w, c)| (word(w), c)),
+/// );
+/// let cong = dpainf(&sample, vec![], true, None).unwrap();
+/// assert!(cong.state_count() >= 2);
+/// ```
 #[allow(clippy::result_large_err)]
 pub fn dpainf<A, C>(
     conflicts: C,
@@ -399,7 +425,6 @@ pub(crate) mod tests {
     use crate::alphabet::CharAlphabet;
     use crate::learning::passive::{SetSample, dpainf::ConflictRelation, sample::OmegaSample};
     use crate::ts::q;
-    use crate::upw;
     use crate::{Class, States};
 
     //     pub fn inf_aba_sample() -> (CharAlphabet, OmegaSample<CharAlphabet>) {
@@ -511,12 +536,12 @@ pub(crate) mod tests {
         let cong = sample.infer_prefix_congruence().unwrap();
         assert_eq!(cong.state_count(), 1);
 
-        let split_sample = sample.split(&cong);
+        let split_sample = sample.split(&cong).unwrap();
         let eps = Class::epsilon();
         let _eps_sample = split_sample.get(q(0)).unwrap();
 
         let conflicts: ConflictRelation<CharAlphabet> =
-            super::iteration_consistency_conflicts(&split_sample, eps);
+            super::iteration_consistency_conflicts(&split_sample, eps).unwrap();
 
         let prc_eps = super::dpainf(conflicts, vec![], false, None).unwrap();
         assert_eq!(prc_eps.state_count(), 6);
@@ -527,8 +552,8 @@ pub(crate) mod tests {
         let (_alphabet, sample) = testing_larger_forc_sample();
         let cong = sample.infer_prefix_congruence().unwrap();
         tracing::debug!("Got prefix congruence");
-        let split = sample.split(&cong);
-        let forc = split.infer_forc();
+        let split = sample.split(&cong).unwrap();
+        let forc = split.infer_forc().unwrap();
         let prc_eps = forc[q(0)].clone();
         assert_eq!(prc_eps.state_count(), 13);
     }

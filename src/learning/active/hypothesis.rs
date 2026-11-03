@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use super::{Experiment, Experiments};
 use crate::automaton::{MealyMachine, MooreMachine};
 use crate::ts::{Deterministic, StateId, SymbolOf};
@@ -7,14 +5,27 @@ use crate::{Color, Void, alphabet::Alphabet, word::FiniteWord};
 use crate::{DTS, Pointed, TransitionSystem};
 use std::hash::Hash;
 
+/// A hypothesis that L* can build: a Mealy or Moore machine whose `Output` is the output of the oracle.
+///
+/// The methods that look at the output of a word expect the hypothesis to be complete, as the
+/// hypotheses that L* builds always are.
 pub trait Hypothesis: TransitionSystem + Deterministic + Pointed {
+    /// The type of the outputs that the hypothesis assigns to words.
     type Output: Color + Eq + Hash;
 
+    /// Returns the output for `input` when starting in `source`.
+    ///
+    /// # Panics
+    /// Panics if the hypothesis is not complete, i.e. if the run on `input` escapes.
     fn output_from<W: FiniteWord<Symbol = <Self::Alphabet as Alphabet>::Symbol>>(
         &self,
         input: W,
         source: Self::StateIndex,
     ) -> Self::Output;
+    /// Returns the output for `input`.
+    ///
+    /// # Panics
+    /// Panics if the hypothesis is not complete, i.e. if the run on `input` escapes.
     fn output<W: FiniteWord<Symbol = <Self::Alphabet as Alphabet>::Symbol>>(
         &self,
         input: W,
@@ -22,16 +33,22 @@ pub trait Hypothesis: TransitionSystem + Deterministic + Pointed {
         self.output_from(input, self.initial())
     }
 
+    /// Builds the hypothesis from the transition system that L* constructed and its initial state.
     fn from_transition_system(
         ts: DTS<Self::Alphabet, Self::StateColor, Self::EdgeColor>,
         initial: StateId,
     ) -> Self;
+    /// Gives the color of the state that belongs to the representative `mr` with the given row of the table.
     fn give_state_color(
         mr: &[SymbolOf<Self>],
         experiments: &Experiments<Self>,
         row: &[Self::Output],
     ) -> Self::StateColor;
 
+    /// Gives the color of the edge that reads `a` from the state of `source_mr` to the state of `target_mr`.
+    ///
+    /// # Panics
+    /// May panic if the rows do not belong to the experiments, which cannot happen when called by L*.
     fn give_transition_color(
         source_mr: &[SymbolOf<Self>],
         a: SymbolOf<Self>,
@@ -41,6 +58,7 @@ pub trait Hypothesis: TransitionSystem + Deterministic + Pointed {
         target_row: &[Self::Output],
     ) -> Self::EdgeColor;
 
+    /// The experiments that the table must contain from the start.
     fn mandatory_experiments(
         alphabet: &Self::Alphabet,
     ) -> impl IntoIterator<Item = Experiment<SymbolOf<Self>>>;

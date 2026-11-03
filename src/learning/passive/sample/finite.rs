@@ -3,12 +3,25 @@ use crate::alphabet::Alphabet;
 use itertools::Itertools;
 use thiserror::Error;
 
+/// The errors that can occur when parsing a finite sample. There are none yet, as parsing is not
+/// implemented.
 #[derive(Debug, Clone, Error)]
 pub enum FiniteSampleParseError {}
 
 impl<A: Alphabet> FiniteSample<A> {
     /// Create a new sample of finite words from the given alphabet and iterator over annotated words. The sample is given
     /// as an iterator over its symbols. The words are given as an iterator of pairs (word, color).
+    ///
+    /// ```
+    /// use automata::alphabet::CharAlphabet;
+    /// use automata::learning::passive::FiniteSample;
+    ///
+    /// let sample = FiniteSample::new_finite(
+    ///     CharAlphabet::of_size(2),
+    ///     [(vec!['a', 'b'], true), (vec!['b'], false)],
+    /// );
+    /// assert_eq!(sample.count_words(), 2);
+    /// ```
     pub fn new_finite<I: IntoIterator<Item = A::Symbol>, J: IntoIterator<Item = (I, bool)>>(
         alphabet: A,
         words: J,

@@ -3,13 +3,16 @@ use crate::math;
 use crate::word::{FiniteWord, Word};
 use std::hash::Hash;
 
+/// A suffix that is used to distinguish the rows of an observation table.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Experiment<S>(pub(super) Vec<S>);
 
 impl<S> Experiment<S> {
+    /// The empty experiment.
     pub fn empty() -> Self {
         Self(vec![])
     }
+    /// Returns true if the experiment consists of exactly the given `letter`.
     pub fn is_letter(&self, letter: S) -> bool
     where
         S: Symbol,
@@ -37,13 +40,17 @@ impl<S: Symbol> Word for Experiment<S> {
     }
 }
 
+/// A word that labels a row of an observation table.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Representative<S>(pub(super) Vec<S>);
 
+/// The outputs of the oracle for a row, one for each experiment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutputRow<X>(pub(super) Vec<X>);
 
 // placeholder: the table is not used by `LStar` yet
+/// An observation table: for each row (representative) it stores the output of the oracle on the
+/// representative followed by each experiment.
 #[allow(dead_code)]
 pub struct ObservationTable<S, X> {
     pub(crate) experiments: Vec<Experiment<S>>,
@@ -63,6 +70,7 @@ impl<S, X> ObservationTable<S, X>
 where
     S: Hash + Eq,
 {
+    /// Creates an empty table.
     pub fn new() -> Self {
         Self {
             experiments: vec![],
@@ -70,6 +78,7 @@ where
         }
     }
 
+    /// Creates a table with the given rows and experiments, where the rows are not filled yet.
     pub fn with_rows_and_experiments<I, J>(rows: I, experiments: J) -> Self
     where
         I: IntoIterator<Item = Representative<S>>,
