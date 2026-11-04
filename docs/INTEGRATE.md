@@ -72,7 +72,7 @@ Legend: `[x]` done, `[-]` skipped on purpose, `[ ]` open. Progress is tracked in
       module names so the migration is `automata_learning::X` -> `automata::learning::X`).
 - [x] Decide feature name and its dependencies (see Phase 2). Recommended: `learning`.
 - [x] Open a tracking issue with this checklist (#138).
-- [ ] Freeze `automata-learning`: no further feature work in the old repo, only the port.
+- [x] Freeze `automata-learning`: no further feature work in the old repo, only the port (the repository is archived).
 
 ## Phase 1 — Baseline the source crate
 
@@ -106,7 +106,7 @@ Do this in `/sam/Rust/automata-learning` before moving anything, so regressions 
 - [x] Check that `tabled`/`owo-colors` are only used for pretty-printing of observation tables or
       samples. If so keep them optional under `learning`, or replace with `Display` impls to
       avoid the dependencies altogether.
-- [ ] Verify the MSRV (1.88) against each new dependency: `cargo +1.88 check --features learning`.
+- [x] Verify the MSRV (1.88) against each new dependency: `cargo +1.88 check --features learning` (the CI job `msrv` runs `--all-features` and is green).
 - [x] Add `pub mod learning;` to `src/lib.rs` behind `#[cfg(feature = "learning")]`, with a
       module-level doc comment stating that the module is experimental (no stability promise until
       the next minor release).
@@ -294,8 +294,8 @@ end to end (a `compare` run takes long); the feature handling is unit-tested.
       (3) families unification. Each must be green on its own.
 - [x] Self-review the diff for leftover `allow`s, `dbg!`, commented-out code (`lib.rs` of the old
       crate has some), stale TODOs (triage into issues).
-- [ ] Wait for CI (all jobs including `nix` and `bench-tools`).
-- [ ] Merge with a **merge commit** (decided by the maintainer; not squash).
+- [x] Wait for CI (all jobs including `nix` and `bench-tools`).
+- [x] Merge with a **merge commit** (decided by the maintainer; not squash). Merged as leonbohn/automata-archive#120.
 
 ## Phase 10 — Release and retire the old crate
 
@@ -310,8 +310,7 @@ end to end (a `compare` run takes long); the feature handling is unit-tested.
       the 0.2 API (the round trip through `CharAlphabet` in `oai` is gone, `sprout` has the new
       error variant), `incong` is removed. Both binaries were smoke tested (`oai todpa` on a HOA
       file, `omega-learning-tasks gen` and `sprout` on a few tasks).
-- [ ] Close the tracking issue (now `leonbohn/automata#138`) and note the release version in it (done:
-      comment with 0.2.1; closing is left until the open items below are done).
+- [x] Close the tracking issue (now `leonbohn/automata#138`) and note the release version in it (closed with a summary comment).
 - [x] Consolidate the repositories, so that GitHub shows the real age of the project (the repository
       `frieda` was created 2024-03-08). What was done, in this order:
       - The histories of `automata` and `frieda` are unrelated (no merge base; both start with a
@@ -337,10 +336,14 @@ end to end (a `compare` run takes long); the feature handling is unit-tested.
 - [x] Done after the consolidation: the webhook of the benchmark service is recreated on
       `leonbohn/automata` and checked, the local clone is replaced by a fresh clone, and the first CI run
       on the new `main` is green.
-- [ ] Still open after the consolidation:
-      - close or update the old open PRs of `frieda` (#119 to #127, mostly stale dependabot PRs);
-      - branch protection for `main` (maintainer, guided);
-      - ~~check the first CI run on the new `main`~~ (green).
+- [x] Done after the consolidation: the stale pull requests of `frieda` (#119 to #127) are closed with
+      a comment, the typo fixes of #125 went to `hoars` (`leonbohn/hoars#10`, merged; the fix of the
+      property `terminal` needs a `hoars` 0.3.1 release), the issues #132 and #133 are closed, the
+      old issue numbers in the bodies of the moved issues are rewritten, the crate
+      `automata-learning` is deleted from crates.io (so the `deprecate` branch with 0.1.1 is not
+      published) and the branch ruleset "Protect main" is active (pull request required, 0
+      approvals, repository admins may bypass, all 12 CI jobs must pass, no force pushes or
+      deletion).
 
 ## Risks and how to handle them
 
