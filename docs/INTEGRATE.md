@@ -334,12 +334,13 @@ end to end (a `compare` run takes long); the feature handling is unit-tested.
       - References to issue and PR numbers in the repository were rewritten: moved issues use
         their new number (`#138`), all others (closed issues and PRs) point to
         `leonbohn/automata-archive#N`. Old commit messages keep the old numbers.
+- [x] Done after the consolidation: the webhook of the benchmark service is recreated on
+      `leonbohn/automata` and checked, the local clone is replaced by a fresh clone, and the first CI run
+      on the new `main` is green.
 - [ ] Still open after the consolidation:
-      - recreate the webhook of the benchmark service on `leonbohn/automata` (maintainer);
       - close or update the old open PRs of `frieda` (#119 to #127, mostly stale dependabot PRs);
       - branch protection for `main` (maintainer, guided);
-      - replace the local clone of `automata` by a clone of the new repository;
-      - check the first CI run on the new `main`.
+      - ~~check the first CI run on the new `main`~~ (green).
 
 ## Risks and how to handle them
 
