@@ -1,10 +1,8 @@
-use automata::TransitionSystem;
+use automata::States;
 use automata::hoa::WriteHoa;
 use tracing::{debug, info, trace};
 use tracing_subscriber::{filter, prelude::*};
 
-use automata::alphabet::{CharAlphabet, PropAlphabet};
-use automata::automaton::DeterministicOmegaAutomaton;
 use clap::{Arg, ArgMatches, Command};
 
 fn cli() -> clap::Command {
@@ -63,25 +61,26 @@ pub fn main() {
             debug!("converting input automata into DPAs");
 
             for aut in stream {
-                debug!("read deterministic automaton with {} states", aut.size());
-
-                let start = std::time::Instant::now();
-                let converted: DeterministicOmegaAutomaton<CharAlphabet> = aut.into();
-                info!(
-                    "conversion into char alphabet automaton took {}µs",
-                    start.elapsed().as_micros()
+                debug!(
+                    "read deterministic automaton with {} states",
+                    aut.state_count()
                 );
 
                 let start = std::time::Instant::now();
-                let reconverted: DeterministicOmegaAutomaton<PropAlphabet> =
-                    converted.try_into().unwrap();
+                let dpa = aut.into_dpa();
                 info!(
-                    "conversion into HOA alphabet automaton took {}µs",
+                    "conversion into a DPA took {}µs",
                     start.elapsed().as_micros()
                 );
 
-                match reconverted.into_dpa() {
-                    Ok(dpa) => print!("{}", dpa.to_hoa()),
+                match dpa {
+                    Ok(dpa) => match dpa.to_hoa() {
+                        Ok(hoa) => print!("{hoa}"),
+                        Err(error) => {
+                            eprintln!("error: {error}");
+                            std::process::exit(1);
+                        }
+                    },
                     Err(error) => {
                         eprintln!("error: {error}");
                         std::process::exit(1);

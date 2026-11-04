@@ -8,9 +8,8 @@ Guidance for working in this repository. See `PLAN.md` for the roadmap.
 
 | Repository | Local path | Contents |
 |---|---|---|
-| `leonbohn/automata` | `/home/lonne/Rust/automata` | transition systems, automata, acceptance conditions, constructions, HOA bridge, rendering (the former `automata` + `automata-core`) |
+| `leonbohn/automata` | `/home/lonne/Rust/automata` | transition systems, automata, acceptance conditions, constructions, HOA bridge, rendering, and (feature `learning`, `automata::learning`) passive and active learning; the former `automata`, `automata-core` and `automata-learning` |
 | `leonbohn/hoars` | `/home/lonne/Rust/hoars` | HOA parser/printer; published on crates.io (0.3.0) |
-| `leonbohn/automata-learning` | `/sam/Rust/automata-learning` | passive and active learning algorithms |
 
 Each of those has its own `CLAUDE.md` and `PLAN.md`. Do not re-add library code here.
 
@@ -19,7 +18,6 @@ Each of those has its own `CLAUDE.md` and `PLAN.md`. Do not re-add library code 
 | Path | Crate | Role |
 |---|---|---|
 | `bin/oai` | `oai` | CLI: reads HOA from stdin, converts to a deterministic parity automaton (`todpa`). |
-| `bin/incong` | `incong` | Enumerates periodic omega words up to rotation. Long-running by design. |
 | `bin/omega-learning-tasks` | `omega-learning-tasks` | Generates learning tasks and runs sprout over them (see its README). |
 | `python/` | `automata_python` | PyO3/maturin bindings; only a `DFA` wrapper; excluded from the workspace and not built by CI. |
 | `assets/` | | Logo for the README. |
@@ -42,7 +40,6 @@ When developing a library change together with a binary, use a local override in
 ```toml
 [patch.crates-io]
 automata = { path = "/home/lonne/Rust/automata" }
-automata-learning = { path = "/sam/Rust/automata-learning" }
 ```
 
 ## Conventions

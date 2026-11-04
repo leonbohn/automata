@@ -26,20 +26,18 @@ Representation of standard acceptance conditions and automata types based on the
 
 The functionality lives in several repositories:
 
-- [`automata`](https://github.com/leonbohn/automata): transition systems, automata, acceptance conditions, constructions, minimization, HOA bridge and rendering.
+- [`automata`](https://github.com/leonbohn/automata): transition systems, automata, acceptance conditions, constructions, minimization, HOA bridge, rendering and (feature `learning`) active and passive automata learning. The former crate `automata-learning` is part of it.
 - [`hoars`](https://github.com/leonbohn/hoars) ([crates.io](https://crates.io/crates/hoars)): parser and printer for the [HOA format](https://adl.github.io/hoaf/).
-- [`automata-learning`](https://github.com/leonbohn/automata-learning): active and passive automata learning algorithms.
 
 This repository (`frieda`) is the umbrella for experiments and tools built on top of them: command line tools in `bin/` and Python bindings in `python/` (work in progress).
 
 ## Quick Start
 
-The libraries are not yet published on crates.io (except `hoars`), so depend on them through git:
+The libraries are on crates.io:
 
 ```toml
 [dependencies]
-automata = { git = "https://github.com/leonbohn/automata" }
-automata-learning = { git = "https://github.com/leonbohn/automata-learning" }
+automata = { version = "0.2", features = ["learning"] }
 ```
 
 See the READMEs of the respective repositories for how to get started.

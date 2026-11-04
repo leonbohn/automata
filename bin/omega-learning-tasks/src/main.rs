@@ -5,22 +5,16 @@ use std::{collections::HashMap, env, fs, path::PathBuf, time::Duration};
 use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 use automata::alphabet::{Alphabet, CharAlphabet};
-use automata::automaton::{BuchiCondition, DBA, DPA, MinEvenParityCondition, Semantics};
-use automata::representation::CollectTs;
-use automata::ts::Deterministic;
-use automata::ts::run::InfiniteObserver;
-use automata::word::{OmegaWord, ReducedOmegaWord};
-use automata::{Color, Void, math, upw};
-use automata::{
-    DTS, TransitionSystem,
-    automaton::InfiniteWordAutomaton,
-    hoa::WriteHoa,
-    random::{generate_random_dba, generate_random_dpa, generate_random_omega_words},
-};
-use automata_learning::passive::{
+use automata::automaton::{BuchiCondition, DBA, DPA, MinEvenParityCondition};
+use automata::hoa::WriteHoa;
+use automata::learning::passive::{
     OmegaSample,
     sprout::{SproutError, sprout},
 };
+use automata::random::{generate_random_dba, generate_random_dpa, generate_random_omega_words};
+use automata::representation::CollectPointed;
+use automata::word::{OmegaWord, ReducedOmegaWord};
+use automata::{States, TransitionSystem, math, upw};
 use tracing::{info, warn};
 
 fn main() {
@@ -107,7 +101,12 @@ pub fn run_sprout() {
                             format!("{}/learned.hoa", dir.to_str().unwrap()),
                             &learned,
                         );
-                        export_sprout_result(dir, &learned, elapsed);
+                        export_sprout_result(
+                            dir,
+                            learned.state_count(),
+                            |w| learned.accepts(w),
+                            elapsed,
+                        );
                     }
                     Err(SproutError::Threshold {
                         thres: _thres,
@@ -123,16 +122,27 @@ pub fn run_sprout() {
                             format!("{}/learned.hoa", dir.to_str().unwrap()),
                             &learned,
                         );
-                        export_sprout_result(dir, &learned, elapsed);
+                        export_sprout_result(
+                            dir,
+                            learned.state_count(),
+                            |w| learned.accepts(w),
+                            elapsed,
+                        );
                     }
                     Err(SproutError::Timeout { aut: partial }) => {
                         let elapsed = time.elapsed();
                         info!(
                             "exceeded timeout on task {i} with partial ts of size {}: {:?}",
-                            partial.size(),
+                            partial.state_count(),
                             dir.to_string_lossy()
                         );
-                        export_sprout_timeout(dir, partial, elapsed);
+                        export_sprout_timeout(dir, partial.state_count(), elapsed);
+                    }
+                    Err(SproutError::Learning(error)) => {
+                        warn!(
+                            "learning failed on task {i} {:?}: {error}",
+                            dir.to_string_lossy()
+                        );
                     }
                 }
             } else {
@@ -153,7 +163,12 @@ pub fn run_sprout() {
                             format!("{}/learned.hoa", dir.to_str().unwrap()),
                             &learned,
                         );
-                        export_sprout_result(dir, &learned, elapsed);
+                        export_sprout_result(
+                            dir,
+                            learned.state_count(),
+                            |w| learned.accepts(w),
+                            elapsed,
+                        );
                     }
                     Err(SproutError::Threshold {
                         thres: _thres,
@@ -169,16 +184,27 @@ pub fn run_sprout() {
                             format!("{}/learned.hoa", dir.to_str().unwrap()),
                             &learned,
                         );
-                        export_sprout_result(dir, &learned, elapsed);
+                        export_sprout_result(
+                            dir,
+                            learned.state_count(),
+                            |w| learned.accepts(w),
+                            elapsed,
+                        );
                     }
                     Err(SproutError::Timeout { aut: partial }) => {
                         let elapsed = time.elapsed();
                         info!(
                             "exceeded timeout on task {i} with partial ts of size {}: {:?}",
-                            partial.size(),
+                            partial.state_count(),
                             dir.to_string_lossy()
                         );
-                        export_sprout_timeout(dir, partial, elapsed);
+                        export_sprout_timeout(dir, partial.state_count(), elapsed);
+                    }
+                    Err(SproutError::Learning(error)) => {
+                        warn!(
+                            "learning failed on task {i} {:?}: {error}",
+                            dir.to_string_lossy()
+                        );
                     }
                 }
             }
@@ -283,8 +309,8 @@ pub fn generate_tasks(
         for (aut_index, dba) in dbas[&aut_size].iter().enumerate() {
             for &train_size in train_sizes.iter() {
                 for (set_index, (tr, te)) in sets_dba[&(aut_size, train_size)].iter().enumerate() {
-                    let train = label_set(dba, tr);
-                    let test = label_set(dba, te);
+                    let train = label_set(|w| dba.accepts(w), tr);
+                    let test = label_set(|w| dba.accepts(w), te);
                     // export as learning task
                     export_task(
                         task_name(
@@ -309,8 +335,8 @@ pub fn generate_tasks(
         for (aut_index, dpa) in dpas[&aut_size].iter().enumerate() {
             for &train_size in train_sizes.iter() {
                 for (set_index, (tr, te)) in sets_dpa[&(aut_size, train_size)].iter().enumerate() {
-                    let train = label_set(dpa, tr);
-                    let test = label_set(dpa, te);
+                    let train = label_set(|w| dpa.accepts(w), tr);
+                    let test = label_set(|w| dpa.accepts(w), te);
                     // export as learning task
                     export_task(
                         task_name(
@@ -339,7 +365,7 @@ pub fn generate_dba(num_symbols: usize, aut_size: usize, lambda: f64) -> DBA {
     loop {
         dba = generate_random_dba(num_symbols, gen_size, lambda).streamlined();
         // check if dba has the correct size
-        if dba.size() == aut_size {
+        if dba.state_count() == aut_size {
             let equiv_dpa = dba
                 .clone()
                 .map_edge_colors(|c| if c { 0 } else { 1 })
@@ -364,7 +390,7 @@ pub fn generate_dpa(num_symbols: usize, aut_size: usize, num_prios: u8, lambda: 
             .streamlined()
             .collect_dpa();
         // check if dpa has the correct size and has informative right congruence
-        if dpa.size() == aut_size && dpa.is_informative_right_congruent() {
+        if dpa.state_count() == aut_size && dpa.is_informative_right_congruent() {
             break;
         }
     }
@@ -380,8 +406,8 @@ pub fn generate_set(
     train_size: usize,
     test_size: usize,
 ) -> (
-    math::Set<ReducedOmegaWord<char>>,
-    math::Set<ReducedOmegaWord<char>>,
+    math::FxIndexSet<ReducedOmegaWord<char>>,
+    math::FxIndexSet<ReducedOmegaWord<char>>,
 ) {
     let alphabet = CharAlphabet::of_size(num_symbols);
     let mut training_set = generate_random_omega_words(
@@ -396,24 +422,18 @@ pub fn generate_set(
     (training_set, test_set)
 }
 
-/// Label a `set` of [`ReducedOmegaWord`]s with the result of the given automaton.
-pub fn label_set<Z, C>(
-    aut: &InfiniteWordAutomaton<CharAlphabet, Z, Void, C, true>,
-    set: &math::Set<ReducedOmegaWord<char>>,
-) -> Vec<(ReducedOmegaWord<char>, bool)>
-where
-    Z: Semantics<DTS<CharAlphabet, Void, C>, true, Output = bool>,
-    Z::Observer: InfiniteObserver<DTS<CharAlphabet, Void, C>>,
-    C: Color,
-{
-    set.into_iter()
-        .map(|w| (w.clone(), aut.accepts(w)))
-        .collect()
+/// Label a `set` of [`ReducedOmegaWord`]s with the result of `accepts`, which is the
+/// acceptance of an automaton.
+pub fn label_set(
+    accepts: impl Fn(&ReducedOmegaWord<char>) -> bool,
+    set: &math::FxIndexSet<ReducedOmegaWord<char>>,
+) -> Vec<(ReducedOmegaWord<char>, bool)> {
+    set.iter().map(|w| (w.clone(), accepts(w))).collect()
 }
 
 /// Write the given automaton to the given `path` in HOA format
 pub fn export_automaton<AUT: WriteHoa>(file: String, aut: &AUT) {
-    fs::write(file, aut.to_hoa()).expect("Unable to write file");
+    fs::write(file, aut.to_hoa().expect("Unable to write HOA")).expect("Unable to write file");
 }
 
 /// Give filename for an omega automaton
@@ -422,7 +442,7 @@ pub fn aut_name(aut_size: usize, aut_index: usize, acc_type: String) -> String {
 }
 
 /// Write the given set to the given `path` as csv
-pub fn export_set(file: String, set: &math::Set<ReducedOmegaWord<char>>) {
+pub fn export_set(file: String, set: &math::FxIndexSet<ReducedOmegaWord<char>>) {
     let mut wtr = Writer::from_path(file).expect("creating file failed");
     for w in set.iter() {
         wtr.write_record(&[
@@ -481,7 +501,7 @@ pub fn export_labelled_set(file: String, set: &[(ReducedOmegaWord<char>, bool)])
 }
 
 /// Write the given omega automata learning task to the given `path` in HOA format
-pub fn export_task<AUT: WriteHoa>(
+pub fn export_task<AUT: WriteHoa + TransitionSystem + States>(
     name: String,
     aut: &AUT,
     train: &[(ReducedOmegaWord<char>, bool)],
@@ -498,7 +518,7 @@ pub fn export_task<AUT: WriteHoa>(
         format!("data/tasks/{name}/settings.txt"),
         name,
         aut.alphabet().size(),
-        aut.size(),
+        aut.state_count(),
         train.len(),
         test.len(),
     );
@@ -539,13 +559,9 @@ pub fn export_settings(
     wtr.flush().unwrap();
 }
 
-pub fn export_sprout_timeout(
-    task_dir: &std::path::Path,
-    partial: impl Deterministic,
-    elapsed: Duration,
-) {
+pub fn export_sprout_timeout(task_dir: &std::path::Path, partial_size: usize, elapsed: Duration) {
     let mut wtr = Writer::from_path(task_dir.join("result.csv")).expect("creating file failed");
-    wtr.write_record(["abort_automaton_size", &partial.size().to_string()])
+    wtr.write_record(["abort_automaton_size", &partial_size.to_string()])
         .unwrap();
     wtr.write_record(["time_ms", &format!("{}", elapsed.as_millis())])
         .unwrap();
@@ -553,15 +569,12 @@ pub fn export_sprout_timeout(
 }
 
 /// Score test set and export results
-pub fn export_sprout_result<Z, C>(
+pub fn export_sprout_result(
     task_dir: &std::path::Path,
-    learned: &InfiniteWordAutomaton<CharAlphabet, Z, Void, C, true>,
+    learned_size: usize,
+    accepts: impl Fn(&ReducedOmegaWord<char>) -> bool,
     elapsed: Duration,
-) where
-    Z: Semantics<DTS<CharAlphabet, Void, C>, true, Output = bool>,
-    Z::Observer: InfiniteObserver<DTS<CharAlphabet, Void, C>>,
-    C: Color,
-{
+) {
     let start = std::time::Instant::now();
     // load test set
     let (test_pos, test_neg) = load_set(task_dir, "test.csv".to_string());
@@ -569,8 +582,8 @@ pub fn export_sprout_result<Z, C>(
     let neg_count = test_neg.len();
     let test_size = pos_count + neg_count;
     // score test set
-    let mut scored_pos = label_set(learned, &test_pos.into_iter().collect());
-    let scored_neg = label_set(learned, &test_neg.into_iter().collect());
+    let mut scored_pos = label_set(&accepts, &test_pos.into_iter().collect());
+    let scored_neg = label_set(&accepts, &test_neg.into_iter().collect());
     let pos_correct = scored_pos.iter().filter(|(_, b)| *b).count();
     let neg_correct = scored_neg.iter().filter(|(_, b)| !b).count();
     let total_correct = pos_correct + neg_correct;
@@ -581,7 +594,7 @@ pub fn export_sprout_result<Z, C>(
 
     // export %correct, %pos/neg correct, aut size in result file
     let mut wtr = Writer::from_path(task_dir.join("result.csv")).expect("creating file failed");
-    wtr.write_record(["learned_aut_size", &format!("{}", learned.size())])
+    wtr.write_record(["learned_aut_size", &format!("{learned_size}")])
         .unwrap();
     wtr.write_record(["scored_correct", &format!("{total_correct}")])
         .unwrap();
