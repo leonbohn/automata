@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-04
+
 ### Added
 
 - New opt-in feature `learning` with the module `automata::learning`: the code of the `automata-learning` crate (passive: sprout, DPAInf, precise DPA; active: L\*), imported by plain copy of its commit `1ed4171` and ported to this crate. The module is experimental. It needs no dependencies besides the feature `families` (the dependencies `bimap`, `crossbeam-channel`, `alea`, `either`, `paste`, `tabled` and `owo-colors` of the old crate are not needed). Two L\* tests that use random machines need the feature `random`.
@@ -227,5 +229,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Breaking:** the trait `Show` (and `show`, `show_collection`) is removed; use `Display`. This includes the `Show` impls for `Path`, `Lasso`, `RunProfile`, `ProductIndex`, `Class`, `PeriodicOmegaWord`, `ReducedOmegaWord`, tuples, `Vec` and primitive types.
 - Unused dependencies `bimap`, `tabled`, `owo-colors` and `rand_distr`.
 
-[Unreleased]: https://github.com/leonbohn/automata/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/leonbohn/automata/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/leonbohn/automata/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/leonbohn/automata/compare/v0.1.0...v0.2.0

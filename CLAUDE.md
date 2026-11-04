@@ -12,8 +12,8 @@ Before committing, you confer with me.
 ## What this is
 
 `automata` is a single crate for transition systems and automata over finite and infinite (omega)
-words, extracted with history from `leonbohn/frieda`. Version 0.1.0 is on crates.io; the tree is
-heading for 0.2.0. Edition 2024, MSRV 1.88 (floor set by `biodivine-lib-bdd` and let-chains,
+words, extracted with history from `leonbohn/frieda`. Version 0.2.1 is on crates.io; the tree is
+heading for 0.3.0. Edition 2024, MSRV 1.88 (floor set by `biodivine-lib-bdd` and let-chains,
 checked by the `msrv` CI job). Published on crates.io under the same name.
 
 Sibling crates that stay elsewhere:
