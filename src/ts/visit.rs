@@ -522,7 +522,7 @@ mod tests {
         }
     }
 
-    /// Regression test for #80: an edge matching several symbols must not yield its target
+    /// Regression test for leonbohn/automata-archive#80: an edge matching several symbols must not yield its target
     /// several times.
     #[test]
     fn multi_symbol_edge_yields_each_state_once() {
@@ -543,7 +543,7 @@ mod tests {
         assert_eq!(reps[1].clone().into_inner(), vec![first_symbol]);
     }
 
-    /// Regression test for #81: among parallel edges the smallest symbol wins, regardless of the
+    /// Regression test for leonbohn/automata-archive#81: among parallel edges the smallest symbol wins, regardless of the
     /// order in which the edges are listed.
     #[test]
     fn parallel_edges_use_smallest_symbol() {

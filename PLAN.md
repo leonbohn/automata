@@ -11,7 +11,7 @@ Goal: a published, documented, well-tested general-purpose crate for finite- and
 - [ ] Acceptance conversions (Buchi/Rabin/Muller to parity) and Safra determinization.
 - [ ] Regex to NFA, `from_words` builders.
 - [ ] Differential tests against Spot via HOA.
-- [x] Learning algorithms (passive: sprout, DPAInf; active: L\*) moved from `automata-learning` into `automata::learning` (feature `learning`, #118). Open: switch `frieda` to depend on this crate, deprecate the old crate, resolve #119.
+- [x] Learning algorithms (passive: sprout, DPAInf; active: L\*) moved from `automata-learning` into `automata::learning` (feature `learning`, #138). Open: switch `frieda` to depend on this crate, deprecate the old crate, resolve #139.
 - [ ] mdBook guide in `docs/`, deployed via GitHub Pages; `CONTRIBUTING.md`; `CHANGELOG.md` is kept up to date under "Unreleased" (add an entry with every user-visible change).
 
 ## Known issues parked for later
