@@ -7,6 +7,8 @@ echo "cargo fmt --check passed"
 cargo clippy --all-targets -- -D warnings
 cargo clippy --all-targets --no-default-features -- -D warnings
 cargo clippy --all-targets --all-features -- -D warnings
+# the command line tools in bin/ (workspace members)
+cargo clippy --workspace --all-targets -- -D warnings
 echo "cargo clippy passed (default, no default, all features)"
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
 echo "cargo doc passed"

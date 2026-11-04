@@ -38,6 +38,10 @@ To ensure code quality, run the following before committing:
   inputs from `benches/common` and Spot-generated `benches/fixtures`), plus `wallclock`
   (criterion, informational). Benchmarks use public API only; names are tracked over time
   (`tools/bench` SQLite history), so rename them only deliberately.
+- `bin/` holds command line tools (workspace members, `publish = false`, not part of the library):
+  `oai` (reads HOA from stdin, `todpa` converts to a deterministic parity automaton) and
+  `omega-learning-tasks` (generates learning tasks and runs sprout over them, see its README).
+  They come from the former `frieda` repository, which this repository now is.
 - `tools/bench/` is a separate crate (`automata-bench`, own `Cargo.lock`, not part of the
   library): runs/compares benchmarks, serves the dashboard. See `docs/benchmarking.md`.
 
