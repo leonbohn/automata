@@ -107,6 +107,9 @@ pub fn hue(k: usize) -> usize {
 pub struct Band {
     pub name: String,
     pub values: Vec<u64>,
+    /// Positions of the commits at which a benchmark of this band first has a result. Before
+    /// that its value is the one of its first result (see [`align`]).
+    pub added: Vec<usize>,
 }
 
 /// A stacked area chart: at each commit the bands are piled up, so the outline is the total.
@@ -166,31 +169,64 @@ pub fn stacked(commits: &[Point], bands: &[Band]) -> String {
             fmt_short(totals[i]),
         );
     }
+    // a benchmark that was added later is backfilled with its first value, which is marked by a
+    // dashed line at the commit that introduced it, so that the backfilled data is recognizable
+    let mut marks: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
+    for band in bands {
+        for i in band.added.iter().filter(|i| **i > 0) {
+            marks.entry(*i).or_default().push(&band.name);
+        }
+    }
+    for (i, names) in marks {
+        let _ = write!(
+            out,
+            r#"<line class="added" x1="{0:.1}" x2="{0:.1}" y1="{1}" y2="{2}" stroke="currentColor" stroke-dasharray="3 3" stroke-width=".7"><title>added here: {3}; the values to the left are backfilled with the first value</title></line>"#,
+            x(i),
+            pad,
+            h - pad,
+            esc(&names.join(", "))
+        );
+    }
     out.push_str("</svg>");
     out
 }
 
 /// Aligns the histories of benchmarks to the list of all commits. A benchmark that did not exist
-/// at a commit contributes nothing there.
+/// at a commit gets the value of its first result there (backfilling), so that adding a benchmark
+/// does not make the stacked chart jump. Gaps after the first result stay empty.
 pub fn align(
     commits: &[Point],
     benches: &BTreeMap<String, Vec<Point>>,
     name_of: impl Fn(&str) -> String,
 ) -> Vec<Band> {
-    let mut grouped: BTreeMap<String, Vec<u64>> = BTreeMap::new();
+    let mut grouped: BTreeMap<String, (Vec<u64>, Vec<usize>)> = BTreeMap::new();
     for (bench, points) in benches {
-        let values = grouped
+        let (values, added) = grouped
             .entry(name_of(bench))
-            .or_insert_with(|| vec![0; commits.len()]);
+            .or_insert_with(|| (vec![0; commits.len()], Vec::new()));
+        let mut first = None;
         for p in points {
             if let Some(i) = commits.iter().position(|c| c.run == p.run) {
                 values[i] += p.value;
+                if first.is_none() {
+                    first = Some((i, p.value));
+                }
             }
+        }
+        if let Some((i, value)) = first {
+            for v in &mut values[..i] {
+                *v += value;
+            }
+            added.push(i);
         }
     }
     grouped
         .into_iter()
-        .map(|(name, values)| Band { name, values })
+        .map(|(name, (values, added))| Band {
+            name,
+            values,
+            added,
+        })
         .collect()
 }
 
@@ -239,7 +275,10 @@ mod tests {
             b.split("::").next().unwrap().to_string()
         });
         assert_eq!(bands.len(), 2);
-        assert_eq!(bands[0].values, vec![10, 25]);
+        // `a::x::2` is backfilled with its first value
+        assert_eq!(bands[0].values, vec![15, 25]);
+        assert_eq!(bands[0].added, vec![0, 1]);
+        assert!(stacked(&commits, &bands).contains("added here: a"));
         let svg = stacked(&commits, &bands);
         assert_eq!(svg.matches("<path").count(), 2);
     }

@@ -118,6 +118,7 @@ in
         "dfa"
         "dpa"
         "storage"
+        "learning"
       ];
       description = "Gungraun bench targets to run, those a revision does not define are skipped.";
     };

@@ -259,6 +259,10 @@ pub mod hoa;
 #[cfg(feature = "families")]
 pub mod families;
 
+/// Passive and active learning of automata. Needs the feature `learning`.
+#[cfg(feature = "learning")]
+pub mod learning;
+
 /// This module defines transition systems and successor functions and such.
 #[macro_use]
 pub mod ts;

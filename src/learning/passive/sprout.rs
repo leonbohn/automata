@@ -1,0 +1,337 @@
+/// Module defining ConsistencyCheck and implementing it for various omega acceptance conditions
+mod consistency;
+pub use consistency::*;
+
+use crate::{DTS, Pointed, States};
+use itertools::Itertools;
+use tracing::{error, info, trace};
+
+use crate::Void;
+use crate::alphabet::CharAlphabet;
+use crate::automaton::WithInitial;
+use crate::ts::{Deterministic, Shrinkable, Sproutable, StateId};
+use crate::word::OmegaWord;
+use std::fmt::Debug;
+
+use super::OmegaSample;
+use crate::learning::LearningError;
+
+/// The ways in which [`sprout`] can fail.
+#[derive(thiserror::Error)]
+pub enum SproutError<A: ConsistencyCheck<WithInitial<DTS>>> {
+    /// The time limit was exceeded.
+    #[error("timeout was exceeded, bailing with ts of size {}", aut.state_count())]
+    Timeout {
+        /// The transition system that was constructed so far.
+        aut: WithInitial<DTS>,
+    },
+    /// The threshold on the length of escape prefixes was exceeded.
+    #[error("escape prefix threshold `{thres}` exceeded, bailing with ts of size {}", aut.state_count())]
+    Threshold {
+        /// The threshold that was exceeded.
+        thres: usize,
+        /// The default automaton, which accepts precisely the positive words.
+        aut: A::Aut,
+    },
+    /// An internal step failed, which indicates an inconsistent sample.
+    #[error(transparent)]
+    Learning(#[from] LearningError),
+}
+
+impl<A: ConsistencyCheck<WithInitial<DTS>>> Debug for SproutError<A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use SproutError::*;
+        write!(
+            f,
+            "{}",
+            match self {
+                Timeout { aut: _ } => "reached timeout".to_string(),
+                Threshold { thres, aut } => format!(
+                    "exceeded threshold {thres} with automaton of size {}",
+                    aut.state_count()
+                ),
+                Learning(error) => error.to_string(),
+            }
+        )
+    }
+}
+
+/// The result of [`sprout`]: the learned automaton or the reason why learning failed.
+#[allow(type_alias_bounds)]
+pub type SproutResult<A: ConsistencyCheck<WithInitial<DTS>>> = Result<A::Aut, SproutError<A>>;
+
+/// gives a deterministic acc_type omega automaton that is consistent with the given sample
+/// implements the sprout passive learning algorithm for omega automata from <https://arxiv.org/pdf/2108.03735.pdf>
+/// # Example
+/// ```
+/// use automata::alphabet::CharAlphabet;
+/// use automata::automaton::BuchiCondition;
+/// use automata::learning::passive::{OmegaSample, sprout::sprout};
+/// use automata::upw;
+///
+/// // all words containing infinitely many `a` are positive
+/// let sample = OmegaSample::new_omega_from_pos_neg(
+///     CharAlphabet::of_size(2),
+///     [upw!("a"), upw!("a", "b")],
+///     [upw!("b")],
+/// );
+/// let dba = sprout(sample.clone(), BuchiCondition).unwrap();
+/// for word in sample.positive_words() {
+///     assert!(dba.accepts(word));
+/// }
+/// for word in sample.negative_words() {
+///     assert!(!dba.accepts(word));
+/// }
+/// ```
+pub fn sprout<A: ConsistencyCheck<WithInitial<DTS>>>(
+    sample: OmegaSample,
+    acc_type: A,
+) -> SproutResult<A> {
+    let time_start = std::time::Instant::now();
+
+    // make ts with initial state
+    let mut ts: WithInitial<DTS> =
+        WithInitial::new_with_initial_color(sample.alphabet().clone(), Void);
+
+    // compute threshold
+    let (lb, le) = sample
+        .words()
+        .map(|w| (w.spoke().len(), w.cycle().len()))
+        .fold((0, 0), |(a0, a1), (b0, b1)| (a0.max(b0), a1.max(b1)));
+    let thresh = (lb + le.pow(2) + 1) as isize;
+    info!("starting sprout with threshold {thresh}");
+
+    // while there are positive sample words that are escaping
+    let mut pos_sets = vec![];
+    let mut neg_sets = vec![];
+    let mut mut_sample = sample.clone();
+
+    'outer: loop {
+        trace!(
+            "attempting to find an escape prefix with sets\npos {pos_sets:?}, neg {neg_sets:?}\n{mut_sample:?}\n{ts:?}"
+        );
+        let Some(escape_prefix) = mut_sample
+            .positive_words()
+            .filter_map(|w| ts.run(w).escape_prefix())
+            .unique()
+            .min()
+        else {
+            break;
+        };
+
+        trace!("found escape prefix {escape_prefix:?}");
+        // the timeout is fixed, there is no way to configure it yet
+        if time_start.elapsed() >= std::time::Duration::from_secs(60 * 30) {
+            error!(
+                "task exceeded timeout, aborting with automaton of size {}",
+                ts.state_count()
+            );
+            return Err(SproutError::Timeout { aut: ts });
+        }
+        // check thresh
+        if (escape_prefix.len() as isize) - 2 > thresh {
+            error!(
+                "task exceeded threshold with an automaton of size {}",
+                ts.state_count()
+            );
+            // compute default automaton
+            return Err(SproutError::Threshold {
+                thres: thresh as usize,
+                aut: acc_type.default_automaton(&sample),
+            });
+        }
+
+        let source = ts
+            .reached_state(&escape_prefix)
+            .ok_or(LearningError::Incomplete)?;
+        let sym = escape_prefix.escape_symbol();
+
+        for q in ts.states().collect_vec() {
+            // try adding transition
+            ts.add_edge((source, sym, Void, q));
+            // continue if consistent
+            let (is_consistent, pos_sets_new, neg_sets_new) =
+                acc_type.consistent(&ts, &mut_sample, pos_sets.clone(), neg_sets.clone());
+            if is_consistent {
+                // update already known infinity sets
+                pos_sets = pos_sets_new;
+                neg_sets = neg_sets_new;
+                mut_sample.remove_non_escaping(&ts);
+                continue 'outer;
+            } else {
+                ts.remove_edges_from_matching(source, sym);
+            }
+        }
+        // if none consistent add new state
+        let new_state = ts.add_state(Void);
+        ts.add_edge((source, sym, Void, new_state));
+    }
+
+    info!(
+        "completed sprout algorithm after {} microseconds",
+        time_start.elapsed().as_micros()
+    );
+    Ok(acc_type.consistent_automaton(&ts, &mut_sample, pos_sets, neg_sets)?)
+}
+
+impl OmegaSample {
+    /// Remove all words from the sample that are not escaping in the given transition system
+    pub fn remove_non_escaping<T>(&mut self, ts: &T)
+    where
+        T: Deterministic<Alphabet = CharAlphabet, StateIndex = StateId> + Pointed,
+    {
+        // run transition system on sample words and
+        // separate in escaping and non-escaping (successful) runs
+        self.positive.retain(|w| !ts.run(w).is_successful());
+        self.negative.retain(|w| !ts.run(w).is_successful());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::DTS;
+    use crate::Void;
+    use crate::alphabet::CharAlphabet;
+    use crate::automaton::{BuchiCondition, MinEvenParityCondition};
+    use crate::learning::passive::OmegaSample;
+    use crate::ts::Sproutable;
+
+    #[test]
+    fn sprout_buchi_successful() {
+        let sigma = CharAlphabet::of_size(2);
+
+        // build sample
+        let sample =
+            OmegaSample::new_omega_from_pos_neg(sigma, [upw!("a"), upw!("a", "b")], [upw!("b")]);
+
+        // build dba
+        let dba = DTS::builder()
+            .with_transitions([
+                (0, 'a', true, 1),
+                (1, 'a', true, 0),
+                (1, 'b', true, 1),
+                (0, 'b', false, 2),
+                (2, 'a', false, 2),
+                (2, 'b', false, 2),
+            ])
+            .default_color(Void)
+            .into_dba(0);
+
+        let res = sprout(sample.clone(), BuchiCondition).unwrap();
+        for pos in sample.positive_words() {
+            assert!(dba.accepts(pos));
+            assert!(res.accepts(pos));
+        }
+        for neg in sample.negative_words() {
+            assert!(!dba.accepts(neg));
+            assert!(!res.accepts(neg));
+        }
+
+        assert_eq!(res, dba);
+    }
+
+    #[test]
+    fn sprout_buchi_thresh() {
+        let sigma = CharAlphabet::of_size(2);
+
+        // build sample
+        let sample = OmegaSample::new_omega_from_pos_neg(
+            sigma,
+            [upw!("a"), upw!("baa")],
+            [upw!("ab"), upw!("ba"), upw!("babaa"), upw!("baaba")],
+        );
+
+        // build dba
+        let dba = DTS::builder()
+            .with_transitions([
+                (0, 'a', true, 1),
+                (0, 'b', true, 2),
+                (1, 'a', true, 1),
+                (1, 'b', false, 5),
+                (2, 'a', true, 3),
+                (2, 'b', false, 5),
+                (3, 'a', true, 4),
+                (3, 'b', false, 5),
+                (4, 'b', true, 2),
+                (4, 'a', false, 5),
+                (5, 'a', false, 5),
+                (5, 'b', false, 5),
+            ])
+            .default_color(Void)
+            .into_dba(0);
+
+        let Err(SproutError::Threshold {
+            thres: _t,
+            aut: res,
+        }) = sprout(sample, BuchiCondition)
+        else {
+            panic!("expected to hit threshold");
+        };
+        assert_eq!(res, dba);
+    }
+
+    #[test]
+    fn sprout_parity() {
+        let sigma = CharAlphabet::of_size(2);
+
+        // build sample
+        let sample = OmegaSample::new_omega_from_pos_neg(
+            sigma,
+            [upw!("a"), upw!("aab")],
+            [upw!("b"), upw!("abb")],
+        );
+
+        // build dba
+        let dpa = DTS::builder()
+            .with_transitions([
+                (0, 'a', 0, 0),
+                (0, 'b', 0, 1),
+                (1, 'a', 0, 0),
+                (1, 'b', 1, 2),
+                (2, 'a', 1, 2),
+                (2, 'b', 1, 2),
+            ])
+            .default_color(Void)
+            .into_dpa(0);
+
+        let res = sprout(sample, MinEvenParityCondition).unwrap();
+        assert_eq!(res, dpa);
+    }
+
+    #[test]
+    fn sprout_parity_thresh() {
+        let sigma = CharAlphabet::of_size(2);
+
+        // build sample
+        let sample = OmegaSample::new_omega_from_pos_neg(
+            sigma,
+            [upw!("a"), upw!("baaa")],
+            [upw!("ba"), upw!("baa")],
+        );
+
+        // build dba
+        let mut dpa = DTS::builder()
+            .with_transitions([
+                (0, 'a', 0, 1),
+                (1, 'a', 0, 1),
+                (0, 'b', 0, 2),
+                (2, 'a', 0, 3),
+                (3, 'a', 0, 4),
+                (4, 'a', 0, 5),
+                (5, 'b', 0, 2),
+            ])
+            .default_color(Void)
+            .into_dpa(0);
+        dpa.complete_with_colors(Void, 1);
+
+        let Err(SproutError::Threshold {
+            thres: _t,
+            aut: res,
+        }) = sprout(sample, MinEvenParityCondition)
+        else {
+            panic!("expected threshold to be exceeded");
+        };
+        assert_eq!(res, dpa);
+    }
+}

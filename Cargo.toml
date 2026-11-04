@@ -45,6 +45,8 @@ default = ["hoa"]
 random = ["dep:rand"]
 hoa = ["dep:hoars"]
 families = []
+# passive and active learning algorithms (sprout, DPAInf, L*), see `automata::learning`
+learning = ["families"]
 graphviz = ["dep:tempfile", "dep:open", "dep:base64"]
 render = ["dep:layout-rs", "dep:base64", "dep:resvg", "dep:open", "dep:tempfile", "dep:usvg"]
 
@@ -54,6 +56,10 @@ all-features = true
 [[example]]
 name = "hoa"
 required-features = ["hoa"]
+
+[[example]]
+name = "learning"
+required-features = ["learning"]
 
 
 [[bench]]
@@ -85,6 +91,11 @@ required-features = ["hoa"]
 name = "dfa"
 harness = false
 required-features = ["hoa"]
+
+[[bench]]
+name = "learning"
+harness = false
+required-features = ["hoa", "learning"]
 
 [[bench]]
 name = "wallclock"

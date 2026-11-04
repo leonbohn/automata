@@ -22,6 +22,7 @@ There are three layers:
 |---|---|
 | `scc` | Strongly connected components (iterative and recursive Tarjan, Kosaraju) on rings, paths, trees, grids, chains of cycles, irregular graphs |
 | `ts` | Building a transition system edge by edge and with the builder, edge lookup, products, reachability, minimal representatives, predecessors, `clone`/`collect`/`map_edge_colors`, removing edges and states, subset construction |
+| `learning` | `sprout` on samples of lassos and L\* against a Mealy machine (needs the feature `learning`; the tool builds the features that the `required-features` of the selected targets name) |
 | `storage` | The same operations on `Det<LinkedTs>`, `DenseTs` and the read-only `CsrTs` (benchmarks ending in `_linked`, `_dense` and `_csr`, the latter only for operations that do not change the system): building, overwriting, successor and edge lookup, predecessors, reachability, runs, products, minimization, completion, removing states, `clone` |
 | `runs` | Runs of finite words (one long word, many short ones), runs of lassos, infinity sets (recurrent edge colors and states), visited sequences, on synthetic and on fixture automata |
 | `dfa` | Minimization (Hopcroft/Moore, with and without edge colors), union, intersection, complement, emptiness and witness, equivalence |
@@ -123,7 +124,8 @@ Plain HTML and CSS, server-rendered, with inline SVG charts. The only JavaScript
 swaps the queue and the history without reloading. The page has no script of its own.
 
 - **History of `main`**: a stacked chart of the whole suite (per benchmark file, or per benchmark of one
-  file) and one chart per benchmark, one point per commit. The metric can be switched between instructions,
+  file; a benchmark that was added later is backfilled with its first value so that adding it does not make
+  the chart jump, and a dashed line marks the commit that introduced it) and one chart per benchmark, one point per commit. The metric can be switched between instructions,
   estimated cycles, allocated bytes and allocations. Points that changed by more than the threshold are red
   or green.
 - **Pull requests** and the **detail view of a run**: the comparison, the environment, the log (live while

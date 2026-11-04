@@ -1,0 +1,185 @@
+use std::fmt::Debug;
+
+use crate::alphabet::{Alphabet, CharAlphabet};
+use crate::automaton::MealyMachine;
+use crate::dag::Dag;
+use crate::learning::LearningError;
+use crate::representation::{CollectPointed, IntoTransitions};
+use crate::ts::operations::DefaultIfMissing;
+use crate::ts::{Sccs, StateId};
+use crate::word::FiniteWord;
+use crate::{Color, DTS, Int, Pointed, States, Void};
+use crate::{RightCongruence, TransitionSystem};
+
+/// A priority mapping is essentially a [`MealyMachine`], i.e. it reads
+/// finite words and ouptuts a priority (which in this case is a `usize`).
+pub type WeakPriorityMapping<A = CharAlphabet> = MealyMachine<DTS<A, Void, Int>>;
+
+/// Stores information on classes/states of a [`RightCongruence`]. This may be
+/// extended in the futuer, but for now it simply stores whether a class c is
+/// idempoten (meaning cc ~ c) and whether it is good (in the sense that the
+/// omega iteration of c is in the language L_c).
+#[derive(Clone, Copy, Ord, PartialEq, PartialOrd, Eq, Hash, Default)]
+pub struct Annotation {
+    pub(super) idempotent: bool,
+    pub(super) good: Option<bool>,
+}
+
+impl std::fmt::Display for Annotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(if !self.idempotent {
+            "#"
+        } else {
+            match self.good {
+                Some(true) => "+",
+                Some(false) => "-",
+                None => "o",
+            }
+        })
+    }
+}
+
+impl std::fmt::Debug for Annotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(b) = self.good {
+            write!(f, "{}", if b { '+' } else { '-' })?;
+        }
+        Ok(())
+    }
+}
+
+impl Annotation {
+    /// Creates a new annotation.
+    pub fn new(idempotent: bool, good: Option<bool>) -> Self {
+        Self { idempotent, good }
+    }
+}
+
+/// This a simple newtype wrapper around a congruence, which has no edge colors and uses
+/// [`Annotation`]s as state colors.
+#[derive(Clone)]
+pub struct AnnotatedCongruence<A: Alphabet = CharAlphabet>(
+    RightCongruence<DTS<A, Annotation, Void>>,
+);
+
+impl<A: Alphabet> AnnotatedCongruence<A> {
+    /// Wraps a right congruence whose states are annotated.
+    pub fn new(rc: RightCongruence<DTS<A, Annotation, Void>>) -> Self {
+        Self(rc)
+    }
+}
+
+pub trait ClassifiesIdempotents<A: Alphabet> {
+    fn classify(&self, class: impl FiniteWord<Symbol = A::Symbol>) -> Option<bool>;
+}
+
+impl<A: Alphabet, CI: ClassifiesIdempotents<A>> ClassifiesIdempotents<A> for &CI {
+    fn classify(&self, class: impl FiniteWord<Symbol = <A as Alphabet>::Symbol>) -> Option<bool> {
+        CI::classify(self, class)
+    }
+}
+
+impl<A: Alphabet> Debug for AnnotatedCongruence<A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl<A: Alphabet> AnnotatedCongruence<A> {
+    /// Computes the canonic coloring on a given annotated congruence. This makes use
+    /// of the dag of strongly connected components of the congruence. For more information
+    /// on how the computation is done exactly, see [Section 5, Step 2](https://arxiv.org/pdf/2302.11043.pdf).
+    ///
+    /// # Errors
+    /// Fails if more priorities than [`Int`] can hold are needed.
+    pub fn canonic_coloring(&self) -> Result<WeakPriorityMapping<A>, LearningError> {
+        // we first need to decompose into sccs and mark them with the color of the
+        // idempotent that it contains.
+        let tjdag = Sccs::on(&self.0).compute();
+        let mut dag: Dag<Result<usize, Option<bool>>> =
+            tjdag.fold_state_colors(Err(None), |acc, x| match (acc, x.good) {
+                (Err(None), None) => Err(None),
+                (Err(Some(x)), Some(y)) => Err(Some(x || y)),
+                (Err(Some(x)), None) => Err(Some(x)),
+                (Err(None), Some(x)) => Err(Some(x)),
+                // the fold starts with an `Err`, so there is no color yet
+                (Ok(i), _) => Ok(i),
+            });
+
+        let mut seen = std::collections::BTreeSet::default();
+        while !dag.masked_is_empty(&seen) {
+            let t = dag
+                .masked_terminal_nodes(&seen)
+                .next()
+                .ok_or(LearningError::Incomplete)?;
+            seen.insert(t);
+            // the colors of the successors are known as they were processed before
+            let mut i = 0;
+            for immediate in dag.immediate(t) {
+                match dag.color(immediate) {
+                    Some(Ok(color)) => i = i.max(*color),
+                    _ => return Err(LearningError::Incomplete),
+                }
+            }
+            let parity = i % 2 == 0;
+
+            let color = dag.color_mut(t).ok_or(LearningError::Incomplete)?;
+            let offset = match color {
+                Err(Some(true)) => !parity as usize,
+                Err(Some(false)) => parity as usize,
+                _ => 0,
+            };
+            *color = Ok(i + offset);
+        }
+
+        let mut state_coloring = crate::math::FxIndexMap::<StateId, Int>::default();
+        for q in self.0.states() {
+            let scc = tjdag.scc_index_of(q).ok_or(LearningError::Incomplete)?;
+            let Some(Ok(color)) = dag.color(*scc) else {
+                return Err(LearningError::Incomplete);
+            };
+            let color = Int::try_from(*color).map_err(|_| LearningError::Priorities {
+                used: *color,
+                max: Int::MAX as usize,
+            })?;
+            state_coloring.insert(q, color);
+        }
+
+        // the mapping of a word is the color of the SCC that its last state belongs to
+        Ok((&self.0)
+            .erase_state_colors()
+            // every state has a color, as the loop above covers all of them
+            .map_edge_colors_full(|_p, _e, _c, q| state_coloring.get(&q).copied().unwrap_or(0))
+            .collect_mealy())
+    }
+
+    /// Takes a reference to a right congruence and a function that classifies idempotents
+    /// of the congruence to construct an annotated congruence.
+    pub fn build<Q, C, F>(rc: &RightCongruence<DTS<A, Q, C>>, f: F) -> Self
+    where
+        Q: Color,
+        C: Color,
+        F: ClassifiesIdempotents<A>,
+    {
+        let annotations: crate::math::FxIndexMap<_, _> = rc
+            .states()
+            .map(|i| {
+                // states that cannot be reached have no representative and are not idempotent
+                let out = match rc.state_to_mr(i) {
+                    Some(cls) if !cls.is_empty() && rc.is_idempotent(i) == Some(true) => {
+                        Annotation::new(true, f.classify(cls))
+                    }
+                    _ => Annotation::new(false, None),
+                };
+                (i, out)
+            })
+            .collect();
+
+        Self::new(
+            rc.erase_edge_colors()
+                .with_state_color(DefaultIfMissing::new(annotations, Annotation::default()))
+                .with_initial(rc.initial())
+                .collect(),
+        )
+    }
+}
