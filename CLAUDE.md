@@ -145,7 +145,7 @@ Two distinctions that recur everywhere:
   crate-wide `#[non_exhaustive]` `Error` with `Error::NotYetImplemented` for missing
   constructions; domain errors (`PropAlphabetError`, `NotPeriodicError`, `hoa::HoaError`,
   `BuilderError`, `AcceptanceError`) convert into it. Never `String` as an error type.
-  Panics that remain are documented with `# Panics` sections (panic audit, issue #7).
+  Panics that remain are documented with `# Panics` sections (panic audit, issue leonbohn/automata-archive#7).
 - Use `tracing` for logging in library code (no `println!`).
 - Features must stay independent: code using an optional dependency needs the matching
   `#[cfg(feature = "...")]`. `scripts/check` and CI build `--no-default-features` and
@@ -162,7 +162,7 @@ Two distinctions that recur everywhere:
 
 - Nested generics (`DFA<DTS<CharAlphabet, bool, Void>>`) make compiler messages long. The
   aliases exist precisely to hide this — prefer them and add one rather than spelling types out.
-- ~300 `unwrap`/`expect` remain in library code (issue #7 tracks the audit); most encode
+- ~300 `unwrap`/`expect` remain in library code (issue leonbohn/automata-archive#7 tracks the audit); most encode
   internal invariants. Before changing one, check whether it is reachable from input.
 - Lazy adapters (`Recolor`, `SubsetConstruction`, `Quotient`, ...) compute on every query and
   memoize nothing; materialize with `.collect::<T>()`. `SubsetConstruction`/`MatchingProduct`

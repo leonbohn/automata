@@ -1,5 +1,5 @@
 //! A deliberately naive model of a transition system, used as the reference in model-based tests
-//! of the storages (#53). Everything here favours being obviously correct over being fast: states
+//! of the storages (leonbohn/automata-archive#53). Everything here favours being obviously correct over being fast: states
 //! are a `Vec`, edges are plain lists, and every query is a linear scan.
 //!
 //! The model is independent of the library traits on purpose, so that it cannot share a bug with

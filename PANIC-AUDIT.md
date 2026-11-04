@@ -1,8 +1,8 @@
 # Panic audit
 
 Library code does not panic on input. Panics that remain encode invariants or are documented with
-a `# Panics` section. This file lists them for the module `automata::learning` (issue #118,
-phase 6 of `docs/INTEGRATE.md`); the audit of the rest of the crate is tracked in issue #7.
+a `# Panics` section. This file lists them for the module `automata::learning` (issue #138,
+phase 6 of `docs/INTEGRATE.md`); the audit of the rest of the crate is tracked in issue leonbohn/automata-archive#7.
 
 ## Converted to errors
 

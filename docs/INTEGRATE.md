@@ -32,7 +32,7 @@ instead of `println!`, features stay independent, confer before committing/pushi
 
 ## Status
 
-Legend: `[x]` done, `[-]` skipped on purpose, `[ ]` open. Progress is tracked in #118.
+Legend: `[x]` done, `[-]` skipped on purpose, `[ ]` open. Progress is tracked in #138.
 
 - Phases 0 to 5 are done on `feat/learning`, apart from the open items below.
 - The history is **not** imported (plain copy of `automata-learning` commit `1ed4171`), so the
@@ -71,7 +71,7 @@ Legend: `[x]` done, `[-]` skipped on purpose, `[ ]` open. Progress is tracked in
 - [x] Decide the public path: `automata::learning::{passive, active}` (recommended; keeps the old
       module names so the migration is `automata_learning::X` -> `automata::learning::X`).
 - [x] Decide feature name and its dependencies (see Phase 2). Recommended: `learning`.
-- [x] Open a tracking issue with this checklist (#118).
+- [x] Open a tracking issue with this checklist (#138).
 - [ ] Freeze `automata-learning`: no further feature work in the old repo, only the port.
 
 ## Phase 1 — Baseline the source crate
@@ -276,14 +276,14 @@ in `families`.
 
 ## Phase 8b - Benchmarks
 - [x] Add benchmarks for the learning part, update the nix module
-- [x] Decide on a way to backfill benchmark values as to not make the stacked performance graph go up. See issue #115.
+- [x] Decide on a way to backfill benchmark values as to not make the stacked performance graph go up. See issue #137.
 
 Notes: `benches/learning.rs` exists (Phase 6); `tools/bench` now builds the features named by the
 `required-features` of the selected targets, `learning` is in the default list of `--bench` and of
 `nix/module.nix`. Backfilling is done when the chart is drawn (`charts::align`), not in the database:
 before its first result a benchmark counts with that first value and a dashed line marks the commit
 that added it, so the stored data stays real. Only the stacked chart changes; the per-benchmark charts
-show real points. Not done from #115: smaller charts, `storage` comparison on one axis. Not run
+show real points. Not done from #137: smaller charts, `storage` comparison on one axis. Not run
 end to end (a `compare` run takes long); the feature handling is unit-tested.
 
 
@@ -299,41 +299,47 @@ end to end (a `compare` run takes long); the feature handling is unit-tested.
 
 ## Phase 10 — Release and retire the old crate
 
-- [ ] Follow `RELEASE.md` for the `automata` release (0.2.x if additive, 0.3.0 if `families` or
-      other public API changed).
-- [ ] In `automata-learning`: publish `0.1.1` (or `0.2.0`) that only changes the README and crate
-      docs to say "moved to `automata`, feature `learning`" and adds
-      `#[deprecated]`-style notices/`[badges] maintenance = { status = "deprecated" }`.
-      Do not re-export from `automata` (that would make a dependency cycle in spirit and tie the
-      old crate to new versions).
-- [ ] Archive the GitHub repo `leonbohn/automata-learning` and update its README to point at
-      `automata`.
-- [ ] `frieda`:
-      - root `Cargo.toml`: remove `automata-learning = "0.1"`, set
-        `automata = { version = "0.2", features = ["learning", ...] }`;
-      - `bin/omega-learning-tasks/Cargo.toml`: depend on the workspace `automata`;
-      - update `use automata_learning::` -> `use automata::learning::`;
-      - `cargo build`, run the binaries on a small input as smoke test.
-- [ ] Close the tracking issue; note the release version in it.
-- [ ] Consolidate the repositories, so that GitHub shows the real age of the project: `frieda` is the
-      old `automata` repository (renamed, about 3 years of history), the current `leonbohn/automata`
-      is young. Do this only after the merge, the release and the migration steps above:
-      - verify how the histories relate (`git merge-base` of `frieda` and `automata`); the crate was
-        extracted from `frieda` with history, so the `automata` history may descend from it;
-      - make sure nothing is lost: back up `leonbohn/automata` (a bare mirror clone), move or record
-        the open issues and PRs that are still wanted (issues, PRs and stars are not copied by a
-        rename), and check the repository settings: secrets, webhooks (the benchmark service
-        listens to the webhook of `automata`), branch protection, the `performance` label, the
-        crates.io trusted-publishing or token setup;
-      - put the code of `automata` onto `frieda` (integrating and overwriting its current content;
-        keep its old state on a branch or tag such as `legacy`), via a merge or a force push, as
-        decided then;
-      - delete `leonbohn/automata` (this frees the name; it cannot be undone), then rename
-        `leonbohn/frieda` to `leonbohn/automata`;
-      - afterwards: `repository` and `homepage` in `Cargo.toml` (they stay valid, the URL is the
-        same), the webhook URL and `repo` option of the benchmark service (`nix/module.nix`,
-        `docs/benchmarking.md`), CI badges and the links in README and docs, local clones
-        (`git remote set-url`), and the crates.io page after the next release.
+- [x] Release `automata` 0.2.1 (additive, so a patch release), following `RELEASE.md`. Tag `v0.2.1`.
+- [-] `automata-learning` 0.1.1 (README and crate docs only, `maintenance = deprecated`) is prepared on
+      the branch `deprecate` of the old repository, based on the tag `v0.1.0`. It is not published,
+      because the maintainer may delete the crate from crates.io instead (it is a few days old and
+      has no users). No re-export from `automata`.
+- [x] The GitHub repository `leonbohn/automata-learning` has a README notice on `main` and is archived.
+- [x] `frieda` is migrated to `automata` 0.2.1 with the feature `learning` (branch
+      `migrate-automata-0.2` of the former `frieda`): `omega-learning-tasks` and `oai` are ported to
+      the 0.2 API (the round trip through `CharAlphabet` in `oai` is gone, `sprout` has the new
+      error variant), `incong` is removed. Both binaries were smoke tested (`oai todpa` on a HOA
+      file, `omega-learning-tasks gen` and `sprout` on a few tasks).
+- [ ] Close the tracking issue (now `leonbohn/automata#138`) and note the release version in it (done:
+      comment with 0.2.1; closing is left until the open items below are done).
+- [x] Consolidate the repositories, so that GitHub shows the real age of the project (the repository
+      `frieda` was created 2024-03-08). What was done, in this order:
+      - The histories of `automata` and `frieda` are unrelated (no merge base; both start with a
+        commit "Migrate code from old repository" on 2024-03-08).
+      - Backup: bare mirrors of both repositories (kept outside of the repository).
+      - The 12 open issues were transferred from `automata` to `frieda` with `gh issue transfer`
+        (labels `api-redesign` and `performance` and the milestones `0.2.0`, `0.3.0` were created
+        in `frieda` first). Mapping old -> new: 5->128, 12->129, 19->130, 26->131, 30->132,
+        60->133, 71->134, 77->135, 97->136, 115->137, 118->138, 119->139. Pull requests cannot be
+        transferred; the open PR #120 was merged before and #121 is the release PR.
+      - Instead of deleting it, the old repository `leonbohn/automata` was renamed to
+        `leonbohn/automata-archive` and archived (its issues, PRs and reviews stay readable; its
+        webhook was removed). `leonbohn/frieda` was then renamed to `leonbohn/automata`.
+      - The tree of the previous `automata` was merged into `frieda/main` with
+        `git merge --allow-unrelated-histories -s ours`, so the whole history of `frieda` is
+        part of `main` and the push was a fast-forward. The binaries `oai` and `omega-learning-tasks`
+        became workspace members in `bin/` (excluded from the published crate); the rest of the old
+        `frieda` tree (`python/`, `assets/`, old workflows) is only in the history. The tags
+        `v0.1.0`, `v0.2.0`, `v0.2.1` were pushed.
+      - References to issue and PR numbers in the repository were rewritten: moved issues use
+        their new number (`#138`), all others (closed issues and PRs) point to
+        `leonbohn/automata-archive#N`. Old commit messages keep the old numbers.
+- [ ] Still open after the consolidation:
+      - recreate the webhook of the benchmark service on `leonbohn/automata` (maintainer);
+      - close or update the old open PRs of `frieda` (#119 to #127, mostly stale dependabot PRs);
+      - branch protection for `main` (maintainer, guided);
+      - replace the local clone of `automata` by a clone of the new repository;
+      - check the first CI run on the new `main`.
 
 ## Risks and how to handle them
 

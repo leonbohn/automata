@@ -14,7 +14,7 @@ version can only be yanked, never overwritten).
       `cargo semver-checks check-release --baseline-version 0.1.0` (with the features you
       care about, e.g. `--all-features`).
 - [ ] Check open blockers: milestone / issues labelled for the release, items in `PLAN.md`
-      Phase 6 (e.g. issue #15), the panic audit (issue #7) if it is a stated release goal.
+      Phase 6 (e.g. issue leonbohn/automata-archive#15), the panic audit (issue leonbohn/automata-archive#7) if it is a stated release goal.
 
 ## 1. Prepare a release branch
 

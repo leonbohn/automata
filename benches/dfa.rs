@@ -61,7 +61,7 @@ fn minimize(dfa: DFA) -> usize {
     black_box(dfa.minimize().state_count())
 }
 
-// A Moore machine whose edges carry colors that are irrelevant for the result (#14).
+// A Moore machine whose edges carry colors that are irrelevant for the result (leonbohn/automata-archive#14).
 fn moore_with_edge_colors(n: usize) -> MooreMachine<DTS<CharAlphabet, bool, u32>> {
     let ts: DTS<CharAlphabet, bool, u32> =
         common::scrambled(n, 2).map_edge_colors(|_| 7u32).collect();
