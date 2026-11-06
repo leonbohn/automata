@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > `#128` to `#139` here.
 
 ## [Unreleased]
+### Changed
+- The dependency `hoars` is 0.4. It validates the header while parsing, so a missing `Acceptance:`
+  item is a parse error (`HoaError::Parse`) instead of `HoaError::MissingAcceptanceSets`, which now
+  only occurs for headers built by hand. Since `hoars` no longer caps labels at six variables, HOA
+  input accepts up to 31 atomic propositions (the limit of `PropAlphabet`) instead of 6.
 
 ## [0.2.1] - 2026-11-04
 

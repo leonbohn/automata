@@ -7,7 +7,7 @@ use crate::automaton::{
 use crate::ts::{DenseId, Det, ForAlphabet, Linked, LinkedTs, Sproutable, StateId, Storage};
 use crate::{
     Int,
-    alphabet::{PropAlphabet, PropAlphabetError, PropExpression},
+    alphabet::{PropAlphabet, PropExpression},
 };
 use hoars::HoaRepresentation;
 use tracing::{trace, warn};
@@ -238,17 +238,11 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
 
     fn try_from(value: &hoars::Header) -> Result<Self, Self::Error> {
         let (acceptance_sets, formula) = value
-            .iter()
-            .find_map(|it| match it {
-                hoars::HeaderItem::Acceptance(acceptance, cond) => Some((*acceptance, cond)),
-                _ => None,
-            })
+            .acceptance()
             .map_or((None, None), |(n, c)| (Some(n), Some(c)));
 
         let name = value
-            .iter()
-            .find_map(|it| it.try_acceptance_name())
-            .map(|(name, _)| name)
+            .acceptance_name()
             .ok_or_else(|| HoaError::UnsupportedAcceptance("missing acc-name".into()))?;
         match name {
             hoars::AcceptanceName::Buchi => Ok(OmegaAcceptanceCondition::Buchi),
@@ -457,14 +451,7 @@ type HoaParts = (
 /// number of states and inserts transitions with the appropriate labels and colors.
 fn hoa_automaton_parts(aut: HoaRepresentation) -> Result<HoaParts, HoaError> {
     let aps = aut.num_aps();
-    if aps > crate::hoa::MAX_APS {
-        return Err(PropAlphabetError::TooManyAtomicPropositions {
-            count: aps as usize,
-            max: crate::hoa::MAX_APS as usize,
-        }
-        .into());
-    }
-
+    // The number of atomic propositions is limited by [`PropAlphabet`], which rejects too many.
     let alphabet = PropAlphabet::try_from_apnames(aut.aps().iter())?;
     let mut ts: LinkedTs<PropAlphabet, Int, AcceptanceMask> = LinkedTs::for_alphabet(alphabet);
 
@@ -574,21 +561,17 @@ mod tests {
 
     #[test]
     fn parity_without_acceptance_item_is_an_error() {
-        let raw_hoa = r#"
-        HOA: v1
-        States: 1
-        Start: 0
-        acc-name: parity min even 2
-        AP: 1 "a"
-        --BODY--
-        State: 0
-        [0] 0 {0}
-        [!0] 0
-        --END--
-        "#;
-        let parsed = hoars::HoaRepresentation::try_from(raw_hoa).expect("valid HOA syntax");
+        // Since `hoars` 0.4 the parser itself rejects a missing `Acceptance:` item
+        // (`ValidationError::MissingAcceptance`), so the header is built by hand here.
+        let mut header = hoars::Header::new("v1");
+        header
+            .push(hoars::HeaderItem::AcceptanceName(
+                hoars::AcceptanceName::Parity,
+                vec![],
+            ))
+            .expect("acc-name is not repeated");
         assert_eq!(
-            super::OmegaAcceptanceCondition::try_from(parsed.header()),
+            super::OmegaAcceptanceCondition::try_from(&header),
             Err(super::HoaError::MissingAcceptanceSets)
         );
     }
@@ -735,14 +718,19 @@ State: 1
     }
 
     fn hoa_with(aps: &str, start: &str, body: &str) -> String {
+        hoa_with_states(2, aps, start, body)
+    }
+
+    fn hoa_with_states(states: usize, aps: &str, start: &str, body: &str) -> String {
         format!(
-            "HOA: v1\nStates: 2\n{start}\nacc-name: Buchi\nAcceptance: 1 Inf(0)\n{aps}\n--BODY--\n{body}\n--END--\n"
+            "HOA: v1\nStates: {states}\n{start}\nacc-name: Buchi\nAcceptance: 1 Inf(0)\n{aps}\n--BODY--\n{body}\n--END--\n"
         )
     }
 
     #[test]
     fn automaton_without_atomic_propositions_is_an_error() {
-        use super::{HoaError, PropAlphabetError};
+        use super::HoaError;
+        use crate::alphabet::PropAlphabetError;
         let hoa = hoa_with("AP: 0", "Start: 0", "State: 0\n[t] 0 {0}\nState: 1\n[t] 1");
         assert_eq!(
             failure(&hoa),
@@ -752,22 +740,32 @@ State: 1
 
     #[test]
     fn automaton_with_too_many_atomic_propositions_is_an_error() {
-        use super::{HoaError, PropAlphabetError};
+        use super::HoaError;
+        use crate::alphabet::PropAlphabetError;
+        // The limit comes from `PropAlphabet` (32 variables for `u32`), i.e. at most 31 APs.
+        let count = 32;
+        let names = (0..count)
+            .map(|i| format!("\"a{i}\""))
+            .collect::<Vec<_>>()
+            .join(" ");
         let hoa = hoa_with(
-            "AP: 7 \"a\" \"b\" \"c\" \"d\" \"e\" \"f\" \"g\"",
+            &format!("AP: {count} {names}"),
             "Start: 0",
             "State: 0\n[t] 0 {0}\nState: 1\n[t] 1",
         );
         assert!(matches!(
             failure(&hoa),
-            HoaError::Alphabet(PropAlphabetError::TooManyAtomicPropositions { count: 7, .. })
+            HoaError::Alphabet(PropAlphabetError::TooManyAtomicPropositions { count: 32, max: 31 })
         ));
     }
 
     #[test]
     fn state_ids_must_be_contiguous() {
         use super::HoaError;
-        let hoa = hoa_with(
+        // `hoars` itself rejects ids beyond `States:`, so declare enough states for id 5 to be
+        // in range; the error then comes from our contiguity check.
+        let hoa = hoa_with_states(
+            6,
             "AP: 1 \"a\"",
             "Start: 0",
             "State: 0\n[t] 0 {0}\nState: 5\n[t] 5",
