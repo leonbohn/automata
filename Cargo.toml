@@ -26,7 +26,7 @@ indexmap = "2.7"
 rand = { version = "0.10", optional = true }
 thiserror = "2.0"
 
-hoars = { version = "0.3", optional = true }
+hoars = { version = "0.4", optional = true }
 
 layout-rs = { version = "0.1.2", optional = true }
 open = { version = "5.3.2", optional = true }
