@@ -21,6 +21,8 @@
           automata-bench = pkgs.callPackage ./nix/package.nix {
             inherit (self.packages.${system}) gungraun-runner;
           };
+          # Spot incl. Python bindings; used to generate benchmark fixtures.
+          spot-platform = pkgs.callPackage ./nix/spot-platform.nix { };
           default = automata-bench;
         }
       );
@@ -52,7 +54,13 @@
               pkgs.valgrind
               self.packages.${system}.gungraun-runner
               self.packages.${system}.automata-bench
+              pkgs.python3
+              self.packages.${system}.spot-platform
             ];
+            # `import spot` in python3
+            shellHook = ''
+              export PYTHONPATH="${self.packages.${system}.spot-platform}/${pkgs.python3.sitePackages}''${PYTHONPATH:+:$PYTHONPATH}"
+            '';
           };
         }
       );
