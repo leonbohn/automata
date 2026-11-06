@@ -5,7 +5,10 @@ Deterministic parity automata (DPAs) in the HOA format that the benchmarks read.
 without it. The files are committed so that benchmarks neither need Spot nor depend on
 random numbers. Regenerate them with `scripts/generate_benchmark_fixtures.sh`, which needs the
 Spot tools `genltl`, `ltl2tgba`, `randaut`, `genaut` and `autfilt`. Regenerating changes the
-benchmark inputs, so it invalidates the history of the benchmarks.
+benchmark inputs, so it invalidates the history of the benchmarks. The script was also checked
+with Spot 2.16.2: it runs unchanged and produces the same 22 fixtures; 19 are identical, the other
+three (`ltl/gh-q-3`, `ltl/rv-counter-3`, `ltl/sejk-k-2`) are equivalent and have the same size, but
+number states and edges differently. They were not regenerated to keep the benchmark history.
 
 Every fixture is deterministic, complete, colored (exactly one priority per edge), uses
 `parity min even`, has one initial state and no unreachable states

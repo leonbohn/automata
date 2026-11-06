@@ -2,9 +2,10 @@
 #
 # Generates the deterministic parity automata (DPAs) used by the benchmarks.
 #
-# This needs Spot (https://spot.lre.epita.fr, tested with 2.14.5): genltl, ltl2tgba, randaut,
-# genaut and autfilt must be in the PATH. The result is committed to the repository; the
-# script is NOT run as part of a benchmark. See benches/fixtures/README.md.
+# This needs Spot (https://spot.lre.epita.fr): genltl, ltl2tgba, randaut, genaut and autfilt
+# must be in the PATH. The committed fixtures were generated with 2.14.5; the script was checked
+# with 2.16.2 (3 of 22 fixtures differ only in state and edge numbering). The result is committed
+# to the repository; the script is NOT run as part of a benchmark. See benches/fixtures/README.md.
 #
 # Usage: scripts/generate_benchmark_fixtures.sh [OUTPUT_DIR]   (default: benches/fixtures)
 #
