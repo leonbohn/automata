@@ -507,7 +507,60 @@ mod tests {
     use crate::ts::{Det, Linked};
     use tracing::debug;
 
-    use crate::hoa::HoaString;
+    use crate::hoa::{HoaString, WriteHoa};
+
+    #[test]
+    fn edge_labels_with_disjunction() {
+        let raw_hoa = hoa_with_states(
+            2,
+            "AP: 3 \"a\" \"b\" \"c\"",
+            "Start: 0",
+            r#"
+        State: 0
+        [0&1 | 0&!2] 0 {0}
+        [!0 | (!1&2)] 1
+        State: 1
+        [t] 1
+        "#,
+        );
+        // Per edge: (source, target, acceptance, symbols satisfying the label), order-independent.
+        let edges = |hoa: &str| {
+            use crate::ts::{DenseId, TransitionSystem};
+            use std::collections::BTreeSet;
+            let aut = super::parse_omega_automaton_range::<Linked>(hoa, 0, hoa.len())
+                .expect("disjunctive labels must be accepted");
+            assert_eq!(aut.state_count(), 2);
+            let mut edges = BTreeSet::new();
+            for q in aut.states() {
+                for e in aut.edges_from(q).into_iter().flatten() {
+                    let mut syms: Vec<char> = e.expression().chars_iter().collect();
+                    syms.sort();
+                    edges.insert((
+                        q.into_usize(),
+                        e.target().into_usize(),
+                        format!("{:?}", e.color()),
+                        syms,
+                    ));
+                }
+            }
+            (edges, aut)
+        };
+
+        let (parsed, aut) = edges(&raw_hoa);
+        // a, b, c with a=bit 0: a&b | a&!c = a&(b|!c) holds for 3 of 8 valuations, !a | (!b&c) for 5 of 8.
+        let sizes: Vec<_> = parsed
+            .iter()
+            .map(|(q, t, _, s)| (*q, *t, s.len()))
+            .collect();
+        assert_eq!(sizes, vec![(0, 0, 3), (0, 1, 5), (1, 1, 8)]);
+
+        let written = aut.to_hoa().expect("cannot write hoa");
+        assert_eq!(
+            edges(&written).0,
+            parsed,
+            "round trip changed the automaton"
+        );
+    }
 
     #[test]
     fn hoa_tdba_with_abort_and_nondeterministic() {
