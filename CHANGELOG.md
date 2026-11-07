@@ -33,6 +33,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `Equivalence` for `NFA` (via `NFA::determinize`). Inclusion and equivalence of nondeterministic
   omega automata are not offered, they need a determinization or complementation that does not
   exist yet.
+- Benchmark target `nondeterministic`: acceptance of lassos and emptiness for NPA, NBA, NCW, NRA
+  and NMA, and acceptance on fixtures read with the `Linked` storage. `automata-bench` runs it by
+  default.
 - `Storage::Semantics<C>`: the semantics of a condition on a storage, `C` for the deterministic
   storages and `Existential<C>` for `Linked`.
 

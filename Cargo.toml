@@ -98,6 +98,11 @@ harness = false
 required-features = ["hoa"]
 
 [[bench]]
+name = "nondeterministic"
+harness = false
+required-features = ["hoa"]
+
+[[bench]]
 name = "learning"
 harness = false
 required-features = ["hoa", "learning"]
