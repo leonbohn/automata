@@ -27,6 +27,7 @@ There are three layers:
 | `runs` | Runs of finite words (one long word, many short ones), runs of lassos, infinity sets (recurrent edge colors and states), visited sequences, on synthetic and on fixture automata |
 | `dfa` | Minimization (Hopcroft/Moore, with and without edge colors), union, intersection, complement, emptiness and witness, equivalence |
 | `dpa` | Normalization, complement, accepted/rejected words, witnesses per priority, equivalence/inclusion/counterexamples, SCCs, prefix partition, HOA parsing and printing |
+| `nondeterministic` | Nondeterministic omega automata (`Existential` semantics): acceptance of lassos for NPA/NBA/NCW and on fixtures read with the `Linked` storage, emptiness with witness for NPA/NBA/NCW/NRA/NMA, with nonempty and empty languages |
 | `wallclock` | A handful of the same operations with criterion, see below |
 
 Operations that do not exist yet (for example union and intersection of DPAs, or complementation of NFAs)

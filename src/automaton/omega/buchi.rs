@@ -1,12 +1,13 @@
 use crate::States;
 use crate::alphabet::CharAlphabet;
 use crate::automaton::semantics::observe_omega;
-use crate::automaton::{DPA, Semantics};
+use crate::automaton::{CycleCondition, DPA, Existential, Semantics};
 use crate::representation::IntoTransitions;
 use crate::ts::{Deterministic, StateIndex, SymbolOf};
 use crate::word::OmegaWord;
 use crate::{DTS, TransitionSystem, automaton::Automaton, ts::run};
 use crate::{Int, Void};
+use crate::{NTS, math};
 
 /// Defines the [`Semantics`] of a deterministic Büchi automaton (DBA),
 /// which is an acceptor of infinite words. It considers the set of
@@ -25,20 +26,38 @@ where
     T: Deterministic<EdgeColor = bool>,
     W: OmegaWord<Symbol = SymbolOf<T>>,
 {
-    type Observer = run::GreatestEdgeColor<T>;
     type Output = bool;
-    fn observe(
-        &self,
-        ts: &T,
-        initial: StateIndex<T>,
-        word: W,
-    ) -> Option<<Self::Observer as run::Observer<T>>::Current> {
-        observe_omega::<T, W, Self::Observer>(ts, initial, word)
-    }
-    fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
-        observed
+    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
+        observe_omega::<T, W, run::GreatestEdgeColor<T>>(ts, initial, word)
     }
 }
+
+impl CycleCondition for BuchiCondition {
+    type Color = bool;
+    fn satisfied_by(&self, colors: &math::FxIndexSet<bool>) -> bool {
+        colors.contains(&true)
+    }
+    fn avoid(&self, _: &math::FxIndexSet<bool>) -> Vec<Vec<bool>> {
+        // a component without an accepting edge has no accepting cycle
+        Vec::new()
+    }
+}
+
+/// A nondeterministic Büchi automaton (NBA): it accepts an infinite word if *some* run on it takes
+/// an edge colored with `true` infinitely often, see [`Existential`]. Unlike a [`DBA`], it can
+/// recognize every omega-regular language.
+///
+/// ```
+/// use automata::prelude::*;
+///
+/// // eventually only `b`, which no DBA recognizes: guess when the last `a` has been read
+/// let nba = Builder::without_state_colors()
+///     .with_transitions([(0, 'a', false, 0), (0, 'b', false, 0), (0, 'b', true, 1), (1, 'b', true, 1)])
+///     .into_nba(0);
+/// assert!(nba.accepts(upw!("ab", "b")));
+/// assert!(!nba.accepts(upw!("ab")));
+/// ```
+pub type NBA<T = NTS<CharAlphabet, Void, bool>> = Automaton<T, Existential<BuchiCondition>>;
 
 /// A deterministic Büchi automaton (DBA) is a deterministic automaton with Büchi acceptance condition.
 /// It accepts a word if it has a successful infinite run that takes an accepting

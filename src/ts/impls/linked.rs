@@ -660,6 +660,7 @@ impl<A: Alphabet> Storage<A> for Det<Linked> {
     const DETERMINISTIC: bool = true;
 
     type Ts<QQ: Color, CC: Color> = Det<LinkedTs<A, QQ, CC>>;
+    type Semantics<C> = C;
 
     fn try_from_linked<QQ: Color, CC: Color>(
         ts: LinkedTs<A, QQ, CC>,

@@ -10,6 +10,8 @@ pub use rabin::*;
 
 mod muller;
 pub use muller::*;
+mod co_buchi;
+pub use co_buchi::*;
 
 mod acceptance_mask;
 use super::Automaton;
@@ -17,11 +19,12 @@ use crate::Error;
 use crate::Int;
 use crate::Void;
 use crate::alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropAlphabetError};
-use crate::automaton::Semantics;
 use crate::automaton::semantics::observe_omega;
+use crate::automaton::{CycleCondition, Existential, Semantics};
+use crate::math;
 use crate::representation::IntoTransitions;
 use crate::ts::States;
-use crate::ts::run::{self, Observer as _};
+use crate::ts::run;
 use crate::ts::{Builder, DefaultIdType, ForAlphabet, Sproutable};
 use crate::ts::{Det, Linked, Storage};
 use crate::ts::{Deterministic, StateIndex, SymbolOf};
@@ -45,8 +48,14 @@ pub type NondeterministicOmegaAutomaton<A> = OmegaAutomaton<A, Linked>;
 ///
 /// The storage `S` decides how the transition system is represented and whether it is
 /// deterministic: [`Det<Linked>`] (the default) or [`Linked`].
-pub type OmegaAutomaton<A, S = Det<Linked>> =
-    Automaton<<S as Storage<A>>::Ts<Int, AcceptanceMask>, OmegaAcceptanceCondition>;
+///
+/// The semantics are [`Storage::Semantics`] of the [`OmegaAcceptanceCondition`]: the condition
+/// itself for deterministic storages and [`Existential`] for [`Linked`], so that both accept
+/// words.
+pub type OmegaAutomaton<A, S = Det<Linked>> = Automaton<
+    <S as Storage<A>>::Ts<Int, AcceptanceMask>,
+    <S as Storage<A>>::Semantics<OmegaAcceptanceCondition>,
+>;
 
 /// Disambiguates between the different types of acceptance conditions. This is only
 /// used in conjunction with [`OmegaAutomaton`]/[`DeterministicOmegaAutomaton`] when
@@ -161,25 +170,64 @@ where
     W: OmegaWord<Symbol = SymbolOf<T>>,
 {
     type Output = bool;
-    type Observer = run::EdgeColorSet<T>;
-    fn observe(
-        &self,
-        ts: &T,
-        initial: StateIndex<T>,
-        word: W,
-    ) -> Option<<Self::Observer as run::Observer<T>>::Current> {
-        observe_omega::<T, W, Self::Observer>(ts, initial, word)
-    }
-    fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
-        let infset: BTreeSet<_> = observed.into_current().0.into_iter().collect();
-        self.satisfied(&infset).unwrap_or_else(|error| {
+    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
+        let inf = observe_omega::<T, W, run::EdgeColorSet<T>>(ts, initial, word)?;
+        let infset: BTreeSet<_> = inf.0.into_iter().collect();
+        Some(self.satisfied(&infset).unwrap_or_else(|error| {
             tracing::warn!("rejecting a run with malformed acceptance sets: {error}");
             false
-        })
+        }))
     }
 }
 
-impl<A: Alphabet> Automaton<NTS<A, Int, AcceptanceMask>, OmegaAcceptanceCondition> {
+/// Malformed masks (for example a parity edge without a priority) make the colors rejecting, like
+/// for the deterministic [`Semantics`].
+impl CycleCondition for OmegaAcceptanceCondition {
+    type Color = AcceptanceMask;
+    fn satisfied_by(&self, colors: &math::FxIndexSet<AcceptanceMask>) -> bool {
+        self.satisfied(&colors.iter().cloned().collect())
+            .unwrap_or(false)
+    }
+    fn avoid(&self, colors: &math::FxIndexSet<AcceptanceMask>) -> Vec<Vec<AcceptanceMask>> {
+        let masks_where = |keep: &dyn Fn(&AcceptanceMask) -> bool| -> Vec<AcceptanceMask> {
+            colors.iter().filter(|mask| keep(mask)).cloned().collect()
+        };
+        let priorities =
+            |low, high| Self::priorities(&colors.iter().cloned().collect(), low, high).ok();
+        match self {
+            Self::Buchi | Self::Reachability => Vec::new(),
+            Self::CoBuchi | Self::Safety => vec![masks_where(&AcceptanceMask::as_bool)],
+            Self::Parity(low, high) => {
+                match priorities(*low, *high).and_then(|p| p.into_iter().min()) {
+                    Some(least) => vec![masks_where(&|m| m.try_as_priority().ok() == Some(least))],
+                    None => Vec::new(),
+                }
+            }
+            Self::MaxParity(low, high) => {
+                match priorities(*low, *high).and_then(|p| p.into_iter().max()) {
+                    Some(greatest) => {
+                        vec![masks_where(&|m| m.try_as_priority().ok() == Some(greatest))]
+                    }
+                    None => Vec::new(),
+                }
+            }
+            Self::Rabin(pairs) => pairs
+                .iter()
+                .filter(|pair| {
+                    colors
+                        .iter()
+                        .any(|m| m.iter().any(|set| pair.inf.contains(&set)))
+                })
+                .map(|pair| masks_where(&|m| m.iter().any(|set| pair.fin.contains(&set))))
+                .collect(),
+            // shortcut: Streett falls back to leaving out each mask in turn (exponential), a
+            // dedicated Emerson-Lei decomposition would be polynomial in the number of pairs
+            Self::Streett(_) => colors.iter().map(|mask| vec![mask.clone()]).collect(),
+        }
+    }
+}
+
+impl<A: Alphabet> Automaton<NTS<A, Int, AcceptanceMask>, Existential<OmegaAcceptanceCondition>> {
     /// Creates a new instance from the given transition system, initial state and
     /// acceptance condition.
     pub fn new(
@@ -190,7 +238,7 @@ impl<A: Alphabet> Automaton<NTS<A, Int, AcceptanceMask>, OmegaAcceptanceConditio
         Automaton {
             ts,
             initial,
-            acceptance,
+            acceptance: Existential(acceptance),
         }
     }
 
@@ -204,7 +252,7 @@ impl<A: Alphabet> Automaton<NTS<A, Int, AcceptanceMask>, OmegaAcceptanceConditio
             acceptance,
         } = self;
         match ts.try_into_deterministic() {
-            Ok(dts) => Ok(DeterministicOmegaAutomaton::new(dts, initial, acceptance)),
+            Ok(dts) => Ok(DeterministicOmegaAutomaton::new(dts, initial, acceptance.0)),
             Err(ts) => Err(Self {
                 ts,
                 initial,

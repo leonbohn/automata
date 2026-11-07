@@ -27,14 +27,18 @@ mod reachability;
 pub use reachability::{DFA, ReachabilityCondition};
 
 mod nfa;
-pub use nfa::{NFA, NfaCondition, SomeRunAccepts};
+pub use nfa::NFA;
+pub mod branching;
+mod cycles;
+pub use branching::{CycleCondition, Existential, FinalStateCondition, HistoryDeterministic};
 
 mod omega;
 pub use omega::{
-    AcceptanceError, AcceptanceMask, BuchiCondition, DBA, DMA, DPA, DRA,
-    DeterministicOmegaAutomaton, MaxEvenParityCondition, MaxOddParityCondition,
-    MinEvenParityCondition, MinOddParityCondition, MullerCondition, NondeterministicOmegaAutomaton,
-    OmegaAcceptanceCondition, OmegaAutomaton, RabinCondition, RabinPair,
+    AcceptanceError, AcceptanceMask, BuchiCondition, CoBuchiCondition, DBA, DCW, DMA, DPA, DRA,
+    DeterministicOmegaAutomaton, HDCW, MaxEvenParityCondition, MaxOddParityCondition,
+    MinEvenParityCondition, MinOddParityCondition, MullerCondition, NBA, NCW, NMA, NPA, NRA,
+    NondeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton, RabinCondition,
+    RabinPair,
 };
 
 mod with_initial;
@@ -210,6 +214,17 @@ impl<T: TransitionSystem, Sem> Automaton<T, Sem> {
     pub fn acceptance(&self) -> &Sem {
         &self.acceptance
     }
+
+    /// Replaces the acceptance condition by applying `f` to it, keeping the transition system and
+    /// the initial state. This is how the branching changes, for example
+    /// `dba.map_acceptance(Existential)` views a [`DBA`] as an [`NBA`].
+    pub fn map_acceptance<S>(self, f: impl FnOnce(Sem) -> S) -> Automaton<T, S> {
+        Automaton {
+            ts: self.ts,
+            initial: self.initial,
+            acceptance: f(self.acceptance),
+        }
+    }
 }
 
 impl<T: TransitionSystem, Sem> Automaton<T, Sem> {
@@ -229,8 +244,7 @@ impl<T: TransitionSystem, Sem> Automaton<T, Sem> {
     where
         Sem: Semantics<T, W>,
     {
-        let observed = self.acceptance.observe(&self.ts, self.initial, word)?;
-        Some(self.acceptance.evaluate(observed))
+        self.acceptance.output(&self.ts, self.initial, word)
     }
 }
 

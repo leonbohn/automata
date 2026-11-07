@@ -445,3 +445,43 @@ pub fn fixture_lasso(
     };
     ReducedOmegaWord::ultimately_periodic(pick(spoke, 1), pick(cycle, 2))
 }
+
+// ---------------------------------------------------------------------------------------------
+// Nondeterministic omega automata
+// ---------------------------------------------------------------------------------------------
+
+/// A nondeterministic edge-colored system over `{a, b}` with `n` states: each state has two
+/// successors per symbol, `(q * (2 i + 3) + i + 1) mod n` and `(q * (2 i + 5) + 3 i + 2) mod n`
+/// as in [`scrambled_nts`], plus `q + 1` on `a` so that everything is one SCC. The edge to the
+/// `j`-th successor on symbol `i` from `q` is colored with `color(q + 3 i + j)`.
+pub fn scrambled_omega_nts<C: automata::Color>(
+    n: usize,
+    color: impl Fn(usize) -> C,
+) -> NTS<CharAlphabet, Void, C> {
+    let mut ts = NTS::for_alphabet(CharAlphabet::of_size(2));
+    for _ in 0..n {
+        ts.add_state(Void);
+    }
+    for q in 0..n {
+        for (i, sym) in ['a', 'b'].into_iter().enumerate() {
+            let targets = [
+                (q * (2 * i + 3) + i + 1) % n,
+                (q * (2 * i + 5) + 3 * i + 2) % n,
+            ];
+            for (j, target) in targets.into_iter().enumerate() {
+                ts.add_edge((at(q), sym, color(q + 3 * i + j), at(target)));
+            }
+        }
+        ts.add_edge((at(q), 'a', color(q + 2), at((q + 1) % n)));
+    }
+    ts
+}
+
+/// Parses a fixture with the nondeterministic storage, so that its semantics are existential.
+pub fn parse_nondeterministic(
+    text: &str,
+) -> automata::automaton::NondeterministicOmegaAutomaton<PropAlphabet> {
+    HoaString::from(text.to_string())
+        .pop::<automata::ts::Linked>()
+        .expect("fixture contains an automaton")
+}

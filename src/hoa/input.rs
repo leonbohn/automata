@@ -407,7 +407,9 @@ impl HoaStorage for Linked {
     fn from_hoa(aut: HoaRepresentation) -> Result<OmegaAutomaton<PropAlphabet, Self>, HoaError> {
         let (ts, initial, acceptance) = hoa_automaton_parts(aut)?;
         Ok(crate::Automaton::from_parts_with_acceptance(
-            ts, initial, acceptance,
+            ts,
+            initial,
+            crate::automaton::Existential(acceptance),
         ))
     }
 }
@@ -755,6 +757,19 @@ State: 1
 [t] 1
 --END--
 "#;
+
+    #[test]
+    fn nondeterministic_input_accepts_with_some_run() {
+        use crate::alphabet::PropSymbol;
+        use crate::word::ReducedOmegaWord;
+
+        let end = NONDETERMINISTIC.len();
+        let aut = super::parse_omega_automaton_range::<Linked>(NONDETERMINISTIC, 0, end).unwrap();
+        let [a, not_a] = [true, false].map(|b| PropSymbol::from_bools(vec![b]));
+        // infinitely many `a`
+        assert!(aut.accepts(ReducedOmegaWord::periodic(vec![not_a, a])));
+        assert!(!aut.accepts(ReducedOmegaWord::ultimately_periodic(vec![a], vec![not_a])));
+    }
 
     #[test]
     fn nondeterministic_input_is_rejected_for_deterministic_automata() {
