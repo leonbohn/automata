@@ -9,7 +9,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > `#128` to `#139` here.
 
 ## [Unreleased]
+### Added
+- Nondeterministic automata as aliases over one generic semantics, `automaton::Existential<C>`:
+  a word is accepted if *some* run satisfies the acceptance condition `C` (#143). `NBA`, `NCW`,
+  `NPA` (with the parity variant as a parameter), `NRA` and `NMA` for infinite words, `NFA` for
+  finite ones. Any condition that implements `CycleCondition` (infinite words) or
+  `FinalStateCondition` (finite words) works, so a new condition gets its nondeterministic
+  automaton for free. Infinite words are decided on the product with the word's cycle by an SCC
+  decomposition, which is linear for Büchi, co-Büchi, parity and Rabin conditions (exponential in
+  the number of colors for Muller and Streett).
+- The co-Büchi condition `CoBuchiCondition` with `DCW` and `NCW`.
+- Builder shortcuts `into_nba`, `into_dcw`, `into_ncw`, `into_npa` and the generic
+  `into_nondeterministic_automaton(initial, acceptance)`, each with a `try_` twin.
+- `Storage::Semantics<C>`: the semantics of a condition on a storage, `C` for the deterministic
+  storages and `Existential<C>` for `Linked`.
+
 ### Changed
+- **Breaking:** `NFA<T>` is `Automaton<T, Existential<ReachabilityCondition>>`; `NfaCondition` is
+  gone. Code that names the alias is unaffected, `NfaCondition` becomes
+  `Existential(ReachabilityCondition)`.
+- **Breaking:** an `OmegaAutomaton<A, Linked>` (`NondeterministicOmegaAutomaton`, what HOA input
+  with the `Linked` storage gives) has the semantics `Existential<OmegaAcceptanceCondition>`, so it
+  accepts words (before, it had no `accepts`). Its `acceptance()` is wrapped accordingly, use
+  `.0` for the condition. Implementors of `Storage` have to add `type Semantics<C>`.
 - **Breaking:** `Semantics` has a single method `output(&self, ts, initial, word) -> Option<Output>`
   instead of the associated type `Observer` and the methods `observe` and `evaluate`, so that
   semantics no longer have to be phrased as the observation of a single run (#143). Observers

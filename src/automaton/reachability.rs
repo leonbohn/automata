@@ -1,5 +1,5 @@
 use super::semantics::observe_finite;
-use super::{Automaton, Semantics, StatesWithColor};
+use super::{Automaton, FinalStateCondition, Semantics, StatesWithColor};
 use crate::alphabet::CharAlphabet;
 use crate::ts::States;
 use crate::ts::operations::{DefaultIfMissing, Product, ProductIndex};
@@ -29,6 +29,13 @@ where
     type Output = bool;
     fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
         observe_finite::<T, W, ReachedStateColor<T>>(ts, initial, word)
+    }
+}
+
+impl FinalStateCondition for ReachabilityCondition {
+    type StateColor = bool;
+    fn accepts_final(&self, color: &bool) -> bool {
+        *color
     }
 }
 

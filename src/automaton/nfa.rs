@@ -1,57 +1,15 @@
-use super::{Automaton, DFA, Semantics};
-use crate::alphabet::{Alphabet, CharAlphabet, Matcher};
+use super::{Automaton, DFA, Existential, ReachabilityCondition};
+use crate::alphabet::{Alphabet, CharAlphabet};
 use crate::representation::IntoTransitions;
+use crate::ts::StateId;
 use crate::ts::States;
 use crate::ts::operations::Determinize;
-use crate::ts::{StateId, StateIndex, SymbolOf};
-use crate::word::FiniteWord;
 use crate::{DTS, NTS, TransitionSystem, Void};
-
-/// The [`Semantics`] of a nondeterministic finite automaton [`NFA`]: a finite word is accepted if
-/// *some* run on it ends in a state colored with `true`. Words are checked by tracking the set of
-/// states that the runs can be in, so the cost is linear in the length of the word.
-#[derive(Clone, Copy, Default, Hash, Eq, PartialEq)]
-pub struct NfaCondition;
-
-impl std::fmt::Debug for NfaCondition {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NFA (some run reaches true)")
-    }
-}
-
-impl<T, W> Semantics<T, W> for NfaCondition
-where
-    T: TransitionSystem<StateColor = bool>,
-    W: FiniteWord<Symbol = SymbolOf<T>>,
-{
-    type Output = bool;
-
-    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
-        let mut current = vec![initial];
-        for sym in word.symbols() {
-            let mut next = Vec::new();
-            for q in current {
-                for edge in ts.edges_from(q).into_iter().flatten() {
-                    if sym.matches(edge.expression()) {
-                        next.push(edge.target());
-                    }
-                }
-            }
-            next.sort_unstable();
-            next.dedup();
-            current = next;
-        }
-        Some(
-            current
-                .into_iter()
-                .any(|q| ts.state_color(q).is_some_and(|c| *c)),
-        )
-    }
-}
 
 /// A nondeterministic finite automaton (NFA): a transition system that need not be
 /// [`Deterministic`](crate::Deterministic) (by default an [`NTS`]) whose states are colored with
-/// `true` (accepting) or `false`, see [`NfaCondition`]. Use [`NFA::determinize`] to obtain an
+/// `true` (accepting) or `false`. It accepts a finite word if *some* run on it ends in an
+/// accepting state, see [`Existential`] and [`ReachabilityCondition`]. Use [`NFA::determinize`] to obtain an
 /// equivalent [`DFA`].
 ///
 /// ```
@@ -70,7 +28,7 @@ where
 /// assert_eq!(minimized.state_count(), 4);
 /// assert!(Equivalence::of(&dfa).and(&minimized).holds());
 /// ```
-pub type NFA<T = NTS<CharAlphabet, bool, Void>> = Automaton<T, NfaCondition>;
+pub type NFA<T = NTS<CharAlphabet, bool, Void>> = Automaton<T, Existential<ReachabilityCondition>>;
 
 impl<T> NFA<T>
 where

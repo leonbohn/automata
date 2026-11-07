@@ -1,11 +1,13 @@
 use std::collections::BTreeSet;
 
-use crate::DTS;
 use crate::automaton::semantics::observe_omega;
 use crate::automaton::{Automaton, Semantics};
+use crate::automaton::{CycleCondition, Existential};
 use crate::ts::{Deterministic, EdgeColor, StateIndex, SymbolOf, run};
 use crate::word::OmegaWord;
 use crate::{Color, Int, Void, alphabet::CharAlphabet};
+use crate::{DTS, NTS, math};
+use std::hash::Hash;
 
 /// A deterministic Rabin automaton (DRA) uses a [`RabinCondition`] to determine acceptance.
 /// Specifically, such a condition consists of a set of [`RabinPair`]s, which in turn are
@@ -14,6 +16,11 @@ use crate::{Color, Int, Void, alphabet::CharAlphabet};
 /// visited infinitely often. Overall, a Rabin condition is then satisfied if at least one of
 /// its constituent pairs is satisfied.
 pub type DRA<T = DTS<CharAlphabet, Void, Int>> = Automaton<T, RabinCondition<EdgeColor<T>>>;
+
+/// A nondeterministic Rabin automaton (NRA): it accepts an infinite word if *some* run on it
+/// satisfies the [`RabinCondition`], see [`Existential`].
+pub type NRA<T = NTS<CharAlphabet, Void, Int>> =
+    Automaton<T, Existential<RabinCondition<EdgeColor<T>>>>;
 
 /// Represents a Rabin condition, which is a set of [`RabinPair`]s. Such a condition is satisfied
 /// if at least one of its pairs is satisfied.
@@ -85,6 +92,29 @@ where
                 .iter()
                 .any(|set| set.satisfied_by_iter(inf.iter().cloned())),
         )
+    }
+}
+
+impl<C: Color + Ord + Hash> CycleCondition for RabinCondition<C> {
+    type Color = C;
+    fn satisfied_by(&self, colors: &math::FxIndexSet<C>) -> bool {
+        let colors = colors.iter().cloned().collect();
+        self.0.iter().any(|pair| pair.satisfied_by_set(&colors))
+    }
+    fn avoid(&self, colors: &math::FxIndexSet<C>) -> Vec<Vec<C>> {
+        // a good cycle satisfies some pair whose `inf` the component sees, so it avoids that
+        // pair's `fin`
+        self.0
+            .iter()
+            .filter(|pair| colors.iter().any(|c| pair.inf.contains(c)))
+            .map(|pair| {
+                colors
+                    .iter()
+                    .filter(|c| pair.fin.contains(c))
+                    .cloned()
+                    .collect()
+            })
+            .collect()
     }
 }
 

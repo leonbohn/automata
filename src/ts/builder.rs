@@ -2,7 +2,10 @@ use super::{ForAlphabet, Sproutable, StateId, Storage};
 use crate::TransitionSystem;
 use crate::alphabet::{FromSymbols, Symbol, WrongAlphabetSize};
 use crate::automaton::WithInitial;
-use crate::automaton::{Automaton, DBA, DFA, DPA, MealyMachine, MooreMachine, NFA, NfaCondition};
+use crate::automaton::{
+    Automaton, CoBuchiCondition, DBA, DCW, DFA, DPA, Existential, MealyMachine, MooreMachine, NBA,
+    NCW, NFA, NPA,
+};
 use crate::automaton::{
     BuchiCondition, MealySemantics, MinEvenParityCondition, MooreSemantics, ReachabilityCondition,
 };
@@ -501,6 +504,37 @@ impl<Q: Color, C: Color> Builder<Q, C> {
             acceptance,
         ))
     }
+
+    /// Like [`Self::into_automaton`], but the transition system is an [`NTS`], so edges may
+    /// overlap. Wrap the acceptance condition in [`Existential`] to accept a word if some run is
+    /// accepting.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_build`].
+    #[track_caller]
+    pub fn into_nondeterministic_automaton<Sem>(
+        self,
+        initial: u32,
+        acceptance: Sem,
+    ) -> Automaton<NTS<CharAlphabet, Q, C>, Sem> {
+        or_panic(self.try_into_nondeterministic_automaton(initial, acceptance))
+    }
+
+    /// Fallible version of [`Self::into_nondeterministic_automaton`].
+    ///
+    /// # Errors
+    /// See [`Self::try_build`].
+    pub fn try_into_nondeterministic_automaton<Sem>(
+        self,
+        initial: u32,
+        acceptance: Sem,
+    ) -> Result<Automaton<NTS<CharAlphabet, Q, C>, Sem>, BuilderError> {
+        Ok(Automaton::from_parts_with_acceptance(
+            self.try_build()?,
+            initial.into(),
+            acceptance,
+        ))
+    }
 }
 
 impl Builder<bool, Void> {
@@ -537,11 +571,7 @@ impl Builder<bool, Void> {
         self,
         initial: u32,
     ) -> Result<NFA<NTS<CharAlphabet, bool, Void>>, BuilderError> {
-        Ok(Automaton::from_parts_with_acceptance(
-            self.try_build()?,
-            initial.into(),
-            NfaCondition,
-        ))
+        self.try_into_nondeterministic_automaton(initial, Existential(ReachabilityCondition))
     }
 }
 
@@ -563,6 +593,60 @@ impl Builder<Void, bool> {
         self.default_color(Void)
             .try_into_automaton(initial, BuchiCondition)
     }
+
+    /// Turns `self` into a nondeterministic Büchi automaton. Edges may overlap.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_build`].
+    #[track_caller]
+    pub fn into_nba(self, initial: u32) -> NBA<NTS<CharAlphabet, Void, bool>> {
+        or_panic(self.try_into_nba(initial))
+    }
+
+    /// Fallible version of [`Self::into_nba`].
+    pub fn try_into_nba(
+        self,
+        initial: u32,
+    ) -> Result<NBA<NTS<CharAlphabet, Void, bool>>, BuilderError> {
+        self.default_color(Void)
+            .try_into_nondeterministic_automaton(initial, Existential(BuchiCondition))
+    }
+
+    /// Turns `self` into a deterministic co-Büchi automaton.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_build`].
+    #[track_caller]
+    pub fn into_dcw(self, initial: u32) -> DCW<DTS<CharAlphabet, Void, bool>> {
+        or_panic(self.try_into_dcw(initial))
+    }
+
+    /// Fallible version of [`Self::into_dcw`].
+    pub fn try_into_dcw(
+        self,
+        initial: u32,
+    ) -> Result<DCW<DTS<CharAlphabet, Void, bool>>, BuilderError> {
+        self.default_color(Void)
+            .try_into_automaton(initial, CoBuchiCondition)
+    }
+
+    /// Turns `self` into a nondeterministic co-Büchi automaton. Edges may overlap.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_build`].
+    #[track_caller]
+    pub fn into_ncw(self, initial: u32) -> NCW<NTS<CharAlphabet, Void, bool>> {
+        or_panic(self.try_into_ncw(initial))
+    }
+
+    /// Fallible version of [`Self::into_ncw`].
+    pub fn try_into_ncw(
+        self,
+        initial: u32,
+    ) -> Result<NCW<NTS<CharAlphabet, Void, bool>>, BuilderError> {
+        self.default_color(Void)
+            .try_into_nondeterministic_automaton(initial, Existential(CoBuchiCondition))
+    }
 }
 
 impl Builder<Void, Int> {
@@ -582,6 +666,24 @@ impl Builder<Void, Int> {
     ) -> Result<DPA<DTS<CharAlphabet, Void, Int>>, BuilderError> {
         self.default_color(Void)
             .try_into_automaton(initial, MinEvenParityCondition)
+    }
+
+    /// Turns `self` into a nondeterministic parity automaton (min even). Edges may overlap.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_build`].
+    #[track_caller]
+    pub fn into_npa(self, initial: u32) -> NPA<NTS<CharAlphabet, Void, Int>> {
+        or_panic(self.try_into_npa(initial))
+    }
+
+    /// Fallible version of [`Self::into_npa`].
+    pub fn try_into_npa(
+        self,
+        initial: u32,
+    ) -> Result<NPA<NTS<CharAlphabet, Void, Int>>, BuilderError> {
+        self.default_color(Void)
+            .try_into_nondeterministic_automaton(initial, Existential(MinEvenParityCondition))
     }
 
     /// Builds a Mealy machine from `self`.

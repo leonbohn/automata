@@ -3,9 +3,10 @@ use crate::ts::States;
 use crate::ts::{DenseId, EdgeId, Sproutable};
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
+use crate::NTS;
 use crate::automaton::problems::search;
 use crate::automaton::semantics::observe_omega;
-use crate::automaton::{Automaton, Equivalence, Semantics};
+use crate::automaton::{Automaton, CycleCondition, Equivalence, Existential, Semantics};
 use crate::math;
 use crate::representation::IntoTransitions;
 use crate::ts::operations::{Product, ProductIndex};
@@ -28,6 +29,23 @@ use tracing::trace;
 /// if the least color that appears infinitely often during
 /// a run is even.
 pub type DPA<T = DTS<CharAlphabet, Void, Int>, Sem = MinEvenParityCondition> = Automaton<T, Sem>;
+
+/// A nondeterministic parity automaton (NPA): it accepts an infinite word if *some* run on it
+/// satisfies the parity condition `Sem` (by default [`MinEvenParityCondition`]), see
+/// [`Existential`].
+///
+/// ```
+/// use automata::prelude::*;
+///
+/// // eventually only `b`: priority 0 on the `b` loop that is guessed, 1 elsewhere
+/// let npa = Builder::without_state_colors()
+///     .with_transitions([(0, 'a', 1, 0), (0, 'b', 1, 0), (0, 'b', 0, 1), (1, 'b', 0, 1)])
+///     .into_npa(0);
+/// assert!(npa.accepts(upw!("a", "b")));
+/// assert!(!npa.accepts(upw!("ab")));
+/// ```
+pub type NPA<T = NTS<CharAlphabet, Void, Int>, Sem = MinEvenParityCondition> =
+    Automaton<T, Existential<Sem>>;
 
 /// Represents a min even parity condition which accepts if and only if the least color
 /// that labels a transition that is taken infinitely often, is even. For the automaton
@@ -67,6 +85,30 @@ macro_rules! parity_semantics {
             fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
                 observe_omega::<T, W, run::EdgeColorLimit<T, $max>>(ts, initial, word)
                     .map(|limit| limit.is_multiple_of(2) == $even)
+            }
+        }
+
+        impl CycleCondition for $cond {
+            type Color = Int;
+            fn satisfied_by(&self, colors: &math::FxIndexSet<Int>) -> bool {
+                Self::decisive(colors).is_some_and(|p| p.is_multiple_of(2) == $even)
+            }
+            fn avoid(&self, colors: &math::FxIndexSet<Int>) -> Vec<Vec<Int>> {
+                // every cycle through the decisive priority has the wrong parity
+                Self::decisive(colors)
+                    .map(|p| vec![p])
+                    .into_iter()
+                    .collect()
+            }
+        }
+
+        impl $cond {
+            fn decisive(colors: &math::FxIndexSet<Int>) -> Option<Int> {
+                if $max {
+                    colors.iter().copied().max()
+                } else {
+                    colors.iter().copied().min()
+                }
             }
         }
     };

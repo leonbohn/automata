@@ -1,5 +1,6 @@
 use crate::Color;
 use crate::alphabet::{Alphabet, IndexedAlphabet};
+use crate::automaton::Existential;
 use crate::representation::IntoTransitions;
 use crate::ts::{CsrTs, DenseTs, Det, ForAlphabet, LinkedTs, Sproutable, States};
 
@@ -21,6 +22,10 @@ pub trait Storage<A: Alphabet> {
 
     /// The transition system of this storage with the given colors.
     type Ts<Q: Color, C: Color>: States<Alphabet = A, StateColor = Q, EdgeColor = C>;
+    /// The semantics that the acceptance condition `C` has on the systems of this storage: `C`
+    /// itself for deterministic storages and [`Existential<C>`] (some run is accepting) for the
+    /// others. [`crate::automaton::OmegaAutomaton`] uses this.
+    type Semantics<C>;
 
     /// Converts a non-deterministic [`LinkedTs`] into this storage. A storage that cannot
     /// represent `ts` (because it is deterministic and `ts` is not) returns it as the error.
@@ -52,6 +57,7 @@ impl<A: Alphabet> Storage<A> for Linked {
     const DETERMINISTIC: bool = false;
 
     type Ts<Q: Color, C: Color> = LinkedTs<A, Q, C>;
+    type Semantics<C> = Existential<C>;
 
     fn try_from_linked<Q: Color, C: Color>(
         ts: LinkedTs<A, Q, C>,
@@ -73,6 +79,7 @@ impl<A: IndexedAlphabet> Storage<A> for Dense {
     const DETERMINISTIC: bool = true;
 
     type Ts<Q: Color, C: Color> = DenseTs<A, Q, C>;
+    type Semantics<C> = C;
 
     fn try_from_linked<Q: Color, C: Color>(
         ts: LinkedTs<A, Q, C>,
@@ -94,6 +101,7 @@ impl<A: IndexedAlphabet> Storage<A> for Csr {
     const DETERMINISTIC: bool = true;
 
     type Ts<Q: Color, C: Color> = CsrTs<A, Q, C>;
+    type Semantics<C> = C;
 
     fn try_from_linked<Q: Color, C: Color>(
         ts: LinkedTs<A, Q, C>,

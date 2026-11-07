@@ -1,10 +1,11 @@
 use crate::{Color, Int, Void, alphabet::CharAlphabet, math};
 
-use crate::DTS;
 use crate::automaton::semantics::observe_omega;
 use crate::automaton::{Automaton, Semantics};
+use crate::automaton::{CycleCondition, Existential};
 use crate::ts::{Deterministic, EdgeColor, StateIndex, SymbolOf, run};
 use crate::word::OmegaWord;
+use crate::{DTS, NTS};
 
 /// A deterministic Muller automaton (DMA) uses a [`MullerCondition`] to determine acceptance.
 /// Such a condition consists of a set of sets of colors. It considers an infinite run to
@@ -15,6 +16,12 @@ use crate::word::OmegaWord;
 /// often is not contained in the [`MullerCondition`]. This allows for easy complementation
 /// of a [`DMA`] by simply taking the complement of the [`MullerCondition`].
 pub type DMA<T = DTS<CharAlphabet, Void, Int>> = Automaton<T, MullerCondition<EdgeColor<T>>>;
+
+/// A nondeterministic Muller automaton (NMA): it accepts an infinite word if *some* run on it
+/// satisfies the [`MullerCondition`], see [`Existential`]. Deciding this takes time exponential in
+/// the number of colors in the worst case.
+pub type NMA<T = NTS<CharAlphabet, Void, Int>> =
+    Automaton<T, Existential<MullerCondition<EdgeColor<T>>>>;
 
 /// A Muller condition over some [`Color`] `C` is a set of sets of elements of type `C`. It
 /// is satisfied by a set (usually the set of colors that appear infinitely often in a run),
@@ -70,6 +77,13 @@ where
     fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
         let inf = observe_omega::<T, W, run::EdgeColorSet<T>>(ts, initial, word)?;
         Some(self.0.contains(&inf.0))
+    }
+}
+
+impl<C: Color + Eq + std::hash::Hash> CycleCondition for MullerCondition<C> {
+    type Color = C;
+    fn satisfied_by(&self, colors: &math::FxIndexSet<C>) -> bool {
+        self.0.contains(colors)
     }
 }
 

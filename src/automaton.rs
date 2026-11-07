@@ -27,14 +27,17 @@ mod reachability;
 pub use reachability::{DFA, ReachabilityCondition};
 
 mod nfa;
-pub use nfa::{NFA, NfaCondition};
+pub use nfa::NFA;
+pub mod branching;
+pub use branching::{CycleCondition, Existential, FinalStateCondition};
 
 mod omega;
 pub use omega::{
-    AcceptanceError, AcceptanceMask, BuchiCondition, DBA, DMA, DPA, DRA,
+    AcceptanceError, AcceptanceMask, BuchiCondition, CoBuchiCondition, DBA, DCW, DMA, DPA, DRA,
     DeterministicOmegaAutomaton, MaxEvenParityCondition, MaxOddParityCondition,
-    MinEvenParityCondition, MinOddParityCondition, MullerCondition, NondeterministicOmegaAutomaton,
-    OmegaAcceptanceCondition, OmegaAutomaton, RabinCondition, RabinPair,
+    MinEvenParityCondition, MinOddParityCondition, MullerCondition, NBA, NCW, NMA, NPA, NRA,
+    NondeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton, RabinCondition,
+    RabinPair,
 };
 
 mod with_initial;

@@ -83,6 +83,17 @@ where
     }
 }
 
+/// A nondeterministic automaton is written like a deterministic one, HOA does not distinguish them.
+impl<T: States, C: HoaAcceptance<T>> HoaAcceptance<T> for crate::automaton::Existential<C> {
+    fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError> {
+        self.0.write_acceptance(ts, w)
+    }
+
+    fn write_edge_color<W: Write>(&self, color: &T::EdgeColor, w: &mut W) -> Result<(), HoaError> {
+        self.0.write_edge_color(color, w)
+    }
+}
+
 impl<T: States<EdgeColor = bool>> HoaAcceptance<T> for BuchiCondition {
     fn write_acceptance<W: Write>(&self, _ts: &T, w: &mut W) -> Result<(), HoaError> {
         Ok(write_buchi_hoa(w)?)
