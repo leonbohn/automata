@@ -3,8 +3,7 @@
 # Generates the deterministic parity automata (DPAs) used by the benchmarks.
 #
 # This needs Spot (https://spot.lre.epita.fr): genltl, ltl2tgba, randaut, genaut and autfilt
-# must be in the PATH. The committed fixtures were generated with 2.14.5; the script was checked
-# with 2.16.2 (3 of 22 fixtures differ only in state and edge numbering). The result is committed
+# must be in the PATH. The committed fixtures were generated with 2.16.2. The result is committed
 # to the repository; the script is NOT run as part of a benchmark. See benches/fixtures/README.md.
 #
 # Usage: scripts/generate_benchmark_fixtures.sh [OUTPUT_DIR]   (default: benches/fixtures)
@@ -17,7 +16,7 @@ set -euo pipefail
 OUT=${1:-benches/fixtures}
 
 MAX_STATES=200            # fixtures should stay small, callgrind is slow
-MAX_APS=6                 # the HOA reader supports at most 6 atomic propositions
+MAX_APS=31                # the HOA reader supports at most 31 atomic propositions
 PATTERNS_PER_COLLECTION=4 # how many automata we take from each collection of LTL patterns
 
 # Spot can blow up on some formulas, so every translation gets a time and memory limit.
@@ -27,10 +26,8 @@ translate() { timeout 10 ltl2tgba "$@"; }
 # Turns whatever comes in on stdin into a deterministic, complete, colored min-even parity
 # automaton without unreachable states. Extra arguments are passed on to autfilt.
 # `--hoaf=t` forces priorities on edges: by default Spot puts them on states when it can.
-# `--split-edges` makes every edge label a conjunction that mentions all atomic propositions,
-# the HOA reader of this crate does not accept labels with disjunctions.
 to_dpa() {
-  autfilt --hoaf=t --split-edges --deterministic --complete --colored-parity='min even' \
+  autfilt --hoaf=t --deterministic --complete --colored-parity='min even' \
           --remove-unreachable-states "$@"
 }
 

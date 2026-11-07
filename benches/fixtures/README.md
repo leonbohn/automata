@@ -1,26 +1,26 @@
 # Benchmark fixtures
 
 Deterministic parity automata (DPAs) in the HOA format that the benchmarks read. They are
-**generated with [Spot](https://spot.lre.epita.fr) (version 2.14.5)**; none of this would exist
+**generated with [Spot](https://spot.lre.epita.fr) (version 2.16.2)**; none of this would exist
 without it. The files are committed so that benchmarks neither need Spot nor depend on
 random numbers. Regenerate them with `scripts/generate_benchmark_fixtures.sh`, which needs the
 Spot tools `genltl`, `ltl2tgba`, `randaut`, `genaut` and `autfilt`. Regenerating changes the
-benchmark inputs, so it invalidates the history of the benchmarks. The script was also checked
-with Spot 2.16.2: it runs unchanged and produces the same 22 fixtures; 19 are identical, the other
-three (`ltl/gh-q-3`, `ltl/rv-counter-3`, `ltl/sejk-k-2`) are equivalent and have the same size, but
-number states and edges differently. They were not regenerated to keep the benchmark history.
+benchmark inputs, so it invalidates the history of the benchmarks.
 
 Every fixture is deterministic, complete, colored (exactly one priority per edge), uses
 `parity min even`, has one initial state and no unreachable states
 (`autfilt --deterministic --complete --colored-parity='min even' --remove-unreachable-states`),
-priorities are on the edges (`--hoaf=t`), and every edge label is a conjunction that mentions all
-atomic propositions (`--split-edges`).
+and priorities are on the edges (`--hoaf=t`). Edge labels are exactly as Spot writes them, including
+disjunctions.
 
-Three limitations of the HOA reader shape the files, none of them of Spot: it accepts at most 6
-atomic propositions (automata with more are left out), it does not accept edge labels with
-disjunctions (hence `--split-edges`), and the parser rejects the informative properties
-`stutter-sensitive`, `terminal`, `very-weak`, `weak` and `inherently-weak`, which are therefore
-removed from the files by the script.
+The HOA parser rejects the informative properties `stutter-sensitive`, `terminal`, `very-weak`,
+`weak` and `inherently-weak`, which are therefore removed from the files by the script. The reader
+accepts edge labels with disjunctions and up to 31 atomic propositions, so nothing else is
+changed or left out.
+
+**Regenerated for #143 (WP2) with Spot 2.16.2**: without `--split-edges` and without the limit of
+6 atomic propositions. This changes the benchmark inputs, so the history before this point is not
+comparable.
 
 | Directory | How it was obtained | Files | States |
 |---|---|---|---|
