@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::automaton::semantics::observe_omega;
 use crate::automaton::{Automaton, Semantics};
-use crate::automaton::{CycleCondition, Existential};
+use crate::automaton::{CycleCondition, Existential, HistoryDeterministic};
 use crate::ts::{Deterministic, EdgeColor, StateIndex, SymbolOf, run};
 use crate::word::OmegaWord;
 use crate::{Color, Int, Void, alphabet::CharAlphabet};
@@ -21,6 +21,11 @@ pub type DRA<T = DTS<CharAlphabet, Void, Int>> = Automaton<T, RabinCondition<Edg
 /// satisfies the [`RabinCondition`], see [`Existential`].
 pub type NRA<T = NTS<CharAlphabet, Void, Int>> =
     Automaton<T, Existential<RabinCondition<EdgeColor<T>>>>;
+
+/// A history-deterministic Rabin automaton, an [`NRA`] whose nondeterminism can be resolved on
+/// the fly, see [`HistoryDeterministic`].
+pub type HDRA<T = NTS<CharAlphabet, Void, Int>> =
+    Automaton<T, HistoryDeterministic<RabinCondition<EdgeColor<T>>>>;
 
 /// Represents a Rabin condition, which is a set of [`RabinPair`]s. Such a condition is satisfied
 /// if at least one of its pairs is satisfied.

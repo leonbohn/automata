@@ -18,6 +18,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   automaton for free. Infinite words are decided on the product with the word's cycle by an SCC
   decomposition, which is linear for Büchi, co-Büchi, parity and Rabin conditions (exponential in
   the number of colors for Muller and Streett).
+- History-deterministic automata as a promise in the type: `automaton::HistoryDeterministic<C>`
+  (same acceptance as `Existential<C>`) with the aliases `HDFA`, `HDBA`, `HDCW`, `HDPA`, `HDRA`
+  and `HDMA`. `assume_history_deterministic()` turns a nondeterministic automaton into one
+  (unchecked, the checks come with WP8 of #143), `into_existential()` drops the promise.
+  `Emptiness` and HOA output work as for nondeterministic automata.
+- `Automaton::map_acceptance(f)` replaces the acceptance condition, e.g.
+  `dba.map_acceptance(Existential)` is the `DBA` as an `NBA`.
 - The co-Büchi condition `CoBuchiCondition` with `DCW` and `NCW`.
 - Builder shortcuts `into_nba`, `into_dcw`, `into_ncw`, `into_npa` and the generic
   `into_nondeterministic_automaton(initial, acceptance)`, each with a `try_` twin.

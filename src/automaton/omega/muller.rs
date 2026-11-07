@@ -2,7 +2,7 @@ use crate::{Color, Int, Void, alphabet::CharAlphabet, math};
 
 use crate::automaton::semantics::observe_omega;
 use crate::automaton::{Automaton, Semantics};
-use crate::automaton::{CycleCondition, Existential};
+use crate::automaton::{CycleCondition, Existential, HistoryDeterministic};
 use crate::ts::{Deterministic, EdgeColor, StateIndex, SymbolOf, run};
 use crate::word::OmegaWord;
 use crate::{DTS, NTS};
@@ -22,6 +22,11 @@ pub type DMA<T = DTS<CharAlphabet, Void, Int>> = Automaton<T, MullerCondition<Ed
 /// the number of colors in the worst case.
 pub type NMA<T = NTS<CharAlphabet, Void, Int>> =
     Automaton<T, Existential<MullerCondition<EdgeColor<T>>>>;
+
+/// A history-deterministic Muller automaton, an [`NMA`] whose nondeterminism can be resolved on
+/// the fly, see [`HistoryDeterministic`].
+pub type HDMA<T = NTS<CharAlphabet, Void, Int>> =
+    Automaton<T, HistoryDeterministic<MullerCondition<EdgeColor<T>>>>;
 
 /// A Muller condition over some [`Color`] `C` is a set of sets of elements of type `C`. It
 /// is satisfied by a set (usually the set of colors that appear infinitely often in a run),

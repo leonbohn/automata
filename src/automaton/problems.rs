@@ -20,7 +20,7 @@
 //! Automata over omega words are expected to be complete, as a word on which an automaton has no
 //! run is not taken into account.
 
-use super::branching::{self, CycleCondition, Existential};
+use super::branching::{self, CycleCondition, Existential, HistoryDeterministic};
 use super::{Automaton, DBA, DFA, DPA, NFA};
 use crate::alphabet::Expression;
 use crate::ts::EdgeColor;
@@ -494,6 +494,24 @@ emptiness_via_cycles!(
     DRA => super::RabinCondition<EdgeColor<D>>,
     DMA => super::MullerCondition<EdgeColor<D>>
 );
+
+impl<T, C> Emptiness<'_, Automaton<T, HistoryDeterministic<C>>>
+where
+    T: TransitionSystem,
+    C: CycleCondition<Color = EdgeColor<T>>,
+    EdgeColor<T>: Hash + Eq,
+{
+    /// Returns an ultimately periodic word that is accepted, or `None` if the language is empty,
+    /// like for [`Existential`] automata.
+    pub fn witness(&self) -> Option<ReducedOmegaWord<SymbolOf<T>>> {
+        existential_lasso(self.0.ts(), self.0.initial(), &self.0.acceptance().0)
+    }
+
+    /// Returns true if and only if the language is empty.
+    pub fn holds(&self) -> bool {
+        self.witness().is_none()
+    }
+}
 
 /// An ultimately periodic word on which some run from `initial` satisfies `condition`: a path to
 /// a component found by [`search`](branching::search), then a cycle through one edge of each of

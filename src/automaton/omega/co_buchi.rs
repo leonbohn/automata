@@ -1,6 +1,6 @@
 use crate::alphabet::CharAlphabet;
 use crate::automaton::semantics::observe_omega;
-use crate::automaton::{Automaton, CycleCondition, Existential, Semantics};
+use crate::automaton::{Automaton, CycleCondition, Existential, HistoryDeterministic, Semantics};
 use crate::ts::{Deterministic, StateIndex, SymbolOf, run};
 use crate::word::OmegaWord;
 use crate::{DTS, NTS, Void, math};
@@ -63,3 +63,8 @@ pub type DCW<T = DTS<CharAlphabet, Void, bool>> = Automaton<T, CoBuchiCondition>
 /// assert!(!ncw.accepts(upw!("ab")));
 /// ```
 pub type NCW<T = NTS<CharAlphabet, Void, bool>> = Automaton<T, Existential<CoBuchiCondition>>;
+
+/// A history-deterministic co-Büchi automaton, an [`NCW`] whose nondeterminism can be resolved on
+/// the fly, see [`HistoryDeterministic`].
+pub type HDCW<T = NTS<CharAlphabet, Void, bool>> =
+    Automaton<T, HistoryDeterministic<CoBuchiCondition>>;

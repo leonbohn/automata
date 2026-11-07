@@ -127,6 +127,61 @@ where
     }
 }
 
+/// The semantics of a *history-deterministic* (also called good-for-games) automaton with the
+/// acceptance condition `C`: its nondeterminism can be resolved on the fly, by a strategy that only
+/// knows the prefix read so far, without losing accepted words. A word is accepted under the same
+/// condition as for [`Existential`], so `HistoryDeterministic` mainly serves as a promise in the
+/// type: algorithms that need history-determinism (such as minimization of history-deterministic
+/// co-Büchi automata) can require it, see [`super::HDBA`], [`super::HDCW`], [`super::HDPA`] and
+/// the other aliases.
+///
+/// The promise is not checked: use [`super::Automaton::assume_history_deterministic`] on a
+/// nondeterministic automaton that is known to be history-deterministic. Deterministic automata are
+/// history-deterministic, `automaton.map_acceptance(HistoryDeterministic)` is always fine for them.
+///
+/// ```
+/// use automata::prelude::*;
+/// use automata::automaton::{HDBA, HistoryDeterministic};
+///
+/// let dba = Builder::without_state_colors()
+///     .with_transitions([(0, 'a', true, 0), (0, 'b', false, 0)])
+///     .into_dba(0);
+/// let hdba: HDBA<_> = dba.map_acceptance(HistoryDeterministic);
+/// assert!(hdba.accepts(upw!("ab")) && !hdba.accepts(upw!("a", "b")));
+/// ```
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct HistoryDeterministic<C>(pub C);
+
+impl<T, W, C> Semantics<T, W> for HistoryDeterministic<C>
+where
+    T: TransitionSystem,
+    W: Word,
+    W::Kind: ExistentialKind<T, W, C>,
+{
+    type Output = bool;
+    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
+        Some(<W::Kind as ExistentialKind<T, W, C>>::some_run_accepts(
+            &self.0, ts, initial, word,
+        ))
+    }
+}
+
+impl<T: TransitionSystem, C> super::Automaton<T, Existential<C>> {
+    /// Declares `self` history-deterministic, see [`HistoryDeterministic`]. This is not checked;
+    /// the language stays the same either way, but algorithms for history-deterministic automata
+    /// may give wrong results if the promise does not hold.
+    pub fn assume_history_deterministic(self) -> super::Automaton<T, HistoryDeterministic<C>> {
+        self.map_acceptance(|Existential(condition)| HistoryDeterministic(condition))
+    }
+}
+
+impl<T: TransitionSystem, C> super::Automaton<T, HistoryDeterministic<C>> {
+    /// Drops the promise of history-determinism, the language stays the same.
+    pub fn into_existential(self) -> super::Automaton<T, Existential<C>> {
+        self.map_acceptance(|HistoryDeterministic(condition)| Existential(condition))
+    }
+}
+
 /// The states that the runs from `current` can be in after reading `symbols`.
 fn reached<T: TransitionSystem>(
     ts: &T,
@@ -545,6 +600,26 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn history_deterministic_keeps_the_language() {
+        let nba = Builder::without_state_colors()
+            .with_transitions(
+                random_edges(7, 4)
+                    .into_iter()
+                    .map(|(p, a, c, q)| (p, a, c == 0, q)),
+            )
+            .into_nba(0);
+        let hdba = nba.clone().assume_history_deterministic();
+        for word in words() {
+            assert_eq!(hdba.accepts(&word), nba.accepts(&word), "{word:?}");
+        }
+        assert_eq!(
+            Emptiness::of(&hdba).witness(),
+            Emptiness::of(&nba).witness()
+        );
+        assert!(hdba.into_existential() == nba);
     }
 
     #[test]

@@ -83,6 +83,19 @@ where
     }
 }
 
+/// Written like a nondeterministic automaton, the promise of history-determinism is not recorded.
+impl<T: States, C: HoaAcceptance<T>> HoaAcceptance<T>
+    for crate::automaton::HistoryDeterministic<C>
+{
+    fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError> {
+        self.0.write_acceptance(ts, w)
+    }
+
+    fn write_edge_color<W: Write>(&self, color: &T::EdgeColor, w: &mut W) -> Result<(), HoaError> {
+        self.0.write_edge_color(color, w)
+    }
+}
+
 /// A nondeterministic automaton is written like a deterministic one, HOA does not distinguish them.
 impl<T: States, C: HoaAcceptance<T>> HoaAcceptance<T> for crate::automaton::Existential<C> {
     fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError> {
