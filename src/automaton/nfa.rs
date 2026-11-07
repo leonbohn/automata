@@ -1,4 +1,4 @@
-use super::{Automaton, DFA, Existential, HistoryDeterministic, ReachabilityCondition};
+use super::{Automaton, DFA, Existential, ReachabilityCondition};
 use crate::alphabet::{Alphabet, CharAlphabet};
 use crate::representation::IntoTransitions;
 use crate::ts::StateId;
@@ -29,11 +29,6 @@ use crate::{DTS, NTS, TransitionSystem, Void};
 /// assert!(Equivalence::of(&dfa).and(&minimized).holds());
 /// ```
 pub type NFA<T = NTS<CharAlphabet, bool, Void>> = Automaton<T, Existential<ReachabilityCondition>>;
-
-/// A history-deterministic finite automaton, an [`NFA`] whose nondeterminism can be resolved on
-/// the fly, see [`HistoryDeterministic`].
-pub type HDFA<T = NTS<CharAlphabet, bool, Void>> =
-    Automaton<T, HistoryDeterministic<ReachabilityCondition>>;
 
 impl<T> NFA<T>
 where

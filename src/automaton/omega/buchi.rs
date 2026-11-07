@@ -1,7 +1,7 @@
 use crate::States;
 use crate::alphabet::CharAlphabet;
 use crate::automaton::semantics::observe_omega;
-use crate::automaton::{CycleCondition, DPA, Existential, HistoryDeterministic, Semantics};
+use crate::automaton::{CycleCondition, DPA, Existential, Semantics};
 use crate::representation::IntoTransitions;
 use crate::ts::{Deterministic, StateIndex, SymbolOf};
 use crate::word::OmegaWord;
@@ -58,11 +58,6 @@ impl CycleCondition for BuchiCondition {
 /// assert!(!nba.accepts(upw!("ab")));
 /// ```
 pub type NBA<T = NTS<CharAlphabet, Void, bool>> = Automaton<T, Existential<BuchiCondition>>;
-
-/// A history-deterministic Büchi automaton, an [`NBA`] whose nondeterminism can be resolved on
-/// the fly, see [`HistoryDeterministic`].
-pub type HDBA<T = NTS<CharAlphabet, Void, bool>> =
-    Automaton<T, HistoryDeterministic<BuchiCondition>>;
 
 /// A deterministic Büchi automaton (DBA) is a deterministic automaton with Büchi acceptance condition.
 /// It accepts a word if it has a successful infinite run that takes an accepting

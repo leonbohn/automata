@@ -132,8 +132,7 @@ where
 /// knows the prefix read so far, without losing accepted words. A word is accepted under the same
 /// condition as for [`Existential`], so `HistoryDeterministic` mainly serves as a promise in the
 /// type: algorithms that need history-determinism (such as minimization of history-deterministic
-/// co-Büchi automata) can require it, see [`super::HDBA`], [`super::HDCW`], [`super::HDPA`] and
-/// the other aliases.
+/// co-Büchi automata) can require it. For now, the only alias is [`super::HDCW`].
 ///
 /// The promise is not checked: use [`super::Automaton::assume_history_deterministic`] on a
 /// nondeterministic automaton that is known to be history-deterministic. Deterministic automata are
@@ -141,13 +140,14 @@ where
 ///
 /// ```
 /// use automata::prelude::*;
-/// use automata::automaton::{HDBA, HistoryDeterministic};
+/// use automata::automaton::{HDCW, HistoryDeterministic};
 ///
-/// let dba = Builder::without_state_colors()
+/// // finitely many `a`
+/// let dcw = Builder::without_state_colors()
 ///     .with_transitions([(0, 'a', true, 0), (0, 'b', false, 0)])
-///     .into_dba(0);
-/// let hdba: HDBA<_> = dba.map_acceptance(HistoryDeterministic);
-/// assert!(hdba.accepts(upw!("ab")) && !hdba.accepts(upw!("a", "b")));
+///     .into_dcw(0);
+/// let hdcw: HDCW<_> = dcw.map_acceptance(HistoryDeterministic);
+/// assert!(hdcw.accepts(upw!("a", "b")) && !hdcw.accepts(upw!("ab")));
 /// ```
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct HistoryDeterministic<C>(pub C);

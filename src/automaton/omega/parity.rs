@@ -6,9 +6,7 @@ use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 use crate::NTS;
 use crate::automaton::problems::search;
 use crate::automaton::semantics::observe_omega;
-use crate::automaton::{
-    Automaton, CycleCondition, Equivalence, Existential, HistoryDeterministic, Semantics,
-};
+use crate::automaton::{Automaton, CycleCondition, Equivalence, Existential, Semantics};
 use crate::math;
 use crate::representation::IntoTransitions;
 use crate::ts::operations::{Product, ProductIndex};
@@ -48,11 +46,6 @@ pub type DPA<T = DTS<CharAlphabet, Void, Int>, Sem = MinEvenParityCondition> = A
 /// ```
 pub type NPA<T = NTS<CharAlphabet, Void, Int>, Sem = MinEvenParityCondition> =
     Automaton<T, Existential<Sem>>;
-
-/// A history-deterministic parity automaton, an [`NPA`] whose nondeterminism can be resolved on
-/// the fly, see [`HistoryDeterministic`].
-pub type HDPA<T = NTS<CharAlphabet, Void, Int>, Sem = MinEvenParityCondition> =
-    Automaton<T, HistoryDeterministic<Sem>>;
 
 /// Represents a min even parity condition which accepts if and only if the least color
 /// that labels a transition that is taken infinitely often, is even. For the automaton
