@@ -20,8 +20,10 @@
 //! Automata over omega words are expected to be complete, as a word on which an automaton has no
 //! run is not taken into account.
 
-use super::{Automaton, DBA, DFA, DPA};
+use super::branching::{self, CycleCondition, Existential};
+use super::{Automaton, DBA, DFA, DPA, NFA};
 use crate::alphabet::Expression;
+use crate::ts::EdgeColor;
 use crate::ts::States;
 use crate::ts::connected_components::Scc;
 use crate::ts::operations::{Product, ProductIndex};
@@ -29,6 +31,7 @@ use crate::ts::{Deterministic, EdgeOf, Pointed, Sccs, StateIndex, SymbolOf, Tran
 use crate::word::ReducedOmegaWord;
 use crate::{Int, math};
 use std::borrow::Cow;
+use std::hash::Hash;
 
 /// The problem of deciding whether the language of an automaton is empty, see the
 /// [module](self) documentation.
@@ -376,6 +379,149 @@ where
     pub fn holds(&self) -> bool {
         self.counterexample().is_none()
     }
+}
+
+// ---- nondeterministic automata ------------------------------------------------------------------
+
+impl<T: TransitionSystem<StateColor = bool>> Emptiness<'_, NFA<T>> {
+    /// Returns a length-lexicographically minimal accepted word, or `None` if the language is
+    /// empty.
+    pub fn witness(&self) -> Option<Vec<SymbolOf<T>>> {
+        self.0.minimal_representatives_iter().find_map(|rep| {
+            let accepting = self.0.state_color(rep.state_index()).is_some_and(|c| *c);
+            accepting.then(|| rep.decompose().0)
+        })
+    }
+
+    /// Returns true if and only if the language is empty.
+    pub fn holds(&self) -> bool {
+        self.witness().is_none()
+    }
+}
+
+impl<T, O> InclusionCheck<'_, '_, NFA<T>, NFA<O>>
+where
+    T: States<StateColor = bool>,
+    O: States<Alphabet = T::Alphabet, StateColor = bool>,
+{
+    /// Returns a length-lexicographically minimal word that is accepted by the first but not by
+    /// the second automaton, or `None` if the inclusion holds. Both are determinized first, see
+    /// [`NFA::determinize`].
+    pub fn counterexample(&self) -> Option<Vec<SymbolOf<T>>> {
+        let (subset, superset) = (self.subset.determinize(), self.superset.determinize());
+        Inclusion::of(&subset).within(&superset).counterexample()
+    }
+
+    /// Returns true if and only if the inclusion holds.
+    pub fn holds(&self) -> bool {
+        self.counterexample().is_none()
+    }
+}
+
+impl<T, O> EquivalenceCheck<'_, '_, NFA<T>, NFA<O>>
+where
+    T: States<StateColor = bool>,
+    O: States<Alphabet = T::Alphabet, StateColor = bool>,
+{
+    /// Returns a length-lexicographically minimal word that is accepted by exactly one of the two
+    /// automata, or `None` if they are equivalent. Both are determinized first.
+    pub fn counterexample(&self) -> Option<Vec<SymbolOf<T>>> {
+        let (left, right) = (self.left.determinize(), self.right.determinize());
+        Equivalence::of(&left).and(&right).counterexample()
+    }
+
+    /// Returns true if and only if the two automata accept the same language.
+    pub fn holds(&self) -> bool {
+        self.counterexample().is_none()
+    }
+}
+
+impl<T, C> Emptiness<'_, Automaton<T, Existential<C>>>
+where
+    T: TransitionSystem,
+    C: CycleCondition<Color = EdgeColor<T>>,
+    EdgeColor<T>: Hash + Eq,
+{
+    /// Returns an ultimately periodic word that is accepted, or `None` if the language is empty.
+    /// This works for every nondeterministic omega automaton ([`super::NBA`], [`super::NCW`],
+    /// [`super::NPA`], [`super::NRA`], [`super::NMA`], ...), see [`CycleCondition`].
+    ///
+    /// ```
+    /// use automata::prelude::*;
+    ///
+    /// let nba = Builder::without_state_colors()
+    ///     .with_transitions([(0, 'a', false, 0), (0, 'b', false, 1), (1, 'b', true, 1)])
+    ///     .into_nba(0);
+    /// let word = Emptiness::of(&nba).witness().unwrap();
+    /// assert!(nba.accepts(&word));
+    /// ```
+    pub fn witness(&self) -> Option<ReducedOmegaWord<SymbolOf<T>>> {
+        existential_lasso(self.0.ts(), self.0.initial(), &self.0.acceptance().0)
+    }
+
+    /// Returns true if and only if the language is empty.
+    pub fn holds(&self) -> bool {
+        self.witness().is_none()
+    }
+}
+
+/// Emptiness of deterministic omega automata without a dedicated parity search, by the same search
+/// as for nondeterministic ones (a deterministic automaton accepts some word if and only if a
+/// reachable cycle is accepting).
+macro_rules! emptiness_via_cycles {
+    ($($alias:ident => $cond:ty),*) => {$(
+        impl<D> Emptiness<'_, super::$alias<D>>
+        where
+            D: TransitionSystem,
+            $cond: CycleCondition<Color = EdgeColor<D>>,
+            EdgeColor<D>: Hash + Ord,
+        {
+            /// Returns an ultimately periodic word that is accepted, or `None` if the language is
+            /// empty.
+            pub fn witness(&self) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
+                existential_lasso(self.0.ts(), self.0.initial(), self.0.acceptance())
+            }
+
+            /// Returns true if and only if the language is empty.
+            pub fn holds(&self) -> bool {
+                self.witness().is_none()
+            }
+        }
+    )*};
+}
+emptiness_via_cycles!(
+    DCW => super::CoBuchiCondition,
+    DRA => super::RabinCondition<EdgeColor<D>>,
+    DMA => super::MullerCondition<EdgeColor<D>>
+);
+
+/// An ultimately periodic word on which some run from `initial` satisfies `condition`: a path to
+/// a component found by [`search`](branching::search), then a cycle through one edge of each of
+/// its colors.
+pub(super) fn existential_lasso<T, C>(
+    ts: &T,
+    initial: StateIndex<T>,
+    condition: &C,
+) -> Option<ReducedOmegaWord<SymbolOf<T>>>
+where
+    T: TransitionSystem,
+    C: CycleCondition<Color = EdgeColor<T>>,
+    EdgeColor<T>: Hash + Eq,
+{
+    let (start, cycle) = branching::search(ts, vec![initial], condition, |scc, through| {
+        let view = scc.ts();
+        let start = through.first()?.0;
+        let (mut cycle, mut at) = (Vec::new(), start);
+        for &(from, symbol, to) in through {
+            cycle.extend(view.word_from_to(at, from)?);
+            cycle.push(symbol);
+            at = to;
+        }
+        cycle.extend(view.word_from_to(at, start)?);
+        Some((start, cycle))
+    })?;
+    let spoke = ts.word_from_to(initial, start)?;
+    Some(ReducedOmegaWord::ultimately_periodic(spoke, cycle))
 }
 
 /// A Büchi automaton is a parity automaton with priority 0 on accepting and 1 on other edges.

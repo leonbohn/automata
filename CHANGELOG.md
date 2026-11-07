@@ -21,6 +21,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The co-Büchi condition `CoBuchiCondition` with `DCW` and `NCW`.
 - Builder shortcuts `into_nba`, `into_dcw`, `into_ncw`, `into_npa` and the generic
   `into_nondeterministic_automaton(initial, acceptance)`, each with a `try_` twin.
+- `Emptiness` with an accepted word as witness for every nondeterministic omega automaton
+  (`Automaton<T, Existential<C>>`) and for `DCW`, `DRA` and `DMA`; `Emptiness`, `Inclusion` and
+  `Equivalence` for `NFA` (via `NFA::determinize`). Inclusion and equivalence of nondeterministic
+  omega automata are not offered, they need a determinization or complementation that does not
+  exist yet.
 - `Storage::Semantics<C>`: the semantics of a condition on a storage, `C` for the deterministic
   storages and `Existential<C>` for `Linked`.
 

@@ -443,12 +443,64 @@ mod tests {
             let nma = Builder::without_state_colors()
                 .with_transitions(edges)
                 .into_nondeterministic_automaton(0, Existential(muller.clone()));
+            let mut accepts_some = false;
             for word in words() {
                 let expected = npa.accepts(&word);
+                accepts_some |= expected;
                 assert_eq!(nra.accepts(&word), expected, "seed {seed}, {word:?}");
                 assert_eq!(nma.accepts(&word), expected, "seed {seed}, {word:?}");
             }
+            // a witness is accepted, and an empty language accepts none of the words
+            let witnesses = [
+                Emptiness::of(&npa).witness(),
+                Emptiness::of(&nra).witness(),
+                Emptiness::of(&nma).witness(),
+            ];
+            for witness in &witnesses {
+                assert_eq!(witness.is_some(), witnesses[0].is_some(), "seed {seed}");
+                if let Some(word) = witness {
+                    assert!(npa.accepts(word), "seed {seed}, {word:?}");
+                }
+            }
+            assert!(witnesses[0].is_some() || !accepts_some, "seed {seed}");
         }
+    }
+
+    #[test]
+    fn nfa_problems() {
+        // second to last symbol is an `a`, and words that contain an `a`
+        let second_to_last = Builder::without_edge_colors()
+            .with_state_colors([false, false, true])
+            .with_transitions([
+                (0, 'a', 0),
+                (0, 'b', 0),
+                (0, 'a', 1),
+                (1, 'a', 2),
+                (1, 'b', 2),
+            ])
+            .into_nfa(0);
+        let contains_a = Builder::without_edge_colors()
+            .with_state_colors([false, true])
+            .with_transitions([
+                (0, 'a', 0),
+                (0, 'b', 0),
+                (0, 'a', 1),
+                (1, 'a', 1),
+                (1, 'b', 1),
+            ])
+            .into_nfa(0);
+        assert_eq!(
+            Emptiness::of(&second_to_last).witness(),
+            Some(vec!['a', 'a'])
+        );
+        assert!(Inclusion::of(&second_to_last).within(&contains_a).holds());
+        assert_eq!(
+            Inclusion::of(&contains_a)
+                .within(&second_to_last)
+                .counterexample(),
+            Some(vec!['a'])
+        );
+        assert!(!Equivalence::of(&contains_a).and(&second_to_last).holds());
     }
 
     #[test]
