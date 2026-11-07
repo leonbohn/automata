@@ -9,13 +9,11 @@
 //! [`super::NMA`].
 
 use super::Semantics;
-use crate::alphabet::{Expression, Matcher};
+use super::cycles::{self, Colors};
+use crate::alphabet::Matcher;
 use crate::math;
-use crate::ts::connected_components::Scc;
 use crate::ts::operations::ProductIndex;
-use crate::ts::{
-    EdgeColor, EdgeExpression, EdgeOf, EdgeRef, Sccs, StateColor, StateIndex, SymbolOf,
-};
+use crate::ts::{EdgeColor, EdgeExpression, EdgeRef, StateColor, StateIndex, SymbolOf};
 use crate::word::{Finite, FiniteWord, Omega, OmegaWord, Word};
 use crate::{Color, TransitionSystem};
 use std::borrow::Cow;
@@ -109,7 +107,7 @@ where
             .into_iter()
             .map(|q| ProductIndex(q, 0))
             .collect();
-        search(&view, roots, condition, |_, _| Some(())).is_some()
+        cycles::search(&view, roots, &Colors(condition), |_, _| Some(())).is_some()
     }
 }
 
@@ -204,157 +202,6 @@ fn reached<T: TransitionSystem>(
         }
     }
     current
-}
-
-/// An edge of a transition system, given by its source, a symbol that takes it and its target.
-pub(crate) type Through<T> = (StateIndex<T>, SymbolOf<T>, StateIndex<T>);
-
-/// Decomposes the part of `ts` that is reachable from `roots` into strongly connected components
-/// and calls `visit` for each component whose edge colors satisfy `condition`, until it returns
-/// `Some`. Components that do not satisfy it are decomposed again without the colors that
-/// [`CycleCondition::avoid`] names. `visit` also gets one edge for each color of the component, a
-/// cycle through these edges sees exactly the colors of the component.
-pub(crate) fn search<T, C, R>(
-    ts: &T,
-    roots: Vec<StateIndex<T>>,
-    condition: &C,
-    mut visit: impl for<'v> FnMut(&Scc<'v, Avoiding<'v, T>>, &[Through<T>]) -> Option<R>,
-) -> Option<R>
-where
-    T: TransitionSystem,
-    C: CycleCondition<Color = EdgeColor<T>>,
-    EdgeColor<T>: Hash + Eq,
-{
-    struct Task<I, C> {
-        roots: Vec<I>,
-        avoid: math::FxIndexSet<C>,
-        restrict: bool,
-    }
-    // The same component can be reached by avoiding the same colors in a different order, so the
-    // tasks are deduplicated by their sorted states and the indices of the colors they avoid.
-    let mut palette = math::FxIndexSet::default();
-    let mut seen = math::FxIndexSet::default();
-    let mut tasks = vec![Task {
-        roots,
-        avoid: math::FxIndexSet::default(),
-        restrict: false,
-    }];
-    while let Some(task) = tasks.pop() {
-        // built only for tasks that are actually looked at
-        let inside: Option<math::FxIndexSet<_>> =
-            task.restrict.then(|| task.roots.iter().copied().collect());
-        let view = Avoiding {
-            ts,
-            avoid: &task.avoid,
-            inside: inside.as_ref(),
-        };
-        let sccs = Sccs::on(&view).from(task.roots).compute();
-        for scc in sccs.sccs_iter().filter(|scc| scc.is_nontransient()) {
-            let mut colors = math::FxIndexSet::default();
-            let mut through = Vec::new();
-            for edge in scc.interior_edges() {
-                let Some(symbol) = edge.expression().symbols().next() else {
-                    continue;
-                };
-                if colors.insert(edge.color().clone()) {
-                    through.push((edge.source(), symbol, edge.target()));
-                }
-            }
-            if colors.is_empty() {
-                continue;
-            }
-            if condition.satisfied_by(&colors) {
-                if let Some(found) = visit(scc, &through) {
-                    return Some(found);
-                }
-                continue;
-            }
-            let mut states: Vec<_> = scc.state_indices().copied().collect();
-            states.sort_unstable();
-            for more in condition.avoid(&colors) {
-                let mut avoid = task.avoid.clone();
-                avoid.extend(more);
-                // a task has to avoid a color of the component, otherwise it would be the same
-                if !colors.iter().any(|color| avoid.contains(color)) {
-                    continue;
-                }
-                let mut key: Vec<usize> = avoid
-                    .iter()
-                    .map(|color| palette.insert_full(color.clone()).0)
-                    .collect();
-                key.sort_unstable();
-                if seen.insert((states.clone(), key)) {
-                    tasks.push(Task {
-                        roots: states.clone(),
-                        avoid,
-                        restrict: true,
-                    });
-                }
-            }
-        }
-    }
-    None
-}
-
-/// The part of a transition system without the edges of some colors and, optionally, restricted
-/// to a set of states. See [`search`].
-pub(crate) struct Avoiding<'a, T: TransitionSystem> {
-    ts: &'a T,
-    avoid: &'a math::FxIndexSet<EdgeColor<T>>,
-    inside: Option<&'a math::FxIndexSet<StateIndex<T>>>,
-}
-
-/// The edges of an [`Avoiding`] view that start in a state.
-pub(crate) struct AvoidingEdges<'a, T: TransitionSystem> {
-    it: T::EdgesFromIter<'a>,
-    view: &'a Avoiding<'a, T>,
-}
-
-impl<'a, T: TransitionSystem> Iterator for AvoidingEdges<'a, T>
-where
-    EdgeColor<T>: Hash + Eq,
-{
-    type Item = EdgeOf<'a, T>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let Avoiding { avoid, inside, .. } = self.view;
-        self.it.find(|edge| {
-            (avoid.is_empty() || !avoid.contains(edge.color()))
-                && inside.is_none_or(|set| set.contains(&edge.target()))
-        })
-    }
-}
-
-impl<'a, T: TransitionSystem> TransitionSystem for Avoiding<'a, T>
-where
-    EdgeColor<T>: Hash + Eq,
-{
-    type Alphabet = T::Alphabet;
-    type StateIndex = T::StateIndex;
-    type StateColor = T::StateColor;
-    type EdgeColor = T::EdgeColor;
-    type EdgesFromIter<'this>
-        = AvoidingEdges<'this, T>
-    where
-        Self: 'this;
-
-    fn alphabet(&self) -> &Self::Alphabet {
-        self.ts.alphabet()
-    }
-
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
-        self.ts.state_color(state)
-    }
-
-    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        Some(AvoidingEdges {
-            it: self.ts.edges_from(state)?,
-            view: self,
-        })
-    }
-
-    fn state_bound(&self) -> Option<usize> {
-        self.ts.state_bound()
-    }
 }
 
 /// The product of a transition system with the cycle of an ultimately periodic word: a state

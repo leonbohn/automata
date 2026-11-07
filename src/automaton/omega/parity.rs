@@ -4,7 +4,7 @@ use crate::ts::{DenseId, EdgeId, Sproutable};
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use crate::NTS;
-use crate::automaton::problems::search;
+use crate::automaton::cycles::{Priorities, search};
 use crate::automaton::semantics::observe_omega;
 use crate::automaton::{Automaton, CycleCondition, Equivalence, Existential, Semantics};
 use crate::math;
@@ -356,19 +356,16 @@ where
         let mut separated = vec![false; n * n];
         let mut todo = Vec::new();
         for accepted in [(true, false), (false, true)] {
-            search(
-                &product,
-                pairs.clone(),
-                &|&c| c,
+            let priorities = Priorities {
+                priorities: |&(l, r): &(Int, Int)| (l, r),
                 accepted,
-                (0, 0),
-                |scc, _| {
-                    for &pair in scc.state_indices() {
-                        todo.push(id(pair));
-                    }
-                    None
-                },
-            );
+            };
+            search::<_, _, ()>(&product, pairs.clone(), &priorities, |scc, _| {
+                for &pair in scc.state_indices() {
+                    todo.push(id(pair));
+                }
+                None
+            });
         }
         while let Some(pair) = todo.pop() {
             if !std::mem::replace(&mut separated[pair], true) {

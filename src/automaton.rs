@@ -29,6 +29,7 @@ pub use reachability::{DFA, ReachabilityCondition};
 mod nfa;
 pub use nfa::NFA;
 pub mod branching;
+mod cycles;
 pub use branching::{CycleCondition, Existential, FinalStateCondition, HistoryDeterministic};
 
 mod omega;

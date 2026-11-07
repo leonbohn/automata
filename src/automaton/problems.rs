@@ -20,17 +20,15 @@
 //! Automata over omega words are expected to be complete, as a word on which an automaton has no
 //! run is not taken into account.
 
-use super::branching::{self, CycleCondition, Existential, HistoryDeterministic};
+use super::branching::{CycleCondition, Existential, HistoryDeterministic};
+use super::cycles::{self, Colors, Priorities};
 use super::{Automaton, DBA, DFA, DPA, NFA};
-use crate::alphabet::Expression;
 use crate::ts::EdgeColor;
 use crate::ts::States;
-use crate::ts::connected_components::Scc;
 use crate::ts::operations::{Product, ProductIndex};
-use crate::ts::{Deterministic, EdgeOf, Pointed, Sccs, StateIndex, SymbolOf, TransitionSystem};
+use crate::ts::{Deterministic, Pointed, StateIndex, SymbolOf, TransitionSystem};
 use crate::word::ReducedOmegaWord;
 use crate::{Int, math};
-use std::borrow::Cow;
 use std::hash::Hash;
 
 /// The problem of deciding whether the language of an automaton is empty, see the
@@ -456,7 +454,11 @@ where
     /// assert!(nba.accepts(&word));
     /// ```
     pub fn witness(&self) -> Option<ReducedOmegaWord<SymbolOf<T>>> {
-        existential_lasso(self.0.ts(), self.0.initial(), &self.0.acceptance().0)
+        cycles::lasso(
+            self.0.ts(),
+            self.0.initial(),
+            &Colors(&self.0.acceptance().0),
+        )
     }
 
     /// Returns true if and only if the language is empty.
@@ -479,7 +481,7 @@ macro_rules! emptiness_via_cycles {
             /// Returns an ultimately periodic word that is accepted, or `None` if the language is
             /// empty.
             pub fn witness(&self) -> Option<ReducedOmegaWord<SymbolOf<D>>> {
-                existential_lasso(self.0.ts(), self.0.initial(), self.0.acceptance())
+                cycles::lasso(self.0.ts(), self.0.initial(), &Colors(self.0.acceptance()))
             }
 
             /// Returns true if and only if the language is empty.
@@ -504,7 +506,11 @@ where
     /// Returns an ultimately periodic word that is accepted, or `None` if the language is empty,
     /// like for [`Existential`] automata.
     pub fn witness(&self) -> Option<ReducedOmegaWord<SymbolOf<T>>> {
-        existential_lasso(self.0.ts(), self.0.initial(), &self.0.acceptance().0)
+        cycles::lasso(
+            self.0.ts(),
+            self.0.initial(),
+            &Colors(&self.0.acceptance().0),
+        )
     }
 
     /// Returns true if and only if the language is empty.
@@ -513,44 +519,10 @@ where
     }
 }
 
-/// An ultimately periodic word on which some run from `initial` satisfies `condition`: a path to
-/// a component found by [`search`](branching::search), then a cycle through one edge of each of
-/// its colors.
-pub(super) fn existential_lasso<T, C>(
-    ts: &T,
-    initial: StateIndex<T>,
-    condition: &C,
-) -> Option<ReducedOmegaWord<SymbolOf<T>>>
-where
-    T: TransitionSystem,
-    C: CycleCondition<Color = EdgeColor<T>>,
-    EdgeColor<T>: Hash + Eq,
-{
-    let (start, cycle) = branching::search(ts, vec![initial], condition, |scc, through| {
-        let view = scc.ts();
-        let start = through.first()?.0;
-        let (mut cycle, mut at) = (Vec::new(), start);
-        for &(from, symbol, to) in through {
-            cycle.extend(view.word_from_to(at, from)?);
-            cycle.push(symbol);
-            at = to;
-        }
-        cycle.extend(view.word_from_to(at, start)?);
-        Some((start, cycle))
-    })?;
-    let spoke = ts.word_from_to(initial, start)?;
-    Some(ReducedOmegaWord::ultimately_periodic(spoke, cycle))
-}
-
 /// A Büchi automaton is a parity automaton with priority 0 on accepting and 1 on other edges.
 fn buchi(accepting: bool) -> Int {
     if accepting { 0 } else { 1 }
 }
-
-type Priorities = (Int, Int);
-
-/// An edge of a transition system, given by its source, a symbol that takes it and its target.
-pub(super) type Through<T> = (StateIndex<T>, SymbolOf<T>, StateIndex<T>);
 
 /// The least priority of the given parity that occurs on an edge of `ts`. No cycle can have a
 /// least priority of that parity that is smaller, so edges below it can be ignored right away.
@@ -567,7 +539,7 @@ fn least_priority<T: States>(
         .min()
 }
 
-/// An accepted word of an automaton, see [`lasso`].
+/// An accepted word of a deterministic parity or Büchi automaton, see [`cycles::lasso`].
 fn single_lasso<L, S>(
     automaton: &Automaton<L, S>,
     priority: impl Fn(&L::EdgeColor) -> Int,
@@ -575,13 +547,11 @@ fn single_lasso<L, S>(
 where
     L: Deterministic,
 {
-    lasso(
-        automaton,
-        automaton.initial(),
-        |c| (priority(c), 0),
-        (true, true),
-        (0, 0),
-    )
+    let priorities = Priorities {
+        priorities: |c: &L::EdgeColor| (priority(c), 0),
+        accepted: (true, true),
+    };
+    cycles::lasso(automaton, automaton.initial(), &priorities)
 }
 
 /// Looks for a word whose run in the product of `left` and `right` has the given acceptance (as
@@ -602,222 +572,11 @@ where
     least_priority(right, priority, accepted.1)?;
     let initial = ProductIndex(left.initial(), right.initial());
     let product = left.ts_product(right).with_initial(initial);
-    lasso(
-        &product,
-        initial,
-        |(l, r)| (priority(l), priority(r)),
+    let priorities = Priorities {
+        priorities: |(l, r): &(L::EdgeColor, L::EdgeColor)| (priority(l), priority(r)),
         accepted,
-        (0, 0),
-    )
-}
-
-/// An ultimately periodic word that leads from `initial` into a cycle of `ts` such that the least
-/// first priority on the cycle is even if and only if `accepted.0` and the least second priority
-/// is even if and only if `accepted.1`. Edges with priorities below `floor` are ignored.
-///
-/// This decomposes `ts` into strongly connected components. If all edges of a component (which
-/// can be traversed in one cycle) fit, we are done. Otherwise, a cycle must avoid the edges that
-/// carry a least priority of the wrong parity, so we remove them and decompose the component
-/// again.
-fn lasso<T>(
-    ts: &T,
-    initial: T::StateIndex,
-    priorities: impl Fn(&T::EdgeColor) -> Priorities,
-    accepted: (bool, bool),
-    floor: Priorities,
-) -> Option<ReducedOmegaWord<SymbolOf<T>>>
-where
-    T: TransitionSystem,
-{
-    let mut found = None;
-    search(
-        ts,
-        vec![initial],
-        &priorities,
-        accepted,
-        floor,
-        |scc, through| {
-            // A cycle through the edges with the least priorities has exactly these least priorities,
-            // as all edges of the component are at least that large. This is much shorter than a
-            // cycle that visits the whole component.
-            let view = scc.ts();
-            let [(from_l, symbol_l, to_l), (from_r, symbol_r, to_r)] = *through;
-            let mut cycle = vec![symbol_l];
-            if (from_l, symbol_l, to_l) == (from_r, symbol_r, to_r) {
-                cycle.extend(view.word_from_to(to_l, from_l)?);
-            } else {
-                cycle.extend(view.word_from_to(to_l, from_r)?);
-                cycle.push(symbol_r);
-                cycle.extend(view.word_from_to(to_r, from_l)?);
-            }
-            found = Some((from_l, cycle));
-            Some(())
-        },
-    );
-    let (start, cycle) = found?;
-    let spoke = ts.word_from_to(initial, start)?;
-    Some(ReducedOmegaWord::ultimately_periodic(spoke, cycle))
-}
-
-/// Decomposes the part of `ts` that is reachable from `roots` as described for [`lasso`] and
-/// calls `visit` for every component that can be traversed in a good cycle, until it returns
-/// `Some`.
-pub(super) fn search<T, P>(
-    ts: &T,
-    roots: Vec<T::StateIndex>,
-    priorities: &P,
-    accepted: (bool, bool),
-    floor: Priorities,
-    mut visit: impl for<'v> FnMut(&Scc<'v, Masked<'v, T, P>>, &[Through<T>; 2]) -> Option<()>,
-) where
-    T: TransitionSystem,
-    P: Fn(&T::EdgeColor) -> Priorities,
-{
-    struct Task<I> {
-        floor: Priorities,
-        roots: Vec<I>,
-        restrict: bool,
-    }
-    let mut tasks = vec![Task {
-        floor,
-        roots,
-        restrict: false,
-    }];
-    while let Some(task) = tasks.pop() {
-        // built only for tasks that are actually looked at
-        let inside: Option<math::FxIndexSet<_>> =
-            task.restrict.then(|| task.roots.iter().copied().collect());
-        let view = Masked {
-            ts,
-            priorities,
-            floor: task.floor,
-            inside: inside.as_ref(),
-        };
-        let sccs = Sccs::on(&view).from(task.roots).compute();
-        let mut good = Vec::new();
-        for scc in sccs.sccs_iter().filter(|scc| scc.is_nontransient()) {
-            let (mut low_l, mut low_r) = (Int::MAX, Int::MAX);
-            let (mut through_l, mut through_r) = (None, None);
-            for edge in scc.interior_edges() {
-                let (l, r) = priorities(edge.color());
-                let through = |edge: &EdgeOf<'_, Masked<'_, T, P>>| {
-                    let symbol = edge.expression().symbols().next()?;
-                    Some((edge.source(), symbol, edge.target()))
-                };
-                if l < low_l {
-                    low_l = l;
-                    through_l = through(&edge);
-                }
-                if r < low_r {
-                    low_r = r;
-                    through_r = through(&edge);
-                }
-            }
-            let good_l = low_l.is_multiple_of(2) == accepted.0;
-            let good_r = low_r.is_multiple_of(2) == accepted.1;
-            if good_l && good_r {
-                if let (Some(l), Some(r)) = (through_l, through_r) {
-                    good.push((scc, [l, r]));
-                }
-                continue;
-            }
-            // Cycles through an edge with a bad least priority are bad, so the edges with that
-            // priority are removed. If nothing remains above it, there is no cycle left.
-            let mut floor = task.floor;
-            if !good_l {
-                let Some(next) = low_l.checked_add(1) else {
-                    continue;
-                };
-                floor.0 = next;
-            }
-            if !good_r {
-                let Some(next) = low_r.checked_add(1) else {
-                    continue;
-                };
-                floor.1 = next;
-            }
-            tasks.push(Task {
-                floor,
-                roots: scc.state_indices().copied().collect(),
-                restrict: true,
-            });
-        }
-        // the smallest components have the shortest cycles
-        good.sort_by_key(|(scc, _)| scc.size());
-        for (scc, through) in &good {
-            if visit(scc, through).is_some() {
-                return;
-            }
-        }
-    }
-}
-
-/// The part of a transition system that only has edges with priorities above a floor and states
-/// from a given set.
-pub(super) struct Masked<'a, T: TransitionSystem, P> {
-    ts: &'a T,
-    priorities: &'a P,
-    floor: Priorities,
-    inside: Option<&'a math::FxIndexSet<T::StateIndex>>,
-}
-
-pub(super) struct MaskedEdges<'a, T: TransitionSystem, P> {
-    it: T::EdgesFromIter<'a>,
-    mask: &'a Masked<'a, T, P>,
-}
-
-impl<'a, T, P> Iterator for MaskedEdges<'a, T, P>
-where
-    T: TransitionSystem,
-    P: Fn(&T::EdgeColor) -> Priorities,
-{
-    type Item = EdgeOf<'a, T>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let Masked {
-            priorities,
-            floor,
-            inside,
-            ..
-        } = self.mask;
-        self.it.find(|edge| {
-            let (l, r) = priorities(edge.color());
-            floor.0 <= l && floor.1 <= r && inside.is_none_or(|set| set.contains(&edge.target()))
-        })
-    }
-}
-
-impl<'a, T, P> TransitionSystem for Masked<'a, T, P>
-where
-    T: TransitionSystem,
-    P: Fn(&T::EdgeColor) -> Priorities,
-{
-    type Alphabet = T::Alphabet;
-    type StateIndex = T::StateIndex;
-    type StateColor = T::StateColor;
-    type EdgeColor = T::EdgeColor;
-    type EdgesFromIter<'this>
-        = MaskedEdges<'this, T, P>
-    where
-        Self: 'this;
-
-    fn alphabet(&self) -> &Self::Alphabet {
-        self.ts.alphabet()
-    }
-
-    fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
-        self.ts.state_color(state)
-    }
-
-    fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        Some(MaskedEdges {
-            it: self.ts.edges_from(state)?,
-            mask: self,
-        })
-    }
-
-    fn state_bound(&self) -> Option<usize> {
-        self.ts.state_bound()
-    }
+    };
+    cycles::lasso(&product, initial, &priorities)
 }
 
 #[cfg(test)]
