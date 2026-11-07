@@ -563,6 +563,33 @@ mod tests {
     }
 
     #[test]
+    fn maximal_number_of_atomic_propositions_with_disjunction() {
+        use crate::ts::TransitionSystem;
+        let count = 31;
+        let names = (0..count)
+            .map(|i| format!("\"a{i}\""))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let hoa = hoa_with_states(
+            2,
+            &format!("AP: {count} {names}"),
+            "Start: 0",
+            "State: 0\n[0&30 | !1&!29] 0 {0}\n[!0&!30 | 15] 1\nState: 1\n[t] 1",
+        );
+        let edge_count = |hoa: &str| {
+            let aut = super::parse_omega_automaton_range::<Linked>(hoa, 0, hoa.len())
+                .expect("31 atomic propositions must be accepted");
+            assert_eq!(aut.state_count(), 2);
+            let n = aut.edges_from(0u32.into()).into_iter().flatten().count();
+            (n, aut)
+        };
+        let (n, aut) = edge_count(&hoa);
+        assert_eq!(n, 2);
+        let written = aut.to_hoa().expect("cannot write hoa");
+        assert_eq!(edge_count(&written).0, 2);
+    }
+
+    #[test]
     fn hoa_tdba_with_abort_and_nondeterministic() {
         let raw_hoa = r#"
         HOA: v1
