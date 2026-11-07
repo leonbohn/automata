@@ -107,9 +107,14 @@ Two distinctions that recur everywhere:
     ids, hash containers otherwise), `state_index.rs` (`IdType`, `DenseId`, `EdgeId(u32)`,
     `DefaultIdType = u32`).
   - `model/`: a property-test harness for the storages (`#[cfg(test)]` only, uses proptest).
-- `automaton.rs` + `src/automaton/` — `Automaton<T, Sem>`; aliases `DFA`, `DBA`, `DPA<T, Sem>`,
-  `DRA`, `DMA`, `MooreMachine`, `MealyMachine`, `OmegaAutomaton<A, S = Det<Linked>>` and its
-  deterministic/nondeterministic spellings. `omega/` holds the acceptance conditions (`buchi`,
+- `automaton.rs` + `src/automaton/` — `Automaton<T, Sem>`; aliases `DFA`, `DBA`, `DCW`,
+  `DPA<T, Sem>`, `DRA`, `DMA`, `MooreMachine`, `MealyMachine`, `OmegaAutomaton<A, S = Det<Linked>>`
+  and its deterministic/nondeterministic spellings. The branching is part of `Sem`
+  (`branching.rs`): a bare condition is deterministic, `Existential<C>` (some run accepts) gives
+  `NFA`, `NBA`, `NCW`, `NPA`, `NRA`, `NMA`, and `HistoryDeterministic<C>` the `HD*` aliases. A
+  condition gets these by implementing `CycleCondition` (omega; drives one SCC search for
+  acceptance and emptiness) or `FinalStateCondition` (finite). `Semantics` has the single method
+  `output`. `omega/` holds the acceptance conditions (`buchi`, `co_buchi`,
   `parity` with four min/max even/odd variants, `rabin`, `muller`) plus
   `OmegaAcceptanceCondition`, the enum for parsed automata whose condition is only known at
   runtime. `problems.rs`: language problems with witnesses — `Emptiness::of(&a).witness()`,
@@ -169,8 +174,10 @@ Two distinctions that recur everywhere:
   do not implement `States` — call `.reachable_part()` first.
 - `LinkedTs` removal leaves tombstones (state indices and `EdgeId`s are never reused);
   `compact()` renumbers. Code holding `EdgeId`s across mutation must re-map.
-- Nondeterminism has no first-class `NFA`/`NBA`/`NPA` aliases yet (PLAN Phase 2) — an `NTS` is
-  a `LinkedTs`, and `Determinize`/`subset_construction` is the bridge to deterministic types.
+- Nondeterministic omega automata have `accepts` and `Emptiness`, but no `Inclusion`/`Equivalence`
+  and no determinization (only `NFA::determinize`). `HistoryDeterministic` is an unchecked
+  promise. An `NTS` is a `LinkedTs`; `Determinize`/`subset_construction` is the bridge to
+  deterministic types.
 - `OmegaAcceptanceCondition::Rabin`/`Streett` → `into_dpa` returns
   `Error::NotYetImplemented`.
 - Language problems on omega automata expect complete automata (a word without a run is
