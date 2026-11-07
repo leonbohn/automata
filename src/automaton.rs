@@ -27,7 +27,7 @@ mod reachability;
 pub use reachability::{DFA, ReachabilityCondition};
 
 mod nfa;
-pub use nfa::{NFA, NfaCondition, SomeRunAccepts};
+pub use nfa::{NFA, NfaCondition};
 
 mod omega;
 pub use omega::{
@@ -229,8 +229,7 @@ impl<T: TransitionSystem, Sem> Automaton<T, Sem> {
     where
         Sem: Semantics<T, W>,
     {
-        let observed = self.acceptance.observe(&self.ts, self.initial, word)?;
-        Some(self.acceptance.evaluate(observed))
+        self.acceptance.output(&self.ts, self.initial, word)
     }
 }
 

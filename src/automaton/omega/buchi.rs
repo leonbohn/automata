@@ -25,18 +25,9 @@ where
     T: Deterministic<EdgeColor = bool>,
     W: OmegaWord<Symbol = SymbolOf<T>>,
 {
-    type Observer = run::GreatestEdgeColor<T>;
     type Output = bool;
-    fn observe(
-        &self,
-        ts: &T,
-        initial: StateIndex<T>,
-        word: W,
-    ) -> Option<<Self::Observer as run::Observer<T>>::Current> {
-        observe_omega::<T, W, Self::Observer>(ts, initial, word)
-    }
-    fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
-        observed
+    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
+        observe_omega::<T, W, run::GreatestEdgeColor<T>>(ts, initial, word)
     }
 }
 

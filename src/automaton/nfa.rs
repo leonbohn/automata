@@ -3,7 +3,6 @@ use crate::alphabet::{Alphabet, CharAlphabet, Matcher};
 use crate::representation::IntoTransitions;
 use crate::ts::States;
 use crate::ts::operations::Determinize;
-use crate::ts::run::Observer;
 use crate::ts::{StateId, StateIndex, SymbolOf};
 use crate::word::FiniteWord;
 use crate::{DTS, NTS, TransitionSystem, Void};
@@ -20,37 +19,14 @@ impl std::fmt::Debug for NfaCondition {
     }
 }
 
-/// Carries the verdict of [`NfaCondition`] as the [`Semantics::Observer`] type. A nondeterministic
-/// system has no single run to observe, so this is no observer in the sense of running it step by
-/// step: it only holds the result that [`NfaCondition`] computes with a subset simulation.
-#[derive(Debug, Clone, Copy)]
-pub struct SomeRunAccepts(bool);
-
-impl<T: TransitionSystem> Observer<T> for SomeRunAccepts {
-    type Current = bool;
-    fn into_current(self) -> bool {
-        self.0
-    }
-    fn merge(&mut self, later: Self) {
-        self.0 = later.0;
-    }
-    fn begin(_: &T, _: StateIndex<T>) -> Self {
-        Self(false)
-    }
-    fn observe_one(&mut self, _: &T, _: StateIndex<T>, _: SymbolOf<T>) -> Option<StateIndex<T>> {
-        None
-    }
-}
-
 impl<T, W> Semantics<T, W> for NfaCondition
 where
     T: TransitionSystem<StateColor = bool>,
     W: FiniteWord<Symbol = SymbolOf<T>>,
 {
     type Output = bool;
-    type Observer = SomeRunAccepts;
 
-    fn observe(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
+    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
         let mut current = vec![initial];
         for sym in word.symbols() {
             let mut next = Vec::new();
@@ -70,10 +46,6 @@ where
                 .into_iter()
                 .any(|q| ts.state_color(q).is_some_and(|c| *c)),
         )
-    }
-
-    fn evaluate(&self, observed: bool) -> bool {
-        observed
     }
 }
 

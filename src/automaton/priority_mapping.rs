@@ -2,7 +2,6 @@ use super::semantics::observe_finite;
 use super::{Automaton, MealyLike, Semantics, moore::MooreLike};
 use crate::DTS;
 use crate::alphabet::CharAlphabet;
-use crate::ts::run::Observer;
 use crate::ts::{EdgeColor, StateColor, StateIndex, SymbolOf, run};
 use crate::word::FiniteWord;
 use crate::{Int, Void};
@@ -13,35 +12,17 @@ pub struct WeakPriorityMappingSemantics<const ON_EDGES: bool>;
 impl<T: MooreLike, W: FiniteWord<Symbol = SymbolOf<T>>> Semantics<T, W>
     for WeakPriorityMappingSemantics<false>
 {
-    type Observer = run::LeastStateColor<T>;
     type Output = StateColor<T>;
-    fn observe(
-        &self,
-        ts: &T,
-        initial: StateIndex<T>,
-        word: W,
-    ) -> Option<<Self::Observer as Observer<T>>::Current> {
-        observe_finite::<T, W, Self::Observer>(ts, initial, word)
-    }
-    fn evaluate(&self, observed: <Self::Observer as Observer<T>>::Current) -> Self::Output {
-        observed
+    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<Self::Output> {
+        observe_finite::<T, W, run::LeastStateColor<T>>(ts, initial, word)
     }
 }
 impl<T: MealyLike, W: FiniteWord<Symbol = SymbolOf<T>>> Semantics<T, W>
     for WeakPriorityMappingSemantics<true>
 {
-    type Observer = run::LeastEdgeColor<T>;
     type Output = EdgeColor<T>;
-    fn observe(
-        &self,
-        ts: &T,
-        initial: StateIndex<T>,
-        word: W,
-    ) -> Option<<Self::Observer as Observer<T>>::Current> {
-        observe_finite::<T, W, Self::Observer>(ts, initial, word)
-    }
-    fn evaluate(&self, observed: <Self::Observer as Observer<T>>::Current) -> Self::Output {
-        observed
+    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<Self::Output> {
+        observe_finite::<T, W, run::LeastEdgeColor<T>>(ts, initial, word)
     }
 }
 

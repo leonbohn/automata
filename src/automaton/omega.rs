@@ -21,7 +21,7 @@ use crate::automaton::Semantics;
 use crate::automaton::semantics::observe_omega;
 use crate::representation::IntoTransitions;
 use crate::ts::States;
-use crate::ts::run::{self, Observer as _};
+use crate::ts::run;
 use crate::ts::{Builder, DefaultIdType, ForAlphabet, Sproutable};
 use crate::ts::{Det, Linked, Storage};
 use crate::ts::{Deterministic, StateIndex, SymbolOf};
@@ -161,21 +161,13 @@ where
     W: OmegaWord<Symbol = SymbolOf<T>>,
 {
     type Output = bool;
-    type Observer = run::EdgeColorSet<T>;
-    fn observe(
-        &self,
-        ts: &T,
-        initial: StateIndex<T>,
-        word: W,
-    ) -> Option<<Self::Observer as run::Observer<T>>::Current> {
-        observe_omega::<T, W, Self::Observer>(ts, initial, word)
-    }
-    fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
-        let infset: BTreeSet<_> = observed.into_current().0.into_iter().collect();
-        self.satisfied(&infset).unwrap_or_else(|error| {
+    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
+        let inf = observe_omega::<T, W, run::EdgeColorSet<T>>(ts, initial, word)?;
+        let infset: BTreeSet<_> = inf.0.into_iter().collect();
+        Some(self.satisfied(&infset).unwrap_or_else(|error| {
             tracing::warn!("rejecting a run with malformed acceptance sets: {error}");
             false
-        })
+        }))
     }
 }
 

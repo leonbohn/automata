@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use crate::DTS;
 use crate::automaton::semantics::observe_omega;
 use crate::automaton::{Automaton, Semantics};
-use crate::ts::run::Observer;
 use crate::ts::{Deterministic, EdgeColor, StateIndex, SymbolOf, run};
 use crate::word::OmegaWord;
 use crate::{Color, Int, Void, alphabet::CharAlphabet};
@@ -79,23 +78,13 @@ where
     EdgeColor<T>: Color + Ord + Eq + std::hash::Hash,
 {
     type Output = bool;
-    type Observer = run::EdgeColorSet<T>;
-    fn observe(
-        &self,
-        ts: &T,
-        initial: StateIndex<T>,
-        word: W,
-    ) -> Option<<Self::Observer as run::Observer<T>>::Current> {
-        observe_omega::<T, W, Self::Observer>(ts, initial, word)
-    }
-    fn evaluate(
-        &self,
-        observed: <Self::Observer as crate::ts::run::Observer<T>>::Current,
-    ) -> Self::Output {
-        let cur = observed.into_current().0;
-        self.0
-            .iter()
-            .any(|set| set.satisfied_by_iter(cur.iter().cloned()))
+    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
+        let inf = observe_omega::<T, W, run::EdgeColorSet<T>>(ts, initial, word)?.0;
+        Some(
+            self.0
+                .iter()
+                .any(|set| set.satisfied_by_iter(inf.iter().cloned())),
+        )
     }
 }
 

@@ -66,18 +66,10 @@ where
     T: Deterministic<EdgeColor: Eq + std::hash::Hash>,
     W: OmegaWord<Symbol = SymbolOf<T>>,
 {
-    type Observer = run::EdgeColorSet<T>;
     type Output = bool;
-    fn observe(
-        &self,
-        ts: &T,
-        initial: StateIndex<T>,
-        word: W,
-    ) -> Option<<Self::Observer as run::Observer<T>>::Current> {
-        observe_omega::<T, W, Self::Observer>(ts, initial, word)
-    }
-    fn evaluate(&self, observed: <Self::Observer as run::Observer<T>>::Current) -> Self::Output {
-        self.0.contains(&observed.0)
+    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
+        let inf = observe_omega::<T, W, run::EdgeColorSet<T>>(ts, initial, word)?;
+        Some(self.0.contains(&inf.0))
     }
 }
 

@@ -27,20 +27,8 @@ where
     W: FiniteWord<Symbol = SymbolOf<T>>,
 {
     type Output = bool;
-    type Observer = ReachedStateColor<T>;
-    fn observe(
-        &self,
-        ts: &T,
-        initial: StateIndex<T>,
-        word: W,
-    ) -> Option<<Self::Observer as crate::ts::run::Observer<T>>::Current> {
-        observe_finite::<T, W, Self::Observer>(ts, initial, word)
-    }
-    fn evaluate(
-        &self,
-        observed: <Self::Observer as crate::ts::run::Observer<T>>::Current,
-    ) -> Self::Output {
-        observed
+    fn output(&self, ts: &T, initial: StateIndex<T>, word: W) -> Option<bool> {
+        observe_finite::<T, W, ReachedStateColor<T>>(ts, initial, word)
     }
 }
 

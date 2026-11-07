@@ -10,6 +10,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 ### Changed
+- **Breaking:** `Semantics` has a single method `output(&self, ts, initial, word) -> Option<Output>`
+  instead of the associated type `Observer` and the methods `observe` and `evaluate`, so that
+  semantics no longer have to be phrased as the observation of a single run (#143). Observers
+  stay the way deterministic semantics look at their run. `nfa::SomeRunAccepts`, which only
+  existed to satisfy the old trait, is gone.
+
+  | Before | After |
+  |---|---|
+  | `type Observer = O;` plus `fn observe(..)` and `fn evaluate(observed)` | `fn output(&self, ts, initial, word) -> Option<Self::Output>` |
+  | `sem.evaluate(sem.observe(ts, q, w)?)` | `sem.output(ts, q, w)` |
 - The dependency `hoars` is 0.4. It validates the header while parsing, so a missing `Acceptance:`
   item is a parse error (`HoaError::Parse`) instead of `HoaError::MissingAcceptanceSets`, which now
   only occurs for headers built by hand. Since `hoars` no longer caps labels at six variables, HOA
