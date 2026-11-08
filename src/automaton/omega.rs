@@ -330,7 +330,9 @@ impl<A: Alphabet> Automaton<DTS<A, Int, AcceptanceMask>, OmegaAcceptanceConditio
                 .collect()),
             OmegaAcceptanceCondition::CoBuchi | OmegaAcceptanceCondition::Safety => Ok(self
                 .ts
-                .map_edge_colors(|mask| if mask.as_bool() { 1 } else { 0 })
+                // a run is accepting iff it sees the bad edges (priority 1) only finitely often,
+                // i.e. iff the least priority seen infinitely often is the even 2
+                .map_edge_colors(|mask| if mask.as_bool() { 1 } else { 2 })
                 .with_initial(self.initial)
                 .erase_state_colors()
                 .collect()),
@@ -563,6 +565,33 @@ mod tests {
         let q = ts.add_state(0);
         ts.add_edge((q, 'a', mask, q));
         DeterministicOmegaAutomaton::new(ts, q, acceptance)
+    }
+
+    #[test]
+    fn into_dpa_co_buchi_with_both_kinds_infinitely_often() {
+        use OmegaAcceptanceCondition::{CoBuchi, Safety};
+        // `a` is a bad edge, `b` is a good one; from the loop on `b` we can go back via `a`
+        let mut ts: DTS<CharAlphabet, Int, AcceptanceMask> =
+            DTS::for_alphabet(CharAlphabet::of_size(2));
+        let q = ts.add_state(0);
+        ts.add_edge((q, 'a', AcceptanceMask::from_iter([0]), q));
+        ts.add_edge((q, 'b', AcceptanceMask::from_iter([]), q));
+        for acc in [CoBuchi, Safety] {
+            let aut = DeterministicOmegaAutomaton::new(ts.clone(), q, acc.clone());
+            let dpa = aut.clone().into_dpa().unwrap();
+            for word in [
+                crate::upw!("a"),
+                crate::upw!("b"),
+                crate::upw!("ab"),
+                crate::upw!("b", "a"),
+                crate::upw!("a", "b"),
+                crate::upw!("bba"),
+            ] {
+                assert_eq!(dpa.accepts(&word), aut.accepts(&word), "{acc:?} {word:?}");
+            }
+            assert!(!dpa.accepts(crate::upw!("ab")));
+            assert!(dpa.accepts(crate::upw!("a", "b")));
+        }
     }
 
     #[test]

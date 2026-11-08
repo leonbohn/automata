@@ -78,6 +78,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   only occurs for headers built by hand. Since `hoars` no longer caps labels at six variables, HOA
   input accepts up to 31 atomic propositions (the limit of `PropAlphabet`) instead of 6.
 
+### Fixed
+- `OmegaAcceptanceCondition::into_dpa` converted co-Büchi and safety automata to the wrong
+  language when edges of acceptance set `0` and edges outside of it both occur infinitely often
+  (the priority `0` for the good edges won). The bad edges now get priority `1` and all others `2`.
+
 ## [0.2.1] - 2026-11-04
 
 ### Added
