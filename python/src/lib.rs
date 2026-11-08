@@ -5,8 +5,8 @@ mod class;
 mod dfa;
 mod error;
 mod kind;
-mod nondet;
 mod machines;
+mod nondet;
 mod omega;
 
 use pyo3::prelude::*;

@@ -9,16 +9,36 @@ __all__ = [
     "BuilderError",
     "CharAlphabet",
     "DBA",
+    "DCW",
     "DFA",
     "DFABuilder",
+    "DMA",
+    "DPA",
+    "DRA",
     "HoaError",
+    "MealyMachine",
+    "MooreMachine",
+    "NBA",
+    "NCW",
+    "NFA",
+    "NPA",
     "NotPeriodicError",
     "OmegaWord",
     "PropAlphabet",
     "PropAlphabetError",
     "PropDBA",
+    "PropDCW",
     "PropDFA",
     "PropDFABuilder",
+    "PropDMA",
+    "PropDPA",
+    "PropDRA",
+    "PropMealyMachine",
+    "PropMooreMachine",
+    "PropNBA",
+    "PropNCW",
+    "PropNFA",
+    "PropNPA",
     "version",
 ]
 
@@ -98,13 +118,6 @@ class DBA:
         r"""
         The alphabet of the automaton.
         """
-    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]) -> DBA:
-        r"""
-        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
-        `(source, symbol, color, target)`; a later edge replaces an earlier one with
-        the same source and symbol. Raises `ValueError` for states or symbols that
-        do not exist.
-        """
     def accepts(self, word: OmegaWord) -> builtins.bool:
         r"""
         Whether the automaton accepts the ultimately periodic word.
@@ -116,6 +129,13 @@ class DBA:
     def accepting_word(self) -> typing.Optional[OmegaWord]:
         r"""
         An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]) -> DBA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that
+        do not exist.
         """
     def included_in(self, other: DBA) -> builtins.bool:
         r"""
@@ -133,6 +153,76 @@ class DBA:
     def equivalence_counterexample(self, other: DBA) -> typing.Optional[OmegaWord]:
         r"""
         A word that exactly one of the automata accepts, or `None` if they are equivalent.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class DCW:
+    r"""
+    A deterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` only finitely often.
+    
+    >>> a = CharAlphabet("ab")
+    >>> fin_a = DCW(a, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)])
+    >>> fin_a.accepts(OmegaWord("aa", "b"))
+    True
+    >>> fin_a.accepts(OmegaWord("", "ab"))
+    False
+    >>> fin_a.is_empty()
+    False
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]) -> DCW:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that
+        do not exist.
         """
     def states(self) -> builtins.list[builtins.int]:
         r"""
@@ -308,11 +398,773 @@ class DFABuilder:
         can be used further.
         """
 
+@typing.final
+class DMA:
+    r"""
+    A deterministic Muller automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`). A word is accepted if the set of colors that its run uses infinitely often is one of the given sets.
+    
+    >>> a = CharAlphabet("ab")
+    >>> edges = [(0, "a", 0, 0), (0, "b", 1, 1), (1, "a", 0, 0), (1, "b", 1, 1)]
+    >>> only_one = DMA(a, 2, 0, edges, [[0], [1]])
+    >>> only_one.accepts(OmegaWord("", "a"))
+    True
+    >>> only_one.accepts(OmegaWord("", "ba"))
+    False
+    >>> only_one.is_empty()
+    False
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int, builtins.int]], sets: typing.Sequence[typing.Sequence[builtins.int]]) -> DMA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are
+        tuples `(source, symbol, color, target)`; a later edge replaces an earlier
+        one with the same source and symbol. `sets` is a list of lists of colors:
+        a word is accepted if the colors that its run uses infinitely often are
+        exactly one of the lists. Raises `ValueError` for states or symbols that
+        do not exist.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class DPA:
+    r"""
+    A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) (min-even: a word is accepted if the least color that its run uses infinitely often is even; the other parity conditions are not available).
+    
+    >>> a = CharAlphabet("ab")
+    >>> inf_b = DPA(a, 1, 0, [(0, "a", 1, 0), (0, "b", 0, 0)])
+    >>> inf_b.accepts(OmegaWord("a", "ab"))
+    True
+    >>> inf_b.accepts(OmegaWord("b", "a"))
+    False
+    >>> inf_b.complement().accepts(OmegaWord("b", "a"))
+    True
+    >>> inf_b.complement().complement().equivalent_to(inf_b)
+    True
+    >>> inf_b.rejected_word() is not None
+    True
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]) -> DPA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that
+        do not exist.
+        """
+    def included_in(self, other: DPA) -> builtins.bool:
+        r"""
+        Whether the language of `self` is contained in the one of `other`.
+        """
+    def inclusion_counterexample(self, other: DPA) -> typing.Optional[OmegaWord]:
+        r"""
+        A word accepted by `self` but not by `other`, or `None` if `self` is included in
+        `other`.
+        """
+    def equivalent_to(self, other: DPA) -> builtins.bool:
+        r"""
+        Whether both automata accept the same language.
+        """
+    def equivalence_counterexample(self, other: DPA) -> typing.Optional[OmegaWord]:
+        r"""
+        A word that exactly one of the automata accepts, or `None` if they are equivalent.
+        """
+    def complement(self) -> DPA:
+        r"""
+        The complement: an automaton that accepts exactly the words that `self`
+        rejects. The automaton is expected to be complete. Raises `ValueError` if
+        the colors of the result do not fit into `0..=255`.
+        """
+    def normalized(self) -> DPA:
+        r"""
+        An equivalent automaton that uses as few different colors as possible.
+        """
+    def streamlined(self) -> DPA:
+        r"""
+        An equivalent automaton with few colors and merged equivalent states.
+        """
+    def rejected_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        A word that is rejected, or `None` if the language is universal.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class DRA:
+    r"""
+    A deterministic Rabin automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`). A word is accepted if for some pair `(fin, inf)` its run uses no color of `fin` and some color of `inf` infinitely often.
+    
+    >>> a = CharAlphabet("ab")
+    >>> edges = [(0, "a", 0, 0), (0, "b", 1, 1), (1, "a", 0, 0), (1, "b", 1, 1)]
+    >>> inf_b = DRA(a, 2, 0, edges, [([], [1])])
+    >>> inf_b.accepts(OmegaWord("", "ba"))
+    True
+    >>> inf_b.accepts(OmegaWord("b", "a"))
+    False
+    >>> inf_b.is_empty()
+    False
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int, builtins.int]], pairs: typing.Sequence[tuple[typing.Sequence[builtins.int], typing.Sequence[builtins.int]]]) -> DRA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are
+        tuples `(source, symbol, color, target)`; a later edge replaces an earlier
+        one with the same source and symbol. `pairs` is a list of `(fin, inf)`
+        where both are lists of colors. Raises `ValueError` for states or symbols
+        that do not exist.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
 class HoaError(AutomataError):
     r"""
     A HOA automaton could not be read or written.
     """
     ...
+
+@typing.final
+class MealyMachine:
+    r"""
+    A Mealy machine over a `CharAlphabet`: every edge has an integer output (0 to 255) and a word has the output of the last edge it takes. Words are strings.
+    
+    >>> m = MealyMachine(CharAlphabet("ab"), 2, 0, [(0, "a", 1, 1), (0, "b", 0, 0), (1, "a", 0, 0), (1, "b", 1, 1)])
+    >>> m.output(""), m.output("a"), m.output("ab"), m.output("c")
+    (None, 1, 1, None)
+    >>> m.minimize().num_states
+    2
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]) -> MealyMachine:
+        r"""
+        Creates the Mealy machine with states `0, ..., num_states - 1`. `edges` are
+        tuples `(source, symbol, output, target)` with an integer output from 0 to
+        255; a later edge replaces an earlier one with the same source and symbol.
+        Raises `ValueError` for states or symbols that do not exist.
+        """
+    def output(self, word: builtins.str) -> typing.Optional[builtins.int]:
+        r"""
+        The output of the last edge that the word takes, or `None` if the word is
+        empty (no edge is taken) or the run leaves the machine (missing edge).
+        """
+    def color_range(self) -> builtins.list[builtins.int]:
+        r"""
+        The outputs of the edges that are reachable from the initial state, sorted
+        and without duplicates.
+        """
+    def bisimilar(self, other: MealyMachine) -> builtins.bool:
+        r"""
+        Whether both machines have the same output on every non-empty word. Raises
+        `ValueError` if the alphabets differ.
+        """
+    def witness_restricted_inequivalence(self, other: MealyMachine) -> typing.Optional[builtins.str]:
+        r"""
+        A word whose output differs in the two machines, where a missing edge in
+        `self` or a different output counts as a difference; edges that only `other`
+        has are ignored. `None` if there is no such word. Raises `ValueError` if the
+        alphabets differ.
+        """
+    def witness_inequivalence(self, other: MealyMachine) -> typing.Optional[builtins.str]:
+        r"""
+        A word whose output differs in the two machines (this includes words that only
+        one of them can read), or `None` if they are bisimilar. Raises `ValueError`
+        if the alphabets differ.
+        """
+    def minimize(self) -> MealyMachine:
+        r"""
+        The minimal Mealy machine with the same output on every non-empty word
+        (Hopcroft). Unreachable states are minimized as well and kept.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class MooreMachine:
+    r"""
+    A Moore machine over a `CharAlphabet`: every state has an integer output (0 to 255) and a word has the output of the state it reaches. Words are strings.
+    
+    >>> m = MooreMachine(CharAlphabet("ab"), [0, 1, 2], 0, [(0, "a", 1), (0, "b", 0), (1, "a", 2), (1, "b", 0), (2, "a", 2), (2, "b", 2)])
+    >>> m.output(""), m.output("a"), m.output("aab"), m.output("c")
+    (0, 1, 2, None)
+    >>> m.color_range()
+    [0, 1, 2]
+    >>> [d.accepts("a") for d in m.decompose_dfa()]
+    [False, True, True]
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: CharAlphabet, state_colors: typing.Sequence[builtins.int], initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int]]) -> MooreMachine:
+        r"""
+        Creates the Moore machine with states `0, ..., len(state_colors) - 1`; state
+        `i` outputs `state_colors[i]` (an integer from 0 to 255). `edges` are triples
+        `(source, symbol, target)`; a later edge replaces an earlier one with the same
+        source and symbol. Raises `ValueError` for states or symbols that do not exist.
+        """
+    def output(self, word: builtins.str) -> typing.Optional[builtins.int]:
+        r"""
+        The output of the state that the word reaches (the output of the initial state
+        for the empty word), or `None` if the run leaves the machine (missing edge).
+        """
+    def state_output(self, state: builtins.int) -> builtins.int:
+        r"""
+        The output of a state. Raises `IndexError` if it does not exist.
+        """
+    def color_range(self) -> builtins.list[builtins.int]:
+        r"""
+        The outputs of the states that are reachable from the initial state, sorted
+        and without duplicates.
+        """
+    def decompose_dfa(self) -> builtins.list[DFA]:
+        r"""
+        For each output `c` that occurs (in increasing order) the minimal DFA that
+        accepts exactly the words whose output is at most `c`.
+        """
+    def color_or_below_dfa(self, color: builtins.int) -> DFA:
+        r"""
+        The minimal DFA that accepts the words whose output is at most `color`.
+        """
+    def bisimilar(self, other: MooreMachine) -> builtins.bool:
+        r"""
+        Whether both machines have the same output on every word. Raises
+        `ValueError` if the alphabets differ.
+        """
+    def witness_non_bisimilarity(self, other: MooreMachine) -> typing.Optional[builtins.str]:
+        r"""
+        A word on which the outputs of the machines differ, or `None` if they are
+        bisimilar. Raises `ValueError` if the alphabets differ.
+        """
+    def minimize(self) -> MooreMachine:
+        r"""
+        The minimal Moore machine with the same output on every word (Hopcroft).
+        """
+    def push_colors_to_outgoing_edges(self) -> MealyMachine:
+        r"""
+        The Mealy machine whose edges output the output of their source state: both
+        produce the same sequences of outputs, except for the output of the initial
+        state which a Mealy machine has no way to produce.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class NBA:
+    r"""
+    A nondeterministic Büchi automaton over a `CharAlphabet`. An infinite word is accepted if some run uses edges with color `True` infinitely often.
+    
+    >>> a = CharAlphabet("ab")
+    >>> finitely_many_a = NBA(a, 2, 0, [(0, "a", False, 0), (0, "b", False, 0), (0, "b", False, 1), (1, "b", True, 1)])
+    >>> finitely_many_a.accepts(OmegaWord("ab", "b"))
+    True
+    >>> finitely_many_a.accepts(OmegaWord("", "ab"))
+    False
+    >>> finitely_many_a.accepting_word() is not None
+    True
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]) -> NBA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; several edges with the same source and
+        symbol are allowed. Raises `ValueError` for states or symbols that do not
+        exist.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether some run on the ultimately periodic word is accepting.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    @classmethod
+    def from_dba(cls, dba: DBA) -> NBA:
+        r"""
+        The NBA with the transitions of the DBA.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class NCW:
+    r"""
+    A nondeterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if some run uses edges with color `True` only finitely often.
+    
+    >>> a = CharAlphabet("ab")
+    >>> finitely_many_a = NCW(a, 2, 0, [(0, "a", True, 0), (0, "b", True, 0), (0, "b", False, 1), (1, "b", False, 1)])
+    >>> finitely_many_a.accepts(OmegaWord("ab", "b"))
+    True
+    >>> finitely_many_a.accepts(OmegaWord("", "ab"))
+    False
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]) -> NCW:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; several edges with the same source and
+        symbol are allowed. Raises `ValueError` for states or symbols that do not
+        exist.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether some run on the ultimately periodic word is accepting.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class NFA:
+    r"""
+    A nondeterministic finite automaton over a `CharAlphabet`; words are strings. A word is accepted if some run on it ends in an accepting state.
+    
+    >>> a = CharAlphabet("ab")
+    >>> second_last_a = NFA(a, 3, 0, [2], [(0, "a", 0), (0, "b", 0), (0, "a", 1), (1, "a", 2), (1, "b", 2)])
+    >>> second_last_a.accepts("bab")
+    True
+    >>> second_last_a.accepts("abb")
+    False
+    >>> second_last_a.accepting_word()
+    'aa'
+    >>> dfa = second_last_a.determinize()
+    >>> dfa.accepts("bab"), dfa.minimize().num_states
+    (True, 4)
+    >>> NFA.from_dfa(dfa).equivalent_to(second_last_a)
+    True
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, accepting: typing.Sequence[builtins.int], edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int]]) -> NFA:
+        r"""
+        Creates the NFA with states `0, ..., num_states - 1`. `edges` are triples
+        `(source, symbol, target)`; several edges with the same source and symbol are
+        allowed. Raises `ValueError` for states or symbols that do not exist.
+        """
+    @classmethod
+    def from_dfa(cls, dfa: DFA) -> NFA:
+        r"""
+        The NFA with the transitions of the DFA.
+        """
+    def accepts(self, word: builtins.str) -> builtins.bool:
+        r"""
+        Whether some run on the word ends in an accepting state.
+        """
+    def is_accepting(self, state: builtins.int) -> builtins.bool:
+        r"""
+        Whether the state is accepting. Raises `IndexError` if it does not exist.
+        """
+    def accepting_states(self) -> builtins.list[builtins.int]:
+        r"""
+        The accepting states.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty.
+        """
+    def accepting_word(self) -> typing.Optional[builtins.str]:
+        r"""
+        A shortest accepted word, or `None` if the language is empty.
+        """
+    def included_in(self, other: NFA) -> builtins.bool:
+        r"""
+        Whether the language of `self` is contained in the one of `other` (both are
+        determinized). The alphabets have to be equal.
+        """
+    def inclusion_counterexample(self, other: NFA) -> typing.Optional[builtins.str]:
+        r"""
+        A word accepted by `self` but not by `other`, or `None` if `self` is included
+        in `other`.
+        """
+    def equivalent_to(self, other: NFA) -> builtins.bool:
+        r"""
+        Whether both NFAs accept the same language.
+        """
+    def equivalence_counterexample(self, other: NFA) -> typing.Optional[builtins.str]:
+        r"""
+        A word that exactly one of the NFAs accepts, or `None` if they are equivalent.
+        """
+    def determinize(self) -> DFA:
+        r"""
+        An equivalent complete `DFA` (subset construction, not minimized).
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class NPA:
+    r"""
+    A nondeterministic parity automaton over a `CharAlphabet` (min-even): an infinite word is accepted if some run has an even smallest color among those seen infinitely often. Colors are integers from 0 to 255.
+    
+    >>> a = CharAlphabet("ab")
+    >>> finitely_many_a = NPA(a, 2, 0, [(0, "a", 1, 0), (0, "b", 1, 0), (0, "b", 1, 1), (1, "b", 0, 1)])
+    >>> finitely_many_a.accepts(OmegaWord("ab", "b"))
+    True
+    >>> finitely_many_a.accepts(OmegaWord("", "ab"))
+    False
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]) -> NPA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; several edges with the same source and
+        symbol are allowed. Raises `ValueError` for states or symbols that do not
+        exist.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether some run on the ultimately periodic word is accepting.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
 
 class NotPeriodicError(AutomataError):
     r"""
@@ -410,13 +1262,6 @@ class PropDBA:
         r"""
         The alphabet of the automaton.
         """
-    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.bool, builtins.int]]) -> PropDBA:
-        r"""
-        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
-        `(source, symbol, color, target)`; a later edge replaces an earlier one with
-        the same source and symbol. Raises `ValueError` for states or symbols that
-        do not exist.
-        """
     def accepts(self, word: OmegaWord) -> builtins.bool:
         r"""
         Whether the automaton accepts the ultimately periodic word.
@@ -428,6 +1273,13 @@ class PropDBA:
     def accepting_word(self) -> typing.Optional[OmegaWord]:
         r"""
         An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.bool, builtins.int]]) -> PropDBA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that
+        do not exist.
         """
     def included_in(self, other: PropDBA) -> builtins.bool:
         r"""
@@ -445,6 +1297,67 @@ class PropDBA:
     def equivalence_counterexample(self, other: PropDBA) -> typing.Optional[OmegaWord]:
         r"""
         A word that exactly one of the automata accepts, or `None` if they are equivalent.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropDCW:
+    r"""
+    A deterministic co-Büchi automaton over a `PropAlphabet`, see `DCW`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.bool, builtins.int]]) -> PropDCW:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that
+        do not exist.
         """
     def states(self) -> builtins.list[builtins.int]:
         r"""
@@ -616,6 +1529,699 @@ class PropDFABuilder:
         Creates the DFA. Raises `ValueError` if no initial state was set. The builder
         can be used further.
         """
+
+@typing.final
+class PropDMA:
+    r"""
+    A deterministic Muller automaton over a `PropAlphabet`, see `DMA`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int, builtins.int]], sets: typing.Sequence[typing.Sequence[builtins.int]]) -> PropDMA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are
+        tuples `(source, symbol, color, target)`; a later edge replaces an earlier
+        one with the same source and symbol. `sets` is a list of lists of colors:
+        a word is accepted if the colors that its run uses infinitely often are
+        exactly one of the lists. Raises `ValueError` for states or symbols that
+        do not exist.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropDPA:
+    r"""
+    A deterministic parity automaton over a `PropAlphabet`, see `DPA`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int, builtins.int]]) -> PropDPA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that
+        do not exist.
+        """
+    def included_in(self, other: PropDPA) -> builtins.bool:
+        r"""
+        Whether the language of `self` is contained in the one of `other`.
+        """
+    def inclusion_counterexample(self, other: PropDPA) -> typing.Optional[OmegaWord]:
+        r"""
+        A word accepted by `self` but not by `other`, or `None` if `self` is included in
+        `other`.
+        """
+    def equivalent_to(self, other: PropDPA) -> builtins.bool:
+        r"""
+        Whether both automata accept the same language.
+        """
+    def equivalence_counterexample(self, other: PropDPA) -> typing.Optional[OmegaWord]:
+        r"""
+        A word that exactly one of the automata accepts, or `None` if they are equivalent.
+        """
+    def complement(self) -> PropDPA:
+        r"""
+        The complement: an automaton that accepts exactly the words that `self`
+        rejects. The automaton is expected to be complete. Raises `ValueError` if
+        the colors of the result do not fit into `0..=255`.
+        """
+    def normalized(self) -> PropDPA:
+        r"""
+        An equivalent automaton that uses as few different colors as possible.
+        """
+    def streamlined(self) -> PropDPA:
+        r"""
+        An equivalent automaton with few colors and merged equivalent states.
+        """
+    def rejected_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        A word that is rejected, or `None` if the language is universal.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropDRA:
+    r"""
+    A deterministic Rabin automaton over a `PropAlphabet`, see `DRA`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int, builtins.int]], pairs: typing.Sequence[tuple[typing.Sequence[builtins.int], typing.Sequence[builtins.int]]]) -> PropDRA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are
+        tuples `(source, symbol, color, target)`; a later edge replaces an earlier
+        one with the same source and symbol. `pairs` is a list of `(fin, inf)`
+        where both are lists of colors. Raises `ValueError` for states or symbols
+        that do not exist.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropMealyMachine:
+    r"""
+    A Mealy machine over a `PropAlphabet`, see `MealyMachine`; a symbol is a sequence of booleans, a word a sequence of symbols.
+    
+    >>> m = PropMealyMachine(PropAlphabet(["p"]), 1, 0, [(0, [True], 1, 0), (0, [False], 0, 0)])
+    >>> m.output([[False], [True]])
+    1
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int, builtins.int]]) -> PropMealyMachine:
+        r"""
+        Creates the Mealy machine with states `0, ..., num_states - 1`. `edges` are
+        tuples `(source, symbol, output, target)` with an integer output from 0 to
+        255; a later edge replaces an earlier one with the same source and symbol.
+        Raises `ValueError` for states or symbols that do not exist.
+        """
+    def output(self, word: typing.Sequence[typing.Sequence[builtins.bool]]) -> typing.Optional[builtins.int]:
+        r"""
+        The output of the last edge that the word takes, or `None` if the word is
+        empty (no edge is taken) or the run leaves the machine (missing edge).
+        """
+    def color_range(self) -> builtins.list[builtins.int]:
+        r"""
+        The outputs of the edges that are reachable from the initial state, sorted
+        and without duplicates.
+        """
+    def bisimilar(self, other: PropMealyMachine) -> builtins.bool:
+        r"""
+        Whether both machines have the same output on every non-empty word. Raises
+        `ValueError` if the alphabets differ.
+        """
+    def witness_restricted_inequivalence(self, other: PropMealyMachine) -> typing.Optional[builtins.list[builtins.list[builtins.bool]]]:
+        r"""
+        A word whose output differs in the two machines, where a missing edge in
+        `self` or a different output counts as a difference; edges that only `other`
+        has are ignored. `None` if there is no such word. Raises `ValueError` if the
+        alphabets differ.
+        """
+    def witness_inequivalence(self, other: PropMealyMachine) -> typing.Optional[builtins.list[builtins.list[builtins.bool]]]:
+        r"""
+        A word whose output differs in the two machines (this includes words that only
+        one of them can read), or `None` if they are bisimilar. Raises `ValueError`
+        if the alphabets differ.
+        """
+    def minimize(self) -> PropMealyMachine:
+        r"""
+        The minimal Mealy machine with the same output on every non-empty word
+        (Hopcroft). Unreachable states are minimized as well and kept.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropMooreMachine:
+    r"""
+    A Moore machine over a `PropAlphabet`, see `MooreMachine`; a symbol is a sequence of booleans, a word a sequence of symbols.
+    
+    >>> m = PropMooreMachine(PropAlphabet(["p"]), [0, 1], 0, [(0, [True], 1), (0, [False], 0), (1, [True], 1), (1, [False], 0)])
+    >>> m.output([[True], [True]]), m.output([[True], [False]])
+    (1, 0)
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: PropAlphabet, state_colors: typing.Sequence[builtins.int], initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int]]) -> PropMooreMachine:
+        r"""
+        Creates the Moore machine with states `0, ..., len(state_colors) - 1`; state
+        `i` outputs `state_colors[i]` (an integer from 0 to 255). `edges` are triples
+        `(source, symbol, target)`; a later edge replaces an earlier one with the same
+        source and symbol. Raises `ValueError` for states or symbols that do not exist.
+        """
+    def output(self, word: typing.Sequence[typing.Sequence[builtins.bool]]) -> typing.Optional[builtins.int]:
+        r"""
+        The output of the state that the word reaches (the output of the initial state
+        for the empty word), or `None` if the run leaves the machine (missing edge).
+        """
+    def state_output(self, state: builtins.int) -> builtins.int:
+        r"""
+        The output of a state. Raises `IndexError` if it does not exist.
+        """
+    def color_range(self) -> builtins.list[builtins.int]:
+        r"""
+        The outputs of the states that are reachable from the initial state, sorted
+        and without duplicates.
+        """
+    def decompose_dfa(self) -> builtins.list[PropDFA]:
+        r"""
+        For each output `c` that occurs (in increasing order) the minimal DFA that
+        accepts exactly the words whose output is at most `c`.
+        """
+    def color_or_below_dfa(self, color: builtins.int) -> PropDFA:
+        r"""
+        The minimal DFA that accepts the words whose output is at most `color`.
+        """
+    def bisimilar(self, other: PropMooreMachine) -> builtins.bool:
+        r"""
+        Whether both machines have the same output on every word. Raises
+        `ValueError` if the alphabets differ.
+        """
+    def witness_non_bisimilarity(self, other: PropMooreMachine) -> typing.Optional[builtins.list[builtins.list[builtins.bool]]]:
+        r"""
+        A word on which the outputs of the machines differ, or `None` if they are
+        bisimilar. Raises `ValueError` if the alphabets differ.
+        """
+    def minimize(self) -> PropMooreMachine:
+        r"""
+        The minimal Moore machine with the same output on every word (Hopcroft).
+        """
+    def push_colors_to_outgoing_edges(self) -> PropMealyMachine:
+        r"""
+        The Mealy machine whose edges output the output of their source state: both
+        produce the same sequences of outputs, except for the output of the initial
+        state which a Mealy machine has no way to produce.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropNBA:
+    r"""
+    A nondeterministic Büchi automaton over a `PropAlphabet`, see `NBA`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.bool, builtins.int]]) -> PropNBA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; several edges with the same source and
+        symbol are allowed. Raises `ValueError` for states or symbols that do not
+        exist.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether some run on the ultimately periodic word is accepting.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    @classmethod
+    def from_dba(cls, dba: PropDBA) -> PropNBA:
+        r"""
+        The PropNBA with the transitions of the PropDBA.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropNCW:
+    r"""
+    A nondeterministic co-Büchi automaton over a `PropAlphabet`, see `NCW`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.bool, builtins.int]]) -> PropNCW:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; several edges with the same source and
+        symbol are allowed. Raises `ValueError` for states or symbols that do not
+        exist.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether some run on the ultimately periodic word is accepting.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropNFA:
+    r"""
+    A nondeterministic finite automaton over a `PropAlphabet`, see `NFA`; symbols are sequences of booleans.
+    
+    >>> a = PropAlphabet(["p"])
+    >>> n = PropNFA(a, 2, 0, [1], [(0, [True], 0), (0, [False], 0), (0, [True], 1)])
+    >>> n.accepts([[False], [True]])
+    True
+    >>> n.accepts([[True], [False]])
+    False
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, accepting: typing.Sequence[builtins.int], edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int]]) -> PropNFA:
+        r"""
+        Creates the NFA with states `0, ..., num_states - 1`. `edges` are triples
+        `(source, symbol, target)`; several edges with the same source and symbol are
+        allowed. Raises `ValueError` for states or symbols that do not exist.
+        """
+    @classmethod
+    def from_dfa(cls, dfa: PropDFA) -> PropNFA:
+        r"""
+        The NFA with the transitions of the DFA.
+        """
+    def accepts(self, word: typing.Sequence[typing.Sequence[builtins.bool]]) -> builtins.bool:
+        r"""
+        Whether some run on the word ends in an accepting state.
+        """
+    def is_accepting(self, state: builtins.int) -> builtins.bool:
+        r"""
+        Whether the state is accepting. Raises `IndexError` if it does not exist.
+        """
+    def accepting_states(self) -> builtins.list[builtins.int]:
+        r"""
+        The accepting states.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty.
+        """
+    def accepting_word(self) -> typing.Optional[builtins.list[builtins.list[builtins.bool]]]:
+        r"""
+        A shortest accepted word, or `None` if the language is empty.
+        """
+    def included_in(self, other: PropNFA) -> builtins.bool:
+        r"""
+        Whether the language of `self` is contained in the one of `other` (both are
+        determinized). The alphabets have to be equal.
+        """
+    def inclusion_counterexample(self, other: PropNFA) -> typing.Optional[builtins.list[builtins.list[builtins.bool]]]:
+        r"""
+        A word accepted by `self` but not by `other`, or `None` if `self` is included
+        in `other`.
+        """
+    def equivalent_to(self, other: PropNFA) -> builtins.bool:
+        r"""
+        Whether both NFAs accept the same language.
+        """
+    def equivalence_counterexample(self, other: PropNFA) -> typing.Optional[builtins.list[builtins.list[builtins.bool]]]:
+        r"""
+        A word that exactly one of the NFAs accepts, or `None` if they are equivalent.
+        """
+    def determinize(self) -> PropDFA:
+        r"""
+        An equivalent complete `DFA` (subset construction, not minimized).
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropNPA:
+    r"""
+    A nondeterministic parity automaton over a `PropAlphabet`, see `NPA`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int, builtins.int]]) -> PropNPA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; several edges with the same source and
+        symbol are allowed. Raises `ValueError` for states or symbols that do not
+        exist.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether some run on the ultimately periodic word is accepting.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
 
 def version() -> builtins.str:
     r"""
