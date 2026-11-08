@@ -5,6 +5,7 @@ mod class;
 mod dfa;
 mod error;
 mod kind;
+mod machines;
 mod omega;
 
 use pyo3::prelude::*;
@@ -28,6 +29,10 @@ fn _automata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<kind::PyOmegaWord>()?;
     m.add_class::<omega::PyDba>()?;
     m.add_class::<omega::PyPropDba>()?;
+    m.add_class::<machines::PyMooreMachine>()?;
+    m.add_class::<machines::PyPropMooreMachine>()?;
+    m.add_class::<machines::PyMealyMachine>()?;
+    m.add_class::<machines::PyPropMealyMachine>()?;
     m.add_class::<dfa::PyDfaBuilder>()?;
     m.add_class::<dfa::PyPropDfaBuilder>()?;
     let py = m.py();
