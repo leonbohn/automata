@@ -14,7 +14,11 @@ __all__ = [
     "DFABuilder",
     "DMA",
     "DPA",
+    "DPAMaxEven",
+    "DPAMaxOdd",
+    "DPAMinOdd",
     "DRA",
+    "DSA",
     "HoaError",
     "MealyMachine",
     "MooreMachine",
@@ -32,7 +36,11 @@ __all__ = [
     "PropDFABuilder",
     "PropDMA",
     "PropDPA",
+    "PropDPAMaxEven",
+    "PropDPAMaxOdd",
+    "PropDPAMinOdd",
     "PropDRA",
+    "PropDSA",
     "PropMealyMachine",
     "PropMooreMachine",
     "PropNBA",
@@ -211,6 +219,13 @@ class DCW:
     False
     >>> fin_a.is_empty()
     False
+    
+    The HOA format writes the characters as propositions and reads them back as a `PropDCW`.
+    
+    >>> PropDCW.from_hoa(fin_a.to_hoa()).num_edges
+    2
+    >>> type(parse_hoa(fin_a.to_hoa())).__name__
+    'PropDCW'
     """
     @property
     def num_states(self) -> builtins.int:
@@ -250,6 +265,10 @@ class DCW:
         `(source, symbol, color, target)`; a later edge replaces an earlier one with
         the same source and symbol. Raises `ValueError` for states or symbols that
         do not exist.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
         """
     def states(self) -> builtins.list[builtins.int]:
         r"""
@@ -510,7 +529,7 @@ class DMA:
 @typing.final
 class DPA:
     r"""
-    A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) (min-even: a word is accepted if the least color that its run uses infinitely often is even; the other parity conditions are not available).
+    A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) (min-even: a word is accepted if the least color that its run uses infinitely often is even; the other parity conditions are the classes `DPAMaxEven`, `DPAMinOdd` and `DPAMaxOdd`).
     
     >>> a = CharAlphabet("ab")
     >>> inf_b = DPA(a, 1, 0, [(0, "a", 1, 0), (0, "b", 0, 0)])
@@ -642,6 +661,297 @@ class DPA:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
+class DPAMaxEven:
+    r"""
+    A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) and the max even condition: a word is accepted if the largest color that its run uses infinitely often is even.
+    
+    >>> a = CharAlphabet("ab")
+    >>> inf_a = DPAMaxEven(a, 1, 0, [(0, "a", 2, 0), (0, "b", 1, 0)])
+    >>> inf_a.accepts(OmegaWord("b", "ab"))
+    True
+    >>> inf_a.accepts(OmegaWord("a", "b"))
+    False
+    >>> inf_a.to_min_even().accepts(OmegaWord("a", "b"))
+    False
+    >>> type(inf_a.complement()).__name__
+    'DPAMaxOdd'
+    >>> inf_a.complement().accepts(OmegaWord("a", "b"))
+    True
+    >>> inf_a.is_empty()
+    False
+    >>> type(parse_hoa(inf_a.to_hoa())).__name__
+    'PropDPAMaxEven'
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]) -> DPAMaxEven:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that do
+        not exist.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    def to_min_even(self) -> DPA:
+        r"""
+        A DPA (min even) that accepts the same language. The colors are renumbered
+        (`c + 1` for min odd, `m - c` for max even and max odd, where `m` is the
+        least number at least as large as the largest color that is even for max even
+        and odd for max odd). Raises `ValueError` if a new color does not fit into
+        `0..=255`.
+        """
+    def complement(self) -> DPAMaxOdd:
+        r"""
+        The complement: the automaton with the same transitions and colors and the
+        dual condition (min even and min odd, max even and max odd), which accepts
+        exactly the words that `self` rejects. The automaton is expected to be
+        complete.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty, decided on `to_min_even()`. The automaton is
+        expected to be complete. Raises `ValueError` if `to_min_even` does.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty. Decided on
+        `to_min_even()`, raises `ValueError` if that does.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class DPAMaxOdd:
+    r"""
+    A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) and the max odd condition: a word is accepted if the largest color that its run uses infinitely often is odd.
+    
+    >>> a = CharAlphabet("ab")
+    >>> inf_a = DPAMaxOdd(a, 1, 0, [(0, "a", 1, 0), (0, "b", 0, 0)])
+    >>> inf_a.accepts(OmegaWord("b", "ab"))
+    True
+    >>> inf_a.accepts(OmegaWord("a", "b"))
+    False
+    >>> inf_a.to_min_even().accepts(OmegaWord("b", "ab"))
+    True
+    >>> type(inf_a.complement()).__name__
+    'DPAMaxEven'
+    >>> type(parse_hoa(inf_a.to_hoa())).__name__
+    'PropDPAMaxOdd'
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]) -> DPAMaxOdd:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that do
+        not exist.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    def to_min_even(self) -> DPA:
+        r"""
+        A DPA (min even) that accepts the same language. The colors are renumbered
+        (`c + 1` for min odd, `m - c` for max even and max odd, where `m` is the
+        least number at least as large as the largest color that is even for max even
+        and odd for max odd). Raises `ValueError` if a new color does not fit into
+        `0..=255`.
+        """
+    def complement(self) -> DPAMaxEven:
+        r"""
+        The complement: the automaton with the same transitions and colors and the
+        dual condition (min even and min odd, max even and max odd), which accepts
+        exactly the words that `self` rejects. The automaton is expected to be
+        complete.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty, decided on `to_min_even()`. The automaton is
+        expected to be complete. Raises `ValueError` if `to_min_even` does.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty. Decided on
+        `to_min_even()`, raises `ValueError` if that does.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class DPAMinOdd:
+    r"""
+    A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) and the min odd condition: a word is accepted if the least color that its run uses infinitely often is odd. Its complement is a `DPA` (min even).
+    
+    >>> a = CharAlphabet("ab")
+    >>> fin_b = DPAMinOdd(a, 1, 0, [(0, "a", 1, 0), (0, "b", 0, 0)])
+    >>> fin_b.accepts(OmegaWord("b", "a"))
+    True
+    >>> fin_b.accepts(OmegaWord("a", "ab"))
+    False
+    >>> fin_b.to_min_even().accepts(OmegaWord("b", "a"))
+    True
+    >>> type(fin_b.complement()).__name__
+    'DPA'
+    >>> fin_b.accepting_word() is not None
+    True
+    >>> type(parse_hoa(fin_b.to_hoa())).__name__
+    'PropDPAMinOdd'
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]) -> DPAMinOdd:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that do
+        not exist.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    def to_min_even(self) -> DPA:
+        r"""
+        A DPA (min even) that accepts the same language. The colors are renumbered
+        (`c + 1` for min odd, `m - c` for max even and max odd, where `m` is the
+        least number at least as large as the largest color that is even for max even
+        and odd for max odd). Raises `ValueError` if a new color does not fit into
+        `0..=255`.
+        """
+    def complement(self) -> DPA:
+        r"""
+        The complement: the automaton with the same transitions and colors and the
+        dual condition (min even and min odd, max even and max odd), which accepts
+        exactly the words that `self` rejects. The automaton is expected to be
+        complete.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty, decided on `to_min_even()`. The automaton is
+        expected to be complete. Raises `ValueError` if `to_min_even` does.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty. Decided on
+        `to_min_even()`, raises `ValueError` if that does.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
 class DRA:
     r"""
     A deterministic Rabin automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`). A word is accepted if for some pair `(fin, inf)` its run uses no color of `fin` and some color of `inf` infinitely often.
@@ -655,6 +965,17 @@ class DRA:
     False
     >>> inf_b.is_empty()
     False
+    
+    The Streett automaton `DSA` with the same data and every pair `(fin, inf)` replaced by `(inf, fin)` accepts the complement.
+    
+    >>> DSA(a, 2, 0, edges, [([1], [])]).accepts(OmegaWord("b", "a"))
+    True
+    
+    The HOA format can only express the pairs `(fin, inf) = ([0], [1])`, `([2], [3])`, ... (pair `i` is `Fin(2i) & Inf(2i + 1)`) with the colors `0, ..., 2n - 1`, see `to_hoa`.
+    
+    >>> only_b = DRA(a, 1, 0, [(0, "a", 0, 0), (0, "b", 1, 0)], [([0], [1])])
+    >>> type(parse_hoa(only_b.to_hoa())).__name__
+    'PropDRA'
     """
     @property
     def num_states(self) -> builtins.int:
@@ -695,6 +1016,98 @@ class DRA:
         one with the same source and symbol. `pairs` is a list of `(fin, inf)`
         where both are lists of colors. Raises `ValueError` for states or symbols
         that do not exist.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format (every color is an acceptance set). Only if
+        the pairs are `([0], [1])`, `([2], [3])`, ... and the colors are below
+        `2 * len(pairs)`, the text has the `acc-name` that `from_hoa` and
+        `parse_hoa` need to read it back. Raises `HoaError` if it cannot be written.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class DSA:
+    r"""
+    A deterministic Streett automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`). A word is accepted if for every pair `(fin, inf)` its run uses no color of `fin` or some color of `inf` infinitely often (the dual of `DRA`; without pairs everything is accepted).
+    
+    >>> a = CharAlphabet("ab")
+    >>> edges = [(0, "a", 0, 0), (0, "b", 1, 1), (1, "a", 0, 0), (1, "b", 1, 1)]
+    >>> fin_b = DSA(a, 2, 0, edges, [([1], [])])
+    >>> fin_b.accepts(OmegaWord("b", "a"))
+    True
+    >>> fin_b.accepts(OmegaWord("", "ba"))
+    False
+    >>> fin_b.is_empty()
+    False
+    
+    The HOA format can only express the pairs `([0], [1])`, `([2], [3])`, ... (pair `i` is `Fin(2i) | Inf(2i + 1)`) with the colors `0, ..., 2n - 1`, see `to_hoa`.
+    
+    >>> only_a_finitely = DSA(a, 1, 0, [(0, "a", 0, 0), (0, "b", 1, 0)], [([0], [1])])
+    >>> type(parse_hoa(only_a_finitely.to_hoa())).__name__
+    'PropDSA'
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int, builtins.int]], pairs: typing.Sequence[tuple[typing.Sequence[builtins.int], typing.Sequence[builtins.int]]]) -> DSA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are
+        tuples `(source, symbol, color, target)`; a later edge replaces an earlier
+        one with the same source and symbol. `pairs` is a list of `(fin, inf)`
+        where both are lists of colors. Raises `ValueError` for states or symbols
+        that do not exist.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format (every color is an acceptance set). Only if
+        the pairs are `([0], [1])`, `([2], [3])`, ... and the colors are below
+        `2 * len(pairs)`, the text has the `acc-name` that `from_hoa` and
+        `parse_hoa` need to read it back. Raises `HoaError` if it cannot be written.
         """
     def states(self) -> builtins.list[builtins.int]:
         r"""
@@ -1059,6 +1472,10 @@ class NCW:
     def from_dcw(cls, dcw: DCW) -> NCW:
         r"""
         The NCW with the transitions of the DCW.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
         """
     def states(self) -> builtins.list[builtins.int]:
         r"""
@@ -1475,6 +1892,16 @@ class PropDCW:
         the same source and symbol. Raises `ValueError` for states or symbols that
         do not exist.
         """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    @classmethod
+    def from_hoa(cls, text: builtins.str) -> PropDCW:
+        r"""
+        Reads the first automaton in the HOA text. Raises `HoaError` if the text is not a
+        (supported) deterministic co-Büchi automaton.
+        """
     def states(self) -> builtins.list[builtins.int]:
         r"""
         The states `0, ..., num_states - 1`.
@@ -1807,9 +2234,12 @@ class PropDPA:
     @classmethod
     def from_hoa(cls, text: builtins.str) -> PropDPA:
         r"""
-        Reads the first automaton in the HOA text. Raises `HoaError` if the text is not a
-        (supported) deterministic parity automaton and `NotImplementedError` for parity
-        conditions other than min even.
+        Reads the first automaton in the HOA text and converts it to a min-even DPA: every
+        parity kind (`min even`, `min odd`, `max even`, `max odd`), Büchi and co-Büchi are
+        accepted, the colors are renumbered as `to_min_even` of the variant classes does.
+        Raises `HoaError` if the text is not a (supported) deterministic automaton with one of
+        these conditions and `NotImplementedError` for Rabin and Streett conditions. Use the
+        variant classes (e.g. `PropDPAMaxEven.from_hoa`) to keep the colors.
         """
     def complement(self) -> PropDPA:
         r"""
@@ -1828,6 +2258,273 @@ class PropDPA:
     def rejected_word(self) -> typing.Optional[OmegaWord]:
         r"""
         A word that is rejected, or `None` if the language is universal.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropDPAMaxEven:
+    r"""
+    A deterministic parity automaton over a `PropAlphabet` with the max even condition, see `DPAMaxEven`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int, builtins.int]]) -> PropDPAMaxEven:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that do
+        not exist.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    def to_min_even(self) -> PropDPA:
+        r"""
+        A DPA (min even) that accepts the same language. The colors are renumbered
+        (`c + 1` for min odd, `m - c` for max even and max odd, where `m` is the
+        least number at least as large as the largest color that is even for max even
+        and odd for max odd). Raises `ValueError` if a new color does not fit into
+        `0..=255`.
+        """
+    def complement(self) -> PropDPAMaxOdd:
+        r"""
+        The complement: the automaton with the same transitions and colors and the
+        dual condition (min even and min odd, max even and max odd), which accepts
+        exactly the words that `self` rejects. The automaton is expected to be
+        complete.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty, decided on `to_min_even()`. The automaton is
+        expected to be complete. Raises `ValueError` if `to_min_even` does.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty. Decided on
+        `to_min_even()`, raises `ValueError` if that does.
+        """
+    @classmethod
+    def from_hoa(cls, text: builtins.str) -> PropDPAMaxEven:
+        r"""
+        Reads the first automaton in the HOA text, which has to be a deterministic parity
+        automaton of exactly the kind `parity max even`; the colors are kept. Raises
+        `HoaError` otherwise.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropDPAMaxOdd:
+    r"""
+    A deterministic parity automaton over a `PropAlphabet` with the max odd condition, see `DPAMaxOdd`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int, builtins.int]]) -> PropDPAMaxOdd:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that do
+        not exist.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    def to_min_even(self) -> PropDPA:
+        r"""
+        A DPA (min even) that accepts the same language. The colors are renumbered
+        (`c + 1` for min odd, `m - c` for max even and max odd, where `m` is the
+        least number at least as large as the largest color that is even for max even
+        and odd for max odd). Raises `ValueError` if a new color does not fit into
+        `0..=255`.
+        """
+    def complement(self) -> PropDPAMaxEven:
+        r"""
+        The complement: the automaton with the same transitions and colors and the
+        dual condition (min even and min odd, max even and max odd), which accepts
+        exactly the words that `self` rejects. The automaton is expected to be
+        complete.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty, decided on `to_min_even()`. The automaton is
+        expected to be complete. Raises `ValueError` if `to_min_even` does.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty. Decided on
+        `to_min_even()`, raises `ValueError` if that does.
+        """
+    @classmethod
+    def from_hoa(cls, text: builtins.str) -> PropDPAMaxOdd:
+        r"""
+        Reads the first automaton in the HOA text, which has to be a deterministic parity
+        automaton of exactly the kind `parity max odd`; the colors are kept. Raises
+        `HoaError` otherwise.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropDPAMinOdd:
+    r"""
+    A deterministic parity automaton over a `PropAlphabet` with the min odd condition, see `DPAMinOdd`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int, builtins.int]]) -> PropDPAMinOdd:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that do
+        not exist.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    def to_min_even(self) -> PropDPA:
+        r"""
+        A DPA (min even) that accepts the same language. The colors are renumbered
+        (`c + 1` for min odd, `m - c` for max even and max odd, where `m` is the
+        least number at least as large as the largest color that is even for max even
+        and odd for max odd). Raises `ValueError` if a new color does not fit into
+        `0..=255`.
+        """
+    def complement(self) -> PropDPA:
+        r"""
+        The complement: the automaton with the same transitions and colors and the
+        dual condition (min even and min odd, max even and max odd), which accepts
+        exactly the words that `self` rejects. The automaton is expected to be
+        complete.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty, decided on `to_min_even()`. The automaton is
+        expected to be complete. Raises `ValueError` if `to_min_even` does.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty. Decided on
+        `to_min_even()`, raises `ValueError` if that does.
+        """
+    @classmethod
+    def from_hoa(cls, text: builtins.str) -> PropDPAMinOdd:
+        r"""
+        Reads the first automaton in the HOA text, which has to be a deterministic parity
+        automaton of exactly the kind `parity min odd`; the colors are kept. Raises
+        `HoaError` otherwise.
         """
     def states(self) -> builtins.list[builtins.int]:
         r"""
@@ -1890,6 +2587,103 @@ class PropDRA:
         one with the same source and symbol. `pairs` is a list of `(fin, inf)`
         where both are lists of colors. Raises `ValueError` for states or symbols
         that do not exist.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format (every color is an acceptance set). Only if
+        the pairs are `([0], [1])`, `([2], [3])`, ... and the colors are below
+        `2 * len(pairs)`, the text has the `acc-name` that `from_hoa` and
+        `parse_hoa` need to read it back. Raises `HoaError` if it cannot be written.
+        """
+    @classmethod
+    def from_hoa(cls, text: builtins.str) -> PropDRA:
+        r"""
+        Reads the first automaton in the HOA text, which has to be deterministic with a
+        Rabin condition. The edges of a HOA automaton belong to a *set* of acceptance sets,
+        while an edge of a `PropDRA` has one color: every distinct set of acceptance sets
+        that occurs on an edge becomes a color (numbered `0, 1, ...` in the order of the
+        first occurrence, with the states and their edges in the order of `states()` and
+        `edges_from()`; the empty set is a color too) and the pairs are rewritten
+        accordingly: a color is in `fin` (`inf`) if its set meets a `fin` (`inf`) set of the
+        pair. Raises `HoaError` if the text is not such an automaton or if there are more
+        than 256 different sets.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class PropDSA:
+    r"""
+    A deterministic Streett automaton over a `PropAlphabet`, see `DSA`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int, builtins.int]], pairs: typing.Sequence[tuple[typing.Sequence[builtins.int], typing.Sequence[builtins.int]]]) -> PropDSA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are
+        tuples `(source, symbol, color, target)`; a later edge replaces an earlier
+        one with the same source and symbol. `pairs` is a list of `(fin, inf)`
+        where both are lists of colors. Raises `ValueError` for states or symbols
+        that do not exist.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format (every color is an acceptance set). Only if
+        the pairs are `([0], [1])`, `([2], [3])`, ... and the colors are below
+        `2 * len(pairs)`, the text has the `acc-name` that `from_hoa` and
+        `parse_hoa` need to read it back. Raises `HoaError` if it cannot be written.
+        """
+    @classmethod
+    def from_hoa(cls, text: builtins.str) -> PropDSA:
+        r"""
+        Reads the first automaton in the HOA text, which has to be deterministic with a
+        Streett condition. The colors are numbered like in `PropDRA.from_hoa`. Raises
+        `HoaError` if the text is not such an automaton or if there are more than 256
+        different sets of acceptance sets.
         """
     def states(self) -> builtins.list[builtins.int]:
         r"""
@@ -2233,6 +3027,16 @@ class PropNCW:
         r"""
         The PropNCW with the transitions of the PropDCW.
         """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    @classmethod
+    def from_hoa(cls, text: builtins.str) -> PropNCW:
+        r"""
+        Reads the first automaton in the HOA text, which may be deterministic. Raises
+        `HoaError` if its acceptance condition is not co-Büchi.
+        """
     def states(self) -> builtins.list[builtins.int]:
         r"""
         The states `0, ..., num_states - 1`.
@@ -2431,10 +3235,14 @@ class PropNPA:
 def parse_hoa(text: builtins.str) -> typing.Any:
     r"""
     Reads the first automaton in `text` (a HOA file may contain several) and returns it as an
-    instance of the most specific class: `PropDBA` for a deterministic Büchi automaton, `PropDPA`
-    for parity, `PropNBA` or `PropNPA` if the automaton is not deterministic. Raises `HoaError` if
-    the text is not a (supported) HOA automaton and `NotImplementedError` for acceptance conditions
-    without a class (Rabin, Streett) and for parity conditions other than min even.
+    instance of the most specific class: `PropDBA` for a deterministic Büchi automaton, `PropDCW`
+    for co-Büchi, `PropDPA`, `PropDPAMaxEven`, `PropDPAMinOdd` or `PropDPAMaxOdd` for the parity
+    kind of the file, `PropDRA` for Rabin and `PropDSA` for Streett. Automata that are not
+    deterministic give `PropNBA`, `PropNCW` or `PropNPA` (min even only). Rabin and Streett
+    colors are renumbered, see `PropDRA.from_hoa`. Raises `HoaError` if the text is not a
+    (supported) HOA automaton and `NotImplementedError` for acceptance conditions without a
+    class (nondeterministic Rabin and Streett, generalized conditions, ...) and for
+    nondeterministic parity conditions other than min even.
     """
 
 def parse_hoa_all(text: builtins.str) -> builtins.list[typing.Any]:
