@@ -5,6 +5,7 @@ build-backend = "maturin"
 [project]
 name = "automatars"
 description = "Transition systems and automata over finite and infinite words."
+readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 classifiers = [
