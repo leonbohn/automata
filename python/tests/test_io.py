@@ -118,6 +118,9 @@ State: 0
 --END--
 """
 
+# nondeterministic: two edges for `p`
+NRA_TEXT = RABIN_TEXT.replace("[0] 0 {1}", "[t] 0 {1}")
+
 WORDS = [
     OmegaWord([], [T]),
     OmegaWord([], [F]),
@@ -158,8 +161,6 @@ def test_deterministic_classes_reject_nondeterministic_text():
 def test_wrong_acceptance_condition_is_a_hoa_error():
     with pytest.raises(HoaError, match="Büchi"):
         PropDBA.from_hoa(DPA_TEXT)
-    with pytest.raises(HoaError, match="parity"):
-        PropDPA.from_hoa(DBA_TEXT)
     with pytest.raises(HoaError):
         PropNBA.from_hoa(DPA_TEXT)
     with pytest.raises(HoaError, match="parity"):
@@ -168,23 +169,22 @@ def test_wrong_acceptance_condition_is_a_hoa_error():
         PropNPA.from_hoa(NBA_TEXT)
 
 
-def test_max_and_odd_parity_are_not_implemented():
-    # the crate reads every parity condition as min even, so these must not be read at all
+def test_nondeterministic_max_and_odd_parity_are_not_implemented():
     for text in (MAX_DPA_TEXT, DPA_TEXT.replace("min even", "min odd")):
-        for cls in (PropDPA, PropNPA):
-            with pytest.raises(NotImplementedError):
-                cls.from_hoa(text)
         with pytest.raises(NotImplementedError):
-            parse_hoa(text)
+            PropNPA.from_hoa(text)
+        nondeterministic = text.replace("State: 0\n", "State: 0\n[t] 0 {1}\n")
+        with pytest.raises(NotImplementedError):
+            parse_hoa(nondeterministic)
 
 
-def test_rabin_is_not_implemented():
+def test_rabin_is_only_read_by_the_rabin_class():
     with pytest.raises(NotImplementedError):
         PropDPA.from_hoa(RABIN_TEXT)
     with pytest.raises(NotImplementedError):
         PropNPA.from_hoa(RABIN_TEXT)
     with pytest.raises(NotImplementedError):
-        parse_hoa(RABIN_TEXT)
+        parse_hoa(NRA_TEXT)
     with pytest.raises(HoaError):
         PropDBA.from_hoa(RABIN_TEXT)
 
@@ -239,7 +239,7 @@ def test_parse_hoa_takes_the_first_automaton_and_parse_hoa_all_all_of_them():
 
 def test_parse_hoa_all_fails_if_one_automaton_is_unsupported():
     with pytest.raises(NotImplementedError):
-        parse_hoa_all(DBA_TEXT + RABIN_TEXT)
+        parse_hoa_all(DBA_TEXT + NRA_TEXT)
     with pytest.raises(HoaError):
         parse_hoa_all(DBA_TEXT + "HOA: v1\n--BODY--\nState: 7\n--END--\n")
 
@@ -284,9 +284,14 @@ def test_to_hoa_of_character_automata():
 def test_only_classes_that_the_crate_can_write_have_to_hoa():
     for cls in (DBA, DPA, NBA, NPA, PropDBA, PropDPA, PropNBA, PropNPA):
         assert hasattr(cls, "to_hoa"), cls
-    for cls in (DFA, NFA, MooreMachine, MealyMachine, PropDFA, DCW, NCW, PropDCW, PropNCW):
+    for cls in (DCW, NCW, PropDCW, PropNCW):
+        assert hasattr(cls, "to_hoa"), cls
+    for cls in (DFA, NFA, MooreMachine, MealyMachine, PropDFA):
         assert not hasattr(cls, "to_hoa"), cls
-    for cls in (DBA, DPA, NBA, NPA, DCW, NCW, DFA, NFA, PropDCW, PropNCW, PropDFA):
+    for cls in (PropDBA, PropDCW, PropDPA, PropNBA, PropNCW, PropNPA):
+        assert hasattr(cls, "from_hoa"), cls
+    # the classes over a CharAlphabet cannot be read, HOA automata have propositions
+    for cls in (DBA, DPA, NBA, NPA, DCW, NCW, DFA, NFA, PropDFA):
         assert not hasattr(cls, "from_hoa"), cls
 
 
@@ -353,3 +358,40 @@ def test_classes_without_a_dot_style_in_the_crate_have_no_dot_output():
 def test_module_exports():
     assert callable(automata.parse_hoa) and callable(automata.parse_hoa_all)
     assert issubclass(HoaError, automata.Error)
+
+
+def test_co_buchi_round_trips_and_parse_hoa_returns_it():
+    dcw = PropDCW(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)])
+    text = dcw.to_hoa()
+    assert "acc-name: co-Buchi" in text
+    assert verdicts(PropDCW.from_hoa(text)) == verdicts(dcw) == [False, True, False, True, False]
+    assert type(parse_hoa(text)) is PropDCW
+    # characters become propositions
+    assert "acc-name: co-Buchi" in DCW(AB, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)]).to_hoa()
+    # the nondeterministic class reads deterministic text too
+    assert verdicts(PropNCW.from_hoa(text)) == verdicts(dcw)
+
+    ncw = PropNCW(P, 2, 0, [(0, T, True, 0), (0, F, True, 0), (0, F, False, 1), (1, F, False, 1)])
+    ncw_text = ncw.to_hoa()
+    assert "acc-name: co-Buchi" in ncw_text and "acc-name: co-Buchi" in NCW(AB, 1, 0, [(0, "a", True, 0)]).to_hoa()
+    assert verdicts(PropNCW.from_hoa(ncw_text)) == verdicts(ncw) == [False, True, False, True, False]
+    assert type(parse_hoa(ncw_text)) is PropNCW
+    assert [type(a) for a in parse_hoa_all(text + ncw_text)] == [PropDCW, PropNCW]
+    with pytest.raises(HoaError, match="not deterministic"):
+        PropDCW.from_hoa(ncw_text)
+
+
+def test_co_buchi_is_not_confused_with_buchi():
+    dcw_text = PropDCW(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)]).to_hoa()
+    with pytest.raises(HoaError, match="Büchi"):
+        PropDBA.from_hoa(dcw_text)
+    with pytest.raises(HoaError, match="co-Büchi"):
+        PropDCW.from_hoa(DBA_TEXT)
+    with pytest.raises(HoaError, match="co-Büchi"):
+        PropNCW.from_hoa(NBA_TEXT)
+    with pytest.raises(HoaError):
+        PropNBA.from_hoa(dcw_text)
+    # a DPA reads it as `from_dcw` does
+    assert verdicts(PropDPA.from_hoa(dcw_text)) == verdicts(PropDCW.from_hoa(dcw_text))
+    with pytest.raises(HoaError):
+        PropDCW.from_hoa("garbage")

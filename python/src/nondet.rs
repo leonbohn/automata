@@ -285,6 +285,11 @@ nomega_class!(
         fn from_dcw(_cls: &Bound<'_, PyType>, dcw: &PyDcw) -> Self {
             Self(existential(&dcw.0))
         }
+
+        /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::to_hoa(py, &self.0)
+        }
     }
 );
 nomega_class!(
@@ -300,6 +305,18 @@ nomega_class!(
         #[classmethod]
         fn from_dcw(_cls: &Bound<'_, PyType>, dcw: &PyPropDcw) -> Self {
             Self(existential(&dcw.0))
+        }
+
+        /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::to_hoa(py, &self.0)
+        }
+
+        /// Reads the first automaton in the HOA text, which may be deterministic. Raises
+        /// `HoaError` if its acceptance condition is not co-Büchi.
+        #[classmethod]
+        fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
+            crate::hoa::ncw(py, text).map(Self)
         }
     }
 );

@@ -13,4 +13,4 @@ def test_doctests():
         for test in finder.find(cls, cls.__name__, globs=dict(vars(automata))):
             runner.run(test)
     results = runner.summarize(verbose=False)
-    assert results.attempted >= 20 and results.failed == 0
+    assert results.attempted >= 60 and results.failed == 0

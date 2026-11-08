@@ -37,8 +37,16 @@ fn _automata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<omega::PyPropDcw>()?;
     m.add_class::<omega::PyDpa>()?;
     m.add_class::<omega::PyPropDpa>()?;
+    m.add_class::<omega::PyDpaMaxEven>()?;
+    m.add_class::<omega::PyPropDpaMaxEven>()?;
+    m.add_class::<omega::PyDpaMinOdd>()?;
+    m.add_class::<omega::PyPropDpaMinOdd>()?;
+    m.add_class::<omega::PyDpaMaxOdd>()?;
+    m.add_class::<omega::PyPropDpaMaxOdd>()?;
     m.add_class::<omega::PyDra>()?;
     m.add_class::<omega::PyPropDra>()?;
+    m.add_class::<omega::PyDsa>()?;
+    m.add_class::<omega::PyPropDsa>()?;
     m.add_class::<omega::PyDma>()?;
     m.add_class::<omega::PyPropDma>()?;
     m.add_class::<nondet::PyNfa>()?;

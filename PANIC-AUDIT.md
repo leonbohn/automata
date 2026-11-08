@@ -58,3 +58,6 @@ panic that gets through would surface as `pyo3_runtime.PanicException`.
 | constructors and builders | indexing by state, `add_edge` | every state is checked against `num_states` before |
 | `union`, `intersection`, comparisons, `bisimilar` | products of automata over different alphabets | the alphabet sizes are compared, `ValueError` |
 | `edges_from`, `is_accepting` | state lookups | `IndexError` for unknown states |
+| `from_hoa`, `parse_hoa` of the parity classes | `AcceptanceMask::as_priority` (edge without exactly one acceptance set) | the priorities are validated first (`check_priorities`, `AcceptanceError`), `into_dpa` validates itself |
+| `PropDRA.from_hoa`, `PropDSA.from_hoa` | none: the masks are numbered by the bindings | more than 256 different masks are a `HoaError`, every mask of an edge is in the index by construction |
+| `to_min_even`, `is_empty`, `accepting_word` of the parity variants | `u8` overflow of the renumbered colors | computed in `usize` and checked against `255`, `ValueError` |

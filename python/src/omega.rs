@@ -5,10 +5,12 @@ use automata::{
     alphabet::Alphabet,
     automaton::{
         Automaton, BuchiCondition, CoBuchiCondition, Emptiness, Equivalence, Inclusion,
-        MinEvenParityCondition, MullerCondition, RabinCondition, RabinPair,
+        MaxEvenParityCondition, MaxOddParityCondition, MinEvenParityCondition,
+        MinOddParityCondition, MullerCondition, ParityKind, RabinCondition, RabinPair,
+        StreettCondition,
     },
     representation::IntoTransitions,
-    ts::{ForAlphabet, IntoEdgeTuple, Sproutable, TransitionSystem},
+    ts::{ForAlphabet, IntoEdgeTuple, Sproutable, States, TransitionSystem},
 };
 use pyo3::{exceptions::PyValueError, prelude::*, types::PyType};
 
@@ -138,8 +140,35 @@ macro_rules! omega_class {
     ) => {
         omega_class!(@inner $name, $py_name, $kind, $pyalpha, $color, $sem, $doc, { $($more)* });
     };
+    // like `custom_new`, but without `is_empty` and `accepting_word` (for the conditions that the
+    // crate has no emptiness check for, `more` has to provide them)
+    (
+        $name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $color:ty, $sem:ty, $doc:expr,
+        no_emptiness, { $($more:tt)* }
+    ) => {
+        omega_class!(@base $name, $py_name, $kind, $pyalpha, $color, $sem, $doc, { $($more)* });
+    };
     (
         @inner $name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $color:ty, $sem:ty, $doc:expr,
+        { $($more:tt)* }
+    ) => {
+        omega_class!(@base $name, $py_name, $kind, $pyalpha, $color, $sem, $doc, {
+            /// Whether the language is empty. The automaton is expected to be complete.
+            fn is_empty(&self, py: Python<'_>) -> bool {
+                py.detach(|| Emptiness::of(&self.0).holds())
+            }
+
+            /// An accepted word, or `None` if the language is empty.
+            fn accepting_word(&self, py: Python<'_>) -> Option<PyOmegaWord> {
+                py.detach(|| Emptiness::of(&self.0).witness())
+                    .map(|w| <$kind as Kind>::omega_out(&w))
+            }
+
+            $($more)*
+        });
+    };
+    (
+        @base $name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $color:ty, $sem:ty, $doc:expr,
         { $($more:tt)* }
     ) => {
         automaton_class!(
@@ -152,17 +181,6 @@ macro_rules! omega_class {
                 fn accepts(&self, py: Python<'_>, word: &PyOmegaWord) -> PyResult<bool> {
                     let word = <$kind as Kind>::omega(self.0.ts().alphabet(), word)?;
                     Ok(py.detach(|| self.0.accepts(word)))
-                }
-
-                /// Whether the language is empty. The automaton is expected to be complete.
-                fn is_empty(&self, py: Python<'_>) -> bool {
-                    py.detach(|| Emptiness::of(&self.0).holds())
-                }
-
-                /// An accepted word, or `None` if the language is empty.
-                fn accepting_word(&self, py: Python<'_>) -> Option<PyOmegaWord> {
-                    py.detach(|| Emptiness::of(&self.0).witness())
-                        .map(|w| <$kind as Kind>::omega_out(&w))
                 }
 
                 $($more)*
@@ -240,9 +258,14 @@ omega_class!(
     PyCharAlphabet,
     bool,
     CoBuchiCondition,
-    "A deterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` only finitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> fin_a = DCW(a, 1, 0, [(0, \"a\", True, 0), (0, \"b\", False, 0)])\n>>> fin_a.accepts(OmegaWord(\"aa\", \"b\"))\nTrue\n>>> fin_a.accepts(OmegaWord(\"\", \"ab\"))\nFalse\n>>> fin_a.is_empty()\nFalse",
+    "A deterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` only finitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> fin_a = DCW(a, 1, 0, [(0, \"a\", True, 0), (0, \"b\", False, 0)])\n>>> fin_a.accepts(OmegaWord(\"aa\", \"b\"))\nTrue\n>>> fin_a.accepts(OmegaWord(\"\", \"ab\"))\nFalse\n>>> fin_a.is_empty()\nFalse\n\nThe HOA format writes the characters as propositions and reads them back as a `PropDCW`.\n\n>>> PropDCW.from_hoa(fin_a.to_hoa()).num_edges\n2\n>>> type(parse_hoa(fin_a.to_hoa())).__name__\n'PropDCW'",
     plain,
-    {}
+    {
+        /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::to_hoa(py, &self.0)
+        }
+    }
 );
 omega_class!(
     PyPropDcw,
@@ -253,7 +276,19 @@ omega_class!(
     CoBuchiCondition,
     "A deterministic co-Büchi automaton over a `PropAlphabet`, see `DCW`.",
     plain,
-    {}
+    {
+        /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::to_hoa(py, &self.0)
+        }
+
+        /// Reads the first automaton in the HOA text. Raises `HoaError` if the text is not a
+        /// (supported) deterministic co-Büchi automaton.
+        #[classmethod]
+        fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
+            crate::hoa::dcw(py, text).map(Self)
+        }
+    }
 );
 
 /// Defines a deterministic parity automaton class (min-even: a word is accepted if the least
@@ -341,7 +376,7 @@ dpa_class!(
     PyCharAlphabet,
     PyDba,
     PyDcw,
-    "A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) (min-even: a word is accepted if the least color that its run uses infinitely often is even; the other parity conditions are not available).\n\n>>> a = CharAlphabet(\"ab\")\n>>> inf_b = DPA(a, 1, 0, [(0, \"a\", 1, 0), (0, \"b\", 0, 0)])\n>>> inf_b.accepts(OmegaWord(\"a\", \"ab\"))\nTrue\n>>> inf_b.accepts(OmegaWord(\"b\", \"a\"))\nFalse\n>>> inf_b.complement().accepts(OmegaWord(\"b\", \"a\"))\nTrue\n>>> inf_b.complement().complement().equivalent_to(inf_b)\nTrue\n>>> inf_b.rejected_word() is not None\nTrue",
+    "A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) (min-even: a word is accepted if the least color that its run uses infinitely often is even; the other parity conditions are the classes `DPAMaxEven`, `DPAMinOdd` and `DPAMaxOdd`).\n\n>>> a = CharAlphabet(\"ab\")\n>>> inf_b = DPA(a, 1, 0, [(0, \"a\", 1, 0), (0, \"b\", 0, 0)])\n>>> inf_b.accepts(OmegaWord(\"a\", \"ab\"))\nTrue\n>>> inf_b.accepts(OmegaWord(\"b\", \"a\"))\nFalse\n>>> inf_b.complement().accepts(OmegaWord(\"b\", \"a\"))\nTrue\n>>> inf_b.complement().complement().equivalent_to(inf_b)\nTrue\n>>> inf_b.rejected_word() is not None\nTrue",
     {}
 );
 dpa_class!(
@@ -353,9 +388,12 @@ dpa_class!(
     PyPropDcw,
     "A deterministic parity automaton over a `PropAlphabet`, see `DPA`.",
     {
-        /// Reads the first automaton in the HOA text. Raises `HoaError` if the text is not a
-        /// (supported) deterministic parity automaton and `NotImplementedError` for parity
-        /// conditions other than min even.
+        /// Reads the first automaton in the HOA text and converts it to a min-even DPA: every
+        /// parity kind (`min even`, `min odd`, `max even`, `max odd`), Büchi and co-Büchi are
+        /// accepted, the colors are renumbered as `to_min_even` of the variant classes does.
+        /// Raises `HoaError` if the text is not a (supported) deterministic automaton with one of
+        /// these conditions and `NotImplementedError` for Rabin and Streett conditions. Use the
+        /// variant classes (e.g. `PropDPAMaxEven.from_hoa`) to keep the colors.
         #[classmethod]
         fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
             crate::hoa::dpa(py, text).map(Self)
@@ -363,17 +401,238 @@ dpa_class!(
     }
 );
 
-/// Defines a deterministic Rabin automaton class, whose constructor takes a list of pairs
-/// `(fin, inf)` of lists of colors.
-macro_rules! dra_class {
-    ($name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $doc:expr) => {
+/// A min-even DPA that accepts the language of `aut`, an automaton with the parity condition
+/// `kind` and colors that are used as they are. The colors are renumbered like `into_dpa` of the
+/// crate does: `c + 1` for min odd and `m - c` for the max kinds, where `m` is the least number
+/// at least as large as the largest color that has the right parity (even for max even, odd for
+/// max odd). Fails if a result color does not fit into `0..=255`.
+fn to_min_even<A: Alphabet, Sem: Clone>(
+    aut: &Automaton<DTS<A, Void, Int>, Sem>,
+    kind: ParityKind,
+) -> PyResult<Automaton<DTS<A, Void, Int>, MinEvenParityCondition>> {
+    let ts = aut.ts();
+    let (mut low, mut high) = (usize::MAX, 0);
+    for q in ts.states() {
+        for edge in ts.edges_from(q).into_iter().flatten() {
+            low = low.min(usize::from(*edge.color()));
+            high = high.max(usize::from(*edge.color()));
+        }
+    }
+    // without edges there is nothing to renumber
+    low = low.min(high);
+    let c = high + usize::from((high % 2 == 0) != kind.is_even());
+    let largest = match kind {
+        ParityKind::MinEven => high,
+        ParityKind::MinOdd => high + 1,
+        ParityKind::MaxEven | ParityKind::MaxOdd => c - low,
+    };
+    if largest > usize::from(Int::MAX) {
+        return Err(PyValueError::new_err(format!(
+            "the equivalent min-even automaton needs the color {largest}, but colors are 0..=255"
+        )));
+    }
+    let to_new = |p: Int| {
+        (match kind {
+            ParityKind::MinEven => usize::from(p),
+            ParityKind::MinOdd => usize::from(p) + 1,
+            ParityKind::MaxEven | ParityKind::MaxOdd => c - usize::from(p),
+        }) as Int
+    };
+    let (ts, initial, _) = aut.clone().into_parts();
+    Ok(ts.map_edge_colors(to_new).with_initial(initial).collect())
+}
+
+/// Defines a deterministic parity automaton class for one of the parity conditions other than min
+/// even: `$cond` with the kind `$parity_kind`, whose complement is the class `$dual` with the dual
+/// condition `$dual_cond`. `to_min_even` gives the equivalent `$min_even` (a `DPA`).
+macro_rules! dpa_variant_class {
+    (
+        $name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $cond:ty, $parity_kind:expr,
+        $min_even:ident, $dual:ident, $dual_cond:ty, $doc:expr, { $($more:tt)* }
+    ) => {
         omega_class!(
             $name,
             $py_name,
             $kind,
             $pyalpha,
             Int,
-            RabinCondition<Int>,
+            $cond,
+            $doc,
+            no_emptiness,
+            {
+                /// Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+                /// `(source, symbol, color, target)`; a later edge replaces an earlier one with
+                /// the same source and symbol. Raises `ValueError` for states or symbols that do
+                /// not exist.
+                #[new]
+                fn new(
+                    alphabet: &$pyalpha,
+                    num_states: u32,
+                    initial: u32,
+                    edges: Vec<(u32, <$kind as Kind>::PySymbol<'_>, Int, u32)>,
+                ) -> PyResult<Self> {
+                    colored::<$kind, _, _>(alphabet, num_states, initial, edges, Default::default())
+                        .map(Self)
+                }
+
+                /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+                fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+                    crate::class::to_hoa(py, &self.0)
+                }
+
+                /// A DPA (min even) that accepts the same language. The colors are renumbered
+                /// (`c + 1` for min odd, `m - c` for max even and max odd, where `m` is the
+                /// least number at least as large as the largest color that is even for max even
+                /// and odd for max odd). Raises `ValueError` if a new color does not fit into
+                /// `0..=255`.
+                fn to_min_even(&self, py: Python<'_>) -> PyResult<$min_even> {
+                    py.detach(|| to_min_even(&self.0, $parity_kind)).map($min_even)
+                }
+
+                /// The complement: the automaton with the same transitions and colors and the
+                /// dual condition (min even and min odd, max even and max odd), which accepts
+                /// exactly the words that `self` rejects. The automaton is expected to be
+                /// complete.
+                fn complement(&self) -> $dual {
+                    $dual(self.0.clone().map_acceptance(|_| <$dual_cond>::default()))
+                }
+
+                /// Whether the language is empty, decided on `to_min_even()`. The automaton is
+                /// expected to be complete. Raises `ValueError` if `to_min_even` does.
+                fn is_empty(&self, py: Python<'_>) -> PyResult<bool> {
+                    let min_even = py.detach(|| to_min_even(&self.0, $parity_kind))?;
+                    Ok(py.detach(|| Emptiness::of(&min_even).holds()))
+                }
+
+                /// An accepted word, or `None` if the language is empty. Decided on
+                /// `to_min_even()`, raises `ValueError` if that does.
+                fn accepting_word(&self, py: Python<'_>) -> PyResult<Option<PyOmegaWord>> {
+                    let min_even = py.detach(|| to_min_even(&self.0, $parity_kind))?;
+                    Ok(py
+                        .detach(|| Emptiness::of(&min_even).witness())
+                        .map(|w| <$kind as Kind>::omega_out(&w)))
+                }
+
+                $($more)*
+            }
+        );
+    };
+}
+
+dpa_variant_class!(
+    PyDpaMaxEven,
+    "DPAMaxEven",
+    Chars,
+    PyCharAlphabet,
+    MaxEvenParityCondition,
+    ParityKind::MaxEven,
+    PyDpa,
+    PyDpaMaxOdd,
+    MaxOddParityCondition,
+    "A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) and the max even condition: a word is accepted if the largest color that its run uses infinitely often is even.\n\n>>> a = CharAlphabet(\"ab\")\n>>> inf_a = DPAMaxEven(a, 1, 0, [(0, \"a\", 2, 0), (0, \"b\", 1, 0)])\n>>> inf_a.accepts(OmegaWord(\"b\", \"ab\"))\nTrue\n>>> inf_a.accepts(OmegaWord(\"a\", \"b\"))\nFalse\n>>> inf_a.to_min_even().accepts(OmegaWord(\"a\", \"b\"))\nFalse\n>>> type(inf_a.complement()).__name__\n'DPAMaxOdd'\n>>> inf_a.complement().accepts(OmegaWord(\"a\", \"b\"))\nTrue\n>>> inf_a.is_empty()\nFalse\n>>> type(parse_hoa(inf_a.to_hoa())).__name__\n'PropDPAMaxEven'",
+    {}
+);
+dpa_variant_class!(
+    PyPropDpaMaxEven,
+    "PropDPAMaxEven",
+    Props,
+    PyPropAlphabet,
+    MaxEvenParityCondition,
+    ParityKind::MaxEven,
+    PyPropDpa,
+    PyPropDpaMaxOdd,
+    MaxOddParityCondition,
+    "A deterministic parity automaton over a `PropAlphabet` with the max even condition, see `DPAMaxEven`.",
+    {
+        /// Reads the first automaton in the HOA text, which has to be a deterministic parity
+        /// automaton of exactly the kind `parity max even`; the colors are kept. Raises
+        /// `HoaError` otherwise.
+        #[classmethod]
+        fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
+            crate::hoa::dpa_kind::<MaxEvenParityCondition>(py, text, ParityKind::MaxEven).map(Self)
+        }
+    }
+);
+dpa_variant_class!(
+    PyDpaMinOdd,
+    "DPAMinOdd",
+    Chars,
+    PyCharAlphabet,
+    MinOddParityCondition,
+    ParityKind::MinOdd,
+    PyDpa,
+    PyDpa,
+    MinEvenParityCondition,
+    "A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) and the min odd condition: a word is accepted if the least color that its run uses infinitely often is odd. Its complement is a `DPA` (min even).\n\n>>> a = CharAlphabet(\"ab\")\n>>> fin_b = DPAMinOdd(a, 1, 0, [(0, \"a\", 1, 0), (0, \"b\", 0, 0)])\n>>> fin_b.accepts(OmegaWord(\"b\", \"a\"))\nTrue\n>>> fin_b.accepts(OmegaWord(\"a\", \"ab\"))\nFalse\n>>> fin_b.to_min_even().accepts(OmegaWord(\"b\", \"a\"))\nTrue\n>>> type(fin_b.complement()).__name__\n'DPA'\n>>> fin_b.accepting_word() is not None\nTrue\n>>> type(parse_hoa(fin_b.to_hoa())).__name__\n'PropDPAMinOdd'",
+    {}
+);
+dpa_variant_class!(
+    PyPropDpaMinOdd,
+    "PropDPAMinOdd",
+    Props,
+    PyPropAlphabet,
+    MinOddParityCondition,
+    ParityKind::MinOdd,
+    PyPropDpa,
+    PyPropDpa,
+    MinEvenParityCondition,
+    "A deterministic parity automaton over a `PropAlphabet` with the min odd condition, see `DPAMinOdd`.",
+    {
+        /// Reads the first automaton in the HOA text, which has to be a deterministic parity
+        /// automaton of exactly the kind `parity min odd`; the colors are kept. Raises
+        /// `HoaError` otherwise.
+        #[classmethod]
+        fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
+            crate::hoa::dpa_kind::<MinOddParityCondition>(py, text, ParityKind::MinOdd).map(Self)
+        }
+    }
+);
+dpa_variant_class!(
+    PyDpaMaxOdd,
+    "DPAMaxOdd",
+    Chars,
+    PyCharAlphabet,
+    MaxOddParityCondition,
+    ParityKind::MaxOdd,
+    PyDpa,
+    PyDpaMaxEven,
+    MaxEvenParityCondition,
+    "A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) and the max odd condition: a word is accepted if the largest color that its run uses infinitely often is odd.\n\n>>> a = CharAlphabet(\"ab\")\n>>> inf_a = DPAMaxOdd(a, 1, 0, [(0, \"a\", 1, 0), (0, \"b\", 0, 0)])\n>>> inf_a.accepts(OmegaWord(\"b\", \"ab\"))\nTrue\n>>> inf_a.accepts(OmegaWord(\"a\", \"b\"))\nFalse\n>>> inf_a.to_min_even().accepts(OmegaWord(\"b\", \"ab\"))\nTrue\n>>> type(inf_a.complement()).__name__\n'DPAMaxEven'\n>>> type(parse_hoa(inf_a.to_hoa())).__name__\n'PropDPAMaxOdd'",
+    {}
+);
+dpa_variant_class!(
+    PyPropDpaMaxOdd,
+    "PropDPAMaxOdd",
+    Props,
+    PyPropAlphabet,
+    MaxOddParityCondition,
+    ParityKind::MaxOdd,
+    PyPropDpa,
+    PyPropDpaMaxEven,
+    MaxEvenParityCondition,
+    "A deterministic parity automaton over a `PropAlphabet` with the max odd condition, see `DPAMaxOdd`.",
+    {
+        /// Reads the first automaton in the HOA text, which has to be a deterministic parity
+        /// automaton of exactly the kind `parity max odd`; the colors are kept. Raises
+        /// `HoaError` otherwise.
+        #[classmethod]
+        fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
+            crate::hoa::dpa_kind::<MaxOddParityCondition>(py, text, ParityKind::MaxOdd).map(Self)
+        }
+    }
+);
+
+/// Defines a deterministic Rabin or Streett automaton class with the condition `$cond`, whose
+/// constructor takes a list of pairs `(fin, inf)` of lists of colors.
+macro_rules! pairs_class {
+    ($name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $cond:ident, $doc:expr, { $($more:tt)* }) => {
+        omega_class!(
+            $name,
+            $py_name,
+            $kind,
+            $pyalpha,
+            Int,
+            $cond<Int>,
             $doc,
             custom_new,
             {
@@ -390,31 +649,87 @@ macro_rules! dra_class {
                     edges: Vec<(u32, <$kind as Kind>::PySymbol<'_>, Int, u32)>,
                     pairs: Vec<(Vec<Int>, Vec<Int>)>,
                 ) -> PyResult<Self> {
-                    let condition: RabinCondition<Int> = pairs
+                    let condition: $cond<Int> = pairs
                         .into_iter()
                         .map(|(fin, inf)| RabinPair::from_iters(fin, inf))
                         .into();
                     colored::<$kind, _, _>(alphabet, num_states, initial, edges, condition)
                         .map(Self)
                 }
+
+                /// The automaton in the HOA format (every color is an acceptance set). Only if
+                /// the pairs are `([0], [1])`, `([2], [3])`, ... and the colors are below
+                /// `2 * len(pairs)`, the text has the `acc-name` that `from_hoa` and
+                /// `parse_hoa` need to read it back. Raises `HoaError` if it cannot be written.
+                fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+                    crate::class::to_hoa(py, &self.0)
+                }
+
+                $($more)*
             }
         );
     };
 }
 
-dra_class!(
+pairs_class!(
     PyDra,
     "DRA",
     Chars,
     PyCharAlphabet,
-    "A deterministic Rabin automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`). A word is accepted if for some pair `(fin, inf)` its run uses no color of `fin` and some color of `inf` infinitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> edges = [(0, \"a\", 0, 0), (0, \"b\", 1, 1), (1, \"a\", 0, 0), (1, \"b\", 1, 1)]\n>>> inf_b = DRA(a, 2, 0, edges, [([], [1])])\n>>> inf_b.accepts(OmegaWord(\"\", \"ba\"))\nTrue\n>>> inf_b.accepts(OmegaWord(\"b\", \"a\"))\nFalse\n>>> inf_b.is_empty()\nFalse"
+    RabinCondition,
+    "A deterministic Rabin automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`). A word is accepted if for some pair `(fin, inf)` its run uses no color of `fin` and some color of `inf` infinitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> edges = [(0, \"a\", 0, 0), (0, \"b\", 1, 1), (1, \"a\", 0, 0), (1, \"b\", 1, 1)]\n>>> inf_b = DRA(a, 2, 0, edges, [([], [1])])\n>>> inf_b.accepts(OmegaWord(\"\", \"ba\"))\nTrue\n>>> inf_b.accepts(OmegaWord(\"b\", \"a\"))\nFalse\n>>> inf_b.is_empty()\nFalse\n\nThe Streett automaton `DSA` with the same data and every pair `(fin, inf)` replaced by `(inf, fin)` accepts the complement.\n\n>>> DSA(a, 2, 0, edges, [([1], [])]).accepts(OmegaWord(\"b\", \"a\"))\nTrue\n\nThe HOA format can only express the pairs `(fin, inf) = ([0], [1])`, `([2], [3])`, ... (pair `i` is `Fin(2i) & Inf(2i + 1)`) with the colors `0, ..., 2n - 1`, see `to_hoa`.\n\n>>> only_b = DRA(a, 1, 0, [(0, \"a\", 0, 0), (0, \"b\", 1, 0)], [([0], [1])])\n>>> type(parse_hoa(only_b.to_hoa())).__name__\n'PropDRA'",
+    {}
 );
-dra_class!(
+pairs_class!(
     PyPropDra,
     "PropDRA",
     Props,
     PyPropAlphabet,
-    "A deterministic Rabin automaton over a `PropAlphabet`, see `DRA`."
+    RabinCondition,
+    "A deterministic Rabin automaton over a `PropAlphabet`, see `DRA`.",
+    {
+        /// Reads the first automaton in the HOA text, which has to be deterministic with a
+        /// Rabin condition. The edges of a HOA automaton belong to a *set* of acceptance sets,
+        /// while an edge of a `PropDRA` has one color: every distinct set of acceptance sets
+        /// that occurs on an edge becomes a color (numbered `0, 1, ...` in the order of the
+        /// first occurrence, with the states and their edges in the order of `states()` and
+        /// `edges_from()`; the empty set is a color too) and the pairs are rewritten
+        /// accordingly: a color is in `fin` (`inf`) if its set meets a `fin` (`inf`) set of the
+        /// pair. Raises `HoaError` if the text is not such an automaton or if there are more
+        /// than 256 different sets.
+        #[classmethod]
+        fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
+            crate::hoa::dra(py, text).map(Self)
+        }
+    }
+);
+
+pairs_class!(
+    PyDsa,
+    "DSA",
+    Chars,
+    PyCharAlphabet,
+    StreettCondition,
+    "A deterministic Streett automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`). A word is accepted if for every pair `(fin, inf)` its run uses no color of `fin` or some color of `inf` infinitely often (the dual of `DRA`; without pairs everything is accepted).\n\n>>> a = CharAlphabet(\"ab\")\n>>> edges = [(0, \"a\", 0, 0), (0, \"b\", 1, 1), (1, \"a\", 0, 0), (1, \"b\", 1, 1)]\n>>> fin_b = DSA(a, 2, 0, edges, [([1], [])])\n>>> fin_b.accepts(OmegaWord(\"b\", \"a\"))\nTrue\n>>> fin_b.accepts(OmegaWord(\"\", \"ba\"))\nFalse\n>>> fin_b.is_empty()\nFalse\n\nThe HOA format can only express the pairs `([0], [1])`, `([2], [3])`, ... (pair `i` is `Fin(2i) | Inf(2i + 1)`) with the colors `0, ..., 2n - 1`, see `to_hoa`.\n\n>>> only_a_finitely = DSA(a, 1, 0, [(0, \"a\", 0, 0), (0, \"b\", 1, 0)], [([0], [1])])\n>>> type(parse_hoa(only_a_finitely.to_hoa())).__name__\n'PropDSA'",
+    {}
+);
+pairs_class!(
+    PyPropDsa,
+    "PropDSA",
+    Props,
+    PyPropAlphabet,
+    StreettCondition,
+    "A deterministic Streett automaton over a `PropAlphabet`, see `DSA`.",
+    {
+        /// Reads the first automaton in the HOA text, which has to be deterministic with a
+        /// Streett condition. The colors are numbered like in `PropDRA.from_hoa`. Raises
+        /// `HoaError` if the text is not such an automaton or if there are more than 256
+        /// different sets of acceptance sets.
+        #[classmethod]
+        fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
+            crate::hoa::dsa(py, text).map(Self)
+        }
+    }
 );
 
 /// Defines a deterministic Muller automaton class, whose constructor takes a list of sets
