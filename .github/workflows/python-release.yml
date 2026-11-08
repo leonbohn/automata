@@ -1,0 +1,68 @@
+name: Python release
+
+# Builds the wheels of the Python bindings (python/). A run started by hand publishes to TestPyPI,
+# a tag `py-vX.Y.Z` publishes to PyPI. Both use trusted publishing: the PyPI/TestPyPI project has
+# to list this workflow (and the environments `testpypi` / `pypi`) as a trusted publisher.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["py-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  wheels:
+    name: Wheels (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x86_64, os: ubuntu-latest, target: x86_64, manylinux: auto }
+          - { name: linux-aarch64, os: ubuntu-latest, target: aarch64, manylinux: auto }
+          - { name: macos-arm64, os: macos-14, target: aarch64-apple-darwin, manylinux: "" }
+          - { name: windows-x64, os: windows-latest, target: x64, manylinux: "" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.name }}
+          path: python/dist
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: python/dist
+
+  publish:
+    name: Publish (${{ github.event_name == 'push' && 'PyPI' || 'TestPyPI' }})
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'push' && 'pypi' || 'testpypi' }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ github.event_name == 'push' && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}
