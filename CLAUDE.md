@@ -108,17 +108,17 @@ Two distinctions that recur everywhere:
     `DefaultIdType = u32`).
   - `model/`: a property-test harness for the storages (`#[cfg(test)]` only, uses proptest).
 - `automaton.rs` + `src/automaton/` — `Automaton<T, Sem>`; aliases `DFA`, `DBA`, `DCW`,
-  `DPA<T, Sem>`, `DRA`, `DMA`, `MooreMachine`, `MealyMachine`, `OmegaAutomaton<A, S = Det<Linked>>`
+  `DPA<T, Sem>`, `DRA`, `DSA`, `DMA`, `MooreMachine`, `MealyMachine`, `OmegaAutomaton<A, S = Det<Linked>>`
   and its deterministic/nondeterministic spellings. The branching is part of `Sem`
   (`branching.rs`): a bare condition is deterministic, `Existential<C>` (some run accepts) gives
-  `NFA`, `NBA`, `NCW`, `NPA`, `NRA`, `NMA`, and `HistoryDeterministic<C>` `HDCW` (the only HD
+  `NFA`, `NBA`, `NCW`, `NPA`, `NRA`, `NSA`, `NMA`, and `HistoryDeterministic<C>` `HDCW` (the only HD
   alias so far). A
   condition gets these by implementing `CycleCondition` (omega; drives one SCC search for
   acceptance and emptiness) or `FinalStateCondition` (finite). `Semantics` has the single method
   `output`. `omega/` holds the acceptance conditions (`buchi`, `co_buchi`,
-  `parity` with four min/max even/odd variants, `rabin`, `muller`) plus
+  `parity` with four min/max even/odd variants, `rabin`, `streett`, `muller`) plus
   `OmegaAcceptanceCondition`, the enum for parsed automata whose condition is only known at
-  runtime. `problems.rs`: language problems with witnesses — `Emptiness::of(&a).witness()`,
+  runtime (`Parity(ParityKind, low, high)` covers the four parity variants). `problems.rs`: language problems with witnesses — `Emptiness::of(&a).witness()`,
   `Inclusion::of(&a).within(&b).counterexample()`, `Equivalence::of(&a).and(&b).holds()`,
   `Disjointness` (DFAs).
 - `representation.rs`: `IntoTransitions`/`FromTransitions` (the `IntoIterator`/`FromIterator`

@@ -8,6 +8,9 @@ pub use parity::*;
 mod rabin;
 pub use rabin::*;
 
+mod streett;
+pub use streett::*;
+
 mod muller;
 pub use muller::*;
 mod co_buchi;

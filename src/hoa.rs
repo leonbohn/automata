@@ -36,8 +36,10 @@
 //! assert!(written.contains("[0 & !1] 1 {1}"));
 //! ```
 //!
-//! Büchi, parity, Rabin and Streett acceptance is supported (pairs of the form `Fin(..) & (Inf(..) | ..)`
-//! for Rabin and its dual for Streett, identified by `acc-name`). Reading fails with a
+//! Büchi, co-Büchi, parity, Rabin and Streett acceptance is supported, all identified by `acc-name`.
+//! Parity conditions need the parameters `parity min|max even|odd <sets>` and give the matching
+//! [`ParityKind`](crate::automaton::ParityKind). Rabin pairs have the form `Fin(..) & (Inf(..) | ..)`,
+//! Streett pairs are the dual. Reading fails with a
 //! [`HoaError`] for other acceptance conditions, alternating automata and unsupported inputs.
 
 use tracing::{trace, warn};

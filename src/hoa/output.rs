@@ -1,7 +1,7 @@
 use crate::automaton::{
     AcceptanceMask, Automaton, BuchiCondition, CoBuchiCondition, MaxEvenParityCondition,
     MaxOddParityCondition, MinEvenParityCondition, MinOddParityCondition, OmegaAcceptanceCondition,
-    ParityKind, RabinCondition, RabinPair,
+    ParityKind, RabinCondition, RabinPair, StreettCondition,
 };
 use crate::ts::States;
 use itertools::Itertools;
@@ -137,21 +137,46 @@ impl<T: States<EdgeColor = bool>> HoaAcceptance<T> for CoBuchiCondition {
 /// Every edge belongs to the one acceptance set that is its color, the pairs refer to these sets.
 impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for RabinCondition<Int> {
     fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError> {
-        let pairs: Vec<_> = self.pairs().cloned().collect();
-        let edge_sets = ts
-            .states()
-            .flat_map(|q| ts.edges_from(q).into_iter().flatten())
-            .map(|edge| usize::from(*edge.color()) + 1)
-            .max()
-            .unwrap_or(0);
-        Ok(write_pairs_hoa(
-            w, "Rabin", &pairs, edge_sets, " | ", "f", " & ",
-        )?)
+        write_typed_pairs_hoa(ts, w, "Rabin", self.pairs(), " | ", "f", " & ")
     }
 
     fn write_edge_color<W: Write>(&self, color: &Int, w: &mut W) -> Result<(), HoaError> {
         Ok(write!(w, " {{{color}}}")?)
     }
+}
+
+/// Like for [`RabinCondition`], every edge belongs to the one acceptance set that is its color.
+impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for StreettCondition<Int> {
+    fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError> {
+        write_typed_pairs_hoa(ts, w, "Streett", self.pairs(), " & ", "t", " | ")
+    }
+
+    fn write_edge_color<W: Write>(&self, color: &Int, w: &mut W) -> Result<(), HoaError> {
+        Ok(write!(w, " {{{color}}}")?)
+    }
+}
+
+/// Writes the pairs of a typed Rabin or Streett condition, see [`write_pairs_hoa`], declaring
+/// the acceptance sets of the edge colors of `ts`.
+fn write_typed_pairs_hoa<'a, T: States<EdgeColor = Int>, W: Write>(
+    ts: &T,
+    w: &mut W,
+    name: &str,
+    pairs: impl Iterator<Item = &'a RabinPair<Int>>,
+    pair_join: &str,
+    empty: &str,
+    pair_op: &str,
+) -> Result<(), HoaError> {
+    let pairs: Vec<_> = pairs.cloned().collect();
+    let edge_sets = ts
+        .states()
+        .flat_map(|q| ts.edges_from(q).into_iter().flatten())
+        .map(|edge| usize::from(*edge.color()) + 1)
+        .max()
+        .unwrap_or(0);
+    Ok(write_pairs_hoa(
+        w, name, &pairs, edge_sets, pair_join, empty, pair_op,
+    )?)
 }
 
 /// The typed parity conditions write the sets `0..=high`, where `high` is the greatest color on
@@ -569,6 +594,7 @@ State: 1
         use crate::automaton::{
             Existential, MaxEvenParityCondition, MaxOddParityCondition, MinEvenParityCondition,
             MinOddParityCondition, OmegaAcceptanceCondition, ParityKind, RabinCondition, RabinPair,
+            StreettCondition,
         };
         use crate::hoa::HoaString;
         use crate::ts::{Det, Linked};
@@ -632,6 +658,18 @@ State: 1
                 OmegaAcceptanceCondition::Rabin(vec![pair.clone()])
             );
         }
+        let dsa = Builder::without_state_colors()
+            .with_edges(edges)
+            .into_automaton(0, StreettCondition::from([pair.clone()]));
+        let hoa = dsa.to_hoa().unwrap();
+        assert!(
+            hoa.contains("acc-name: Streett 1\nAcceptance: 2 (Fin(0)) | (Inf(1))\n"),
+            "{hoa}"
+        );
+        assert_eq!(
+            *read(hoa).acceptance(),
+            OmegaAcceptanceCondition::Streett(vec![pair.clone()])
+        );
         // edge colors above the pairs are declared as acceptance sets
         let wide = Builder::without_state_colors()
             .with_edges([(0, 'a', 0u8, 0), (0, 'b', 4, 0)])

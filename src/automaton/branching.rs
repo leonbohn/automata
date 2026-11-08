@@ -5,7 +5,7 @@
 //!
 //! Wrapping works for every condition that implements [`CycleCondition`] (infinite words) or
 //! [`FinalStateCondition`] (finite words), so each nondeterministic automaton type is just an
-//! alias, see [`super::NFA`], [`super::NBA`], [`super::NCW`], [`super::NPA`], [`super::NRA`] and
+//! alias, see [`super::NFA`], [`super::NBA`], [`super::NCW`], [`super::NPA`], [`super::NRA`], [`super::NSA`] and
 //! [`super::NMA`].
 
 use super::Semantics;

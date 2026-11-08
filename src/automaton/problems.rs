@@ -494,6 +494,7 @@ macro_rules! emptiness_via_cycles {
 emptiness_via_cycles!(
     DCW => super::CoBuchiCondition,
     DRA => super::RabinCondition<EdgeColor<D>>,
+    DSA => super::StreettCondition<EdgeColor<D>>,
     DMA => super::MullerCondition<EdgeColor<D>>
 );
 

@@ -32,8 +32,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   finite ones. Any condition that implements `CycleCondition` (infinite words) or
   `FinalStateCondition` (finite words) works, so a new condition gets its nondeterministic
   automaton for free. Infinite words are decided on the product with the word's cycle by an SCC
-  decomposition, which is linear for Büchi, co-Büchi, parity and Rabin conditions (exponential in
-  the number of colors for Muller and Streett).
+  decomposition, which is linear for Büchi, co-Büchi, parity and Rabin conditions, polynomial for
+  Streett (`StreettCondition`) and exponential in the number of colors for Muller and for the
+  Streett case of `OmegaAcceptanceCondition`.
 - History-deterministic automata as a promise in the type: `automaton::HistoryDeterministic<C>`
   (same acceptance as `Existential<C>`) with the aliases `HDFA`, `HDBA`, `HDCW`, `HDPA`, `HDRA`
   and `HDMA`. `assume_history_deterministic()` turns a nondeterministic automaton into one
@@ -42,6 +43,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Automaton::map_acceptance(f)` replaces the acceptance condition, e.g.
   `dba.map_acceptance(Existential)` is the `DBA` as an `NBA`.
 - The co-Büchi condition `CoBuchiCondition` with `DCW` and `NCW`.
+- The Streett condition `StreettCondition<C>`, dual to `RabinCondition<C>` and built from the same
+  `RabinPair`s (`fin` disjoint from the colors seen infinitely often, or `inf` meets them; all pairs
+  have to hold, no pair accepts everything), with `DSA` and `NSA`. It implements `Semantics` and
+  `CycleCondition`, so `accepts`, `Emptiness` and HOA output (`HoaAcceptance`) work; emptiness
+  refines the SCCs by removing the `fin` colors of violated pairs.
 - Builder shortcuts `into_nba`, `into_dcw`, `into_ncw`, `into_npa` and the generic
   `into_nondeterministic_automaton(initial, acceptance)`, each with a `try_` twin.
 - `Emptiness` with an accepted word as witness for every nondeterministic omega automaton
