@@ -389,7 +389,7 @@ impl HoaSuitableAlphabet for PropAlphabet {
 /// decides first to the one that decides last (increasing for min, decreasing for max). A set is
 /// accepting if its parity is even (`even`) or odd (`!even`).
 fn build_parity_condition_hoa(order: &[Int], even: bool) -> String {
-    let accepting = |set: Int| (set % 2 == 0) == even;
+    let accepting = |set: Int| set.is_multiple_of(2) == even;
     match order {
         [] => "f".to_string(),
         [only] => if accepting(*only) { "t" } else { "f" }.to_string(),

@@ -147,7 +147,7 @@ impl OmegaAcceptanceCondition {
         match self {
             OmegaAcceptanceCondition::Parity(kind, low, high) => {
                 let decisive = kind.decisive(Self::priorities(infset, *low, *high)?);
-                Ok(decisive.is_some_and(|x| (x % 2 == 0) == kind.is_even()))
+                Ok(decisive.is_some_and(|x| x.is_multiple_of(2) == kind.is_even()))
             }
             OmegaAcceptanceCondition::Buchi | OmegaAcceptanceCondition::Reachability => {
                 Ok(infset.iter().any(AcceptanceMask::as_bool))
