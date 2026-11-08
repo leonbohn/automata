@@ -7,9 +7,10 @@ use automata::{
         Automaton, BuchiCondition, CoBuchiCondition, Emptiness, Equivalence, Inclusion,
         MinEvenParityCondition, MullerCondition, RabinCondition, RabinPair,
     },
+    representation::IntoTransitions,
     ts::{ForAlphabet, IntoEdgeTuple, Sproutable, TransitionSystem},
 };
-use pyo3::{exceptions::PyValueError, prelude::*};
+use pyo3::{exceptions::PyValueError, prelude::*, types::PyType};
 
 use crate::alphabet::{PyCharAlphabet, PyPropAlphabet};
 use crate::class::{Edge, assemble, automaton_class, check_state};
@@ -55,6 +56,17 @@ where
         &edges,
         semantics,
     ))
+}
+
+/// The DPA with the same transitions as `det`, whose edge color `c` becomes `color(c)`. For a
+/// Büchi automaton, `color` maps `true` below `false` (as `into_dpa` of the crate does), for a
+/// co-Büchi automaton `true` has to be odd and `false` even and larger.
+fn parity_of<A: Alphabet, Sem: Clone>(
+    det: &Automaton<DTS<A, Void, bool>, Sem>,
+    color: impl Fn(bool) -> Int,
+) -> Automaton<DTS<A, Void, Int>, MinEvenParityCondition> {
+    let (ts, initial, _) = det.clone().into_parts();
+    ts.map_edge_colors(color).with_initial(initial).collect()
 }
 
 /// Defines an omega automaton class, `omega_class!(..., comparisons, { more })` for the classes
@@ -162,9 +174,25 @@ omega_class!(
     PyCharAlphabet,
     bool,
     BuchiCondition,
-    "A deterministic Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` infinitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> inf_a = DBA(a, 1, 0, [(0, \"a\", True, 0), (0, \"b\", False, 0)])\n>>> inf_a.accepts(OmegaWord(\"b\", \"ab\"))\nTrue\n>>> inf_a.accepts(OmegaWord(\"a\", \"b\"))\nFalse\n>>> inf_a.is_empty()\nFalse",
+    "A deterministic Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` infinitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> inf_a = DBA(a, 1, 0, [(0, \"a\", True, 0), (0, \"b\", False, 0)])\n>>> inf_a.accepts(OmegaWord(\"b\", \"ab\"))\nTrue\n>>> inf_a.accepts(OmegaWord(\"a\", \"b\"))\nFalse\n>>> inf_a.is_empty()\nFalse\n\nThe HOA format writes the characters as propositions and reads them back as a `PropDBA`.\n\n>>> hoa = inf_a.to_hoa()\n>>> hoa.splitlines()[0]\n'HOA: v1'\n>>> PropDBA.from_hoa(hoa).num_edges\n2\n>>> type(parse_hoa(hoa)).__name__\n'PropDBA'\n>>> inf_a.to_dot().startswith(\"digraph\")\nTrue",
     comparisons,
-    {}
+    {
+        /// The automaton in the DOT format (of graphviz).
+        fn to_dot(&self) -> String {
+            automata::dot::Dottable::dot_representation(&self.0)
+        }
+
+        /// The automaton as an SVG image, which is how Jupyter shows it (drawn natively, graphviz is
+        /// not needed).
+        fn _repr_svg_(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::svg(py, &self.0)
+        }
+
+        /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::to_hoa(py, &self.0)
+        }
+    }
 );
 omega_class!(
     PyPropDba,
@@ -175,7 +203,30 @@ omega_class!(
     BuchiCondition,
     "A deterministic Büchi automaton over a `PropAlphabet`, see `DBA`.",
     comparisons,
-    {}
+    {
+        /// The automaton in the DOT format (of graphviz).
+        fn to_dot(&self) -> String {
+            automata::dot::Dottable::dot_representation(&self.0)
+        }
+
+        /// The automaton as an SVG image, which is how Jupyter shows it (drawn natively, graphviz is
+        /// not needed).
+        fn _repr_svg_(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::svg(py, &self.0)
+        }
+
+        /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::to_hoa(py, &self.0)
+        }
+
+        /// Reads the first automaton in the HOA text. Raises `HoaError` if the text is not a
+        /// (supported) deterministic Büchi automaton.
+        #[classmethod]
+        fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
+            crate::hoa::dba(py, text).map(Self)
+        }
+    }
 );
 
 omega_class!(
@@ -205,7 +256,7 @@ omega_class!(
 /// color its run uses infinitely often is even), which has the extra methods of `DPA` of the
 /// crate.
 macro_rules! dpa_class {
-    ($name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $doc:expr) => {
+    ($name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $dba:ident, $dcw:ident, $doc:expr, { $($more:tt)* }) => {
         omega_class!(
             $name,
             $py_name,
@@ -216,6 +267,38 @@ macro_rules! dpa_class {
             $doc,
             comparisons,
             {
+                /// The automaton in the DOT format (of graphviz).
+                fn to_dot(&self) -> String {
+                    ::automata::dot::Dottable::dot_representation(&self.0)
+                }
+
+                /// The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
+                /// graphviz is not needed).
+                fn _repr_svg_(&self, py: ::pyo3::Python<'_>) -> ::pyo3::PyResult<String> {
+                    $crate::class::svg(py, &self.0)
+                }
+
+                /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+                fn to_hoa(&self, py: ::pyo3::Python<'_>) -> ::pyo3::PyResult<String> {
+                    $crate::class::to_hoa(py, &self.0)
+                }
+
+/// The DPA with the colors `0` and `1` for the edges of the DBA with color `True` and
+                /// `False`, which accepts the same language.
+                #[classmethod]
+                fn from_dba(_cls: &Bound<'_, PyType>, dba: &$dba) -> Self {
+                    Self(parity_of(&dba.0, |accepting| Int::from(!accepting)))
+                }
+
+                /// The DPA with the colors `1` and `2` for the edges of the DCW with color `True`
+                /// and `False`, which accepts the same language.
+                #[classmethod]
+                fn from_dcw(_cls: &Bound<'_, PyType>, dcw: &$dcw) -> Self {
+                    Self(parity_of(&dcw.0, |bad| if bad { 1 } else { 2 }))
+                }
+
+                $($more)*
+
                 /// The complement: an automaton that accepts exactly the words that `self`
                 /// rejects. The automaton is expected to be complete. Raises `ValueError` if
                 /// the colors of the result do not fit into `0..=255`.
@@ -252,14 +335,28 @@ dpa_class!(
     "DPA",
     Chars,
     PyCharAlphabet,
-    "A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) (min-even: a word is accepted if the least color that its run uses infinitely often is even; the other parity conditions are not available).\n\n>>> a = CharAlphabet(\"ab\")\n>>> inf_b = DPA(a, 1, 0, [(0, \"a\", 1, 0), (0, \"b\", 0, 0)])\n>>> inf_b.accepts(OmegaWord(\"a\", \"ab\"))\nTrue\n>>> inf_b.accepts(OmegaWord(\"b\", \"a\"))\nFalse\n>>> inf_b.complement().accepts(OmegaWord(\"b\", \"a\"))\nTrue\n>>> inf_b.complement().complement().equivalent_to(inf_b)\nTrue\n>>> inf_b.rejected_word() is not None\nTrue"
+    PyDba,
+    PyDcw,
+    "A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) (min-even: a word is accepted if the least color that its run uses infinitely often is even; the other parity conditions are not available).\n\n>>> a = CharAlphabet(\"ab\")\n>>> inf_b = DPA(a, 1, 0, [(0, \"a\", 1, 0), (0, \"b\", 0, 0)])\n>>> inf_b.accepts(OmegaWord(\"a\", \"ab\"))\nTrue\n>>> inf_b.accepts(OmegaWord(\"b\", \"a\"))\nFalse\n>>> inf_b.complement().accepts(OmegaWord(\"b\", \"a\"))\nTrue\n>>> inf_b.complement().complement().equivalent_to(inf_b)\nTrue\n>>> inf_b.rejected_word() is not None\nTrue",
+    {}
 );
 dpa_class!(
     PyPropDpa,
     "PropDPA",
     Props,
     PyPropAlphabet,
-    "A deterministic parity automaton over a `PropAlphabet`, see `DPA`."
+    PyPropDba,
+    PyPropDcw,
+    "A deterministic parity automaton over a `PropAlphabet`, see `DPA`.",
+    {
+        /// Reads the first automaton in the HOA text. Raises `HoaError` if the text is not a
+        /// (supported) deterministic parity automaton and `NotImplementedError` for parity
+        /// conditions other than min even.
+        #[classmethod]
+        fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
+            crate::hoa::dpa(py, text).map(Self)
+        }
+    }
 );
 
 /// Defines a deterministic Rabin automaton class, whose constructor takes a list of pairs

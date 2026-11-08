@@ -15,7 +15,7 @@ use crate::alphabet::{PyCharAlphabet, PyPropAlphabet};
 use crate::class::automaton_class;
 use crate::dfa::{PyDfa, PyPropDfa, finite};
 use crate::kind::{Chars, Kind, Props, PyOmegaWord};
-use crate::omega::{PyDba, PyPropDba, colored};
+use crate::omega::{PyDba, PyDcw, PyDpa, PyPropDba, PyPropDcw, PyPropDpa, colored};
 
 /// Views a deterministic automaton as a nondeterministic one with the same transitions.
 fn existential<T, C>(det: &Automaton<automata::ts::Det<T>, C>) -> Automaton<T, Existential<C>>
@@ -235,6 +235,11 @@ nomega_class!(
         fn from_dba(_cls: &Bound<'_, PyType>, dba: &PyDba) -> Self {
             Self(existential(&dba.0))
         }
+
+        /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::to_hoa(py, &self.0)
+        }
     }
 );
 nomega_class!(
@@ -251,6 +256,18 @@ nomega_class!(
         fn from_dba(_cls: &Bound<'_, PyType>, dba: &PyPropDba) -> Self {
             Self(existential(&dba.0))
         }
+
+        /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::to_hoa(py, &self.0)
+        }
+
+        /// Reads the first automaton in the HOA text, which may be deterministic. Raises `HoaError` if its acceptance
+        /// condition is not Büchi.
+        #[classmethod]
+        fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
+            crate::hoa::nba(py, text).map(Self)
+        }
     }
 );
 
@@ -262,7 +279,13 @@ nomega_class!(
     bool,
     CoBuchiCondition,
     "A nondeterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if some run uses edges with color `True` only finitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> finitely_many_a = NCW(a, 2, 0, [(0, \"a\", True, 0), (0, \"b\", True, 0), (0, \"b\", False, 1), (1, \"b\", False, 1)])\n>>> finitely_many_a.accepts(OmegaWord(\"ab\", \"b\"))\nTrue\n>>> finitely_many_a.accepts(OmegaWord(\"\", \"ab\"))\nFalse",
-    {}
+    {
+        /// The NCW with the transitions of the DCW.
+        #[classmethod]
+        fn from_dcw(_cls: &Bound<'_, PyType>, dcw: &PyDcw) -> Self {
+            Self(existential(&dcw.0))
+        }
+    }
 );
 nomega_class!(
     PyPropNcw,
@@ -272,7 +295,13 @@ nomega_class!(
     bool,
     CoBuchiCondition,
     "A nondeterministic co-Büchi automaton over a `PropAlphabet`, see `NCW`.",
-    {}
+    {
+        /// The PropNCW with the transitions of the PropDCW.
+        #[classmethod]
+        fn from_dcw(_cls: &Bound<'_, PyType>, dcw: &PyPropDcw) -> Self {
+            Self(existential(&dcw.0))
+        }
+    }
 );
 
 nomega_class!(
@@ -283,7 +312,18 @@ nomega_class!(
     u8,
     MinEvenParityCondition,
     "A nondeterministic parity automaton over a `CharAlphabet` (min-even): an infinite word is accepted if some run has an even smallest color among those seen infinitely often. Colors are integers from 0 to 255.\n\n>>> a = CharAlphabet(\"ab\")\n>>> finitely_many_a = NPA(a, 2, 0, [(0, \"a\", 1, 0), (0, \"b\", 1, 0), (0, \"b\", 1, 1), (1, \"b\", 0, 1)])\n>>> finitely_many_a.accepts(OmegaWord(\"ab\", \"b\"))\nTrue\n>>> finitely_many_a.accepts(OmegaWord(\"\", \"ab\"))\nFalse",
-    {}
+    {
+        /// The NPA with the transitions of the DPA.
+        #[classmethod]
+        fn from_dpa(_cls: &Bound<'_, PyType>, dpa: &PyDpa) -> Self {
+            Self(existential(&dpa.0))
+        }
+
+        /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::to_hoa(py, &self.0)
+        }
+    }
 );
 nomega_class!(
     PyPropNpa,
@@ -293,5 +333,23 @@ nomega_class!(
     u8,
     MinEvenParityCondition,
     "A nondeterministic parity automaton over a `PropAlphabet`, see `NPA`.",
-    {}
+    {
+        /// The PropNPA with the transitions of the PropDPA.
+        #[classmethod]
+        fn from_dpa(_cls: &Bound<'_, PyType>, dpa: &PyPropDpa) -> Self {
+            Self(existential(&dpa.0))
+        }
+
+        /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
+            crate::class::to_hoa(py, &self.0)
+        }
+
+        /// Reads the first automaton in the HOA text, which may be deterministic. Only min parity conditions are
+        /// supported. Raises `HoaError` for other conditions and `NotImplementedError` for max parity.
+        #[classmethod]
+        fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
+            crate::hoa::npa(py, text).map(Self)
+        }
+    }
 );

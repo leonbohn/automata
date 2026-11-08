@@ -4,6 +4,7 @@ mod alphabet;
 mod class;
 mod dfa;
 mod error;
+mod hoa;
 mod kind;
 mod machines;
 mod nondet;
@@ -23,6 +24,8 @@ fn version() -> &'static str {
 fn _automata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", version())?;
     m.add_function(wrap_pyfunction!(version, m)?)?;
+    m.add_function(wrap_pyfunction!(hoa::parse_hoa, m)?)?;
+    m.add_function(wrap_pyfunction!(hoa::parse_hoa_all, m)?)?;
     m.add_class::<alphabet::PyCharAlphabet>()?;
     m.add_class::<alphabet::PyPropAlphabet>()?;
     m.add_class::<dfa::PyDfa>()?;
