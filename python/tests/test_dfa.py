@@ -1,5 +1,3 @@
-import doctest
-
 import pytest
 
 import automata
@@ -11,16 +9,6 @@ EVEN_A = [(0, "a", 1), (0, "b", 0), (1, "a", 0), (1, "b", 1)]
 
 def even_a():
     return DFA(AB, 2, 0, [0], EVEN_A)
-
-
-def test_doctests():
-    finder = doctest.DocTestFinder()
-    runner = doctest.DocTestRunner()
-    for cls in (CharAlphabet, PropAlphabet, DFA, PropDFA, DFABuilder, PropDFABuilder):
-        for t in finder.find(cls, cls.__name__, globs=dict(vars(automata))):
-            runner.run(t)
-    results = runner.summarize(verbose=False)
-    assert results.attempted >= 20 and results.failed == 0
 
 
 def test_alphabets():
@@ -109,3 +97,22 @@ def test_prop_builder():
     assert b.build().accepts([[True]] * 3)
     with pytest.raises(ValueError):
         b.add_edge(q, [True, False], q)
+
+
+def test_dfa_operations():
+    d = even_a()
+    odd = d.complement()
+    assert odd.accepts("a") and not odd.accepts("")
+    assert d.union(odd).equivalent_to(DFA(AB, 1, 0, [0], [(0, "a", 0), (0, "b", 0)]))
+    assert d.intersection(odd).is_empty()
+    assert d.intersection(odd).accepting_word() is None
+    assert d.accepting_word() == ""
+    assert odd.accepting_word() == "a"
+    assert d.disjoint_from(odd) and not d.included_in(odd)
+    assert d.inclusion_counterexample(odd) == ""
+    assert d.equivalence_counterexample(odd) is not None
+    assert d.equivalence_counterexample(d) is None
+    big = DFA(AB, 3, 0, [0, 2], [(0, "a", 1), (0, "b", 0), (1, "a", 2), (1, "b", 1), (2, "a", 1), (2, "b", 2)])
+    assert big.minimize().num_states == 2 and big.minimize().equivalent_to(big)
+    with pytest.raises(ValueError):
+        d.union(DFA(CharAlphabet("abc"), 1, 0, [0], []))

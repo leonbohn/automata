@@ -8,12 +8,15 @@ __all__ = [
     "AutomataError",
     "BuilderError",
     "CharAlphabet",
+    "DBA",
     "DFA",
     "DFABuilder",
     "HoaError",
     "NotPeriodicError",
+    "OmegaWord",
     "PropAlphabet",
     "PropAlphabetError",
+    "PropDBA",
     "PropDFA",
     "PropDFABuilder",
     "version",
@@ -62,6 +65,88 @@ class CharAlphabet:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
+class DBA:
+    r"""
+    A deterministic Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` infinitely often.
+    
+    >>> a = CharAlphabet("ab")
+    >>> inf_a = DBA(a, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)])
+    >>> inf_a.accepts(OmegaWord("b", "ab"))
+    True
+    >>> inf_a.accepts(OmegaWord("a", "b"))
+    False
+    >>> inf_a.is_empty()
+    False
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> CharAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]) -> DBA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that
+        do not exist.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def included_in(self, other: DBA) -> builtins.bool:
+        r"""
+        Whether the language of `self` is contained in the one of `other`.
+        """
+    def inclusion_counterexample(self, other: DBA) -> typing.Optional[OmegaWord]:
+        r"""
+        A word accepted by `self` but not by `other`, or `None` if `self` is included in
+        `other`.
+        """
+    def equivalent_to(self, other: DBA) -> builtins.bool:
+        r"""
+        Whether both automata accept the same language.
+        """
+    def equivalence_counterexample(self, other: DBA) -> typing.Optional[OmegaWord]:
+        r"""
+        A word that exactly one of the automata accepts, or `None` if they are equivalent.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
 class DFA:
     r"""
     A deterministic finite automaton over a `CharAlphabet`; words are strings.
@@ -93,31 +178,82 @@ class DFA:
     @property
     def alphabet(self) -> CharAlphabet:
         r"""
-        The alphabet of the DFA.
+        The alphabet of the automaton.
         """
     def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, accepting: typing.Sequence[builtins.int], edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int]]) -> DFA:
         r"""
         Creates the DFA with states `0, ..., num_states - 1`. `edges` are triples
         `(source, symbol, target)`; a later edge replaces an earlier one with the same
-        source and symbol. Raises `ValueError` for states that do not exist.
+        source and symbol. Raises `ValueError` for states or symbols that do not exist.
         """
     def accepts(self, word: builtins.str) -> builtins.bool:
         r"""
         Whether the DFA accepts the word. Words that leave the DFA (missing edge) are
         rejected.
         """
-    def states(self) -> builtins.list[builtins.int]:
-        r"""
-        The states `0, ..., num_states - 1`.
-        """
     def is_accepting(self, state: builtins.int) -> builtins.bool:
         r"""
         Whether the state is accepting. Raises `IndexError` if it does not exist.
         """
+    def accepting_states(self) -> builtins.list[builtins.int]:
+        r"""
+        The accepting states.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty.
+        """
+    def accepting_word(self) -> typing.Optional[builtins.str]:
+        r"""
+        A shortest accepted word, or `None` if the language is empty.
+        """
+    def included_in(self, other: DFA) -> builtins.bool:
+        r"""
+        Whether the language of `self` is contained in the one of `other`.
+        """
+    def inclusion_counterexample(self, other: DFA) -> typing.Optional[builtins.str]:
+        r"""
+        A word accepted by `self` but not by `other`, or `None` if `self` is included
+        in `other`.
+        """
+    def equivalent_to(self, other: DFA) -> builtins.bool:
+        r"""
+        Whether both DFAs accept the same language.
+        """
+    def equivalence_counterexample(self, other: DFA) -> typing.Optional[builtins.str]:
+        r"""
+        A word that exactly one of the DFAs accepts, or `None` if they are equivalent.
+        """
+    def disjoint_from(self, other: DFA) -> builtins.bool:
+        r"""
+        Whether no word is accepted by both DFAs.
+        """
+    def complement(self) -> DFA:
+        r"""
+        The DFA for the complement language (same alphabet, accepting states swapped).
+        """
+    def union(self, other: DFA) -> DFA:
+        r"""
+        The DFA for the union of the languages (product construction, only the
+        reachable part). The alphabets have to be equal.
+        """
+    def intersection(self, other: DFA) -> DFA:
+        r"""
+        The DFA for the intersection of the languages, see `union`.
+        """
+    def minimize(self) -> DFA:
+        r"""
+        The minimal DFA for the same language (Hopcroft).
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
     def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int]]:
         r"""
-        The edges leaving `state` as triples `(source, label, target)`. Raises
-        `IndexError` if the state does not exist.
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
         """
     def __repr__(self) -> builtins.str: ...
 
@@ -175,6 +311,36 @@ class NotPeriodicError(AutomataError):
     ...
 
 @typing.final
+class OmegaWord:
+    r"""
+    An ultimately periodic infinite word `prefix period^ω`. Both parts are strings (for automata
+    over a `CharAlphabet`) or sequences of symbols (for automata over a `PropAlphabet`).
+    
+    >>> w = OmegaWord("ab", "c")
+    >>> w.prefix, w.period
+    ('ab', 'c')
+    >>> OmegaWord([[True]], [[False]]).period
+    [[False]]
+    """
+    @property
+    def prefix(self) -> typing.Any:
+        r"""
+        The finite prefix.
+        """
+    @property
+    def period(self) -> typing.Any:
+        r"""
+        The period, repeated forever after the prefix.
+        """
+    def __eq__(self, other: builtins.object, /) -> builtins.bool: ...
+    def __new__(cls, prefix: typing.Any, period: typing.Any) -> OmegaWord:
+        r"""
+        Creates the word. Raises `ValueError` if the period is empty and `TypeError` if the
+        parts are not both strings or both sequences of symbols.
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
 class PropAlphabet:
     r"""
     A propositional alphabet: a symbol is a valuation of the atomic propositions, given as a
@@ -210,6 +376,79 @@ class PropAlphabetError(AutomataError):
     ...
 
 @typing.final
+class PropDBA:
+    r"""
+    A deterministic Büchi automaton over a `PropAlphabet`, see `DBA`.
+    """
+    @property
+    def num_states(self) -> builtins.int:
+        r"""
+        The number of states.
+        """
+    @property
+    def num_edges(self) -> builtins.int:
+        r"""
+        The number of edges.
+        """
+    @property
+    def initial(self) -> builtins.int:
+        r"""
+        The initial state.
+        """
+    @property
+    def alphabet(self) -> PropAlphabet:
+        r"""
+        The alphabet of the automaton.
+        """
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.bool, builtins.int]]) -> PropDBA:
+        r"""
+        Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
+        `(source, symbol, color, target)`; a later edge replaces an earlier one with
+        the same source and symbol. Raises `ValueError` for states or symbols that
+        do not exist.
+        """
+    def accepts(self, word: OmegaWord) -> builtins.bool:
+        r"""
+        Whether the automaton accepts the ultimately periodic word.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty. The automaton is expected to be complete.
+        """
+    def accepting_word(self) -> typing.Optional[OmegaWord]:
+        r"""
+        An accepted word, or `None` if the language is empty.
+        """
+    def included_in(self, other: PropDBA) -> builtins.bool:
+        r"""
+        Whether the language of `self` is contained in the one of `other`.
+        """
+    def inclusion_counterexample(self, other: PropDBA) -> typing.Optional[OmegaWord]:
+        r"""
+        A word accepted by `self` but not by `other`, or `None` if `self` is included in
+        `other`.
+        """
+    def equivalent_to(self, other: PropDBA) -> builtins.bool:
+        r"""
+        Whether both automata accept the same language.
+        """
+    def equivalence_counterexample(self, other: PropDBA) -> typing.Optional[OmegaWord]:
+        r"""
+        A word that exactly one of the automata accepts, or `None` if they are equivalent.
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
+    def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]:
+        r"""
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
+        """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
 class PropDFA:
     r"""
     A deterministic finite automaton over a `PropAlphabet`; a symbol is a sequence of booleans, a word a sequence of symbols. Edge labels are given by the same sequences and shown in HOA syntax (`0 & !1`).
@@ -239,31 +478,82 @@ class PropDFA:
     @property
     def alphabet(self) -> PropAlphabet:
         r"""
-        The alphabet of the DFA.
+        The alphabet of the automaton.
         """
     def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, accepting: typing.Sequence[builtins.int], edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int]]) -> PropDFA:
         r"""
         Creates the DFA with states `0, ..., num_states - 1`. `edges` are triples
         `(source, symbol, target)`; a later edge replaces an earlier one with the same
-        source and symbol. Raises `ValueError` for states that do not exist.
+        source and symbol. Raises `ValueError` for states or symbols that do not exist.
         """
     def accepts(self, word: typing.Sequence[typing.Sequence[builtins.bool]]) -> builtins.bool:
         r"""
         Whether the DFA accepts the word. Words that leave the DFA (missing edge) are
         rejected.
         """
-    def states(self) -> builtins.list[builtins.int]:
-        r"""
-        The states `0, ..., num_states - 1`.
-        """
     def is_accepting(self, state: builtins.int) -> builtins.bool:
         r"""
         Whether the state is accepting. Raises `IndexError` if it does not exist.
         """
+    def accepting_states(self) -> builtins.list[builtins.int]:
+        r"""
+        The accepting states.
+        """
+    def is_empty(self) -> builtins.bool:
+        r"""
+        Whether the language is empty.
+        """
+    def accepting_word(self) -> typing.Optional[builtins.list[builtins.list[builtins.bool]]]:
+        r"""
+        A shortest accepted word, or `None` if the language is empty.
+        """
+    def included_in(self, other: PropDFA) -> builtins.bool:
+        r"""
+        Whether the language of `self` is contained in the one of `other`.
+        """
+    def inclusion_counterexample(self, other: PropDFA) -> typing.Optional[builtins.list[builtins.list[builtins.bool]]]:
+        r"""
+        A word accepted by `self` but not by `other`, or `None` if `self` is included
+        in `other`.
+        """
+    def equivalent_to(self, other: PropDFA) -> builtins.bool:
+        r"""
+        Whether both DFAs accept the same language.
+        """
+    def equivalence_counterexample(self, other: PropDFA) -> typing.Optional[builtins.list[builtins.list[builtins.bool]]]:
+        r"""
+        A word that exactly one of the DFAs accepts, or `None` if they are equivalent.
+        """
+    def disjoint_from(self, other: PropDFA) -> builtins.bool:
+        r"""
+        Whether no word is accepted by both DFAs.
+        """
+    def complement(self) -> PropDFA:
+        r"""
+        The DFA for the complement language (same alphabet, accepting states swapped).
+        """
+    def union(self, other: PropDFA) -> PropDFA:
+        r"""
+        The DFA for the union of the languages (product construction, only the
+        reachable part). The alphabets have to be equal.
+        """
+    def intersection(self, other: PropDFA) -> PropDFA:
+        r"""
+        The DFA for the intersection of the languages, see `union`.
+        """
+    def minimize(self) -> PropDFA:
+        r"""
+        The minimal DFA for the same language (Hopcroft).
+        """
+    def states(self) -> builtins.list[builtins.int]:
+        r"""
+        The states `0, ..., num_states - 1`.
+        """
     def edges_from(self, state: builtins.int) -> builtins.list[tuple[builtins.int, builtins.str, builtins.int]]:
         r"""
-        The edges leaving `state` as triples `(source, label, target)`. Raises
-        `IndexError` if the state does not exist.
+        The edges leaving `state`, as `(source, label, target)` or, if edges have a
+        color, `(source, label, color, target)`. Raises `IndexError` if the state does
+        not exist.
         """
     def __repr__(self) -> builtins.str: ...
 

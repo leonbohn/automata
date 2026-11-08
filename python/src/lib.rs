@@ -1,8 +1,11 @@
 //! Python bindings for the `automata` crate (extension module `automata._automata`).
 
 mod alphabet;
+mod class;
 mod dfa;
 mod error;
+mod kind;
+mod omega;
 
 use pyo3::prelude::*;
 use pyo3_stub_gen::{define_stub_info_gatherer, derive::gen_stub_pyfunction};
@@ -22,6 +25,9 @@ fn _automata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<alphabet::PyPropAlphabet>()?;
     m.add_class::<dfa::PyDfa>()?;
     m.add_class::<dfa::PyPropDfa>()?;
+    m.add_class::<kind::PyOmegaWord>()?;
+    m.add_class::<omega::PyDba>()?;
+    m.add_class::<omega::PyPropDba>()?;
     m.add_class::<dfa::PyDfaBuilder>()?;
     m.add_class::<dfa::PyPropDfaBuilder>()?;
     let py = m.py();

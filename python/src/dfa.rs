@@ -2,134 +2,40 @@
 
 use automata::{
     DTS, Void,
-    alphabet::{Alphabet, CharAlphabet, PropAlphabet, PropSymbol},
-    automaton::DFA,
-    ts::{ForAlphabet, Sproutable, States, TransitionSystem, q},
+    alphabet::Alphabet,
+    automaton::{Disjointness, Emptiness, Equivalence, Inclusion},
+    representation::CollectPointed,
+    ts::{Pointed, TransitionSystem},
 };
-use pyo3::{
-    exceptions::{PyIndexError, PyValueError},
-    prelude::*,
-};
+use pyo3::{exceptions::PyValueError, prelude::*};
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
-use crate::alphabet::{PyCharAlphabet, PyPropAlphabet, valuation};
+use crate::alphabet::{PyCharAlphabet, PyPropAlphabet};
+use crate::class::{Edge, assemble, automaton_class, check_state};
+use crate::kind::{Chars, Kind, Props};
 
-/// Everything that differs between the DFA classes: how Python values are turned into symbols.
-trait Frontend {
-    /// The Rust alphabet.
-    type A: Alphabet<Symbol: Clone + Send> + Clone + Send + Sync + 'static;
-    /// The Python alphabet class.
-    type PyAlphabet;
-    /// How a single symbol is written in Python.
-    type PySymbol<'py>: FromPyObject<'py, 'py>;
-    /// How a word is written in Python.
-    type PyWord<'py>: FromPyObject<'py, 'py>;
-
-    fn alphabet(a: &Self::PyAlphabet) -> Self::A;
-    fn to_py_alphabet(a: Self::A) -> Self::PyAlphabet;
-    fn symbol(a: &Self::A, s: Self::PySymbol<'_>) -> PyResult<<Self::A as Alphabet>::Symbol>;
-    fn word(a: &Self::A, w: Self::PyWord<'_>) -> PyResult<Vec<<Self::A as Alphabet>::Symbol>>;
-    fn label(e: &<Self::A as Alphabet>::Expression) -> String;
-}
-
-struct Chars;
-struct Props;
-
-impl Frontend for Chars {
-    type A = CharAlphabet;
-    type PyAlphabet = PyCharAlphabet;
-    type PySymbol<'py> = char;
-    type PyWord<'py> = String;
-
-    fn alphabet(a: &PyCharAlphabet) -> CharAlphabet {
-        a.0.clone()
-    }
-    fn to_py_alphabet(a: CharAlphabet) -> PyCharAlphabet {
-        PyCharAlphabet(a)
-    }
-    fn symbol(a: &CharAlphabet, s: char) -> PyResult<char> {
-        if a.contains(s) {
-            Ok(s)
-        } else {
-            Err(PyValueError::new_err(format!(
-                "{s:?} is not in the alphabet"
-            )))
-        }
-    }
-    fn word(_: &CharAlphabet, w: String) -> PyResult<Vec<char>> {
-        // symbols outside of the alphabet have no transition, so the word is rejected
-        Ok(w.chars().collect())
-    }
-    fn label(e: &char) -> String {
-        e.to_string()
-    }
-}
-
-impl Frontend for Props {
-    type A = PropAlphabet;
-    type PyAlphabet = PyPropAlphabet;
-    type PySymbol<'py> = Vec<bool>;
-    type PyWord<'py> = Vec<Vec<bool>>;
-
-    fn alphabet(a: &PyPropAlphabet) -> PropAlphabet {
-        a.0.clone()
-    }
-    fn to_py_alphabet(a: PropAlphabet) -> PyPropAlphabet {
-        PyPropAlphabet(a)
-    }
-    fn symbol(a: &PropAlphabet, s: Vec<bool>) -> PyResult<PropSymbol> {
-        Ok(PropSymbol::from_bools(valuation(a, s)?))
-    }
-    fn word(a: &PropAlphabet, w: Vec<Vec<bool>>) -> PyResult<Vec<PropSymbol>> {
-        w.into_iter().map(|s| Self::symbol(a, s)).collect()
-    }
-    fn label(e: &<PropAlphabet as Alphabet>::Expression) -> String {
-        e.to_hoa_label()
-    }
-}
-
-type Dfa<F> = DFA<DTS<<F as Frontend>::A, bool, Void>>;
-
-type Sym<F> = <<F as Frontend>::A as Alphabet>::Symbol;
-
-fn check_state(q: u32, num_states: usize) -> PyResult<u32> {
-    if (q as usize) < num_states {
-        Ok(q)
-    } else {
-        Err(PyValueError::new_err(format!(
-            "state {q} does not exist, there are {num_states} states"
-        )))
-    }
-}
-
-/// Assembles the DFA; all states in the arguments have to exist (`accepting.len()` many states).
-fn assemble<F: Frontend>(
-    alphabet: &F::A,
-    accepting: &[bool],
-    initial: u32,
-    edges: &[(u32, Sym<F>, u32)],
-) -> Dfa<F> {
-    let mut ts = DTS::<F::A, bool, Void>::for_alphabet(alphabet.clone());
-    let states: Vec<_> = accepting.iter().map(|&acc| ts.add_state(acc)).collect();
-    for (source, symbol, target) in edges {
-        ts.add_edge((
-            states[*source as usize],
-            alphabet.make_expression(*symbol),
-            states[*target as usize],
-        ));
-    }
-    DFA::from((ts, states[initial as usize]))
-}
-
-fn build<F: Frontend>(
-    alphabet: &F::PyAlphabet,
+/// Creates a finite-word automaton (states colored with `bool`, edges uncolored).
+pub fn finite<K, T, Sem>(
+    alphabet: &K::PyAlphabet,
     num_states: u32,
     initial: u32,
     accepting: Vec<u32>,
-    edges: Vec<(u32, F::PySymbol<'_>, u32)>,
-) -> PyResult<Dfa<F>> {
+    edges: Vec<(u32, K::PySymbol<'_>, u32)>,
+    semantics: Sem,
+) -> PyResult<automata::automaton::Automaton<T, Sem>>
+where
+    K: Kind,
+    T: automata::ts::ForAlphabet<K::A>
+        + automata::ts::Sproutable<Alphabet = K::A, StateColor = bool, EdgeColor = Void>,
+    (
+        T::StateIndex,
+        <K::A as Alphabet>::Expression,
+        Void,
+        T::StateIndex,
+    ): automata::ts::IntoEdgeTuple<T>,
+{
     let n = num_states as usize;
-    let alphabet = F::alphabet(alphabet);
+    let alphabet = K::alphabet(alphabet);
     let mut flags = vec![false; n];
     for q in accepting {
         flags[check_state(q, n)? as usize] = true;
@@ -140,122 +46,141 @@ fn build<F: Frontend>(
         .map(|(s, sym, t)| {
             Ok((
                 check_state(s, n)?,
-                F::symbol(&alphabet, sym)?,
+                K::symbol(&alphabet, sym)?,
+                Void,
                 check_state(t, n)?,
             ))
         })
-        .collect::<PyResult<Vec<_>>>()?;
-    Ok(assemble::<F>(&alphabet, &flags, initial, &edges))
-}
-
-fn edges_from<F: Frontend>(dfa: &Dfa<F>, state: u32) -> PyResult<Vec<(u32, String, u32)>> {
-    if state as usize >= dfa.ts().state_count() {
-        return Err(PyIndexError::new_err(format!(
-            "state {state} does not exist"
-        )));
-    }
-    Ok(dfa
-        .ts()
-        .edges_from(q(state))
-        .into_iter()
-        .flatten()
-        .map(|e| {
-            (
-                e.source().into(),
-                F::label(e.expression()),
-                e.target().into(),
-            )
-        })
-        .collect())
+        .collect::<PyResult<Vec<Edge<K, Void>>>>()?;
+    Ok(assemble::<K, T, Sem>(
+        &alphabet, flags, initial, &edges, semantics,
+    ))
 }
 
 macro_rules! dfa_class {
-    ($name:ident, $py_name:literal, $front:ty, $alphabet:ty, $doc:literal) => {
-        #[doc = $doc]
-        #[gen_stub_pyclass]
-        #[pyclass(frozen, name = $py_name, module = "automata._automata")]
-        pub struct $name(Dfa<$front>);
+    ($name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $doc:expr) => {
+        automaton_class!(
+            $name, $py_name, $kind, $pyalpha,
+            DTS<<$kind as Kind>::A, bool, Void>, automata::automaton::ReachabilityCondition,
+            edge = (u32, String, u32), out = |s, l, _c: &Void, t| (s, l, t), doc = $doc,
+            {
+                /// Creates the DFA with states `0, ..., num_states - 1`. `edges` are triples
+                /// `(source, symbol, target)`; a later edge replaces an earlier one with the same
+                /// source and symbol. Raises `ValueError` for states or symbols that do not exist.
+                #[new]
+                fn new(
+                    alphabet: &$pyalpha,
+                    num_states: u32,
+                    initial: u32,
+                    accepting: Vec<u32>,
+                    edges: Vec<(u32, <$kind as Kind>::PySymbol<'_>, u32)>,
+                ) -> PyResult<Self> {
+                    finite::<$kind, _, _>(
+                        alphabet, num_states, initial, accepting, edges, Default::default(),
+                    )
+                    .map(Self)
+                }
 
-        #[gen_stub_pymethods]
-        #[pymethods]
+                /// Whether the DFA accepts the word. Words that leave the DFA (missing edge) are
+                /// rejected.
+                fn accepts(
+                    &self,
+                    py: Python<'_>,
+                    word: <$kind as Kind>::PyWord<'_>,
+                ) -> PyResult<bool> {
+                    let word = <$kind as Kind>::word(self.0.ts().alphabet(), word)?;
+                    Ok(py.detach(|| self.0.accepts(word)))
+                }
+
+                /// Whether the state is accepting. Raises `IndexError` if it does not exist.
+                fn is_accepting(&self, state: u32) -> PyResult<bool> {
+                    self.edges_from(state)?;
+                    Ok(self.0.is_accepting(automata::ts::q(state)))
+                }
+
+                /// The accepting states.
+                fn accepting_states(&self) -> Vec<u32> {
+                    self.0.accepting_states().map(u32::from).collect()
+                }
+
+                /// Whether the language is empty.
+                fn is_empty(&self, py: Python<'_>) -> bool {
+                    py.detach(|| Emptiness::of(&self.0).holds())
+                }
+
+                /// A shortest accepted word, or `None` if the language is empty.
+                fn accepting_word(&self, py: Python<'_>) -> Option<<$kind as Kind>::PyWordOut> {
+                    py.detach(|| Emptiness::of(&self.0).witness()).map(<$kind as Kind>::word_out)
+                }
+
+                /// Whether the language of `self` is contained in the one of `other`.
+                fn included_in(&self, py: Python<'_>, other: &Self) -> bool {
+                    py.detach(|| Inclusion::of(&self.0).within(&other.0).holds())
+                }
+
+                /// A word accepted by `self` but not by `other`, or `None` if `self` is included
+                /// in `other`.
+                fn inclusion_counterexample(
+                    &self,
+                    py: Python<'_>,
+                    other: &Self,
+                ) -> Option<<$kind as Kind>::PyWordOut> {
+                    py.detach(|| Inclusion::of(&self.0).within(&other.0).counterexample())
+                        .map(<$kind as Kind>::word_out)
+                }
+
+                /// Whether both DFAs accept the same language.
+                fn equivalent_to(&self, py: Python<'_>, other: &Self) -> bool {
+                    py.detach(|| Equivalence::of(&self.0).and(&other.0).holds())
+                }
+
+                /// A word that exactly one of the DFAs accepts, or `None` if they are equivalent.
+                fn equivalence_counterexample(
+                    &self,
+                    py: Python<'_>,
+                    other: &Self,
+                ) -> Option<<$kind as Kind>::PyWordOut> {
+                    py.detach(|| Equivalence::of(&self.0).and(&other.0).counterexample())
+                        .map(<$kind as Kind>::word_out)
+                }
+
+                /// Whether no word is accepted by both DFAs.
+                fn disjoint_from(&self, py: Python<'_>, other: &Self) -> bool {
+                    py.detach(|| Disjointness::of(&self.0).and(&other.0).holds())
+                }
+
+                /// The DFA for the complement language (same alphabet, accepting states swapped).
+                fn complement(&self, py: Python<'_>) -> Self {
+                    Self(py.detach(|| self.0.negation().reachable_part().collect_dfa()))
+                }
+
+                /// The DFA for the union of the languages (product construction, only the
+                /// reachable part). The alphabets have to be equal.
+                fn union(&self, py: Python<'_>, other: &Self) -> PyResult<Self> {
+                    self.same_alphabet(other)?;
+                    Ok(Self(py.detach(|| self.0.union(&other.0).reachable_part().collect_dfa())))
+                }
+
+                /// The DFA for the intersection of the languages, see `union`.
+                fn intersection(&self, py: Python<'_>, other: &Self) -> PyResult<Self> {
+                    self.same_alphabet(other)?;
+                    Ok(Self(py.detach(|| self.0.intersection(&other.0).reachable_part().collect_dfa())))
+                }
+
+                /// The minimal DFA for the same language (Hopcroft).
+                fn minimize(&self, py: Python<'_>) -> Self {
+                    Self(py.detach(|| self.0.clone().minimize()))
+                }
+            }
+        );
+
         impl $name {
-            /// Creates the DFA with states `0, ..., num_states - 1`. `edges` are triples
-            /// `(source, symbol, target)`; a later edge replaces an earlier one with the same
-            /// source and symbol. Raises `ValueError` for states that do not exist.
-            #[new]
-            #[pyo3(signature = (alphabet, num_states, initial, accepting, edges))]
-            fn new(
-                alphabet: &$alphabet,
-                num_states: u32,
-                initial: u32,
-                accepting: Vec<u32>,
-                edges: Vec<(u32, <$front as Frontend>::PySymbol<'_>, u32)>,
-            ) -> PyResult<Self> {
-                build::<$front>(alphabet, num_states, initial, accepting, edges).map(Self)
-            }
-
-            /// Whether the DFA accepts the word. Words that leave the DFA (missing edge) are
-            /// rejected.
-            fn accepts(
-                &self,
-                py: Python<'_>,
-                word: <$front as Frontend>::PyWord<'_>,
-            ) -> PyResult<bool> {
-                let word = <$front as Frontend>::word(self.0.ts().alphabet(), word)?;
-                Ok(py.detach(|| self.0.accepts(word)))
-            }
-
-            /// The number of states.
-            #[getter]
-            fn num_states(&self) -> usize {
-                self.0.ts().state_count()
-            }
-
-            /// The number of edges.
-            #[getter]
-            fn num_edges(&self) -> usize {
-                self.0
-                    .ts()
-                    .states()
-                    .map(|s| self.0.ts().edges_from(s).into_iter().flatten().count())
-                    .sum()
-            }
-
-            /// The initial state.
-            #[getter]
-            fn initial(&self) -> u32 {
-                automata::Pointed::initial(&self.0).into()
-            }
-
-            /// The alphabet of the DFA.
-            #[getter]
-            fn alphabet(&self) -> $alphabet {
-                <$front>::to_py_alphabet(self.0.ts().alphabet().clone())
-            }
-
-            /// The states `0, ..., num_states - 1`.
-            fn states(&self) -> Vec<u32> {
-                self.0.ts().states().map(u32::from).collect()
-            }
-
-            /// Whether the state is accepting. Raises `IndexError` if it does not exist.
-            fn is_accepting(&self, state: u32) -> PyResult<bool> {
-                edges_from::<$front>(&self.0, state)?;
-                Ok(self.0.is_accepting(q(state)))
-            }
-
-            /// The edges leaving `state` as triples `(source, label, target)`. Raises
-            /// `IndexError` if the state does not exist.
-            fn edges_from(&self, state: u32) -> PyResult<Vec<(u32, String, u32)>> {
-                edges_from::<$front>(&self.0, state)
-            }
-
-            fn __repr__(&self) -> String {
-                format!(
-                    concat!($py_name, "(states={}, edges={})"),
-                    self.num_states(),
-                    self.num_edges()
-                )
+            fn same_alphabet(&self, other: &Self) -> PyResult<()> {
+                if self.0.ts().alphabet().size() == other.0.ts().alphabet().size() {
+                    Ok(())
+                } else {
+                    Err(PyValueError::new_err("the automata have different alphabets"))
+                }
             }
         }
     };
@@ -283,10 +208,10 @@ macro_rules! builder_class {
         #[gen_stub_pyclass]
         #[pyclass(name = $py_name, module = "automata._automata")]
         pub struct $name {
-            alphabet: <$front as Frontend>::A,
+            alphabet: <$front as Kind>::A,
             accepting: Vec<bool>,
             initial: Option<u32>,
-            edges: Vec<(u32, Sym<$front>, u32)>,
+            edges: Vec<Edge<$front, Void>>,
         }
 
         #[gen_stub_pymethods]
@@ -316,13 +241,14 @@ macro_rules! builder_class {
             fn add_edge(
                 &mut self,
                 source: u32,
-                symbol: <$front as Frontend>::PySymbol<'_>,
+                symbol: <$front as Kind>::PySymbol<'_>,
                 target: u32,
             ) -> PyResult<()> {
                 let n = self.accepting.len();
                 let edge = (
                     check_state(source, n)?,
                     <$front>::symbol(&self.alphabet, symbol)?,
+                    Void,
                     check_state(target, n)?,
                 );
                 self.edges.push(edge);
@@ -349,11 +275,12 @@ macro_rules! builder_class {
                 let initial = self
                     .initial
                     .ok_or_else(|| PyValueError::new_err("no initial state set"))?;
-                Ok($dfa(assemble::<$front>(
+                Ok($dfa(assemble::<$front, _, _>(
                     &self.alphabet,
-                    &self.accepting,
+                    self.accepting.clone(),
                     initial,
                     &self.edges,
+                    automata::automaton::ReachabilityCondition,
                 )))
             }
         }
