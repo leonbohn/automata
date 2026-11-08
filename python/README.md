@@ -30,8 +30,8 @@ alphabets.
 
 | | finite words | infinite words |
 | --- | --- | --- |
-| deterministic | `DFA` | `DBA`, `DCW`, `DPA` (min-even), `DRA`, `DMA` |
-| nondeterministic | `NFA` | `NBA`, `NCW`, `NPA` (min-even) |
+| deterministic | `DFA` | `DBA`, `DCW`, `DPA` (min even), `DPAMaxEven`, `DPAMinOdd`, `DPAMaxOdd`, `DRA`, `DSA`, `DMA` |
+| nondeterministic | `NFA` | `NBA`, `NCW`, `NPA` (min even) |
 | output | `MooreMachine`, `MealyMachine` | |
 
 All of them have `accepts`/`output`, `num_states`, `num_edges`, `initial`, `states()`,
@@ -40,7 +40,40 @@ All of them have `accepts`/`output`, `num_states`, `num_edges`, `initial`, `stat
 Rust crate decides them. Automata are immutable; operations return new automata. Lazy adapters of
 the Rust API are not exposed.
 
+The three other parity conditions are classes of their own (the color of an edge is a number
+from 0 to 255 in all of them). `to_min_even()` gives the equivalent `DPA`, `complement()` the
+automaton with the dual condition (`DPAMaxEven` and `DPAMaxOdd` are complements of each other, the
+complement of `DPAMinOdd` is a `DPA`), `is_empty()` and `accepting_word()` work on `to_min_even()`.
+`DSA` is the Streett automaton with the constructor of `DRA`: `DSA(alphabet, num_states, initial,
+edges, pairs)` accepts if for every pair `(fin, inf)` no color of `fin` or some color of `inf`
+occurs infinitely often.
+
 Automata can also be built step by step with `DFABuilder` (and the builders in `automata.builders`).
+
+## HOA
+
+`to_hoa()` writes `DBA`, `DCW`, the four parity classes, `DRA`, `DSA`, `NBA`, `NCW` and `NPA`
+(and their `Prop` variants); characters become propositions. `from_hoa(text)` and
+`automata.parse_hoa(text)` need propositional alphabets, so only the `Prop` classes have
+`from_hoa`:
+
+| class | reads |
+| --- | --- |
+| `PropDBA`, `PropDCW` | deterministic Büchi, co-Büchi |
+| `PropDPA` | every parity kind, Büchi and co-Büchi, converted to min even (`NotImplementedError` for Rabin/Streett) |
+| `PropDPAMaxEven`, `PropDPAMinOdd`, `PropDPAMaxOdd` | exactly their own parity kind, the colors are kept |
+| `PropDRA`, `PropDSA` | deterministic Rabin, Streett |
+| `PropNBA`, `PropNCW`, `PropNPA` | also deterministic automata; `PropNPA` only min even |
+
+`parse_hoa` returns the most specific class (`PropDPAMaxEven` for `parity max even`, `PropNCW` for
+a nondeterministic co-Büchi automaton, ...); nondeterministic Rabin/Streett automata, generalized
+conditions and nondeterministic parity automata other than min even raise
+`NotImplementedError`. An edge of a HOA automaton belongs to a *set* of acceptance sets, an edge of
+a `DRA`/`DSA` has one color. `PropDRA.from_hoa` and `PropDSA.from_hoa` therefore number the
+distinct sets of acceptance sets on the edges `0, 1, ...` in the order of their first occurrence
+(the empty set is a color, more than 256 different sets are a `HoaError`) and rewrite the pairs:
+a color is in `fin` (`inf`) if its set meets a `fin` (`inf`) set of the pair. `to_hoa()` of a `DRA`
+or `DSA` can only be read back if its pairs are `([0], [1])`, `([2], [3])`, ... .
 
 ## Errors
 

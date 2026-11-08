@@ -15,10 +15,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   the prefix `Prop`, over a `PropAlphabet`:
   - `CharAlphabet`, `PropAlphabet`, `OmegaWord(prefix, period)`.
   - Deterministic: `DFA` (union, intersection, complement, minimize, language problems with
-    counterexamples), `DBA`, `DCW`, `DPA` (min-even; complement, inclusion, equivalence), `DRA`,
-    `DMA`, `MooreMachine` and `MealyMachine` (minimize, bisimilarity). Nondeterministic: `NFA`
+    counterexamples), `DBA`, `DCW`, `DPA` (min even; complement, inclusion, equivalence),
+    `DPAMaxEven`, `DPAMinOdd` and `DPAMaxOdd` (`to_min_even`, `complement`, `to_hoa`, `from_hoa`),
+    `DRA`, `DSA`, `DMA`, `MooreMachine` and `MealyMachine` (minimize, bisimilarity). Nondeterministic: `NFA`
     (`determinize`), `NBA`, `NCW`, `NPA`. All have `sccs()`, `states()`, `edges_from(q)`.
-  - HOA input/output (`to_hoa`, `from_hoa`, `automata.parse_hoa`, `parse_hoa_all`), conversions
+  - HOA input/output (`to_hoa`, `from_hoa`, `automata.parse_hoa`, `parse_hoa_all`) for Büchi,
+    co-Büchi, all four parity conditions, Rabin and Streett (`PropDRA`/`PropDSA` number the sets
+    of acceptance sets of the edges as colors), conversions
     (`NFA.from_dfa`, `NBA.from_dba`, `NCW.from_dcw`, `NPA.from_dpa`, `DPA.from_dba`, `DPA.from_dcw`),
     DOT and SVG output (`to_dot`, `_repr_svg_`), builders (`DFABuilder`, `automata.builders`).
   - Exceptions: `automata.Error` with subclasses mirroring `crate::Error`; `NotYetImplemented` is
