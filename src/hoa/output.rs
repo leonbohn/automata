@@ -326,7 +326,11 @@ fn write_pairs_hoa<W: Write>(
                     term(&p.inf, "Inf", " | ", "f")
                 );
                 // `&` binds tighter than `|`, so the pairs need their own parentheses
-                if pairs.len() > 1 { format!("({pair})") } else { pair }
+                if pairs.len() > 1 {
+                    format!("({pair})")
+                } else {
+                    pair
+                }
             })
             .join(pair_join)
     };
