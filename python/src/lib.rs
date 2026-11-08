@@ -28,6 +28,14 @@ fn _automata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<kind::PyOmegaWord>()?;
     m.add_class::<omega::PyDba>()?;
     m.add_class::<omega::PyPropDba>()?;
+    m.add_class::<omega::PyDcw>()?;
+    m.add_class::<omega::PyPropDcw>()?;
+    m.add_class::<omega::PyDpa>()?;
+    m.add_class::<omega::PyPropDpa>()?;
+    m.add_class::<omega::PyDra>()?;
+    m.add_class::<omega::PyPropDra>()?;
+    m.add_class::<omega::PyDma>()?;
+    m.add_class::<omega::PyPropDma>()?;
     m.add_class::<dfa::PyDfaBuilder>()?;
     m.add_class::<dfa::PyPropDfaBuilder>()?;
     let py = m.py();
