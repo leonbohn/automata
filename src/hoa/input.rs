@@ -246,6 +246,7 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
             .ok_or_else(|| HoaError::UnsupportedAcceptance("missing acc-name".into()))?;
         match name {
             hoars::AcceptanceName::Buchi => Ok(OmegaAcceptanceCondition::Buchi),
+            hoars::AcceptanceName::CoBuchi => Ok(OmegaAcceptanceCondition::CoBuchi),
             hoars::AcceptanceName::Parity => {
                 let sets = acceptance_sets.ok_or(HoaError::MissingAcceptanceSets)?;
                 let info = value
@@ -501,12 +502,17 @@ fn hoa_automaton_parts(aut: HoaRepresentation) -> Result<HoaParts, HoaError> {
         debug_assert_eq!(added.into_usize(), position);
     }
 
+    // without a `States:` item nothing else checks that the targets exist
+    let state_exists = |id: u32| (id as usize) < aut.body().len();
     for state in aut.body().iter() {
         for edge in state.edges() {
             let target = edge
                 .state_conjunction()
                 .get_singleton()
                 .ok_or(HoaError::UnsupportedAlternation)?;
+            if !state_exists(target) {
+                return Err(HoaError::UnknownState(target));
+            }
             let label = edge.label().deref().clone();
 
             let expr = label
@@ -530,6 +536,9 @@ fn hoa_automaton_parts(aut: HoaRepresentation) -> Result<HoaParts, HoaError> {
     let initial = start[0]
         .get_singleton()
         .ok_or(HoaError::UnsupportedAlternation)?;
+    if !state_exists(initial) {
+        return Err(HoaError::UnknownState(initial));
+    }
 
     let acceptance: OmegaAcceptanceCondition = aut.header().try_into()?;
 
@@ -927,6 +936,36 @@ State: 1
             failure(&hoa),
             HoaError::Alphabet(PropAlphabetError::NoAtomicPropositions)
         );
+    }
+
+    #[test]
+    fn edges_to_undefined_states_are_an_error_without_states_item() {
+        use super::HoaError;
+        let hoa = |start: u32, target: u32| {
+            format!(
+                "HOA: v1\nStart: {start}\nacc-name: Buchi\nAcceptance: 1 Inf(0)\nAP: 1 \"a\"\n--BODY--\nState: 0\n[t] {target}\n--END--\n"
+            )
+        };
+        assert_eq!(failure(&hoa(0, 3)), HoaError::UnknownState(3));
+        assert_eq!(failure(&hoa(2, 0)), HoaError::UnknownState(2));
+        assert!(
+            super::parse_omega_automaton_range::<Linked>(&hoa(0, 0), 0, hoa(0, 0).len()).is_ok()
+        );
+    }
+
+    #[test]
+    fn co_buchi_is_written_and_read_back() {
+        use crate::hoa::{HoaString, WriteHoa};
+        let aut = crate::ts::Builder::without_state_colors()
+            .with_transitions([(0, 'a', true, 0), (0, 'b', false, 0)])
+            .into_dcw(0);
+        let hoa = aut.to_hoa().unwrap();
+        assert!(
+            hoa.contains("acc-name: co-Buchi\nAcceptance: 1 Fin(0)\n"),
+            "{hoa}"
+        );
+        let read = HoaString::from(hoa).pop::<Det<Linked>>().unwrap();
+        assert_eq!(*read.acceptance(), OmegaAcceptanceCondition::CoBuchi);
     }
 
     #[test]

@@ -46,6 +46,13 @@ where
     }
 }
 
+impl<C: Color + Ord> RabinCondition<C> {
+    /// Iterates over the pairs of the condition, in increasing order.
+    pub fn pairs(&self) -> impl Iterator<Item = &RabinPair<C>> {
+        self.0.iter()
+    }
+}
+
 impl<C: Color + Ord> RabinPair<C> {
     /// Creates a new pair from the given set of finite and infinite colors.
     pub fn new(fin: BTreeSet<C>, inf: BTreeSet<C>) -> Self {

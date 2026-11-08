@@ -55,6 +55,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `automaton::ParityKind` (`MinEven`, `MaxEven`, `MinOdd`, `MaxOdd`) for the four variants of the
   parity condition, with `is_max` and `is_even`. `AcceptanceError::PriorityOverflow` and
   `HoaError::InconsistentAcceptance` are new (both enums are `#[non_exhaustive]`).
+- HOA output (`HoaAcceptance`) for `CoBuchiCondition` (so `DCW`, `NCW`, `HDCW`) and
+  `RabinCondition<Int>` (`DRA`, `NRA`, every edge color is the one acceptance set of its edge);
+  `RabinCondition::pairs`. Muller automata have no HOA form.
 - `Storage::Semantics<C>`: the semantics of a condition on a storage, `C` for the deterministic
   storages and `Existential<C>` for `Linked`.
 
@@ -104,6 +107,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `OmegaAcceptanceCondition::into_dpa` converted co-Büchi and safety automata to the wrong
   language when edges of acceptance set `0` and edges outside of it both occur infinitely often
   (the priority `0` for the good edges won). The bad edges now get priority `1` and all others `2`.
+- HOA input reads `acc-name: co-Buchi` (it was rejected although the output writes it). An edge
+  or `Start:` item that refers to a state that is not in the body panicked when the header had no
+  `States:` item, it is now `HoaError::UnknownState`.
+- HOA output of Rabin and Streett conditions declares enough acceptance sets for the edges (before,
+  only the sets of the pairs, which made the output invalid if an edge was in a larger set) and
+  only writes `acc-name: Rabin n` if the condition is the standard one over exactly `2n` sets.
 
 ## [0.2.1] - 2026-11-04
 

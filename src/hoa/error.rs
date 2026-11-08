@@ -20,6 +20,9 @@ pub enum HoaError {
         /// The identifier of the state.
         id: u32,
     },
+    /// An edge or the initial condition refers to a state that is not in the body.
+    #[error("the state {0} is used, but not defined in the body")]
+    UnknownState(u32),
     /// An edge or the initial condition has a conjunction of states, i.e. the automaton is alternating.
     #[error("alternating automata (conjunctions of states) are not supported")]
     UnsupportedAlternation,
