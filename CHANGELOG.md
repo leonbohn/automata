@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 ### Added
+- Python bindings in `python/` (distribution `automatars`, import name `automata`, built with maturin,
+  `abi3-py311`; #143, WP4): the exceptions `automata.Error` (class `AutomataError`) with subclasses
+  mirroring `crate::Error`, `CharAlphabet`/`PropAlphabet`, `DFA`/`PropDFA` with their builders
+  `DFABuilder`/`PropDFABuilder`, and generated `.pyi` stubs (`cargo run --bin stub_gen`).
 - Nondeterministic automata as aliases over one generic semantics, `automaton::Existential<C>`:
   a word is accepted if *some* run satisfies the acceptance condition `C` (#143). `NBA`, `NCW`,
   `NPA` (with the parity variant as a parameter), `NRA` and `NMA` for infinite words, `NFA` for
