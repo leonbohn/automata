@@ -50,3 +50,9 @@ def test_prop_dba():
     assert d.accepts(w)
     with pytest.raises(ValueError):
         d.accepts(OmegaWord([[True, True]], [[True]]))
+
+
+def test_sccs():
+    d = DBA(AB, 3, 0, [(0, "a", False, 1), (0, "b", False, 0), (1, "a", True, 1), (1, "b", True, 2), (2, "a", False, 2), (2, "b", False, 2)])
+    assert sorted(map(sorted, d.sccs())) == [[0], [1], [2]]
+    assert sorted(map(sorted, inf_a().sccs())) == [[0]]

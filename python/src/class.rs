@@ -143,6 +143,19 @@ macro_rules! automaton_class {
                     .collect())
             }
 
+            /// The strongly connected components, each as a sorted list of states (trivial
+            /// components included).
+            fn sccs(&self, py: ::pyo3::Python<'_>) -> Vec<Vec<u32>> {
+                use ::automata::ts::connected_components::Sccs;
+                py.detach(|| {
+                    Sccs::on(self.0.ts())
+                        .compute()
+                        .sccs_iter()
+                        .map(|scc| scc.iter().map(|&q| u32::from(q)).collect())
+                        .collect()
+                })
+            }
+
             fn __repr__(&self) -> String {
                 format!(
                     concat!($py_name, "(states={}, edges={})"),

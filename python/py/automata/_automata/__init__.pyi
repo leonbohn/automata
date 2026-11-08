@@ -144,6 +144,11 @@ class DBA:
         color, `(source, label, color, target)`. Raises `IndexError` if the state does
         not exist.
         """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -254,6 +259,11 @@ class DFA:
         The edges leaving `state`, as `(source, label, target)` or, if edges have a
         color, `(source, label, color, target)`. Raises `IndexError` if the state does
         not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
         """
     def __repr__(self) -> builtins.str: ...
 
@@ -446,6 +456,11 @@ class PropDBA:
         color, `(source, label, color, target)`. Raises `IndexError` if the state does
         not exist.
         """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
+        """
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -554,6 +569,11 @@ class PropDFA:
         The edges leaving `state`, as `(source, label, target)` or, if edges have a
         color, `(source, label, color, target)`. Raises `IndexError` if the state does
         not exist.
+        """
+    def sccs(self) -> builtins.list[builtins.list[builtins.int]]:
+        r"""
+        The strongly connected components, each as a sorted list of states (trivial
+        components included).
         """
     def __repr__(self) -> builtins.str: ...
 
