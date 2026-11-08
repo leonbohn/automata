@@ -52,6 +52,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Benchmark target `nondeterministic`: acceptance of lassos and emptiness for NPA, NBA, NCW, NRA
   and NMA, and acceptance on fixtures read with the `Linked` storage. `automata-bench` runs it by
   default.
+- `automaton::ParityKind` (`MinEven`, `MaxEven`, `MinOdd`, `MaxOdd`) for the four variants of the
+  parity condition, with `is_max` and `is_even`. `AcceptanceError::PriorityOverflow` and
+  `HoaError::InconsistentAcceptance` are new (both enums are `#[non_exhaustive]`).
 - `Storage::Semantics<C>`: the semantics of a condition on a storage, `C` for the deterministic
   storages and `Existential<C>` for `Linked`.
 
@@ -73,6 +76,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   |---|---|
   | `type Observer = O;` plus `fn observe(..)` and `fn evaluate(observed)` | `fn output(&self, ts, initial, word) -> Option<Self::Output>` |
   | `sem.evaluate(sem.observe(ts, q, w)?)` | `sem.output(ts, q, w)` |
+- **Breaking:** the parity condition of `OmegaAcceptanceCondition` carries its `ParityKind`:
+  `Parity(ParityKind, low, high)`; `MaxParity` is gone. `satisfied`, `into_dpa` (a DPA is
+  min-even, so priorities are renumbered, `AcceptanceError::PriorityOverflow` if the result does
+  not fit into an `Int`), HOA input and HOA output work for all four kinds. HOA input reads the
+  kind and the number of sets from `acc-name: parity <min|max> <even|odd> <n>` (before, every
+  parity automaton was read as min even); a missing, malformed or inconsistent name is
+  `HoaError::InconsistentAcceptance`. HOA output writes the name and the matching formula, and
+  `HoaAcceptance` exists for `MaxEvenParityCondition`, `MinOddParityCondition` and
+  `MaxOddParityCondition` like for `MinEvenParityCondition`.
+
+  | Before | After |
+  |---|---|
+  | `Parity(low, high)` | `Parity(ParityKind::MinEven, low, high)` |
+  | `MaxParity(low, high)`, `high` even | `Parity(ParityKind::MaxEven, low, high)` |
+  | `MaxParity(low, high)`, `high` odd | `Parity(ParityKind::MaxOdd, low, high)` |
+  | `acc-name: parity` without kind and sets | add `min even <n>` (or the actual kind) |
+
+  `MaxParity` accepted when `high - max` was even, i.e. when `max` had the parity of `high`; this
+  is the table's second and third row.
 - The dependency `hoars` is 0.4. It validates the header while parsing, so a missing `Acceptance:`
   item is a parse error (`HoaError::Parse`) instead of `HoaError::MissingAcceptanceSets`, which now
   only occurs for headers built by hand. Since `hoars` no longer caps labels at six variables, HOA

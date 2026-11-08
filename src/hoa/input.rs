@@ -2,7 +2,7 @@ use std::{collections::BTreeSet, io::BufRead, ops::Deref};
 
 use crate::automaton::{
     AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
-    RabinPair,
+    ParityKind, RabinPair,
 };
 use crate::ts::{DenseId, Det, ForAlphabet, Linked, LinkedTs, Sproutable, StateId, Storage};
 use crate::{
@@ -248,10 +248,14 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
             hoars::AcceptanceName::Buchi => Ok(OmegaAcceptanceCondition::Buchi),
             hoars::AcceptanceName::Parity => {
                 let sets = acceptance_sets.ok_or(HoaError::MissingAcceptanceSets)?;
-                Ok(OmegaAcceptanceCondition::Parity(
-                    0,
-                    (sets as Int).saturating_sub(1),
-                ))
+                let info = value
+                    .acceptance_name_info()
+                    .map_or(&[][..], |(_, info)| info);
+                let kind = read_parity_kind(info, sets)?;
+                let high = Int::try_from(sets.saturating_sub(1)).map_err(|_| {
+                    HoaError::UnsupportedAcceptance(format!("parity with {sets} acceptance sets"))
+                })?;
+                Ok(OmegaAcceptanceCondition::Parity(kind, 0, high))
             }
             hoars::AcceptanceName::Rabin => Ok(OmegaAcceptanceCondition::Rabin(read_pairs(
                 formula.ok_or(HoaError::MissingAcceptanceSets)?,
@@ -263,6 +267,35 @@ impl TryFrom<&hoars::Header> for OmegaAcceptanceCondition {
             )?)),
             other => Err(HoaError::UnsupportedAcceptance(format!("{other:?}"))),
         }
+    }
+}
+
+/// Reads the parameters `min|max even|odd n` of `acc-name: parity` and checks that `n` is the
+/// number of acceptance sets of the `Acceptance:` item.
+fn read_parity_kind(
+    info: &[hoars::AcceptanceInfo],
+    sets: hoars::Id,
+) -> Result<ParityKind, HoaError> {
+    use hoars::AcceptanceInfo::{Identifier, Int as Number};
+    let inconsistent = |what: String| HoaError::InconsistentAcceptance(what);
+    let [Identifier(extremum), Identifier(parity), Number(declared)] = info else {
+        return Err(inconsistent(format!(
+            "expected `parity min|max even|odd <sets>`, found parameters {info:?}"
+        )));
+    };
+    if *declared != sets {
+        return Err(inconsistent(format!(
+            "acc-name declares {declared} acceptance sets, but Acceptance has {sets}"
+        )));
+    }
+    match (extremum.as_str(), parity.as_str()) {
+        ("min", "even") => Ok(ParityKind::MinEven),
+        ("max", "even") => Ok(ParityKind::MaxEven),
+        ("min", "odd") => Ok(ParityKind::MinOdd),
+        ("max", "odd") => Ok(ParityKind::MaxOdd),
+        _ => Err(inconsistent(format!(
+            "unknown parity kind `{extremum} {parity}`"
+        ))),
     }
 }
 
@@ -740,6 +773,69 @@ mod tests {
             .pop::<Det<Linked>>()
             .unwrap();
         assert_eq!(again.acceptance(), aut.acceptance());
+    }
+
+    #[test]
+    fn parity_kinds_are_written_and_read_back() {
+        use crate::automaton::ParityKind;
+        use crate::hoa::{HoaString, WriteHoa};
+        for (kind, name) in [
+            (ParityKind::MinEven, "min even"),
+            (ParityKind::MaxEven, "max even"),
+            (ParityKind::MinOdd, "min odd"),
+            (ParityKind::MaxOdd, "max odd"),
+        ] {
+            let condition = OmegaAcceptanceCondition::Parity(kind, 0, 2);
+            let aut = crate::ts::Builder::default()
+                .with_state_colors([crate::Void])
+                .with_edges([(0, 'a', crate::automaton::AcceptanceMask::from_iter([1]), 0)])
+                .into_automaton(0, condition.clone());
+            let hoa = aut.to_hoa().unwrap();
+            assert!(
+                hoa.contains(&format!("acc-name: parity {name} 3\n")),
+                "{hoa}"
+            );
+            let again = HoaString::from(hoa.clone()).pop::<Det<Linked>>().unwrap();
+            assert_eq!(*again.acceptance(), condition, "{hoa}");
+            assert_eq!(again.to_hoa().unwrap(), hoa);
+        }
+    }
+
+    #[test]
+    fn parity_names_are_checked_against_the_acceptance_item() {
+        use crate::automaton::ParityKind;
+        for (name, kind) in [
+            ("parity min even 3", ParityKind::MinEven),
+            ("parity max even 3", ParityKind::MaxEven),
+            ("parity min odd 3", ParityKind::MinOdd),
+            ("parity max odd 3", ParityKind::MaxOdd),
+        ] {
+            assert_eq!(
+                pair_condition(name, 3, "Inf(0)"),
+                Ok(OmegaAcceptanceCondition::Parity(kind, 0, 2))
+            );
+        }
+        for name in [
+            "parity",
+            "parity min even",
+            "parity min even 4",
+            "parity middle even 3",
+            "parity min fancy 3",
+            "parity min even 3 extra",
+        ] {
+            assert!(
+                matches!(
+                    pair_condition(name, 3, "Inf(0)"),
+                    Err(HoaError::InconsistentAcceptance(_))
+                ),
+                "{name}: {:?}",
+                pair_condition(name, 3, "Inf(0)")
+            );
+        }
+        assert!(matches!(
+            pair_condition("parity min even 300", 300, "Inf(0)"),
+            Err(HoaError::UnsupportedAcceptance(_))
+        ));
     }
 
     const NONDETERMINISTIC: &str = r#"HOA: v1

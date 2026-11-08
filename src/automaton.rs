@@ -37,8 +37,8 @@ pub use omega::{
     AcceptanceError, AcceptanceMask, BuchiCondition, CoBuchiCondition, DBA, DCW, DMA, DPA, DRA,
     DeterministicOmegaAutomaton, HDCW, MaxEvenParityCondition, MaxOddParityCondition,
     MinEvenParityCondition, MinOddParityCondition, MullerCondition, NBA, NCW, NMA, NPA, NRA,
-    NondeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton, RabinCondition,
-    RabinPair,
+    NondeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton, ParityKind,
+    RabinCondition, RabinPair,
 };
 
 mod with_initial;

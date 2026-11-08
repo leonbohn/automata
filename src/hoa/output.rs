@@ -1,6 +1,6 @@
 use crate::automaton::{
-    AcceptanceMask, Automaton, BuchiCondition, MinEvenParityCondition, OmegaAcceptanceCondition,
-    RabinPair,
+    AcceptanceMask, Automaton, BuchiCondition, MaxEvenParityCondition, MaxOddParityCondition,
+    MinEvenParityCondition, MinOddParityCondition, OmegaAcceptanceCondition, ParityKind, RabinPair,
 };
 use crate::ts::States;
 use itertools::Itertools;
@@ -120,27 +120,38 @@ impl<T: States<EdgeColor = bool>> HoaAcceptance<T> for BuchiCondition {
     }
 }
 
-impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for MinEvenParityCondition {
-    fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError> {
-        let mut colors = ts
-            .states()
-            .flat_map(|q| ts.edges_from(q).into_iter().flatten())
-            .map(|edge| *edge.color());
-        let first = colors.next().unwrap_or(0);
-        let high = colors.fold(first, Int::max);
-        Ok(write_parity_hoa(w, high)?)
-    }
+/// The typed parity conditions write the sets `0..=high`, where `high` is the greatest color on
+/// an edge.
+macro_rules! typed_parity_hoa {
+    ($cond:ty, $kind:expr) => {
+        impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for $cond {
+            fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError> {
+                let high = ts
+                    .states()
+                    .flat_map(|q| ts.edges_from(q).into_iter().flatten())
+                    .map(|edge| *edge.color())
+                    .max()
+                    .unwrap_or(0);
+                Ok(write_parity_hoa(w, $kind, high)?)
+            }
 
-    fn write_edge_color<W: Write>(&self, color: &Int, w: &mut W) -> Result<(), HoaError> {
-        Ok(write!(w, " {{{color}}}")?)
-    }
+            fn write_edge_color<W: Write>(&self, color: &Int, w: &mut W) -> Result<(), HoaError> {
+                Ok(write!(w, " {{{color}}}")?)
+            }
+        }
+    };
 }
+typed_parity_hoa!(MinEvenParityCondition, ParityKind::MinEven);
+typed_parity_hoa!(MaxEvenParityCondition, ParityKind::MaxEven);
+typed_parity_hoa!(MinOddParityCondition, ParityKind::MinOdd);
+typed_parity_hoa!(MaxOddParityCondition, ParityKind::MaxOdd);
 
 impl<T: States<EdgeColor = AcceptanceMask>> HoaAcceptance<T> for OmegaAcceptanceCondition {
     fn write_acceptance<W: Write>(&self, _ts: &T, w: &mut W) -> Result<(), HoaError> {
         match self {
-            OmegaAcceptanceCondition::Parity(_, high) => Ok(write_parity_hoa(w, *high)?),
-            OmegaAcceptanceCondition::MaxParity(_, high) => Ok(write_max_parity_hoa(w, *high)?),
+            OmegaAcceptanceCondition::Parity(kind, _, high) => {
+                Ok(write_parity_hoa(w, *kind, *high)?)
+            }
             OmegaAcceptanceCondition::Buchi | OmegaAcceptanceCondition::Reachability => {
                 Ok(write_buchi_hoa(w)?)
             }
@@ -168,36 +179,22 @@ fn write_buchi_hoa<W: Write>(w: &mut W) -> std::fmt::Result {
     write!(w, "acc-name: Buchi\nAcceptance: 1 Inf(0)\n")
 }
 
-fn write_parity_hoa<W: Write>(w: &mut W, high: Int) -> std::fmt::Result {
-    // the edges are labeled with their priorities as they are, so the sets are `0..=high` even if
-    // the sets below the least priority are unused
+/// Writes a parity condition over the acceptance sets `0..=high`. The edges are labeled with their
+/// priorities as they are, so the sets are `0..=high` even if the sets below the least priority
+/// are unused.
+fn write_parity_hoa<W: Write>(w: &mut W, kind: ParityKind, high: Int) -> std::fmt::Result {
+    let sets = usize::from(high) + 1;
+    let order: Vec<Int> = if kind.is_max() {
+        (0..=high).rev().collect()
+    } else {
+        (0..=high).collect()
+    };
     write!(
         w,
-        "acc-name: parity min even {}\nAcceptance: {} {}\n",
-        high as usize + 1,
-        high as usize + 1,
-        build_parity_condition_hoa(0, high)
-    )
-}
-
-/// Writes a max parity condition over the acceptance sets `0..=high` in which the largest set
-/// seen infinitely often is accepting if it has the same parity as `high`.
-fn write_max_parity_hoa<W: Write>(w: &mut W, high: Int) -> std::fmt::Result {
-    let accepting_parity = high % 2;
-    let mut formula = if accepting_parity == 0 { "Inf(0)" } else { "f" }.to_string();
-    for set in 1..=high {
-        formula = if set % 2 == accepting_parity {
-            format!("Inf({set}) | ({formula})")
-        } else {
-            format!("Fin({set}) & ({formula})")
-        };
-    }
-    write!(
-        w,
-        "acc-name: parity max {} {}\nAcceptance: {} {formula}\n",
-        if accepting_parity == 0 { "even" } else { "odd" },
-        high + 1,
-        high + 1,
+        "acc-name: parity {} {} {sets}\nAcceptance: {sets} {}\n",
+        if kind.is_max() { "max" } else { "min" },
+        if kind.is_even() { "even" } else { "odd" },
+        build_parity_condition_hoa(&order, kind.is_even())
     )
 }
 
@@ -302,39 +299,21 @@ impl HoaSuitableAlphabet for PropAlphabet {
     }
 }
 
-/// Assumes that `low` is the least occurring and `high` is the highest occurring priority,
-/// *inclusive*.
-fn build_parity_condition_hoa(low: Int, high: Int) -> String {
-    let parity = low % 2;
-
-    let even = parity == 0;
-
-    if high <= low {
-        return if even { "t" } else { "f" }.to_string();
-    }
-
-    match high - low {
-        0 => {
-            if even {
-                format!("Inf({low})")
-            } else {
-                format!("Fin({low})")
-            }
+/// The parity formula over the acceptance sets in `order`, which lists them from the one that
+/// decides first to the one that decides last (increasing for min, decreasing for max). A set is
+/// accepting if its parity is even (`even`) or odd (`!even`).
+fn build_parity_condition_hoa(order: &[Int], even: bool) -> String {
+    let accepting = |set: Int| (set % 2 == 0) == even;
+    match order {
+        [] => "f".to_string(),
+        [only] => if accepting(*only) { "t" } else { "f" }.to_string(),
+        [set, last] if accepting(*set) => format!("Inf({set}) | Fin({last})"),
+        [set, last] => format!("Fin({set}) & Inf({last})"),
+        [set, rest @ ..] if accepting(*set) => {
+            format!("Inf({set}) | ({})", build_parity_condition_hoa(rest, even))
         }
-        1 => {
-            if even {
-                format!("Inf({low}) | Fin({high})")
-            } else {
-                format!("Fin({low}) & Inf({high})")
-            }
-        }
-        _ => {
-            let rest = build_parity_condition_hoa(low + 1, high);
-            if even {
-                format!("Inf({low}) | ({rest})")
-            } else {
-                format!("Fin({low}) & ({rest})")
-            }
+        [set, rest @ ..] => {
+            format!("Fin({set}) & ({})", build_parity_condition_hoa(rest, even))
         }
     }
 }
@@ -402,7 +381,7 @@ State: 1
 
     #[test]
     fn omega_acceptance_conditions_are_written() {
-        use crate::automaton::{OmegaAcceptanceCondition::*, RabinPair};
+        use crate::automaton::{OmegaAcceptanceCondition::*, ParityKind, RabinPair};
         let header = |acc| {
             let aut = Builder::default()
                 .with_state_colors([crate::Void])
@@ -420,8 +399,16 @@ State: 1
         assert_eq!(header(Buchi), "acc-name: Buchi\nAcceptance: 1 Inf(0)");
         assert_eq!(header(CoBuchi), "acc-name: co-Buchi\nAcceptance: 1 Fin(0)");
         assert_eq!(
-            header(MaxParity(0, 2)),
-            "acc-name: parity max even 3\nAcceptance: 3 Inf(2) | (Fin(1) & (Inf(0)))"
+            header(Parity(ParityKind::MaxEven, 0, 2)),
+            "acc-name: parity max even 3\nAcceptance: 3 Inf(2) | (Fin(1) & Inf(0))"
+        );
+        assert_eq!(
+            header(Parity(ParityKind::MinOdd, 0, 2)),
+            "acc-name: parity min odd 3\nAcceptance: 3 Fin(0) & (Inf(1) | Fin(2))"
+        );
+        assert_eq!(
+            header(Parity(ParityKind::MaxOdd, 0, 2)),
+            "acc-name: parity max odd 3\nAcceptance: 3 Fin(2) & (Inf(1) | Fin(0))"
         );
         assert_eq!(
             header(Rabin(vec![RabinPair::from_iters([0], [1, 2])])),
@@ -479,11 +466,11 @@ State: 1
     #[test]
     fn build_parity_hoa_string() {
         assert_eq!(
-            crate::hoa::output::build_parity_condition_hoa(0, 4),
+            crate::hoa::output::build_parity_condition_hoa(&[0, 1, 2, 3, 4], true),
             "Inf(0) | (Fin(1) & (Inf(2) | (Fin(3) & Inf(4))))"
         );
         assert_eq!(
-            crate::hoa::output::build_parity_condition_hoa(0, 2),
+            crate::hoa::output::build_parity_condition_hoa(&[0, 1, 2], true),
             "Inf(0) | (Fin(1) & Inf(2))"
         );
     }

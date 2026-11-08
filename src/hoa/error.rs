@@ -35,6 +35,10 @@ pub enum HoaError {
     /// The acceptance condition (given by its name) is not supported.
     #[error("unsupported acceptance condition: {0}")]
     UnsupportedAcceptance(String),
+    /// The `acc-name` header item is missing parameters, has malformed ones or contradicts the
+    /// `Acceptance` item.
+    #[error("inconsistent acceptance condition: {0}")]
+    InconsistentAcceptance(String),
     /// A label of an edge could not be converted into an expression over the atomic propositions.
     #[error("invalid edge label: {0}")]
     InvalidLabel(String),
