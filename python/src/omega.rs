@@ -79,26 +79,30 @@ macro_rules! omega_class {
     ) => {
         omega_class!($name, $py_name, $kind, $pyalpha, $color, $sem, $doc, plain, {
             /// Whether the language of `self` is contained in the one of `other`.
-            fn included_in(&self, py: Python<'_>, other: &Self) -> bool {
-                py.detach(|| Inclusion::of(&self.0).within(&other.0).holds())
+            fn included_in(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
+                crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())?;
+                Ok(py.detach(|| Inclusion::of(&self.0).within(&other.0).holds()))
             }
 
             /// A word accepted by `self` but not by `other`, or `None` if `self` is included in
             /// `other`.
-            fn inclusion_counterexample(&self, py: Python<'_>, other: &Self) -> Option<PyOmegaWord> {
-                py.detach(|| Inclusion::of(&self.0).within(&other.0).counterexample())
-                    .map(|w| <$kind as Kind>::omega_out(&w))
+            fn inclusion_counterexample(&self, py: Python<'_>, other: &Self) -> PyResult<Option<PyOmegaWord>> {
+                crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())?;
+                Ok(py.detach(|| Inclusion::of(&self.0).within(&other.0).counterexample())
+                        .map(|w| <$kind as Kind>::omega_out(&w)))
             }
 
             /// Whether both automata accept the same language.
-            fn equivalent_to(&self, py: Python<'_>, other: &Self) -> bool {
-                py.detach(|| Equivalence::of(&self.0).and(&other.0).holds())
+            fn equivalent_to(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
+                crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())?;
+                Ok(py.detach(|| Equivalence::of(&self.0).and(&other.0).holds()))
             }
 
             /// A word that exactly one of the automata accepts, or `None` if they are equivalent.
-            fn equivalence_counterexample(&self, py: Python<'_>, other: &Self) -> Option<PyOmegaWord> {
-                py.detach(|| Equivalence::of(&self.0).and(&other.0).counterexample())
-                    .map(|w| <$kind as Kind>::omega_out(&w))
+            fn equivalence_counterexample(&self, py: Python<'_>, other: &Self) -> PyResult<Option<PyOmegaWord>> {
+                crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())?;
+                Ok(py.detach(|| Equivalence::of(&self.0).and(&other.0).counterexample())
+                        .map(|w| <$kind as Kind>::omega_out(&w)))
             }
 
             $($more)*

@@ -125,8 +125,9 @@ macro_rules! dfa_class {
                 }
 
                 /// Whether the language of `self` is contained in the one of `other`.
-                fn included_in(&self, py: Python<'_>, other: &Self) -> bool {
-                    py.detach(|| Inclusion::of(&self.0).within(&other.0).holds())
+                fn included_in(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
+                    crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())?;
+                    Ok(py.detach(|| Inclusion::of(&self.0).within(&other.0).holds()))
                 }
 
                 /// A word accepted by `self` but not by `other`, or `None` if `self` is included
@@ -135,14 +136,16 @@ macro_rules! dfa_class {
                     &self,
                     py: Python<'_>,
                     other: &Self,
-                ) -> Option<<$kind as Kind>::PyWordOut> {
-                    py.detach(|| Inclusion::of(&self.0).within(&other.0).counterexample())
-                        .map(<$kind as Kind>::word_out)
+                ) -> PyResult<Option<<$kind as Kind>::PyWordOut>> {
+                    crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())?;
+                    Ok(py.detach(|| Inclusion::of(&self.0).within(&other.0).counterexample())
+                            .map(<$kind as Kind>::word_out))
                 }
 
                 /// Whether both DFAs accept the same language.
-                fn equivalent_to(&self, py: Python<'_>, other: &Self) -> bool {
-                    py.detach(|| Equivalence::of(&self.0).and(&other.0).holds())
+                fn equivalent_to(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
+                    crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())?;
+                    Ok(py.detach(|| Equivalence::of(&self.0).and(&other.0).holds()))
                 }
 
                 /// A word that exactly one of the DFAs accepts, or `None` if they are equivalent.
@@ -150,14 +153,16 @@ macro_rules! dfa_class {
                     &self,
                     py: Python<'_>,
                     other: &Self,
-                ) -> Option<<$kind as Kind>::PyWordOut> {
-                    py.detach(|| Equivalence::of(&self.0).and(&other.0).counterexample())
-                        .map(<$kind as Kind>::word_out)
+                ) -> PyResult<Option<<$kind as Kind>::PyWordOut>> {
+                    crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())?;
+                    Ok(py.detach(|| Equivalence::of(&self.0).and(&other.0).counterexample())
+                            .map(<$kind as Kind>::word_out))
                 }
 
                 /// Whether no word is accepted by both DFAs.
-                fn disjoint_from(&self, py: Python<'_>, other: &Self) -> bool {
-                    py.detach(|| Disjointness::of(&self.0).and(&other.0).holds())
+                fn disjoint_from(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
+                    crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())?;
+                    Ok(py.detach(|| Disjointness::of(&self.0).and(&other.0).holds()))
                 }
 
                 /// The DFA for the complement language (same alphabet, accepting states swapped).

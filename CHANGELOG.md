@@ -11,9 +11,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 ### Added
 - Python bindings in `python/` (distribution `automatars`, import name `automata`, built with maturin,
-  `abi3-py311`; #143, WP4): the exceptions `automata.Error` (class `AutomataError`) with subclasses
-  mirroring `crate::Error`, `CharAlphabet`/`PropAlphabet`, `DFA`/`PropDFA` with their builders
-  `DFABuilder`/`PropDFABuilder`, `OmegaWord`, `DBA`/`PropDBA` and generated `.pyi` stubs (`cargo run --bin stub_gen`).
+  `abi3-py311`; #143, WP4 and WP5). Every automaton class exists over a `CharAlphabet` and, with
+  the prefix `Prop`, over a `PropAlphabet`:
+  - `CharAlphabet`, `PropAlphabet`, `OmegaWord(prefix, period)`.
+  - Deterministic: `DFA` (union, intersection, complement, minimize, language problems with
+    counterexamples), `DBA`, `DCW`, `DPA` (min-even; complement, inclusion, equivalence), `DRA`,
+    `DMA`, `MooreMachine` and `MealyMachine` (minimize, bisimilarity). Nondeterministic: `NFA`
+    (`determinize`), `NBA`, `NCW`, `NPA`. All have `sccs()`, `states()`, `edges_from(q)`.
+  - HOA input/output (`to_hoa`, `from_hoa`, `automata.parse_hoa`, `parse_hoa_all`), conversions
+    (`NFA.from_dfa`, `NBA.from_dba`, `NCW.from_dcw`, `NPA.from_dpa`, `DPA.from_dba`, `DPA.from_dcw`),
+    DOT and SVG output (`to_dot`, `_repr_svg_`), builders (`DFABuilder`, `automata.builders`).
+  - Exceptions: `automata.Error` with subclasses mirroring `crate::Error`; `NotYetImplemented` is
+    `NotImplementedError`. Generated `.pyi` stubs (`cargo run --bin stub_gen`), `PANIC-AUDIT.md`
+    lists the guards for Python input.
+  - A `python` job in CI, an optional Python step in `scripts/check` and a release workflow
+    (wheels via maturin-action, trusted publishing; first run on TestPyPI).
 - Nondeterministic automata as aliases over one generic semantics, `automaton::Existential<C>`:
   a word is accepted if *some* run satisfies the acceptance condition `C` (#143). `NBA`, `NCW`,
   `NPA` (with the parity variant as a parameter), `NRA` and `NMA` for infinite words, `NFA` for

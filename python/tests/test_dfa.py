@@ -116,3 +116,11 @@ def test_dfa_operations():
     assert big.minimize().num_states == 2 and big.minimize().equivalent_to(big)
     with pytest.raises(ValueError):
         d.union(DFA(CharAlphabet("abc"), 1, 0, [0], []))
+
+
+def test_comparisons_need_equal_alphabets():
+    d2 = DFA(AB, 1, 0, [0], [(0, "a", 0), (0, "b", 0)])
+    d3 = DFA(CharAlphabet("abc"), 1, 0, [0], [(0, "a", 0), (0, "b", 0), (0, "c", 0)])
+    for f in (d2.included_in, d2.equivalent_to, d2.disjoint_from, d2.inclusion_counterexample, d2.equivalence_counterexample):
+        with pytest.raises(ValueError):
+            f(d3)

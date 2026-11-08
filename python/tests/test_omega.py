@@ -56,3 +56,10 @@ def test_sccs():
     d = DBA(AB, 3, 0, [(0, "a", False, 1), (0, "b", False, 0), (1, "a", True, 1), (1, "b", True, 2), (2, "a", False, 2), (2, "b", False, 2)])
     assert sorted(map(sorted, d.sccs())) == [[0], [1], [2]]
     assert sorted(map(sorted, inf_a().sccs())) == [[0]]
+
+
+def test_omega_comparisons_need_equal_alphabets():
+    other = DBA(CharAlphabet("abc"), 1, 0, [(0, "a", True, 0), (0, "b", False, 0), (0, "c", False, 0)])
+    for f in (inf_a().included_in, inf_a().equivalent_to, inf_a().inclusion_counterexample, inf_a().equivalence_counterexample):
+        with pytest.raises(ValueError):
+            f(other)

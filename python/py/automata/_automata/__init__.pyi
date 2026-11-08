@@ -39,6 +39,8 @@ __all__ = [
     "PropNCW",
     "PropNFA",
     "PropNPA",
+    "parse_hoa",
+    "parse_hoa_all",
     "version",
 ]
 
@@ -97,6 +99,18 @@ class DBA:
     False
     >>> inf_a.is_empty()
     False
+    
+    The HOA format writes the characters as propositions and reads them back as a `PropDBA`.
+    
+    >>> hoa = inf_a.to_hoa()
+    >>> hoa.splitlines()[0]
+    'HOA: v1'
+    >>> PropDBA.from_hoa(hoa).num_edges
+    2
+    >>> type(parse_hoa(hoa)).__name__
+    'PropDBA'
+    >>> inf_a.to_dot().startswith("digraph")
+    True
     """
     @property
     def num_states(self) -> builtins.int:
@@ -153,6 +167,19 @@ class DBA:
     def equivalence_counterexample(self, other: DBA) -> typing.Optional[OmegaWord]:
         r"""
         A word that exactly one of the automata accepts, or `None` if they are equivalent.
+        """
+    def to_dot(self) -> builtins.str:
+        r"""
+        The automaton in the DOT format (of graphviz).
+        """
+    def _repr_svg_(self) -> builtins.str:
+        r"""
+        The automaton as an SVG image, which is how Jupyter shows it (drawn natively, graphviz is
+        not needed).
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
         """
     def states(self) -> builtins.list[builtins.int]:
         r"""
@@ -274,6 +301,15 @@ class DFA:
     def alphabet(self) -> CharAlphabet:
         r"""
         The alphabet of the automaton.
+        """
+    def to_dot(self) -> builtins.str:
+        r"""
+        The automaton in the DOT format (of graphviz).
+        """
+    def _repr_svg_(self) -> builtins.str:
+        r"""
+        The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
+        graphviz is not needed).
         """
     def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, accepting: typing.Sequence[builtins.int], edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int]]) -> DFA:
         r"""
@@ -545,6 +581,31 @@ class DPA:
         r"""
         A word that exactly one of the automata accepts, or `None` if they are equivalent.
         """
+    def to_dot(self) -> builtins.str:
+        r"""
+        The automaton in the DOT format (of graphviz).
+        """
+    def _repr_svg_(self) -> builtins.str:
+        r"""
+        The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
+        graphviz is not needed).
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    @classmethod
+    def from_dba(cls, dba: DBA) -> DPA:
+        r"""
+        The DPA with the colors `0` and `1` for the edges of the DBA with color `True` and
+        `False`, which accepts the same language.
+        """
+    @classmethod
+    def from_dcw(cls, dcw: DCW) -> DPA:
+        r"""
+        The DPA with the colors `1` and `2` for the edges of the DCW with color `True`
+        and `False`, which accepts the same language.
+        """
     def complement(self) -> DPA:
         r"""
         The complement: an automaton that accepts exactly the words that `self`
@@ -689,6 +750,15 @@ class MealyMachine:
         r"""
         The alphabet of the automaton.
         """
+    def to_dot(self) -> builtins.str:
+        r"""
+        The automaton in the DOT format (of graphviz).
+        """
+    def _repr_svg_(self) -> builtins.str:
+        r"""
+        The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
+        graphviz is not needed).
+        """
     def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int, builtins.int]]) -> MealyMachine:
         r"""
         Creates the Mealy machine with states `0, ..., num_states - 1`. `edges` are
@@ -778,6 +848,15 @@ class MooreMachine:
     def alphabet(self) -> CharAlphabet:
         r"""
         The alphabet of the automaton.
+        """
+    def to_dot(self) -> builtins.str:
+        r"""
+        The automaton in the DOT format (of graphviz).
+        """
+    def _repr_svg_(self) -> builtins.str:
+        r"""
+        The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
+        graphviz is not needed).
         """
     def __new__(cls, alphabet: CharAlphabet, state_colors: typing.Sequence[builtins.int], initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.int]]) -> MooreMachine:
         r"""
@@ -904,6 +983,10 @@ class NBA:
         r"""
         The NBA with the transitions of the DBA.
         """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
     def states(self) -> builtins.list[builtins.int]:
         r"""
         The states `0, ..., num_states - 1`.
@@ -971,6 +1054,11 @@ class NCW:
     def accepting_word(self) -> typing.Optional[OmegaWord]:
         r"""
         An accepted word, or `None` if the language is empty.
+        """
+    @classmethod
+    def from_dcw(cls, dcw: DCW) -> NCW:
+        r"""
+        The NCW with the transitions of the DCW.
         """
     def states(self) -> builtins.list[builtins.int]:
         r"""
@@ -1149,6 +1237,15 @@ class NPA:
         r"""
         An accepted word, or `None` if the language is empty.
         """
+    @classmethod
+    def from_dpa(cls, dpa: DPA) -> NPA:
+        r"""
+        The NPA with the transitions of the DPA.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
     def states(self) -> builtins.list[builtins.int]:
         r"""
         The states `0, ..., num_states - 1`.
@@ -1298,6 +1395,25 @@ class PropDBA:
         r"""
         A word that exactly one of the automata accepts, or `None` if they are equivalent.
         """
+    def to_dot(self) -> builtins.str:
+        r"""
+        The automaton in the DOT format (of graphviz).
+        """
+    def _repr_svg_(self) -> builtins.str:
+        r"""
+        The automaton as an SVG image, which is how Jupyter shows it (drawn natively, graphviz is
+        not needed).
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    @classmethod
+    def from_hoa(cls, text: builtins.str) -> PropDBA:
+        r"""
+        Reads the first automaton in the HOA text. Raises `HoaError` if the text is not a
+        (supported) deterministic Büchi automaton.
+        """
     def states(self) -> builtins.list[builtins.int]:
         r"""
         The states `0, ..., num_states - 1`.
@@ -1407,6 +1523,15 @@ class PropDFA:
     def alphabet(self) -> PropAlphabet:
         r"""
         The alphabet of the automaton.
+        """
+    def to_dot(self) -> builtins.str:
+        r"""
+        The automaton in the DOT format (of graphviz).
+        """
+    def _repr_svg_(self) -> builtins.str:
+        r"""
+        The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
+        graphviz is not needed).
         """
     def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, accepting: typing.Sequence[builtins.int], edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int]]) -> PropDFA:
         r"""
@@ -1654,6 +1779,38 @@ class PropDPA:
         r"""
         A word that exactly one of the automata accepts, or `None` if they are equivalent.
         """
+    def to_dot(self) -> builtins.str:
+        r"""
+        The automaton in the DOT format (of graphviz).
+        """
+    def _repr_svg_(self) -> builtins.str:
+        r"""
+        The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
+        graphviz is not needed).
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    @classmethod
+    def from_dba(cls, dba: PropDBA) -> PropDPA:
+        r"""
+        The DPA with the colors `0` and `1` for the edges of the DBA with color `True` and
+        `False`, which accepts the same language.
+        """
+    @classmethod
+    def from_dcw(cls, dcw: PropDCW) -> PropDPA:
+        r"""
+        The DPA with the colors `1` and `2` for the edges of the DCW with color `True`
+        and `False`, which accepts the same language.
+        """
+    @classmethod
+    def from_hoa(cls, text: builtins.str) -> PropDPA:
+        r"""
+        Reads the first automaton in the HOA text. Raises `HoaError` if the text is not a
+        (supported) deterministic parity automaton and `NotImplementedError` for parity
+        conditions other than min even.
+        """
     def complement(self) -> PropDPA:
         r"""
         The complement: an automaton that accepts exactly the words that `self`
@@ -1780,6 +1937,15 @@ class PropMealyMachine:
         r"""
         The alphabet of the automaton.
         """
+    def to_dot(self) -> builtins.str:
+        r"""
+        The automaton in the DOT format (of graphviz).
+        """
+    def _repr_svg_(self) -> builtins.str:
+        r"""
+        The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
+        graphviz is not needed).
+        """
     def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int, builtins.int]]) -> PropMealyMachine:
         r"""
         Creates the Mealy machine with states `0, ..., num_states - 1`. `edges` are
@@ -1865,6 +2031,15 @@ class PropMooreMachine:
     def alphabet(self) -> PropAlphabet:
         r"""
         The alphabet of the automaton.
+        """
+    def to_dot(self) -> builtins.str:
+        r"""
+        The automaton in the DOT format (of graphviz).
+        """
+    def _repr_svg_(self) -> builtins.str:
+        r"""
+        The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
+        graphviz is not needed).
         """
     def __new__(cls, alphabet: PropAlphabet, state_colors: typing.Sequence[builtins.int], initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.int]]) -> PropMooreMachine:
         r"""
@@ -1982,6 +2157,16 @@ class PropNBA:
         r"""
         The PropNBA with the transitions of the PropDBA.
         """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    @classmethod
+    def from_hoa(cls, text: builtins.str) -> PropNBA:
+        r"""
+        Reads the first automaton in the HOA text, which may be deterministic. Raises `HoaError` if its acceptance
+        condition is not Büchi.
+        """
     def states(self) -> builtins.list[builtins.int]:
         r"""
         The states `0, ..., num_states - 1`.
@@ -2042,6 +2227,11 @@ class PropNCW:
     def accepting_word(self) -> typing.Optional[OmegaWord]:
         r"""
         An accepted word, or `None` if the language is empty.
+        """
+    @classmethod
+    def from_dcw(cls, dcw: PropDCW) -> PropNCW:
+        r"""
+        The PropNCW with the transitions of the PropDCW.
         """
     def states(self) -> builtins.list[builtins.int]:
         r"""
@@ -2206,6 +2396,21 @@ class PropNPA:
         r"""
         An accepted word, or `None` if the language is empty.
         """
+    @classmethod
+    def from_dpa(cls, dpa: PropDPA) -> PropNPA:
+        r"""
+        The PropNPA with the transitions of the PropDPA.
+        """
+    def to_hoa(self) -> builtins.str:
+        r"""
+        The automaton in the HOA format. Raises `HoaError` if it cannot be written.
+        """
+    @classmethod
+    def from_hoa(cls, text: builtins.str) -> PropNPA:
+        r"""
+        Reads the first automaton in the HOA text, which may be deterministic. Only min parity conditions are
+        supported. Raises `HoaError` for other conditions and `NotImplementedError` for max parity.
+        """
     def states(self) -> builtins.list[builtins.int]:
         r"""
         The states `0, ..., num_states - 1`.
@@ -2222,6 +2427,20 @@ class PropNPA:
         components included).
         """
     def __repr__(self) -> builtins.str: ...
+
+def parse_hoa(text: builtins.str) -> typing.Any:
+    r"""
+    Reads the first automaton in `text` (a HOA file may contain several) and returns it as an
+    instance of the most specific class: `PropDBA` for a deterministic Büchi automaton, `PropDPA`
+    for parity, `PropNBA` or `PropNPA` if the automaton is not deterministic. Raises `HoaError` if
+    the text is not a (supported) HOA automaton and `NotImplementedError` for acceptance conditions
+    without a class (Rabin, Streett) and for parity conditions other than min even.
+    """
+
+def parse_hoa_all(text: builtins.str) -> builtins.list[typing.Any]:
+    r"""
+    Like `parse_hoa`, but returns a list with all automata in `text`.
+    """
 
 def version() -> builtins.str:
     r"""

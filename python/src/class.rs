@@ -182,3 +182,15 @@ pub fn to_hoa<W: automata::hoa::WriteHoa + Sync>(
     py.detach(|| automaton.to_hoa())
         .map_err(|e| crate::error::PyError(e.into()).into())
 }
+
+/// Binary operations need automata over alphabets of the same size (otherwise the crate would
+/// silently compare unrelated languages).
+pub fn same_alphabet<A: automata::alphabet::Alphabet>(left: &A, right: &A) -> PyResult<()> {
+    if left.size() == right.size() {
+        Ok(())
+    } else {
+        Err(PyValueError::new_err(
+            "the automata have different alphabets",
+        ))
+    }
+}
