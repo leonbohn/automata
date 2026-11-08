@@ -5,6 +5,7 @@ mod class;
 mod dfa;
 mod error;
 mod kind;
+mod nondet;
 mod omega;
 
 use pyo3::prelude::*;
@@ -36,6 +37,14 @@ fn _automata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<omega::PyPropDra>()?;
     m.add_class::<omega::PyDma>()?;
     m.add_class::<omega::PyPropDma>()?;
+    m.add_class::<nondet::PyNfa>()?;
+    m.add_class::<nondet::PyPropNfa>()?;
+    m.add_class::<nondet::PyNba>()?;
+    m.add_class::<nondet::PyPropNba>()?;
+    m.add_class::<nondet::PyNcw>()?;
+    m.add_class::<nondet::PyPropNcw>()?;
+    m.add_class::<nondet::PyNpa>()?;
+    m.add_class::<nondet::PyPropNpa>()?;
     m.add_class::<dfa::PyDfaBuilder>()?;
     m.add_class::<dfa::PyPropDfaBuilder>()?;
     let py = m.py();
