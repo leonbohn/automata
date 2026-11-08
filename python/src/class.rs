@@ -173,3 +173,12 @@ pub fn svg<D: automata::dot::Dottable + Sync>(py: Python<'_>, automaton: &D) -> 
     py.detach(|| automaton.try_svg())
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
 }
+
+/// Writes the automaton in the HOA format.
+pub fn to_hoa<W: automata::hoa::WriteHoa + Sync>(
+    py: Python<'_>,
+    automaton: &W,
+) -> PyResult<String> {
+    py.detach(|| automaton.to_hoa())
+        .map_err(|e| crate::error::PyError(e.into()).into())
+}
