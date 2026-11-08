@@ -320,11 +320,13 @@ fn write_pairs_hoa<W: Write>(
         pairs
             .iter()
             .map(|p| {
-                format!(
+                let pair = format!(
                     "({}){pair_op}({})",
                     term(&p.fin, "Fin", " & ", "t"),
                     term(&p.inf, "Inf", " | ", "f")
-                )
+                );
+                // `&` binds tighter than `|`, so the pairs need their own parentheses
+                if pairs.len() > 1 { format!("({pair})") } else { pair }
             })
             .join(pair_join)
     };
@@ -506,7 +508,7 @@ State: 1
                 RabinPair::from_iters([0], [1]),
                 RabinPair::from_iters([], [2])
             ])),
-            "Acceptance: 3 (Fin(0)) | (Inf(1)) & (t) | (Inf(2))"
+            "Acceptance: 3 ((Fin(0)) | (Inf(1))) & ((t) | (Inf(2)))"
         );
         assert_eq!(
             header_with(&[], Rabin(vec![])),

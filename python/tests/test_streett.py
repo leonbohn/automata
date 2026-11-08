@@ -190,7 +190,6 @@ def test_hoa_round_trip(char, prop):
     assert [type(a) for a in parse_hoa_all(char_aut.to_hoa() * 2)] == [prop, prop]
 
 
-@pytest.mark.xfail(strict=True, reason="the crate writes `(Fin(0)) | (Inf(1)) & (Fin(2)) | (Inf(3))` for two pairs")
 def test_hoa_round_trip_of_two_streett_pairs():
     aut = PropDSA(P, 1, 0, [(0, T, 0, 0), (0, F, 3, 0)], standard_pairs(2))
     assert verdicts(PropDSA.from_hoa(aut.to_hoa()), PROP_LASSOS) == verdicts(aut, PROP_LASSOS)
