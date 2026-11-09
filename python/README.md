@@ -1,8 +1,21 @@
 # automatars
 
 Python bindings for the Rust crate [`automata`](https://github.com/leonbohn/automata): transition
-systems and automata over finite and infinite words. Install with `pip install automatars`;
-the module is imported as `automata`.
+systems and automata over finite and infinite words. The distribution is called `automatars`, the
+module is imported as `automata`. See [Installation](#installation).
+
+## Installation
+
+The package is not on PyPI. Install it from GitHub, which builds the extension module, so a Rust
+toolchain (1.88 or newer) and `maturin` are needed:
+
+```shell
+pip install maturin
+pip install "git+https://github.com/leonbohn/automata#subdirectory=python"
+```
+
+From a clone of the repository, `pip install ./python` does the same and `maturin develop` (see
+[Development](#development)) installs it in editable mode.
 
 ```python
 from automata import CharAlphabet, DFA, DBA, OmegaWord
@@ -30,7 +43,7 @@ alphabets.
 
 | | finite words | infinite words |
 | --- | --- | --- |
-| deterministic | `DFA` | `DBA`, `DCA`, `DPA` (min even), `DPAMaxEven`, `DPAMinOdd`, `DPAMaxOdd`, `DRA`, `DSA`, `DMA` |
+| deterministic | `DFA` | `DBA` (Büchi), `DCA` (co-Büchi), `DPA` (parity, min even), `DPAMaxEven`, `DPAMinOdd`, `DPAMaxOdd`, `DRA` (Rabin), `DSA` (Streett), `DMA` (Muller) |
 | nondeterministic | `NFA` | `NBA`, `NCA`, `NPA` (min even) |
 | output | `MooreMachine`, `MealyMachine` | |
 
@@ -48,12 +61,35 @@ complement of `DPAMinOdd` is a `DPA`), `is_empty()` and `accepting_word()` work 
 edges, pairs)` accepts if for every pair `(fin, inf)` no color of `fin` or some color of `inf`
 occurs infinitely often.
 
+### Complements
+
+`DFA`, `DPA` and the three other parity classes have `complement()` as well. For the other
+deterministic omega classes the complement is just another condition on the same transitions and
+colors and is available as a method:
+
+| class | `complement()` |
+| --- | --- |
+| `DBA` | `DCA`, and the other way round |
+| `DRA` | `DSA` with every pair `(fin, inf)` replaced by `(inf, fin)`, and the other way round |
+| `DMA` | `DMA` whose sets are all nonempty sets of edge colors that are not in the family (`ValueError` for more than 16 colors) |
+
+The automaton has to be complete (a word without a run is ignored). `DBA.streamlined()` and
+`DPA.streamlined()`/`normalized()` give equivalent automata with fewer states and colors.
+
 Automata can also be built step by step with `DFABuilder` (and the builders in `automata.builders`).
+
+## DOT and SVG
+
+Every class has `to_dot()` (the DOT source for graphviz) and `_repr_svg_()`, so that Jupyter draws
+an automaton as an SVG image (rendered natively, graphviz is not needed). Edges are labelled with
+their symbol and color, the accepting states of `DFA` and `NFA` are double circles and the pairs of
+a `DRA`/`DSA` and the sets of a `DMA` are written in an extra node.
 
 ## HOA
 
 `to_hoa()` writes `DBA`, `DCA`, the four parity classes, `DRA`, `DSA`, `NBA`, `NCA` and `NPA`
-(and their `Prop` variants); characters become propositions. `from_hoa(text)` and
+(and their `Prop` variants; there is no HOA output for `DFA`, `NFA`, `DMA` and the machines);
+characters become propositions. `from_hoa(text)` and
 `automata.parse_hoa(text)` need propositional alphabets, so only the `Prop` classes have
 `from_hoa`:
 
@@ -92,3 +128,6 @@ maturin develop
 python -m pytest            # includes the doctests of the classes
 cargo run --bin stub_gen    # regenerates automata/_automata/__init__.pyi
 ```
+
+`tests/README.md` describes the test suite, including the differential tests against Spot
+(`pytest -m spot`, they need `nix develop`).

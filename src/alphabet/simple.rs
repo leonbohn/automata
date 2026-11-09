@@ -137,6 +137,9 @@ impl Expression for char {
     fn overlaps(&self, other: &Self) -> bool {
         self == other
     }
+    fn intersection(&self, other: &Self) -> Option<Self> {
+        (self == other).then_some(*self)
+    }
 
     fn for_each<F: Fn(char)>(&self, f: F) {
         (f)(*self)
@@ -260,6 +263,9 @@ impl Expression for usize {
     }
     fn overlaps(&self, other: &Self) -> bool {
         self == other
+    }
+    fn intersection(&self, other: &Self) -> Option<Self> {
+        (self == other).then_some(*self)
     }
 
     fn matched_by(&self, symbol: usize) -> bool {
@@ -412,6 +418,9 @@ impl Expression for InvertibleChar {
     }
     fn overlaps(&self, other: &Self) -> bool {
         self == other
+    }
+    fn intersection(&self, other: &Self) -> Option<Self> {
+        (self == other).then_some(*self)
     }
 
     fn matched_by(&self, symbol: InvertibleChar) -> bool {

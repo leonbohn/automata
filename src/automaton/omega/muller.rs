@@ -62,6 +62,11 @@ impl<C: Color + Ord + Eq + std::hash::Hash> MullerCondition<C> {
         self.satisfied_by_set(&iter.into_iter().collect())
     }
 
+    /// The sets of colors that satisfy the condition.
+    pub fn sets(&self) -> &[math::FxIndexSet<C>] {
+        &self.0
+    }
+
     /// Creates a new instance from a set of sets of colors.
     pub fn new(sets: Vec<math::FxIndexSet<C>>) -> Self {
         Self(sets)

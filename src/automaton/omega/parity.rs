@@ -405,17 +405,23 @@ where
     pub fn witness_color(&self, color: Int) -> Option<ReducedOmegaWord<SymbolOf<Self>>> {
         let restrict = self.edge_color_restricted(color, Int::MAX);
         let sccs = Sccs::on(&restrict).compute();
+        // The loop only uses edges of colors from `color` on, but the component may be reached
+        // through edges of smaller colors, so the way there is searched in `self`.
+        let reachable: math::FxIndexSet<_> = self.reachable_state_indices().collect();
         for (_, scc) in sccs.iter() {
             if scc.is_transient() {
                 continue;
             }
             if scc.interior_edge_colors().any(|c| c == color) {
-                // components that cannot be reached from the initial state have no representative
-                let Some(rep) = scc.minimal_representative() else {
+                // components that cannot be reached from the initial state are skipped
+                let Some(&start) = scc.state_indices().find(|q| reachable.contains(*q)) else {
+                    continue;
+                };
+                let Some(rep) = self.minimal_representative(start) else {
                     continue;
                 };
                 let cycle = scc
-                    .maximal_loop_from(rep.state_index())
+                    .maximal_loop_from(start)
                     .expect("This thing is non-transient");
                 return Some(ReducedOmegaWord::ultimately_periodic(
                     rep.collect_vec(),
@@ -603,6 +609,60 @@ mod tests {
     use crate::ts::q;
     use crate::ts::{Builder, Deterministic};
     use crate::{DTS, Pointed, RightCongruence, TransitionSystem};
+
+    #[test]
+    fn rejected_word_is_found_if_the_loop_is_reached_through_smaller_priorities() {
+        // the loop of priority 1 at state 1 is only reachable through edges of priority 0
+        let dpa = Builder::without_state_colors()
+            .with_transitions([
+                (0, 'a', 0, 1),
+                (0, 'b', 0, 1),
+                (1, 'b', 2, 0),
+                (1, 'a', 1, 1),
+            ])
+            .into_dpa(0);
+        let word = dpa.give_rejected_word().expect("a^ω is rejected");
+        assert!(!dpa.accepts(&word));
+    }
+
+    #[test]
+    fn rejected_word_exists_if_and_only_if_the_complement_accepts_a_word() {
+        let mut seed = 0x2545_f491_4f6c_dd1d_u64;
+        let mut next = |bound: u64| {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed % bound
+        };
+        let mut rejecting = 0;
+        for _ in 0..300 {
+            let states = 1 + next(5) as u32;
+            let mut edges = Vec::new();
+            for q in 0..states {
+                for sym in ['a', 'b'] {
+                    edges.push((q, sym, next(4) as u8, next(states as u64) as u32));
+                }
+            }
+            let dpa = Builder::without_state_colors()
+                .with_transitions(edges.clone())
+                .into_dpa(0);
+            let complement = dpa.clone().complement();
+            let rejected = dpa.give_rejected_word();
+            assert_eq!(
+                rejected.is_some(),
+                Emptiness::of(&complement).witness().is_some(),
+                "{edges:?}"
+            );
+            if let Some(word) = rejected {
+                rejecting += 1;
+                assert!(
+                    !dpa.accepts(&word) && complement.accepts(&word),
+                    "{edges:?}"
+                );
+            }
+        }
+        assert!(rejecting > 20);
+    }
 
     #[test]
     fn normalize_dpa() {

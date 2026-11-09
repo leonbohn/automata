@@ -11,6 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 ### Added
 - Co-Büchi automata are named `DCA`, `NCA` and `HDCA` (and `into_dca`, `into_nca`, `NCA::from_dca`, ...) like the other types (acceptance condition + `A` for automaton); these names were never released.
+- `Dottable` for automata with co-Büchi (`DCA`), Rabin, Streett and Muller conditions, for the three
+  parity conditions other than min even and for the nondeterministic `NFA`, `NBA`, `NCA`, `NPA`,
+  `NRA`, `NSA` and `NMA`: edges show their color, the accepting states of an `NFA` are double
+  circles and the pairs (Rabin, Streett) or sets (Muller) of the condition are written in an extra
+  `acceptance` node. `DotStyle::dot_header_statements` adds statements to the header of the graph
+  and `MullerCondition::sets` returns the sets of the condition.
 - Python bindings in `python/` (distribution `automatars`, import name `automata`, built with maturin,
   `abi3-py311`; #143, WP4 and WP5). Every automaton class exists over a `CharAlphabet` and, with
   the prefix `Prop`, over a `PropAlphabet`:
@@ -24,12 +30,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     co-Büchi, all four parity conditions, Rabin and Streett (`PropDRA`/`PropDSA` number the sets
     of acceptance sets of the edges as colors), conversions
     (`NFA.from_dfa`, `NBA.from_dba`, `NCA.from_dca`, `NPA.from_dpa`, `DPA.from_dba`, `DPA.from_dca`),
-    DOT and SVG output (`to_dot`, `_repr_svg_`), builders (`DFABuilder`, `automata.builders`).
+    builders (`DFABuilder`, `automata.builders`).
+  - DOT and SVG output (`to_dot`, `_repr_svg_`) for every class.
+  - Complements that only change the condition: `DBA.complement()` (a `DCA`), `DCA.complement()`,
+    `DRA.complement()` (a `DSA` with every pair `(fin, inf)` swapped), `DSA.complement()` and
+    `DMA.complement()` (all nonempty sets of edge colors that are not in the family; `ValueError`
+    for more than 16 colors). `DBA.streamlined()`.
   - Exceptions: `automata.Error` with subclasses mirroring `crate::Error`; `NotYetImplemented` is
     `NotImplementedError`. Generated `.pyi` stubs (`cargo run --bin stub_gen`), `PANIC-AUDIT.md`
     lists the guards for Python input.
-  - A `python` job in CI, an optional Python step in `scripts/check` and a release workflow
-    (wheels via maturin-action, trusted publishing; first run on TestPyPI).
+  - A `python` job in CI and an optional Python step in `scripts/check`. The package is installed
+    from GitHub (see `python/README.md`).
 - Nondeterministic automata as aliases over one generic semantics, `automaton::Existential<C>`:
   a word is accepted if *some* run satisfies the acceptance condition `C` (#143). `NBA`, `NCA`,
   `NPA` (with the parity variant as a parameter), `NRA` and `NMA` for infinite words, `NFA` for
@@ -114,6 +125,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   input accepts up to 31 atomic propositions (the limit of `PropAlphabet`) instead of 6.
 
 ### Fixed
+- `DFA::minimize`, `MooreMachine::minimize`, `MealyMachine::minimize` and `Minimize::on(..).run()`
+  kept the unreachable states (merged into classes), although the result is documented as the
+  minimal machine. They are removed now, and the states of the result are numbered in the order in
+  which a breadth-first search from the initial state discovers them, so the initial state is `0`.
+  **Breaking:** the result can have fewer states than before and other state numbers; this also
+  applies to `DPA::streamlined`. The benchmark results of the minimization benchmarks (`dfa`)
+  may change, as the quotient is built from the reachable states only.
+- `DPA::give_rejected_word` (and `rejected_word()` in Python) returned `None` for automata that
+  are not universal if the rejecting loop can only be reached through edges of a smaller priority:
+  the way to the loop was searched in the automaton without these edges.
+- HOA input ignored state-based acceptance (`State: 0 {0}`), so the automaton got no acceptance
+  sets on the edges of that state and accepted another language. The sets of a state are now put on
+  all its outgoing edges (united with the sets of the edge, so parity automata with a set on the
+  state and on the edge are still an `AcceptanceError`).
+- Products (`ts_product`, `MatchingProduct`) only paired edges with equal expressions. Over a
+  `PropAlphabet`, where edges may be labeled with any formula (`[t]`, `[0]`, ...), this lost
+  transitions: `Inclusion`/`Equivalence` and their counterexamples, `DPA::prefix_partition`,
+  union and intersection gave wrong answers for automata with edges that are not labeled by
+  single valuations (for example, a non-empty DBA was reported as included in an empty one). The
+  product now has an edge for each pair of overlapping edges, labeled with the intersection of the
+  expressions, for which `Expression` has the new method `intersection`.
+  **Breaking:** custom implementations of `Expression` have to implement `intersection`;
+  `EdgeRef::expression` no longer returns a reference with the lifetime of the system but one
+  that is bound to the edge, as an edge can own a computed expression (`EdgeRef::with_expression`).
 - The HOA writer put no parentheses around the pairs of Rabin and Streett conditions with two or more pairs (`(Fin(0)) | (Inf(1)) & ...`), so the written formula meant something else and could not be read back. `RabinPair` has the getters `fin()` and `inf()`.
 - `OmegaAcceptanceCondition::into_dpa` converted co-Büchi and safety automata to the wrong
   language when edges of acceptance set `0` and edges outside of it both occur infinitely often

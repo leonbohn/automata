@@ -1,7 +1,7 @@
 use crate::TransitionSystem;
 use crate::alphabet::{Alphabet, Expression};
 use crate::ts::EdgeOf;
-use crate::ts::{Deterministic, EdgeExpression, SymbolOf};
+use crate::ts::{Deterministic, SymbolOf};
 
 /// Specialized version of an iterator over the edges leaving a specific state of a **deterministic**
 /// transition system.
@@ -35,7 +35,7 @@ impl<'a, Ts: TransitionSystem> DeterministicEdgesFrom<'a, Ts> {
 /// a transition system.
 pub struct TransitionsFrom<'a, D: TransitionSystem + 'a> {
     edges: D::EdgesFromIter<'a>,
-    symbols: Option<<EdgeExpression<D> as Expression>::SymbolsIter<'a>>,
+    symbols: std::vec::IntoIter<SymbolOf<D>>,
     target: Option<D::StateIndex>,
     color: Option<D::EdgeColor>,
     source: D::StateIndex,
@@ -44,7 +44,7 @@ pub struct TransitionsFrom<'a, D: TransitionSystem + 'a> {
 impl<'a, D: TransitionSystem + 'a> Iterator for TransitionsFrom<'a, D> {
     type Item = (D::StateIndex, SymbolOf<D>, D::EdgeColor, D::StateIndex);
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(sym) = self.symbols.as_mut().and_then(|it| it.next()) {
+        if let Some(sym) = self.symbols.next() {
             return Some((
                 self.source,
                 sym,
@@ -57,7 +57,8 @@ impl<'a, D: TransitionSystem + 'a> Iterator for TransitionsFrom<'a, D> {
                 if let Some(sym) = it.next() {
                     let target = t.target();
                     let color = t.color().clone();
-                    self.symbols = Some(it);
+                    // an expression usually stands for few symbols, so this seldom allocates
+                    self.symbols = it.collect::<Vec<_>>().into_iter();
                     self.color = Some(color.clone());
                     self.target = Some(target);
                     return Some((self.source, sym, color.clone(), target));
@@ -76,7 +77,7 @@ impl<'a, D: TransitionSystem + 'a> TransitionsFrom<'a, D> {
 
         Some(Self {
             edges,
-            symbols: None,
+            symbols: Vec::new().into_iter(),
 
             target: None,
             color: None,

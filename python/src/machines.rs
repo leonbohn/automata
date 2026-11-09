@@ -101,17 +101,6 @@ macro_rules! moore_class {
             DTS<<$kind as Kind>::A, Int, Void>, MooreSemantics,
             edge = (u32, String, u32), out = |s, l, _c: &Void, t| (s, l, t), doc = $doc,
             {
-                /// The automaton in the DOT format (of graphviz).
-                fn to_dot(&self) -> String {
-                    ::automata::dot::Dottable::dot_representation(&self.0)
-                }
-
-                /// The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
-                /// graphviz is not needed).
-                fn _repr_svg_(&self, py: ::pyo3::Python<'_>) -> ::pyo3::PyResult<String> {
-                    $crate::class::svg(py, &self.0)
-                }
-
                 /// Creates the Moore machine with states `0, ..., len(state_colors) - 1`; state
                 /// `i` outputs `state_colors[i]` (an integer from 0 to 255). `edges` are triples
                 /// `(source, symbol, target)`; a later edge replaces an earlier one with the same
@@ -182,7 +171,8 @@ macro_rules! moore_class {
                         .map(<$kind as Kind>::word_out))
                 }
 
-                /// The minimal Moore machine with the same output on every word (Hopcroft).
+                /// The minimal Moore machine with the same output on every word (Hopcroft). Unreachable states
+                /// are removed.
                 fn minimize(&self, py: Python<'_>) -> Self {
                     Self(py.detach(|| self.0.minimize()))
                 }
@@ -220,17 +210,6 @@ macro_rules! mealy_class {
             DTS<<$kind as Kind>::A, Void, Int>, MealySemantics,
             edge = (u32, String, Int, u32), out = |s, l, c: &Int, t| (s, l, *c, t), doc = $doc,
             {
-                /// The automaton in the DOT format (of graphviz).
-                fn to_dot(&self) -> String {
-                    ::automata::dot::Dottable::dot_representation(&self.0)
-                }
-
-                /// The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
-                /// graphviz is not needed).
-                fn _repr_svg_(&self, py: ::pyo3::Python<'_>) -> ::pyo3::PyResult<String> {
-                    $crate::class::svg(py, &self.0)
-                }
-
                 /// Creates the Mealy machine with states `0, ..., num_states - 1`. `edges` are
                 /// tuples `(source, symbol, output, target)` with an integer output from 0 to
                 /// 255; a later edge replaces an earlier one with the same source and symbol.
@@ -301,7 +280,7 @@ macro_rules! mealy_class {
                 }
 
                 /// The minimal Mealy machine with the same output on every non-empty word
-                /// (Hopcroft). Unreachable states are minimized as well and kept.
+                /// (Hopcroft). Unreachable states are removed.
                 fn minimize(&self, py: Python<'_>) -> Self {
                     Self(py.detach(|| {
                         self.0.minimize().erase_state_colors().collect_mealy()

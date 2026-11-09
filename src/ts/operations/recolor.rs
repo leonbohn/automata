@@ -106,14 +106,7 @@ impl<T: TransitionSystem, C: Color, F: Fn(T::EdgeColor) -> C> EdgeRecolor<T> for
     type Color = C;
     #[inline(always)]
     fn recolor<'a>(&self, edge: EdgeOf<'a, T>) -> EdgeRef<'a, StateIndex<T>, EdgeExpression<T>, C> {
-        let (source, target) = (edge.source(), edge.target());
-        let expression = edge.expression();
-        EdgeRef::owned(
-            source,
-            expression,
-            (self.0)(edge.into_color().into_owned()),
-            target,
-        )
+        edge.map_color(|_, _, color, _| (self.0)(color))
     }
 }
 
@@ -131,10 +124,7 @@ where
     type Color = C;
     #[inline(always)]
     fn recolor<'a>(&self, edge: EdgeOf<'a, T>) -> EdgeRef<'a, StateIndex<T>, EdgeExpression<T>, C> {
-        let (source, target) = (edge.source(), edge.target());
-        let expression = edge.expression();
-        let color = (self.0)(source, expression, edge.into_color().into_owned(), target);
-        EdgeRef::owned(source, expression, color, target)
+        edge.map_color(&self.0)
     }
 }
 

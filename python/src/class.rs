@@ -80,6 +80,17 @@ macro_rules! automaton_class {
         impl $name {
             $($extra)*
 
+            /// The automaton in the DOT format (of graphviz).
+            fn to_dot(&self) -> String {
+                ::automata::dot::Dottable::dot_representation(&self.0)
+            }
+
+            /// The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
+            /// graphviz is not needed).
+            fn _repr_svg_(&self, py: ::pyo3::Python<'_>) -> ::pyo3::PyResult<String> {
+                $crate::class::svg(py, &self.0)
+            }
+
             /// The number of states.
             #[getter]
             fn num_states(&self) -> usize {

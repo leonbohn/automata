@@ -64,17 +64,6 @@ macro_rules! dfa_class {
             DTS<<$kind as Kind>::A, bool, Void>, automata::automaton::ReachabilityCondition,
             edge = (u32, String, u32), out = |s, l, _c: &Void, t| (s, l, t), doc = $doc,
             {
-                /// The automaton in the DOT format (of graphviz).
-                fn to_dot(&self) -> String {
-                    ::automata::dot::Dottable::dot_representation(&self.0)
-                }
-
-                /// The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
-                /// graphviz is not needed).
-                fn _repr_svg_(&self, py: ::pyo3::Python<'_>) -> ::pyo3::PyResult<String> {
-                    $crate::class::svg(py, &self.0)
-                }
-
                 /// Creates the DFA with states `0, ..., num_states - 1`. `edges` are triples
                 /// `(source, symbol, target)`; a later edge replaces an earlier one with the same
                 /// source and symbol. Raises `ValueError` for states or symbols that do not exist.
@@ -183,7 +172,7 @@ macro_rules! dfa_class {
                     Ok(Self(py.detach(|| self.0.intersection(&other.0).reachable_part().collect_dfa())))
                 }
 
-                /// The minimal DFA for the same language (Hopcroft).
+                /// The minimal DFA for the same language (Hopcroft). Unreachable states are removed.
                 fn minimize(&self, py: Python<'_>) -> Self {
                     Self(py.detach(|| self.0.clone().minimize()))
                 }

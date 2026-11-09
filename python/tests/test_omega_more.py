@@ -39,7 +39,7 @@ def test_dca():
     assert d.accepting_word() is not None and d.accepts(d.accepting_word())
     assert DCA(AB, 1, 0, [(0, "a", True, 0), (0, "b", True, 0)]).is_empty()
     assert (d.num_states, d.num_edges) == (1, 2)
-    assert not hasattr(d, "complement")
+    assert d.complement().accepts(w("", "ab"))
 
 
 def test_prop_dca():

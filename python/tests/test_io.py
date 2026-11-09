@@ -350,9 +350,9 @@ def test_repr_svg_draws_an_svg_image():
         assert "<svg" in svg and svg.rstrip().endswith("</svg>"), aut
 
 
-def test_classes_without_a_dot_style_in_the_crate_have_no_dot_output():
+def test_all_classes_have_dot_output():
     for cls in (DCA, NBA, NCA, NPA, NFA, PropNBA):
-        assert not hasattr(cls, "to_dot") and not hasattr(cls, "_repr_svg_"), cls
+        assert hasattr(cls, "to_dot") and hasattr(cls, "_repr_svg_"), cls
 
 
 def test_module_exports():

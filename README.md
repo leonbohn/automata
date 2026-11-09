@@ -233,6 +233,31 @@ Both offer the same operations, the `graphviz` variants carry the suffix `_graph
 Displaying writes an SVG to a temporary file and opens it with the default program of your system (`xdg-open`, `open` or `start`).
 Set the environment variable `IMAGE_VIEWER` to use a different program, it is called with the path of the file.
 
+## Python
+
+The crate has Python bindings (`python/`, import name `automata`, built with [maturin](https://www.maturin.rs)). They are not on PyPI; installing from GitHub needs a Rust toolchain:
+
+```shell
+pip install maturin
+pip install "git+https://github.com/leonbohn/automata#subdirectory=python"
+```
+
+```python
+from automata import CharAlphabet, DBA, DFA, OmegaWord
+
+ab = CharAlphabet("ab")
+# DFA(alphabet, num_states, initial, accepting, edges): an even number of a's
+even_a = DFA(ab, 2, 0, [0], [(0, "a", 1), (0, "b", 0), (1, "a", 0), (1, "b", 1)])
+assert even_a.accepts("abba") and even_a.complement().accepting_word() == "a"
+# infinitely many a's: the edges of a DBA carry a color, `True` is accepting
+inf_a = DBA(ab, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)])
+assert inf_a.accepts(OmegaWord("bb", "ab")) and not inf_a.accepts(OmegaWord("a", "b"))
+assert inf_a.complement().accepts(OmegaWord("a", "b"))  # a DCA
+print(inf_a.to_dot())  # in Jupyter, the automaton is drawn as SVG
+```
+
+`python/README.md` lists all classes, the HOA support and the dualities.
+
 ## Concepts
 
 An **automaton** is a transition system together with an initial state and an acceptance component that decides which words are accepted.

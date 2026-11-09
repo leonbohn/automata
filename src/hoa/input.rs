@@ -518,7 +518,7 @@ fn hoa_automaton_parts(aut: HoaRepresentation) -> Result<HoaParts, HoaError> {
             let expr = label
                 .try_into_hoa_expression(aps)
                 .map_err(HoaError::InvalidLabel)?;
-            let color: AcceptanceMask = edge.acceptance_signature().into();
+            let color: AcceptanceMask = (&edge.effective_acceptance(state)).into();
 
             ts.add_edge((
                 StateId::from(state.id()),
@@ -925,6 +925,87 @@ State: 1
         format!(
             "HOA: v1\nStates: {states}\n{start}\nacc-name: Buchi\nAcceptance: 1 Inf(0)\n{aps}\n--BODY--\n{body}\n--END--\n"
         )
+    }
+
+    /// The edges of the parsed automaton as `(source, target, symbols, color)`, in a fixed order.
+    fn colored_edges(hoa: &str) -> Vec<(usize, usize, Vec<char>, String)> {
+        use crate::ts::{DenseId, TransitionSystem};
+        let aut = super::parse_omega_automaton_range::<Linked>(hoa, 0, hoa.len()).unwrap();
+        let mut edges = Vec::new();
+        for q in aut.states() {
+            for e in aut.edges_from(q).into_iter().flatten() {
+                let mut symbols: Vec<char> = e.expression().chars_iter().collect();
+                symbols.sort();
+                edges.push((
+                    q.into_usize(),
+                    e.target().into_usize(),
+                    symbols,
+                    format!("{:?}", e.color()),
+                ));
+            }
+        }
+        edges.sort();
+        edges
+    }
+
+    #[test]
+    fn state_based_acceptance_is_put_on_the_outgoing_edges() {
+        let state_based = hoa_with(
+            "AP: 1 \"a\"",
+            "Start: 0",
+            "State: 0 {0}\n[0] 1\n[!0] 0\nState: 1\n[t] 0",
+        );
+        let edge_based = hoa_with(
+            "AP: 1 \"a\"",
+            "Start: 0",
+            "State: 0\n[0] 1 {0}\n[!0] 0 {0}\nState: 1\n[t] 0",
+        );
+        let edges = colored_edges(&state_based);
+        assert_eq!(edges, colored_edges(&edge_based));
+        // the two edges of state 0 are in set 0, the one of state 1 in no set
+        assert_eq!(edges[0].3, edges[1].3);
+        assert_ne!(edges[0].3, edges[2].3);
+    }
+
+    #[test]
+    fn state_based_and_edge_based_acceptance_on_one_edge_are_united() {
+        let hoa = |body: &str| {
+            format!(
+                "HOA: v1\nStates: 2\nStart: 0\nacc-name: Rabin 1\nAcceptance: 2 Fin(0) & Inf(1)\nAP: 1 \"a\"\n--BODY--\n{body}\n--END--\n"
+            )
+        };
+        let mixed = hoa("State: 0 {0}\n[0] 1 {1}\n[!0] 0\nState: 1\n[t] 0");
+        let united = hoa("State: 0\n[0] 1 {0 1}\n[!0] 0 {0}\nState: 1\n[t] 0");
+        assert_eq!(colored_edges(&mixed), colored_edges(&united));
+    }
+
+    #[test]
+    fn state_based_acceptance_of_parity_automata_gives_the_priorities() {
+        use crate::ts::TransitionSystem;
+        let hoa = |body: &str| {
+            format!(
+                "HOA: v1\nStates: 2\nStart: 0\nacc-name: parity min even 3\nAcceptance: 3 Inf(0) | (Fin(1) & Inf(2))\nAP: 1 \"a\"\n--BODY--\n{body}\n--END--\n"
+            )
+        };
+        let priorities = |text: &str| {
+            let dpa = HoaString::from(text.to_string())
+                .pop::<Det<Linked>>()
+                .and_then(|a| a.into_dpa().ok())
+                .expect("a parity automaton");
+            let mut priorities: Vec<_> = dpa
+                .states()
+                .flat_map(|q| dpa.edges_from(q).into_iter().flatten())
+                .map(|e| *e.color())
+                .collect();
+            priorities.sort();
+            priorities
+        };
+        let state_based = hoa("State: 0 {0}\n[0] 1\n[!0] 0\nState: 1 {2}\n[t] 1");
+        assert_eq!(priorities(&state_based), [0, 0, 2]);
+        // a set on the state and another one on the edge give the edge two priorities
+        let both = hoa("State: 0 {0}\n[0] 1 {1}\n[!0] 0\nState: 1\n[t] 1 {1}");
+        let mut hoa = HoaString::from(both);
+        assert!(hoa.pop::<Det<Linked>>().unwrap().into_dpa().is_err());
     }
 
     #[test]

@@ -141,6 +141,21 @@ Two distinctions that recur everywhere:
   deterministic hashing, keeps benchmarks reproducible), `dag.rs`, `color.rs`
   (`Color` is `Clone + Debug`; `Int = u8`, `Void`, `Lattice`), `error.rs` (crate-wide `Error`).
 
+- `python/` (own crate `automata-py`, workspace-external, distribution `automatars`, import name
+  `automata`; maturin + pyo3, `abi3-py311`): `src/kind.rs` (`Kind`: `Chars` and `Props`, how symbols
+  and words convert; every class exists once per kind, `Prop` prefix), `src/class.rs`
+  (`automaton_class!`, the methods every class has incl. `to_dot`/`_repr_svg_`, and shared helpers),
+  per-family files `dfa.rs`, `machines.rs`, `omega.rs` (`omega_class!`, `dpa_class!`,
+  `pairs_class!`, `dma_class!`), `nondet.rs`, `hoa.rs`, `alphabet.rs`, `error.rs` (`Error` →
+  exception classes); `py/automata/` is the Python package (`builders.py`, the generated stub
+  `_automata/__init__.pyi`), `src/bin/stub_gen.rs` generates the stub, `tests/` are pytest files
+  (the classes' doctests run through `test_doctests.py`). Rules: never panic on Python input,
+  long work under `py.detach`, a new class needs both kinds. Python checks (also run by
+  `scripts/check` when maturin is installed): in `python/`, `cargo fmt --check`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo test`, then
+  `python3 -m venv .venv && . .venv/bin/activate && pip install maturin pytest && maturin develop
+  && python -m pytest -q`; after API changes `cargo run --bin stub_gen` and commit the `.pyi`.
+
 ## Conventions
 
 - `#![deny(missing_docs)]` and `deny(rustdoc::broken_intra_doc_links)` are on. The README is
