@@ -92,3 +92,6 @@ maturin develop
 python -m pytest            # includes the doctests of the classes
 cargo run --bin stub_gen    # regenerates automata/_automata/__init__.pyi
 ```
+
+`tests/README.md` describes the test suite, including the differential tests against Spot
+(`pytest -m spot`, they need `nix develop`).

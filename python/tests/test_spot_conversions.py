@@ -39,7 +39,7 @@ def test_normal_forms_of_random_dpas(method, seed):
 
 
 @pytest.mark.parametrize("method", ["normalized", "streamlined"])
-@pytest.mark.parametrize("path", fixture_cases(max_states=130))
+@pytest.mark.parametrize("path", fixture_cases(max_states=300))
 def test_normal_forms_of_fixtures(method, path):
     sa, o = read_fixture(path)
     check_equivalent(sa, getattr(o, method)())

@@ -23,7 +23,7 @@ def test_nondeterministic_automata_without_a_class_raise(kind):
         ours(a)
 
 
-@pytest.mark.parametrize("path", fixture_cases(max_states=64))
+@pytest.mark.parametrize("path", fixture_cases(max_states=300))
 def test_fixture_round_trips(path):
     a, o = read_fixture(path)
     assert type(o).__name__ == "PropDPA"

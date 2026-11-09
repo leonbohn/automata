@@ -26,7 +26,7 @@ def test_random_complement(kind, det, seed):
     check_complement(sa, ours(sa), seed)
 
 
-@pytest.mark.parametrize("path", fixture_cases(max_states=130))
+@pytest.mark.parametrize("path", fixture_cases(max_states=300))
 def test_fixture_complement(path):
     sa, o = read_fixture(path)
     check_complement(sa, o, len(path.name))
