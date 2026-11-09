@@ -339,6 +339,19 @@ macro_rules! dpa_class {
                     Self(parity_of(&dca.0, |bad| if bad { 1 } else { 2 }))
                 }
 
+                /// The letter game of the automaton, see the Rust documentation of
+                /// `ParityGame.letter_game`: `chooser` (`"eve"` or `"adam"`) picks the letters
+                /// and Eve wins iff the run is accepting. Returns the game and the vertex of
+                /// the initial state. For a prop automaton, the game has a vertex per state
+                /// and valuation, so it is exponential in the number of propositions.
+                #[pyo3(signature = (chooser = "adam"))]
+                fn letter_game(
+                    &self,
+                    chooser: &str,
+                ) -> PyResult<($crate::game::PyMinEvenParityGame, u32)> {
+                    $crate::game::letter_game(&self.0, chooser)
+                }
+
                 $($more)*
 
                 /// The complement: an automaton that accepts exactly the words that `self`

@@ -667,6 +667,14 @@ class DPA:
         The DPA with the colors `1` and `2` for the edges of the DCA with color `True`
         and `False`, which accepts the same language.
         """
+    def letter_game(self, chooser: builtins.str = 'adam') -> tuple[MinEvenParityGame, builtins.int]:
+        r"""
+        The letter game of the automaton, see the Rust documentation of
+        `ParityGame.letter_game`: `chooser` (`"eve"` or `"adam"`) picks the letters
+        and Eve wins iff the run is accepting. Returns the game and the vertex of
+        the initial state. For a prop automaton, the game has a vertex per state
+        and valuation, so it is exponential in the number of propositions.
+        """
     def complement(self) -> DPA:
         r"""
         The complement: an automaton that accepts exactly the words that `self`
@@ -1294,6 +1302,18 @@ class MaxEvenParityGame:
         
         Raises `GameError` if some vertex has no successor.
         """
+    def solve_zielonka(self) -> builtins.list[builtins.str]:
+        r"""
+        Like `solve`, but with Zielonka's algorithm, which is slower and serves as a
+        reference.
+        """
+    def solve_with_strategy(self) -> tuple[builtins.list[builtins.str], builtins.list[typing.Optional[builtins.int]]]:
+        r"""
+        Solves the game and returns the winners as `solve` and a winning strategy: for
+        every vertex its successor if it is owned by its winner, else `None`.
+        
+        Raises `GameError` if some vertex has no successor.
+        """
     def __len__(self) -> builtins.int: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -1333,6 +1353,18 @@ class MaxOddParityGame:
     def solve(self) -> builtins.list[builtins.str]:
         r"""
         Solves the game and returns, for every vertex, its winner: `"eve"` or `"adam"`.
+        
+        Raises `GameError` if some vertex has no successor.
+        """
+    def solve_zielonka(self) -> builtins.list[builtins.str]:
+        r"""
+        Like `solve`, but with Zielonka's algorithm, which is slower and serves as a
+        reference.
+        """
+    def solve_with_strategy(self) -> tuple[builtins.list[builtins.str], builtins.list[typing.Optional[builtins.int]]]:
+        r"""
+        Solves the game and returns the winners as `solve` and a winning strategy: for
+        every vertex its successor if it is owned by its winner, else `None`.
         
         Raises `GameError` if some vertex has no successor.
         """
@@ -1475,6 +1507,18 @@ class MinEvenParityGame:
         
         Raises `GameError` if some vertex has no successor.
         """
+    def solve_zielonka(self) -> builtins.list[builtins.str]:
+        r"""
+        Like `solve`, but with Zielonka's algorithm, which is slower and serves as a
+        reference.
+        """
+    def solve_with_strategy(self) -> tuple[builtins.list[builtins.str], builtins.list[typing.Optional[builtins.int]]]:
+        r"""
+        Solves the game and returns the winners as `solve` and a winning strategy: for
+        every vertex its successor if it is owned by its winner, else `None`.
+        
+        Raises `GameError` if some vertex has no successor.
+        """
     def __len__(self) -> builtins.int: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -1514,6 +1558,18 @@ class MinOddParityGame:
     def solve(self) -> builtins.list[builtins.str]:
         r"""
         Solves the game and returns, for every vertex, its winner: `"eve"` or `"adam"`.
+        
+        Raises `GameError` if some vertex has no successor.
+        """
+    def solve_zielonka(self) -> builtins.list[builtins.str]:
+        r"""
+        Like `solve`, but with Zielonka's algorithm, which is slower and serves as a
+        reference.
+        """
+    def solve_with_strategy(self) -> tuple[builtins.list[builtins.str], builtins.list[typing.Optional[builtins.int]]]:
+        r"""
+        Solves the game and returns the winners as `solve` and a winning strategy: for
+        every vertex its successor if it is owned by its winner, else `None`.
         
         Raises `GameError` if some vertex has no successor.
         """
@@ -2590,6 +2646,14 @@ class PropDPA:
         r"""
         The DPA with the colors `1` and `2` for the edges of the DCA with color `True`
         and `False`, which accepts the same language.
+        """
+    def letter_game(self, chooser: builtins.str = 'adam') -> tuple[MinEvenParityGame, builtins.int]:
+        r"""
+        The letter game of the automaton, see the Rust documentation of
+        `ParityGame.letter_game`: `chooser` (`"eve"` or `"adam"`) picks the letters
+        and Eve wins iff the run is accepting. Returns the game and the vertex of
+        the initial state. For a prop automaton, the game has a vertex per state
+        and valuation, so it is exponential in the number of propositions.
         """
     @classmethod
     def from_hoa(cls, text: builtins.str) -> PropDPA:

@@ -32,6 +32,24 @@ fn player_name(player: Player) -> &'static str {
     }
 }
 
+/// The letter game of the automaton `automaton`, see [`ParityGame::letter_game`], and the vertex
+/// of its initial state.
+pub fn letter_game<T, S>(
+    automaton: &automata::automaton::Automaton<T, S>,
+    chooser: &str,
+) -> PyResult<(PyMinEvenParityGame, u32)>
+where
+    T: automata::TransitionSystem<EdgeColor = Int> + States,
+    automata::automaton::Automaton<T, S>: automata::ts::Pointed<StateIndex = T::StateIndex>,
+{
+    let (game, vertices) = MinEvenParityGame::letter_game(automaton.ts(), player(chooser)?);
+    let initial = vertices
+        .get(&automata::ts::Pointed::initial(automaton))
+        .map(|q| q.into_usize() as u32)
+        .ok_or_else(|| PyValueError::new_err("the initial state is not a state"))?;
+    Ok((PyMinEvenParityGame(game), initial))
+}
+
 /// Checks that `v` is one of the vertices of `game` and returns it as a state of the arena.
 fn vertex<C>(game: &ParityGame<Arena, C>, v: u32) -> PyResult<StateId> {
     let n = game.arena().state_count();
@@ -42,6 +60,21 @@ fn vertex<C>(game: &ParityGame<Arena, C>, v: u32) -> PyResult<StateId> {
             "vertex {v} does not exist, there are {n} vertices"
         )))
     }
+}
+
+/// The winner of each vertex; vertices are numbered like the states of the arena.
+fn winners_of(
+    solution: &automata::game::Solution<StateId>,
+    n: usize,
+) -> PyResult<Vec<&'static str>> {
+    (0..n as u32)
+        .map(|v| {
+            solution
+                .winner(StateId::from(v))
+                .map(player_name)
+                .ok_or_else(|| PyValueError::new_err("vertex without a winner"))
+        })
+        .collect()
 }
 
 macro_rules! parity_game_class {
@@ -108,15 +141,37 @@ macro_rules! parity_game_class {
                 let solution = py
                     .detach(|| self.0.solve())
                     .map_err(|e: GameError| PyError(e.into()))?;
-                // vertices are numbered like the states of the arena
-                (0..self.__len__() as u32)
+                winners_of(&solution, self.__len__())
+            }
+
+            /// Like `solve`, but with Zielonka's algorithm, which is slower and serves as a
+            /// reference.
+            fn solve_zielonka(&self, py: Python<'_>) -> PyResult<Vec<&'static str>> {
+                let solution = py
+                    .detach(|| self.0.solve_zielonka())
+                    .map_err(|e: GameError| PyError(e.into()))?;
+                winners_of(&solution, self.__len__())
+            }
+
+            /// Solves the game and returns the winners as `solve` and a winning strategy: for
+            /// every vertex its successor if it is owned by its winner, else `None`.
+            ///
+            /// Raises `GameError` if some vertex has no successor.
+            fn solve_with_strategy(
+                &self,
+                py: Python<'_>,
+            ) -> PyResult<(Vec<&'static str>, Vec<Option<u32>>)> {
+                let solution = py
+                    .detach(|| self.0.solve())
+                    .map_err(|e: GameError| PyError(e.into()))?;
+                let strategy = (0..self.__len__() as u32)
                     .map(|v| {
                         solution
-                            .winner(StateId::from(v))
-                            .map(player_name)
-                            .ok_or_else(|| PyValueError::new_err("vertex without a winner"))
+                            .strategy(StateId::from(v))
+                            .map(|w| w.into_usize() as u32)
                     })
-                    .collect()
+                    .collect();
+                Ok((winners_of(&solution, self.__len__())?, strategy))
             }
 
             fn __len__(&self) -> usize {
