@@ -4,6 +4,7 @@ mod alphabet;
 mod class;
 mod dfa;
 mod error;
+mod game;
 mod hoa;
 mod kind;
 mod machines;
@@ -61,6 +62,10 @@ fn _automata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<machines::PyPropMooreMachine>()?;
     m.add_class::<machines::PyMealyMachine>()?;
     m.add_class::<machines::PyPropMealyMachine>()?;
+    m.add_class::<game::PyMaxEvenParityGame>()?;
+    m.add_class::<game::PyMinEvenParityGame>()?;
+    m.add_class::<game::PyMaxOddParityGame>()?;
+    m.add_class::<game::PyMinOddParityGame>()?;
     m.add_class::<dfa::PyDfaBuilder>()?;
     m.add_class::<dfa::PyPropDfaBuilder>()?;
     let py = m.py();
@@ -72,6 +77,7 @@ fn _automata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.add("BuilderError", py.get_type::<error::BuilderError>())?;
     m.add("AcceptanceError", py.get_type::<error::AcceptanceError>())?;
+    m.add("GameError", py.get_type::<error::GameError>())?;
     m.add("NotPeriodicError", py.get_type::<error::NotPeriodicError>())?;
     Ok(())
 }

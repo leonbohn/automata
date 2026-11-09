@@ -36,6 +36,12 @@ create_exception!(
 );
 create_exception!(
     automata._automata,
+    GameError,
+    AutomataError,
+    "A game could not be solved."
+);
+create_exception!(
+    automata._automata,
     NotPeriodicError,
     AutomataError,
     "A word is not ultimately periodic."
@@ -60,6 +66,7 @@ impl From<PyError> for PyErr {
             Error::PropAlphabet(_) => PropAlphabetError::new_err(msg),
             Error::Builder(_) => BuilderError::new_err(msg),
             Error::Acceptance(_) => AcceptanceError::new_err(msg),
+            Error::Game(_) => GameError::new_err(msg),
             Error::NotPeriodic(_) => NotPeriodicError::new_err(msg),
             // `Error` is non_exhaustive
             _ => AutomataError::new_err(msg),
