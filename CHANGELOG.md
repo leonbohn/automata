@@ -39,8 +39,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Exceptions: `automata.Error` with subclasses mirroring `crate::Error`; `NotYetImplemented` is
     `NotImplementedError`. Generated `.pyi` stubs (`cargo run --bin stub_gen`), `PANIC-AUDIT.md`
     lists the guards for Python input.
-  - A `python` job in CI, an optional Python step in `scripts/check` and a release workflow
-    (wheels via maturin-action, trusted publishing; first run on TestPyPI).
+  - A `python` job in CI and an optional Python step in `scripts/check`. The package is installed
+    from GitHub (see `python/README.md`).
 - Nondeterministic automata as aliases over one generic semantics, `automaton::Existential<C>`:
   a word is accepted if *some* run satisfies the acceptance condition `C` (#143). `NBA`, `NCA`,
   `NPA` (with the parity variant as a parameter), `NRA` and `NMA` for infinite words, `NFA` for
