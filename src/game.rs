@@ -4,7 +4,8 @@
 //! around a [`TransitionSystem`] whose state colors are [`Vertex`]es (owner and priority) and whose
 //! edges are the moves of the players. The alphabet carries no information, so the default arena
 //! [`Arena`] uses a single letter and all edges are labeled with it. All four parity conditions
-//! (min/max, even/odd) are supported, see [`ParityCondition`].
+//! (min/max, even/odd) are supported, see [`ParityCondition`]. The solver is tested against Oink
+//! (`tests/oink.rs`).
 //!
 //! ```
 //! use automata::game::{MaxEvenParityGame, Player};
@@ -70,6 +71,20 @@ pub enum GameError {
     /// Some vertex has no successor, but the arena of a parity game must be total.
     #[error("the arena of a parity game must be total, but some vertex has no successor")]
     NotTotal,
+    /// A game in the PGSolver format could not be read.
+    #[error(transparent)]
+    PgSolver(#[from] PgSolverError),
+}
+
+/// A game in the PGSolver format could not be read, see [`ParityGame::from_pgsolver`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+#[error("invalid PGSolver game in statement {statement}: {reason}")]
+pub struct PgSolverError {
+    /// The number of the offending statement (terminated by `;`), counted from one.
+    pub statement: usize,
+    /// What is wrong with it.
+    pub reason: &'static str,
 }
 
 mod sealed {
@@ -146,6 +161,140 @@ impl<C> ParityGame<Arena, C> {
     /// Adds an edge from `source` to `target`.
     pub fn add_edge(&mut self, source: StateIndex<Arena>, target: StateIndex<Arena>) {
         self.ts.add_edge((source, 'x', Void, target));
+    }
+}
+
+impl<C> ParityGame<Arena, C> {
+    /// Reads a game in the [PGSolver format](https://github.com/tcsprojects/pgsolver): an optional
+    /// header `parity n;` followed by one statement `id priority owner successors "name";` per
+    /// vertex, where `successors` is a comma separated list, `owner` is `0` for [`Player::Eve`]
+    /// and `1` for [`Player::Adam`] and the name is optional and ignored. The ids must be exactly
+    /// `0..n` (in any order) and the vertices of the game are numbered like them.
+    ///
+    /// The format does not say who wins a play, PGSolver and Oink use max-even priorities. The
+    /// condition `C` of the game gives the priorities their meaning.
+    ///
+    /// ```
+    /// use automata::game::{MaxEvenParityGame, Player};
+    ///
+    /// let game = MaxEvenParityGame::from_pgsolver("parity 1;\n0 1 1 0,1;\n1 2 0 0;\n")?;
+    /// assert_eq!(game.to_pgsolver(), "parity 1;\n0 1 1 0,1;\n1 2 0 0;\n");
+    /// # Ok::<(), automata::game::GameError>(())
+    /// ```
+    pub fn from_pgsolver(input: &str) -> Result<Self, GameError> {
+        fn err(statement: usize, reason: &'static str) -> GameError {
+            PgSolverError { statement, reason }.into()
+        }
+        let mut statements = input
+            .split(';')
+            .map(str::trim)
+            .enumerate()
+            .map(|(i, s)| (i + 1, s))
+            .filter(|(_, s)| !s.is_empty())
+            .peekable();
+        let mut declared = None; // (statement, n)
+        if let Some(&(i, header)) = statements.peek()
+            && let Some(rest) = header.strip_prefix("parity")
+        {
+            let max: usize = rest
+                .trim()
+                .parse()
+                .map_err(|_| err(i, "the header must be `parity n`"))?;
+            declared = Some((i, max));
+            statements.next();
+        }
+
+        // every id must occur exactly once, so there are as many statements as vertices
+        let statements: Vec<_> = statements.collect();
+        let n = statements.len();
+        if let Some((i, max)) = declared
+            && max.checked_add(1) != Some(n)
+        {
+            return Err(err(i, "the header does not match the number of vertices"));
+        }
+        let mut vertices: Vec<Option<(Vertex, Vec<usize>)>> = vec![None; n];
+        for (i, statement) in statements {
+            // the name is the part in quotes, everything before it are the fields
+            let fields = statement.split('"').next().unwrap_or_default();
+            let mut fields = fields.split_whitespace();
+            let mut next = |reason| fields.next().ok_or_else(|| err(i, reason));
+            let id: usize = next("missing id")?
+                .parse()
+                .map_err(|_| err(i, "the id is not a number"))?;
+            let priority: Int = next("missing priority")?
+                .parse()
+                .map_err(|_| err(i, "the priority is not a number from 0 to 255"))?;
+            let owner = match next("missing owner")? {
+                "0" => Player::Eve,
+                "1" => Player::Adam,
+                _ => return Err(err(i, "the owner must be 0 or 1")),
+            };
+            let successors = fields.collect::<String>();
+            let successors: Vec<usize> = successors
+                .split(',')
+                .map(|w| match w.parse() {
+                    Ok(w) if w < n => Ok(w),
+                    _ => Err(err(i, "a successor is not the id of a vertex")),
+                })
+                .collect::<Result<_, _>>()?;
+            let slot = vertices
+                .get_mut(id)
+                .ok_or_else(|| err(i, "the ids must be exactly 0..n"))?;
+            if slot
+                .replace((Vertex { owner, priority }, successors))
+                .is_some()
+            {
+                return Err(err(i, "the id occurs twice"));
+            }
+        }
+
+        let mut game = Self::new();
+        let ids: Vec<_> = vertices
+            .iter()
+            .flatten()
+            .map(|(v, _)| game.add_vertex(v.owner, v.priority))
+            .collect();
+        for (v, (_, successors)) in vertices.iter().flatten().enumerate() {
+            for &w in successors {
+                game.add_edge(ids[v], ids[w]);
+            }
+        }
+        Ok(game)
+    }
+}
+
+impl<T, C> ParityGame<T, C>
+where
+    T: TransitionSystem<StateColor = Vertex> + States,
+{
+    /// Writes the game in the PGSolver format, see [`ParityGame::from_pgsolver`]. The vertices are
+    /// numbered in the order of [`States::states`] and the successors are sorted. A vertex without a successor is written with
+    /// an empty list of successors, which no solver accepts.
+    pub fn to_pgsolver(&self) -> String {
+        use std::fmt::Write;
+        let ids: Vec<T::StateIndex> = self.ts.states().collect();
+        let index: FxIndexMap<T::StateIndex, usize> =
+            ids.iter().enumerate().map(|(i, q)| (*q, i)).collect();
+        let mut out = format!("parity {};\n", ids.len().saturating_sub(1));
+        for (v, q) in ids.iter().enumerate() {
+            let Some(vertex) = self.ts.state_color(*q) else {
+                continue;
+            };
+            let owner = u8::from(vertex.owner == Player::Adam);
+            // sorted, so that the output does not depend on the order of the storage
+            let mut successors: Vec<usize> = (self.ts.edges_from(*q).into_iter().flatten())
+                .map(|e| index[&e.target()])
+                .collect();
+            successors.sort_unstable();
+            let successors: Vec<_> = successors.iter().map(usize::to_string).collect();
+            let _ = writeln!(
+                out,
+                "{v} {} {owner} {};",
+                vertex.priority,
+                successors.join(",")
+            );
+        }
+        out
     }
 }
 
@@ -505,6 +654,50 @@ mod tests {
             winners(&icag::<MinOddParityCondition>(p.map(|x| 7 - x)), 8),
             expected
         );
+    }
+
+    #[test]
+    fn pgsolver_roundtrip() {
+        let game = icag::<MaxEvenParityCondition>([3, 2, 2, 3, 2, 0, 4, 1]);
+        let text = game.to_pgsolver();
+        assert!(text.starts_with("parity 7;\n0 3 0 1,4;\n"));
+        let read = MaxEvenParityGame::from_pgsolver(&text).unwrap();
+        assert_eq!(read.to_pgsolver(), text);
+        assert_eq!(winners(&read, 8), winners(&game, 8));
+    }
+
+    #[test]
+    fn pgsolver_reads_names_whitespace_and_any_order() {
+        let text = "parity 1;\n1 0 1 0, 1 \"b\";\n  0 3 0 1;\n";
+        let game = MaxEvenParityGame::from_pgsolver(text).unwrap();
+        assert_eq!(game.to_pgsolver(), "parity 1;\n0 3 0 1;\n1 0 1 0,1;\n");
+        // the header is optional
+        let game = MaxEvenParityGame::from_pgsolver("0 1 0 0;").unwrap();
+        assert_eq!(game.to_pgsolver(), "parity 0;\n0 1 0 0;\n");
+    }
+
+    #[test]
+    fn pgsolver_rejects_invalid_input() {
+        for text in [
+            "parity x;",           // header
+            "parity 2;\n0 0 0 0;", // header does not match
+            "0 0 0 0;\n0 0 0 0;",  // id twice
+            "0 0 0 0;\n2 0 0 0;",  // id out of range
+            "0 0 2 0;",            // owner
+            "0 256 0 0;",          // priority
+            "0 0 0 1;",            // successor
+            "0 0 0;",              // no successors
+            "0 0",                 // too short
+            "a 0 0 0;",            // id
+        ] {
+            assert!(
+                matches!(
+                    MaxEvenParityGame::from_pgsolver(text),
+                    Err(GameError::PgSolver(_))
+                ),
+                "{text:?}"
+            );
+        }
     }
 
     #[test]

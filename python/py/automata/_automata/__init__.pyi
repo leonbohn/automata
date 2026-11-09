@@ -19,8 +19,13 @@ __all__ = [
     "DPAMinOdd",
     "DRA",
     "DSA",
+    "GameError",
     "HoaError",
+    "MaxEvenParityGame",
+    "MaxOddParityGame",
     "MealyMachine",
+    "MinEvenParityGame",
+    "MinOddParityGame",
     "MooreMachine",
     "NBA",
     "NCA",
@@ -1231,11 +1236,108 @@ class DSA:
         """
     def __repr__(self) -> builtins.str: ...
 
+class GameError(AutomataError):
+    r"""
+    A game could not be solved.
+    """
+    ...
+
 class HoaError(AutomataError):
     r"""
     A HOA automaton could not be read or written.
     """
     ...
+
+@typing.final
+class MaxEvenParityGame:
+    r"""
+    A parity game in which Eve wins a play if the greatest priority seen infinitely often is even.
+    
+    >>> game = MaxEvenParityGame([("adam", 1), ("eve", 2)], [(0, 0), (0, 1), (1, 0)])
+    >>> game.solve()
+    ['adam', 'adam']
+    >>> game = MaxEvenParityGame([("eve", 1), ("eve", 2)], [(0, 0), (0, 1), (1, 0)])
+    >>> game.solve()
+    ['eve', 'eve']
+    """
+    def __new__(cls, vertices: typing.Sequence[tuple[builtins.str, builtins.int]] = [], edges: typing.Sequence[tuple[builtins.int, builtins.int]] = []) -> MaxEvenParityGame:
+        r"""
+        Creates a game with the given `vertices`, pairs `(owner, priority)` with owner
+        `"eve"` or `"adam"` and a priority from 0 to 255, and `edges`, pairs
+        `(source, target)` of vertices. The vertices are numbered `0, 1, ...` in the order
+        of `vertices`. Raises `ValueError` for an unknown player or a vertex that does not
+        exist.
+        """
+    @staticmethod
+    def from_pgsolver(text: builtins.str) -> MaxEvenParityGame:
+        r"""
+        Reads a game in the PGSolver format, see the Rust documentation of
+        `ParityGame.from_pgsolver`. PGSolver and Oink use max-even priorities. Raises
+        `GameError` if the text is not a valid game.
+        """
+    def to_pgsolver(self) -> builtins.str:
+        r"""
+        Writes the game in the PGSolver format; vertex `i` has id `i`.
+        """
+    def add_vertex(self, owner: builtins.str, priority: builtins.int) -> builtins.int:
+        r"""
+        Adds a vertex owned by `owner` (`"eve"` or `"adam"`) with the given priority and
+        returns its number.
+        """
+    def add_edge(self, source: builtins.int, target: builtins.int) -> None:
+        r"""
+        Adds an edge between two existing vertices.
+        """
+    def solve(self) -> builtins.list[builtins.str]:
+        r"""
+        Solves the game and returns, for every vertex, its winner: `"eve"` or `"adam"`.
+        
+        Raises `GameError` if some vertex has no successor.
+        """
+    def __len__(self) -> builtins.int: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class MaxOddParityGame:
+    r"""
+    A parity game in which Eve wins a play if the greatest priority seen infinitely often is odd.
+    """
+    def __new__(cls, vertices: typing.Sequence[tuple[builtins.str, builtins.int]] = [], edges: typing.Sequence[tuple[builtins.int, builtins.int]] = []) -> MaxOddParityGame:
+        r"""
+        Creates a game with the given `vertices`, pairs `(owner, priority)` with owner
+        `"eve"` or `"adam"` and a priority from 0 to 255, and `edges`, pairs
+        `(source, target)` of vertices. The vertices are numbered `0, 1, ...` in the order
+        of `vertices`. Raises `ValueError` for an unknown player or a vertex that does not
+        exist.
+        """
+    @staticmethod
+    def from_pgsolver(text: builtins.str) -> MaxOddParityGame:
+        r"""
+        Reads a game in the PGSolver format, see the Rust documentation of
+        `ParityGame.from_pgsolver`. PGSolver and Oink use max-even priorities. Raises
+        `GameError` if the text is not a valid game.
+        """
+    def to_pgsolver(self) -> builtins.str:
+        r"""
+        Writes the game in the PGSolver format; vertex `i` has id `i`.
+        """
+    def add_vertex(self, owner: builtins.str, priority: builtins.int) -> builtins.int:
+        r"""
+        Adds a vertex owned by `owner` (`"eve"` or `"adam"`) with the given priority and
+        returns its number.
+        """
+    def add_edge(self, source: builtins.int, target: builtins.int) -> None:
+        r"""
+        Adds an edge between two existing vertices.
+        """
+    def solve(self) -> builtins.list[builtins.str]:
+        r"""
+        Solves the game and returns, for every vertex, its winner: `"eve"` or `"adam"`.
+        
+        Raises `GameError` if some vertex has no successor.
+        """
+    def __len__(self) -> builtins.int: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class MealyMachine:
@@ -1332,6 +1434,90 @@ class MealyMachine:
         The strongly connected components, each as a sorted list of states (trivial
         components included).
         """
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class MinEvenParityGame:
+    r"""
+    A parity game in which Eve wins a play if the least priority seen infinitely often is even.
+    """
+    def __new__(cls, vertices: typing.Sequence[tuple[builtins.str, builtins.int]] = [], edges: typing.Sequence[tuple[builtins.int, builtins.int]] = []) -> MinEvenParityGame:
+        r"""
+        Creates a game with the given `vertices`, pairs `(owner, priority)` with owner
+        `"eve"` or `"adam"` and a priority from 0 to 255, and `edges`, pairs
+        `(source, target)` of vertices. The vertices are numbered `0, 1, ...` in the order
+        of `vertices`. Raises `ValueError` for an unknown player or a vertex that does not
+        exist.
+        """
+    @staticmethod
+    def from_pgsolver(text: builtins.str) -> MinEvenParityGame:
+        r"""
+        Reads a game in the PGSolver format, see the Rust documentation of
+        `ParityGame.from_pgsolver`. PGSolver and Oink use max-even priorities. Raises
+        `GameError` if the text is not a valid game.
+        """
+    def to_pgsolver(self) -> builtins.str:
+        r"""
+        Writes the game in the PGSolver format; vertex `i` has id `i`.
+        """
+    def add_vertex(self, owner: builtins.str, priority: builtins.int) -> builtins.int:
+        r"""
+        Adds a vertex owned by `owner` (`"eve"` or `"adam"`) with the given priority and
+        returns its number.
+        """
+    def add_edge(self, source: builtins.int, target: builtins.int) -> None:
+        r"""
+        Adds an edge between two existing vertices.
+        """
+    def solve(self) -> builtins.list[builtins.str]:
+        r"""
+        Solves the game and returns, for every vertex, its winner: `"eve"` or `"adam"`.
+        
+        Raises `GameError` if some vertex has no successor.
+        """
+    def __len__(self) -> builtins.int: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class MinOddParityGame:
+    r"""
+    A parity game in which Eve wins a play if the least priority seen infinitely often is odd.
+    """
+    def __new__(cls, vertices: typing.Sequence[tuple[builtins.str, builtins.int]] = [], edges: typing.Sequence[tuple[builtins.int, builtins.int]] = []) -> MinOddParityGame:
+        r"""
+        Creates a game with the given `vertices`, pairs `(owner, priority)` with owner
+        `"eve"` or `"adam"` and a priority from 0 to 255, and `edges`, pairs
+        `(source, target)` of vertices. The vertices are numbered `0, 1, ...` in the order
+        of `vertices`. Raises `ValueError` for an unknown player or a vertex that does not
+        exist.
+        """
+    @staticmethod
+    def from_pgsolver(text: builtins.str) -> MinOddParityGame:
+        r"""
+        Reads a game in the PGSolver format, see the Rust documentation of
+        `ParityGame.from_pgsolver`. PGSolver and Oink use max-even priorities. Raises
+        `GameError` if the text is not a valid game.
+        """
+    def to_pgsolver(self) -> builtins.str:
+        r"""
+        Writes the game in the PGSolver format; vertex `i` has id `i`.
+        """
+    def add_vertex(self, owner: builtins.str, priority: builtins.int) -> builtins.int:
+        r"""
+        Adds a vertex owned by `owner` (`"eve"` or `"adam"`) with the given priority and
+        returns its number.
+        """
+    def add_edge(self, source: builtins.int, target: builtins.int) -> None:
+        r"""
+        Adds an edge between two existing vertices.
+        """
+    def solve(self) -> builtins.list[builtins.str]:
+        r"""
+        Solves the game and returns, for every vertex, its winner: `"eve"` or `"adam"`.
+        
+        Raises `GameError` if some vertex has no successor.
+        """
+    def __len__(self) -> builtins.int: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
