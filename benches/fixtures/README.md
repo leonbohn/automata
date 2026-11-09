@@ -26,7 +26,13 @@ comparable.
 |---|---|---|---|
 | `ltl/` | Formulas from `genltl` (parametrised families for n = 1 to 3 and the first four larger automata of each pattern collection), translated with `ltl2tgba --deterministic --generic`, then converted with `autfilt` | 15 | 2 to 25 |
 | `random/` | `randaut --deterministic --colored --acceptance='parity min even P'` with fixed seeds, non-empty languages only. The seed is part of the file name. | 4 | 16 to 256 |
+| `many_aps/` | Added for #156. `genltl` families `--and-gf=12`, `--gf-equiv=12` and `--r-right=10`, and three `randaut` automata (8, 12 and 16 requested propositions, high edge density, 4 priorities, seed 1). Same conversion as above. | 6 | 11 to 32 |
 | `hard/` | `genaut --m-nba`, `--l-nba`, `--ks-nca`, `--l-dsa` for n = 2 and 3, converted to parity with `autfilt`. These force many states and priorities. | 3 | 29 to 121 |
+
+`many_aps/` is the only directory with more than 5 atomic propositions (8 to 13, i.e. the
+fixtures that cannot use the truth-table representation of edge labels). `randaut` only uses as
+many propositions as its edges need, so `random-n32-a16-p4-s1` has 13: the number in the name is
+the requested one, the `AP:` header is what the automaton has.
 
 File names say what they are: `ltl/gh-r-2.hoa` is `genltl --gh-r=2`,
 `random/n64-a2-p4-s1.hoa` has 64 states, 2 atomic propositions, 4 priorities and seed 1. The
@@ -38,8 +44,9 @@ References for the formula families are in `genltl --help` and the Spot document
 
 ## Which files are kept
 
-The script generates a superset and then keeps only the files the benchmarks read (the lists `LTL`
-and `SYNTHETIC` in `benches/common/mod.rs`, which must match the list in the script). Parsing HOA is
+The script generates a superset and then keeps only the files the benchmarks read (the lists `LTL`,
+`SYNTHETIC` and `MANY_APS` in `benches/common/mod.rs`, which must match the list in the script). Parsing HOA is
 slow (about 45 µs per edge, and benchmarks run under valgrind, roughly 100 times slower), and every
-benchmark parses its inputs again, so the selection is small and avoids automata with many atomic
-propositions. `tests/benchmark_fixtures.rs` checks that all files can be read.
+benchmark parses its inputs again, so the selections are small. Only `MANY_APS` has automata with many atomic
+propositions, and its benchmarks have their own ids (`::many_aps`) so that the histories of the
+others stay comparable. `tests/benchmark_fixtures.rs` checks that all files can be read.
