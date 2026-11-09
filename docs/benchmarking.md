@@ -29,6 +29,7 @@ There are three layers:
 | `dpa` | Normalization, complement, accepted/rejected words, witnesses per priority, equivalence/inclusion/counterexamples, SCCs, prefix partition, HOA parsing and printing |
 | `nondeterministic` | Nondeterministic omega automata (`Existential` semantics): acceptance of lassos for NPA/NBA/NCA and on fixtures read with the `Linked` storage, emptiness with witness for NPA/NBA/NCA/NRA/NMA, with nonempty and empty languages |
 | `wallclock` | A handful of the same operations with criterion, see below |
+| `versus/` | Not a cargo target: Python script comparing wall-clock times with Spot and Oink, see below |
 
 Operations that do not exist yet (for example union and intersection of DPAs, or complementation of NFAs)
 have no benchmark; each PR that adds one adds its benchmark to the same inputs.
@@ -53,6 +54,21 @@ to a benchmark (or to `main!`) to enable it.
 
 **Wall-clock times.** `benches/wallclock.rs` uses criterion on a few operations, for real magnitudes.
 They are only shown in the detail view of a run and never compared or graphed.
+
+## Versus Spot and Oink
+
+`benches/versus/compare.py` compares wall-clock times of `automata` with reference tools: Spot
+(`import spot`) for operations on automata and for parity games, Oink for parity games. Our side runs
+through the Python bindings, like Spot, so the call overhead is the same; parsing and building the inputs is
+never timed, results are fully built inside the timed call, and every comparison records whether both sides
+computed the same result (Oink runs as a process, we use the time it reports for preprocessing and solving).
+`automata-bench` runs it after the other targets (it builds the wheel of each revision with `maturin`),
+stores the rows in the history and shows them on the page `/versus` (latest `main`, ratio over time) and in
+the detail view of a run. Like the criterion times they depend on the machine and never block a pull request.
+`benches/versus/README.md` explains how to add an operation, for example determinization.
+
+Without the service: `maturin develop --release` in `python/`, then `python3 benches/versus/compare.py`
+(inside `nix develop`, which has Spot and Oink; a debug build of the bindings is an order of magnitude slower).
 
 ## Locally
 

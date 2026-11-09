@@ -194,14 +194,18 @@ pub fn to_hoa<W: automata::hoa::WriteHoa + Sync>(
         .map_err(|e| crate::error::PyError(e.into()).into())
 }
 
-/// Binary operations need automata over alphabets of the same size (otherwise the crate would
-/// silently compare unrelated languages).
-pub fn same_alphabet<A: automata::alphabet::Alphabet>(left: &A, right: &A) -> PyResult<()> {
-    if left.size() == right.size() {
+/// Binary operations need automata over the same alphabet (otherwise the crate would silently
+/// compare unrelated languages): same symbols, and for propositional alphabets the same atomic
+/// propositions in the same order.
+pub fn same_alphabet<A: automata::alphabet::Alphabet + PartialEq>(
+    left: &A,
+    right: &A,
+) -> PyResult<()> {
+    if left == right {
         Ok(())
     } else {
-        Err(PyValueError::new_err(
-            "the automata have different alphabets",
-        ))
+        Err(PyValueError::new_err(format!(
+            "the automata have different alphabets: {left:?} and {right:?}"
+        )))
     }
 }

@@ -13,6 +13,7 @@ on:
       - "src/ts/operations/**"
       - "src/hoa/**"
       - "python/**"
+      - "benches/versus/**"
       - ".github/workflows/python-spot.yml"
 
 jobs:
@@ -37,4 +38,6 @@ jobs:
             . .venv/bin/activate
             maturin develop
             python -m pytest -m spot
+            # the comparison with Spot and Oink (benches/versus) still runs, with minimal repetitions
+            python ../benches/versus/compare.py --budget 0 --max-runs 1 --out /dev/null
           '

@@ -2,14 +2,13 @@
 
 use automata::{
     NTS, Void,
-    alphabet::Alphabet,
     automaton::{
         Automaton, BuchiCondition, CoBuchiCondition, Emptiness, Equivalence, Existential,
         Inclusion, MinEvenParityCondition, ReachabilityCondition,
     },
     ts::TransitionSystem,
 };
-use pyo3::{exceptions::PyValueError, prelude::*, types::PyType};
+use pyo3::{prelude::*, types::PyType};
 
 use crate::alphabet::{PyCharAlphabet, PyPropAlphabet};
 use crate::class::automaton_class;
@@ -142,11 +141,7 @@ macro_rules! nfa_class {
 
         impl $name {
             fn same_alphabet(&self, other: &Self) -> PyResult<()> {
-                if self.0.ts().alphabet().size() == other.0.ts().alphabet().size() {
-                    Ok(())
-                } else {
-                    Err(PyValueError::new_err("the automata have different alphabets"))
-                }
+                crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())
             }
         }
     };

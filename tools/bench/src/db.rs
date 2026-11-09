@@ -1,7 +1,9 @@
 //! SQLite storage for runs and their results.
 
 use crate::compare::{self, Row};
-use crate::model::{EnvInfo, Measured, Metric, Metrics, Results, WallClock, WallResults, now};
+use crate::model::{
+    EnvInfo, Measured, Metric, Metrics, Results, Versus, VersusRow, WallClock, WallResults, now,
+};
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
@@ -94,6 +96,25 @@ CREATE TABLE IF NOT EXISTS wallclock (
     lo_ns REAL NOT NULL,
     hi_ns REAL NOT NULL,
     PRIMARY KEY (run_id, role, bench)
+);
+CREATE TABLE IF NOT EXISTS versus (
+    run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    bench TEXT NOT NULL,
+    reference TEXT NOT NULL,
+    ours_ns REAL NOT NULL,
+    ref_ns REAL NOT NULL,
+    ours_size INTEGER,
+    ref_size INTEGER,
+    equivalent INTEGER NOT NULL,
+    runs INTEGER NOT NULL,
+    PRIMARY KEY (run_id, role, bench, reference)
+);
+CREATE TABLE IF NOT EXISTS versus_settings (
+    run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    settings TEXT NOT NULL,
+    PRIMARY KEY (run_id, role)
 );
 CREATE INDEX IF NOT EXISTS runs_head ON runs(head_sha);
 ";
@@ -253,6 +274,29 @@ impl Db {
                     params![id, role, bench, w.mean_ns, w.lo_ns, w.hi_ns],
                 )?;
             }
+            for v in &m.versus.rows {
+                tx.execute(
+                    "INSERT OR REPLACE INTO versus VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+                    params![
+                        id,
+                        role,
+                        v.bench,
+                        v.reference,
+                        v.ours_ns,
+                        v.ref_ns,
+                        v.ours_size,
+                        v.ref_size,
+                        v.equivalent,
+                        v.runs
+                    ],
+                )?;
+            }
+            if !m.versus.rows.is_empty() {
+                tx.execute(
+                    "INSERT OR REPLACE INTO versus_settings VALUES (?1,?2,?3)",
+                    params![id, role, m.versus.settings.to_string()],
+                )?;
+            }
         }
         tx.execute(
             "UPDATE runs SET status='done', finished_at=?2, base_sha=?3, env=?4, error=NULL WHERE id=?1",
@@ -309,6 +353,71 @@ impl Db {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    pub fn versus(&self, run: i64, role: &str) -> Result<Versus> {
+        let mut stmt = self.0.prepare(
+            "SELECT bench, reference, ours_ns, ref_ns, ours_size, ref_size, equivalent, runs
+             FROM versus WHERE run_id=?1 AND role=?2 ORDER BY bench, reference",
+        )?;
+        let rows = stmt
+            .query_map(params![run, role], |r| {
+                Ok(VersusRow {
+                    bench: r.get(0)?,
+                    reference: r.get(1)?,
+                    ours_ns: r.get(2)?,
+                    ref_ns: r.get(3)?,
+                    ours_size: r.get(4)?,
+                    ref_size: r.get(5)?,
+                    equivalent: r.get(6)?,
+                    runs: r.get(7)?,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        let settings: Option<String> = self
+            .0
+            .query_row(
+                "SELECT settings FROM versus_settings WHERE run_id=?1 AND role=?2",
+                params![run, role],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(Versus {
+            settings: settings
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default(),
+            rows,
+        })
+    }
+
+    /// `ours / reference` (wall clock) of every comparison at every finished commit of `main`,
+    /// oldest first, as per mille so that it fits a [`Point`]. Keyed `bench vs reference`.
+    pub fn versus_history(&self, history: usize) -> Result<BTreeMap<String, Vec<Point>>> {
+        let mut stmt = self.0.prepare(
+            "SELECT v.bench || ' vs ' || v.reference, runs.id, runs.head_sha,
+                    COALESCE(runs.finished_at, runs.created_at), v.ours_ns / MAX(v.ref_ns, 1.0)
+             FROM versus v JOIN runs ON runs.id = v.run_id
+             WHERE runs.kind='main' AND runs.status='done' AND v.role='head'
+               AND runs.id IN (SELECT id FROM runs WHERE kind='main' AND status='done' ORDER BY id DESC LIMIT ?1)
+             ORDER BY runs.id",
+        )?;
+        let rows = stmt.query_map([history], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                Point {
+                    run: r.get(1)?,
+                    sha: r.get(2)?,
+                    time: r.get(3)?,
+                    value: (r.get::<_, f64>(4)? * 1000.0) as u64,
+                },
+            ))
+        })?;
+        let mut out: BTreeMap<String, Vec<Point>> = BTreeMap::new();
+        for row in rows {
+            let (key, point) = row?;
+            out.entry(key).or_default().push(point);
+        }
+        Ok(out)
+    }
+
     /// The measurement of a commit of `main` that was already benchmarked, so that a pull
     /// request does not measure its merge base again.
     pub fn main_measurement(&self, sha: &str) -> Result<Option<Measured>> {
@@ -325,6 +434,7 @@ impl Db {
             Ok(Measured {
                 results: self.results(id, "head")?,
                 wall: self.wall(id, "head")?,
+                versus: self.versus(id, "head")?,
             })
         })
         .transpose()
@@ -476,6 +586,19 @@ mod tests {
                         hi_ns: 2.0,
                     },
                 )]),
+                versus: Versus {
+                    settings: serde_json::json!({"spot": "2.16"}),
+                    rows: vec![VersusRow {
+                        bench: "op/in".into(),
+                        reference: "spot".into(),
+                        ours_ns: 3.0,
+                        ref_ns: 2.0,
+                        ours_size: Some(4),
+                        ref_size: None,
+                        equivalent: true,
+                        runs: 5,
+                    }],
+                },
             },
         )])
     }
@@ -502,6 +625,11 @@ mod tests {
             .unwrap();
         assert_eq!(db.results(id, "head").unwrap()["x"], metrics(5));
         assert_eq!(db.wall(id, "head").unwrap()["w"].mean_ns, 1.0);
+        assert_eq!(
+            db.versus(id, "head").unwrap(),
+            measured(5)["head"].versus.clone()
+        );
+        assert!(db.versus_history(10).unwrap().is_empty()); // PR runs are not history
         assert_eq!(db.pull_requests(1.0).unwrap().len(), 1);
     }
 
@@ -519,6 +647,12 @@ mod tests {
         assert_eq!(values, vec![20, 30]);
         // heap blocks were not measured
         assert!(db.history(Metric::HeapBlocks, 10).unwrap().is_empty());
+        // ours / reference = 1.5, as per mille
+        assert_eq!(db.versus_history(10).unwrap()["op/in vs spot"].len(), 3);
+        assert_eq!(
+            db.versus_history(10).unwrap()["op/in vs spot"][0].value,
+            1500
+        );
         assert!(db.main_measurement("b").unwrap().is_some());
         assert!(db.main_measurement("zzz").unwrap().is_none());
     }
