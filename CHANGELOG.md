@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 ### Added
+- Benchmark suite `benches/versus` (#143, WP9): wall-clock comparison of `automata` (through the Python bindings) with Spot (DPA equivalence and inclusion, parity games) and with Oink (parity games, Zielonka and PP+), with a check that both sides compute the same result. `automata-bench` runs it after the other benchmarks (`--versus-script`, `--no-versus`), stores it in the history and shows it on the new page `/versus` and in the detail view of a run; the NixOS option `services.automata-bench.versusScript` controls it, the package brings `maturin`, `python3`, Spot and Oink, and the default `benches` now include `nondeterministic` and `game`. New operations are added in `benches/versus/ops_*.py`, see its README.
+- Differential tests of the parity game solver against `spot.solve_parity_game` (`python/tests/test_spot_games.py`).
 - `ParityGame::from_pgsolver` and `ParityGame::to_pgsolver` read and write games in the PGSolver format (`GameError::PgSolver`, `PgSolverError`); in Python `from_pgsolver` and `to_pgsolver`.
 - Python: the parity games `MaxEvenParityGame`, `MinEvenParityGame`, `MaxOddParityGame` and `MinOddParityGame` (`add_vertex`, `add_edge`, `solve`) and the exception `GameError`.
 - Differential tests of `automata::game` against the solver [Oink](https://github.com/trolando/oink) (`tests/oink.rs`; skipped if `oink` is not found), the benchmark `game`, and the flake package `oink` (also in the dev shell). The package `oink` of nixpkgs is an unrelated DDNS client, so `nix/oink.nix` builds the solver.

@@ -36,7 +36,8 @@ To ensure code quality, run the following before committing:
   `hoa` is declared with `required-features = ["hoa"]` in Cargo.toml.
 - Benches in `benches/`: `scc`, `ts`, `storage`, `runs`, `dfa`, `dpa` (gungraun, deterministic,
   inputs from `benches/common` and Spot-generated `benches/fixtures`), plus `wallclock`
-  (criterion, informational). Benchmarks use public API only; names are tracked over time
+  (criterion, informational), and `benches/versus/` (Python, wall-clock against Spot and Oink, see its
+  README). Benchmarks use public API only; names are tracked over time
   (`tools/bench` SQLite history), so rename them only deliberately.
 - `bin/` holds command line tools (workspace members, `publish = false`, not part of the library):
   `oai` (reads HOA from stdin, `todpa` converts to a deterministic parity automaton) and
