@@ -196,18 +196,19 @@ omega_class!(
     PyCharAlphabet,
     bool,
     BuchiCondition,
-    "A deterministic Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` infinitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> inf_a = DBA(a, 1, 0, [(0, \"a\", True, 0), (0, \"b\", False, 0)])\n>>> inf_a.accepts(OmegaWord(\"b\", \"ab\"))\nTrue\n>>> inf_a.accepts(OmegaWord(\"a\", \"b\"))\nFalse\n>>> inf_a.is_empty()\nFalse\n\nThe HOA format writes the characters as propositions and reads them back as a `PropDBA`.\n\n>>> hoa = inf_a.to_hoa()\n>>> hoa.splitlines()[0]\n'HOA: v1'\n>>> PropDBA.from_hoa(hoa).num_edges\n2\n>>> type(parse_hoa(hoa)).__name__\n'PropDBA'\n>>> inf_a.to_dot().startswith(\"digraph\")\nTrue",
+    "A deterministic Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` infinitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> inf_a = DBA(a, 1, 0, [(0, \"a\", True, 0), (0, \"b\", False, 0)])\n>>> inf_a.accepts(OmegaWord(\"b\", \"ab\"))\nTrue\n>>> inf_a.accepts(OmegaWord(\"a\", \"b\"))\nFalse\n>>> inf_a.is_empty()\nFalse\n\nThe complement is the co-Büchi automaton `DCA` with the same transitions.\n\n>>> inf_a.complement().accepts(OmegaWord(\"a\", \"b\"))\nTrue\n\nThe HOA format writes the characters as propositions and reads them back as a `PropDBA`.\n\n>>> hoa = inf_a.to_hoa()\n>>> hoa.splitlines()[0]\n'HOA: v1'\n>>> PropDBA.from_hoa(hoa).num_edges\n2\n>>> type(parse_hoa(hoa)).__name__\n'PropDBA'\n>>> inf_a.to_dot().startswith(\"digraph\")\nTrue",
     comparisons,
     {
-        /// The automaton in the DOT format (of graphviz).
-        fn to_dot(&self) -> String {
-            automata::dot::Dottable::dot_representation(&self.0)
+        /// The complement: the `DCA` with the same transitions and colors, which accepts exactly
+        /// the words that `self` rejects (a run uses `True` edges infinitely often if and only
+        /// if it does not use them only finitely often).
+        fn complement(&self) -> PyDca {
+            PyDca(self.0.clone().map_acceptance(|_| CoBuchiCondition))
         }
 
-        /// The automaton as an SVG image, which is how Jupyter shows it (drawn natively, graphviz is
-        /// not needed).
-        fn _repr_svg_(&self, py: Python<'_>) -> PyResult<String> {
-            crate::class::svg(py, &self.0)
+        /// An equivalent automaton with fewer states and colors, see `DPA.streamlined`.
+        fn streamlined(&self, py: Python<'_>) -> Self {
+            Self(py.detach(|| self.0.streamlined()))
         }
 
         /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
@@ -226,15 +227,16 @@ omega_class!(
     "A deterministic Büchi automaton over a `PropAlphabet`, see `DBA`.",
     comparisons,
     {
-        /// The automaton in the DOT format (of graphviz).
-        fn to_dot(&self) -> String {
-            automata::dot::Dottable::dot_representation(&self.0)
+        /// The complement: the `DCA` with the same transitions and colors, which accepts exactly
+        /// the words that `self` rejects (a run uses `True` edges infinitely often if and only
+        /// if it does not use them only finitely often).
+        fn complement(&self) -> PyPropDca {
+            PyPropDca(self.0.clone().map_acceptance(|_| CoBuchiCondition))
         }
 
-        /// The automaton as an SVG image, which is how Jupyter shows it (drawn natively, graphviz is
-        /// not needed).
-        fn _repr_svg_(&self, py: Python<'_>) -> PyResult<String> {
-            crate::class::svg(py, &self.0)
+        /// An equivalent automaton with fewer states and colors, see `DPA.streamlined`.
+        fn streamlined(&self, py: Python<'_>) -> Self {
+            Self(py.detach(|| self.0.streamlined()))
         }
 
         /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
@@ -261,6 +263,12 @@ omega_class!(
     "A deterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` only finitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> fin_a = DCA(a, 1, 0, [(0, \"a\", True, 0), (0, \"b\", False, 0)])\n>>> fin_a.accepts(OmegaWord(\"aa\", \"b\"))\nTrue\n>>> fin_a.accepts(OmegaWord(\"\", \"ab\"))\nFalse\n>>> fin_a.is_empty()\nFalse\n\nThe HOA format writes the characters as propositions and reads them back as a `PropDCA`.\n\n>>> PropDCA.from_hoa(fin_a.to_hoa()).num_edges\n2\n>>> type(parse_hoa(fin_a.to_hoa())).__name__\n'PropDCA'",
     plain,
     {
+        /// The complement: the `DBA` with the same transitions and colors, which accepts exactly
+        /// the words that `self` rejects.
+        fn complement(&self) -> PyDba {
+            PyDba(self.0.clone().map_acceptance(|_| BuchiCondition))
+        }
+
         /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
         fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
             crate::class::to_hoa(py, &self.0)
@@ -277,6 +285,12 @@ omega_class!(
     "A deterministic co-Büchi automaton over a `PropAlphabet`, see `DCA`.",
     plain,
     {
+        /// The complement: the `DBA` with the same transitions and colors, which accepts exactly
+        /// the words that `self` rejects.
+        fn complement(&self) -> PyPropDba {
+            PyPropDba(self.0.clone().map_acceptance(|_| BuchiCondition))
+        }
+
         /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
         fn to_hoa(&self, py: Python<'_>) -> PyResult<String> {
             crate::class::to_hoa(py, &self.0)
@@ -306,17 +320,6 @@ macro_rules! dpa_class {
             $doc,
             comparisons,
             {
-                /// The automaton in the DOT format (of graphviz).
-                fn to_dot(&self) -> String {
-                    ::automata::dot::Dottable::dot_representation(&self.0)
-                }
-
-                /// The automaton as an SVG image, which is how Jupyter shows it (drawn natively,
-                /// graphviz is not needed).
-                fn _repr_svg_(&self, py: ::pyo3::Python<'_>) -> ::pyo3::PyResult<String> {
-                    $crate::class::svg(py, &self.0)
-                }
-
                 /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
                 fn to_hoa(&self, py: ::pyo3::Python<'_>) -> ::pyo3::PyResult<String> {
                     $crate::class::to_hoa(py, &self.0)
@@ -625,7 +628,7 @@ dpa_variant_class!(
 /// Defines a deterministic Rabin or Streett automaton class with the condition `$cond`, whose
 /// constructor takes a list of pairs `(fin, inf)` of lists of colors.
 macro_rules! pairs_class {
-    ($name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $cond:ident, $doc:expr, { $($more:tt)* }) => {
+    ($name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $cond:ident, $dual:ident, $dual_cond:ident, $doc:expr, { $($more:tt)* }) => {
         omega_class!(
             $name,
             $py_name,
@@ -665,6 +668,20 @@ macro_rules! pairs_class {
                     crate::class::to_hoa(py, &self.0)
                 }
 
+                /// The complement: the automaton of the dual kind (`DRA` and `DSA`) with the same
+                /// transitions and colors and every pair `(fin, inf)` replaced by
+                /// `(inf, fin)`. It accepts exactly the words that `self` rejects. The
+                /// automaton is expected to be complete.
+                fn complement(&self) -> $dual {
+                    let pairs: $dual_cond<Int> = self
+                        .0
+                        .acceptance()
+                        .pairs()
+                        .map(|pair| RabinPair::new(pair.inf().clone(), pair.fin().clone()))
+                        .into();
+                    $dual(self.0.clone().map_acceptance(|_| pairs))
+                }
+
                 $($more)*
             }
         );
@@ -677,6 +694,8 @@ pairs_class!(
     Chars,
     PyCharAlphabet,
     RabinCondition,
+    PyDsa,
+    StreettCondition,
     "A deterministic Rabin automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`). A word is accepted if for some pair `(fin, inf)` its run uses no color of `fin` and some color of `inf` infinitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> edges = [(0, \"a\", 0, 0), (0, \"b\", 1, 1), (1, \"a\", 0, 0), (1, \"b\", 1, 1)]\n>>> inf_b = DRA(a, 2, 0, edges, [([], [1])])\n>>> inf_b.accepts(OmegaWord(\"\", \"ba\"))\nTrue\n>>> inf_b.accepts(OmegaWord(\"b\", \"a\"))\nFalse\n>>> inf_b.is_empty()\nFalse\n\nThe Streett automaton `DSA` with the same data and every pair `(fin, inf)` replaced by `(inf, fin)` accepts the complement.\n\n>>> DSA(a, 2, 0, edges, [([1], [])]).accepts(OmegaWord(\"b\", \"a\"))\nTrue\n\nThe HOA format can only express the pairs `(fin, inf) = ([0], [1])`, `([2], [3])`, ... (pair `i` is `Fin(2i) & Inf(2i + 1)`) with the colors `0, ..., 2n - 1`, see `to_hoa`.\n\n>>> only_b = DRA(a, 1, 0, [(0, \"a\", 0, 0), (0, \"b\", 1, 0)], [([0], [1])])\n>>> type(parse_hoa(only_b.to_hoa())).__name__\n'PropDRA'",
     {}
 );
@@ -686,6 +705,8 @@ pairs_class!(
     Props,
     PyPropAlphabet,
     RabinCondition,
+    PyPropDsa,
+    StreettCondition,
     "A deterministic Rabin automaton over a `PropAlphabet`, see `DRA`.",
     {
         /// Reads the first automaton in the HOA text, which has to be deterministic with a
@@ -710,6 +731,8 @@ pairs_class!(
     Chars,
     PyCharAlphabet,
     StreettCondition,
+    PyDra,
+    RabinCondition,
     "A deterministic Streett automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`). A word is accepted if for every pair `(fin, inf)` its run uses no color of `fin` or some color of `inf` infinitely often (the dual of `DRA`; without pairs everything is accepted).\n\n>>> a = CharAlphabet(\"ab\")\n>>> edges = [(0, \"a\", 0, 0), (0, \"b\", 1, 1), (1, \"a\", 0, 0), (1, \"b\", 1, 1)]\n>>> fin_b = DSA(a, 2, 0, edges, [([1], [])])\n>>> fin_b.accepts(OmegaWord(\"b\", \"a\"))\nTrue\n>>> fin_b.accepts(OmegaWord(\"\", \"ba\"))\nFalse\n>>> fin_b.is_empty()\nFalse\n\nThe HOA format can only express the pairs `([0], [1])`, `([2], [3])`, ... (pair `i` is `Fin(2i) | Inf(2i + 1)`) with the colors `0, ..., 2n - 1`, see `to_hoa`.\n\n>>> only_a_finitely = DSA(a, 1, 0, [(0, \"a\", 0, 0), (0, \"b\", 1, 0)], [([0], [1])])\n>>> type(parse_hoa(only_a_finitely.to_hoa())).__name__\n'PropDSA'",
     {}
 );
@@ -719,6 +742,8 @@ pairs_class!(
     Props,
     PyPropAlphabet,
     StreettCondition,
+    PyPropDra,
+    RabinCondition,
     "A deterministic Streett automaton over a `PropAlphabet`, see `DSA`.",
     {
         /// Reads the first automaton in the HOA text, which has to be deterministic with a
@@ -731,6 +756,43 @@ pairs_class!(
         }
     }
 );
+
+/// The largest number of colors for which the complement of a Muller automaton is computed, it has
+/// up to `2^16` sets.
+const MAX_MULLER_COMPLEMENT_COLORS: usize = 16;
+
+/// The Muller automaton with the same transitions that accepts the words that `dma` rejects. The
+/// colors that an infinite run uses infinitely often form a nonempty subset of the colors of the
+/// edges, so the new sets are the nonempty subsets of these that are not sets of `dma`.
+fn muller_complement<A: Alphabet>(
+    dma: &Automaton<DTS<A, Void, Int>, MullerCondition<Int>>,
+) -> PyResult<Automaton<DTS<A, Void, Int>, MullerCondition<Int>>> {
+    let ts = dma.ts();
+    let colors: Vec<Int> = ts
+        .states()
+        .flat_map(|q| ts.edges_from(q).into_iter().flatten().map(|e| *e.color()))
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    if colors.len() > MAX_MULLER_COMPLEMENT_COLORS {
+        return Err(PyValueError::new_err(format!(
+            "the complement needs the subsets of the {} colors of the edges, at most {MAX_MULLER_COMPLEMENT_COLORS} are supported",
+            colors.len()
+        )));
+    }
+    let sets: Vec<automata::math::FxIndexSet<Int>> = (1u32..1 << colors.len())
+        .map(|mask| {
+            colors
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| mask >> i & 1 == 1)
+                .map(|(_, c)| *c)
+                .collect::<automata::math::FxIndexSet<Int>>()
+        })
+        .filter(|set| !dma.acceptance().satisfied_by_set(set))
+        .collect();
+    Ok(dma.clone().map_acceptance(|_| MullerCondition::new(sets)))
+}
 
 /// Defines a deterministic Muller automaton class, whose constructor takes a list of sets
 /// (lists) of colors.
@@ -768,6 +830,15 @@ macro_rules! dma_class {
                         MullerCondition::from_iter_iter(sets),
                     )
                     .map(Self)
+                }
+
+                /// The complement: a `DMA` with the same transitions and colors, whose sets are
+                /// the nonempty sets of colors of the edges that are not sets of `self`. It
+                /// accepts exactly the words that `self` rejects. The automaton is expected to
+                /// be complete. Raises `ValueError` if the edges have more than 16 different
+                /// colors.
+                fn complement(&self, py: Python<'_>) -> PyResult<Self> {
+                    py.detach(|| muller_complement(&self.0)).map(Self)
                 }
             }
         );

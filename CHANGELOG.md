@@ -30,7 +30,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     co-Büchi, all four parity conditions, Rabin and Streett (`PropDRA`/`PropDSA` number the sets
     of acceptance sets of the edges as colors), conversions
     (`NFA.from_dfa`, `NBA.from_dba`, `NCA.from_dca`, `NPA.from_dpa`, `DPA.from_dba`, `DPA.from_dca`),
-    DOT and SVG output (`to_dot`, `_repr_svg_`), builders (`DFABuilder`, `automata.builders`).
+    builders (`DFABuilder`, `automata.builders`).
+  - DOT and SVG output (`to_dot`, `_repr_svg_`) for every class.
+  - Complements that only change the condition: `DBA.complement()` (a `DCA`), `DCA.complement()`,
+    `DRA.complement()` (a `DSA` with every pair `(fin, inf)` swapped), `DSA.complement()` and
+    `DMA.complement()` (all nonempty sets of edge colors that are not in the family; `ValueError`
+    for more than 16 colors). `DBA.streamlined()`.
   - Exceptions: `automata.Error` with subclasses mirroring `crate::Error`; `NotYetImplemented` is
     `NotImplementedError`. Generated `.pyi` stubs (`cargo run --bin stub_gen`), `PANIC-AUDIT.md`
     lists the guards for Python input.

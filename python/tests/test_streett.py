@@ -128,7 +128,7 @@ def test_dsa_example_of_the_documentation():
     assert d.accepts(OmegaWord("a", "b")) and d.accepts(OmegaWord("", "ab")) and not d.accepts(OmegaWord("", "a"))
     assert d.sccs() == [[0]] and d.states() == [0] and (d.num_states, d.num_edges, d.initial) == (1, 2, 0)
     assert d.edges_from(0) and "DSA" in repr(d)
-    assert not hasattr(d, "complement")  # take the DRA with swapped pairs
+    assert d.complement().accepts(OmegaWord("", "a"))  # the DRA with swapped pairs
 
 
 @pytest.mark.parametrize("cls", [DRA, DSA])
