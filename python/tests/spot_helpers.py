@@ -45,16 +45,32 @@ def randaut(kind, seed, deterministic, states=5, aps=2, density=None, acc_prob=N
         cmd += f" -e {density}"
     if acc_prob is not None:
         cmd += f" -a {acc_prob}"
-    aut = spot.automaton(f"{cmd} {aps} |")
     # randaut leaves edges without a parity color; our reader needs exactly one (see
     # `test_parity_edges_without_color_are_read`)
-    return spot.colorize_parity(aut, True) if kind in PARITY else aut
+    colored = "--colored" if kind in PARITY else ""
+    return spot.automaton(f"{cmd} {colored} {aps} |")
 
 
 def expected_class(kind, spot_aut):
     """Name of the class `parse_hoa` returns for the random automaton (`randaut` without `-D`
     sometimes gives a deterministic one)."""
     return KINDS[kind][1 if spot.is_deterministic(spot_aut) else 2]
+
+
+def widen(text, kind, seed):
+    """HOA text of an automaton whose language contains the one of `text` (random changes of
+    edges that can only add accepted words): Büchi edges get the mark, odd color 1 of min even
+    parity (3 colors) becomes 2."""
+    rng = random.Random(seed)
+    lines = []
+    for line in text.splitlines():
+        if line.startswith("["):
+            if kind == "buchi" and "{" not in line and rng.random() < 0.5:
+                line += " {0}"
+            elif kind == "parity-min-even" and line.endswith("{1}") and rng.random() < 0.5:
+                line = line[:-3] + "{2}"
+        lines.append(line)
+    return "\n".join(lines) + "\n"
 
 
 def case_id(kind, deterministic, seed):
@@ -105,9 +121,13 @@ def fixture_cases(max_states=None):
     return out
 
 
-def read_fixture(path):
-    """The fixture as `(spot automaton, our automaton)`."""
-    return spot.automaton(str(path)), automata.parse_hoa(path.read_text())
+def read_fixture(path, split=False):
+    """The fixture as `(spot automaton, our automaton)`; `split` splits edges into minterms
+    (needed for inclusion, see `test_inclusion_of_automata_with_true_labels`)."""
+    sa = spot.automaton(str(path))
+    if split:
+        sa = spot.split_edges(sa)
+    return sa, ours(sa)
 
 
 def lassos(num_aps, seed, count=25, max_prefix=3, max_period=3):
