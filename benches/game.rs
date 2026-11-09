@@ -73,29 +73,36 @@ fn random_min_odd(n: usize) -> (usize, MinOddParityGame) {
     (n, MinOddParityGame::from_arena(arena))
 }
 
-#[library_benchmark]
-#[bench::few_priorities_1000(args = (1_000), setup = random_few)]
-#[bench::few_priorities_4000(args = (4_000), setup = random_few)]
-#[bench::many_priorities_1000(args = (1_000), setup = random_many)]
-#[bench::many_priorities_4000(args = (4_000), setup = random_many)]
-#[bench::ladder_1000(args = (1_000), setup = ladder)]
-#[bench::ladder_4000(args = (4_000), setup = ladder)]
-fn zielonka((n, game): (usize, MaxEvenParityGame)) -> usize {
-    let solution = black_box(game.solve().unwrap());
-    black_box(solution.winning_region(Player::Eve).count()) + n
+macro_rules! solver_benchmarks {
+    ($plain:ident, $min_odd:ident, $solve:ident) => {
+        #[library_benchmark]
+        #[bench::few_priorities_1000(args = (1_000), setup = random_few)]
+        #[bench::few_priorities_4000(args = (4_000), setup = random_few)]
+        #[bench::many_priorities_1000(args = (1_000), setup = random_many)]
+        #[bench::many_priorities_4000(args = (4_000), setup = random_many)]
+        #[bench::ladder_1000(args = (1_000), setup = ladder)]
+        #[bench::ladder_4000(args = (4_000), setup = ladder)]
+        fn $plain((n, game): (usize, MaxEvenParityGame)) -> usize {
+            let solution = black_box(game.$solve().unwrap());
+            black_box(solution.winning_region(Player::Eve).count()) + n
+        }
+
+        #[library_benchmark]
+        #[bench::few_priorities_1000(args = (1_000), setup = random_min_odd)]
+        #[bench::few_priorities_4000(args = (4_000), setup = random_min_odd)]
+        fn $min_odd((n, game): (usize, MinOddParityGame)) -> usize {
+            let solution = black_box(game.$solve().unwrap());
+            black_box(solution.winning_region(Player::Eve).count()) + n
+        }
+    };
 }
 
-#[library_benchmark]
-#[bench::few_priorities_1000(args = (1_000), setup = random_min_odd)]
-#[bench::few_priorities_4000(args = (4_000), setup = random_min_odd)]
-fn zielonka_min_odd((n, game): (usize, MinOddParityGame)) -> usize {
-    let solution = black_box(game.solve().unwrap());
-    black_box(solution.winning_region(Player::Eve).count()) + n
-}
+solver_benchmarks!(zielonka, zielonka_min_odd, solve_zielonka);
+solver_benchmarks!(tangle_learning, tangle_learning_min_odd, solve);
 
 library_benchmark_group!(
     name = game;
-    benchmarks = zielonka, zielonka_min_odd
+    benchmarks = zielonka, zielonka_min_odd, tangle_learning, tangle_learning_min_odd
 );
 
 main!(

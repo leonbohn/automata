@@ -75,3 +75,28 @@ def test_pgsolver_roundtrip():
 def test_pgsolver_invalid():
     with pytest.raises(GameError):
         MaxEvenParityGame.from_pgsolver("0 0 2 0;")
+
+
+def test_solve_zielonka_agrees():
+    game = lecture(MaxEvenParityGame, PRIORITIES)
+    assert game.solve_zielonka() == game.solve() == WINNERS
+
+
+def test_strategy_stays_in_winning_region():
+    game = lecture(MaxEvenParityGame, PRIORITIES)
+    winners, strategy = game.solve_with_strategy()
+    assert winners == WINNERS
+    for v, (owner, w) in enumerate(zip(OWNERS, strategy)):
+        if owner == winners[v]:
+            assert (v, w) in EDGES and winners[w] == winners[v]
+        else:
+            assert w is None
+
+
+def test_letter_game_decides_universality():
+    a = automata.CharAlphabet("ab")
+    universal = automata.DPA(a, 1, 0, [(0, "a", 0, 0), (0, "b", 2, 0)])
+    other = automata.DPA(a, 1, 0, [(0, "a", 0, 0), (0, "b", 1, 0)])
+    for dpa, winner in [(universal, "eve"), (other, "adam")]:
+        game, initial = dpa.letter_game()
+        assert game.solve()[initial] == winner
