@@ -1,0 +1,35 @@
+name: Python bindings vs Spot
+
+# Differential tests of the Python bindings against Spot (python/tests/test_spot_*.py). Spot comes
+# from the flake's dev shell (nix/spot-platform.nix); building it is slow if it is not cached.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"
+  pull_request:
+    paths:
+      - "src/automaton/**"
+      - "src/ts/operations/**"
+      - "src/hoa/**"
+      - "python/**"
+      - ".github/workflows/python-spot.yml"
+
+jobs:
+  spot:
+    name: pytest -m spot
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - name: Differential tests against Spot
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cd python
+            python -m venv .venv
+            .venv/bin/pip install maturin pytest
+            . .venv/bin/activate
+            maturin develop
+            python -m pytest -m spot
+          '
