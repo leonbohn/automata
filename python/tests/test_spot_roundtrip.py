@@ -30,11 +30,6 @@ def test_fixture_round_trips(path):
     assert spot.are_equivalent(a, to_spot(o)), msg("round trip changed the language", a)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: state-based acceptance (`State: 0 {0}`) is silently dropped by the HOA reader "
-    "(src/hoa/input.rs only uses the acceptance signature of edges)",
-)
 def test_state_based_acceptance_is_read():
     a = randaut("buchi", 5, True)
     text = hoa(a, "s")

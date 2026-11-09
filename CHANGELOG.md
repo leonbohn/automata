@@ -125,6 +125,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   input accepts up to 31 atomic propositions (the limit of `PropAlphabet`) instead of 6.
 
 ### Fixed
+- HOA input ignored state-based acceptance (`State: 0 {0}`), so the automaton got no acceptance
+  sets on the edges of that state and accepted another language. The sets of a state are now put on
+  all its outgoing edges (united with the sets of the edge, so parity automata with a set on the
+  state and on the edge are still an `AcceptanceError`).
 - Products (`ts_product`, `MatchingProduct`) only paired edges with equal expressions. Over a
   `PropAlphabet`, where edges may be labeled with any formula (`[t]`, `[0]`, ...), this lost
   transitions: `Inclusion`/`Equivalence` and their counterexamples, `DPA::prefix_partition`,
