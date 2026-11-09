@@ -23,12 +23,14 @@
 use super::branching::{CycleCondition, Existential, HistoryDeterministic};
 use super::cycles::{self, Colors, Priorities};
 use super::{Automaton, DBA, DFA, DPA, NFA};
+use crate::color::Void;
+use crate::representation::{FromTransitions, Parts};
 use crate::ts::EdgeColor;
 use crate::ts::States;
 use crate::ts::operations::{Product, ProductIndex};
 use crate::ts::{Deterministic, Pointed, StateIndex, SymbolOf, TransitionSystem};
 use crate::word::ReducedOmegaWord;
-use crate::{Int, math};
+use crate::{Int, NTS, math};
 use std::hash::Hash;
 
 /// The problem of deciding whether the language of an automaton is empty, see the
@@ -317,7 +319,7 @@ where
     /// strongly connected components, only decomposing those again that cannot be used right
     /// away.
     pub fn counterexample(&self) -> Option<ReducedOmegaWord<SymbolOf<DPA<D>>>> {
-        product_lasso(self.subset, self.superset, |&c| c, (true, false))
+        product_lasso(self.subset, self.superset, |&c| c, &[(true, false)])
     }
 
     /// Returns true if and only if the inclusion holds.
@@ -334,8 +336,12 @@ where
     /// Returns an ultimately periodic word that is accepted by exactly one of the two automata,
     /// or `None` if they are equivalent.
     pub fn counterexample(&self) -> Option<ReducedOmegaWord<SymbolOf<DPA<D>>>> {
-        product_lasso(self.left, self.right, |&c| c, (true, false))
-            .or_else(|| product_lasso(self.left, self.right, |&c| c, (false, true)))
+        product_lasso(
+            self.left,
+            self.right,
+            |&c| c,
+            &[(true, false), (false, true)],
+        )
     }
 
     /// Returns true if and only if the two automata accept the same language.
@@ -352,7 +358,7 @@ where
     /// Returns an ultimately periodic word that is accepted by the first but not by the second
     /// automaton, or `None` if the inclusion holds.
     pub fn counterexample(&self) -> Option<ReducedOmegaWord<SymbolOf<DBA<D>>>> {
-        product_lasso(self.subset, self.superset, |&c| buchi(c), (true, false))
+        product_lasso(self.subset, self.superset, |&c| buchi(c), &[(true, false)])
     }
 
     /// Returns true if and only if the inclusion holds.
@@ -369,8 +375,12 @@ where
     /// Returns an ultimately periodic word that is accepted by exactly one of the two automata,
     /// or `None` if they are equivalent.
     pub fn counterexample(&self) -> Option<ReducedOmegaWord<SymbolOf<DBA<D>>>> {
-        product_lasso(self.left, self.right, |&c| buchi(c), (true, false))
-            .or_else(|| product_lasso(self.left, self.right, |&c| buchi(c), (false, true)))
+        product_lasso(
+            self.left,
+            self.right,
+            |&c| buchi(c),
+            &[(true, false), (false, true)],
+        )
     }
 
     /// Returns true if and only if the two automata accept the same language.
@@ -555,13 +565,14 @@ where
     cycles::lasso(automaton, automaton.initial(), &priorities)
 }
 
-/// Looks for a word whose run in the product of `left` and `right` has the given acceptance (as
-/// seen by the min-even parity condition on `priority`) in both automata.
+/// Looks for a word whose run in the product of `left` and `right` has one of the given
+/// acceptances (as seen by the min-even parity condition on `priority`) in both automata. The
+/// product is built once, with its edge labels computed once, and shared by all acceptances.
 fn product_lasso<L, R, S>(
     left: &Automaton<L, S>,
     right: &Automaton<R, S>,
     priority: impl Fn(&L::EdgeColor) -> Int + Copy,
-    accepted: (bool, bool),
+    accepted: &[(bool, bool)],
 ) -> Option<ReducedOmegaWord<SymbolOf<L>>>
 where
     L: Deterministic + States,
@@ -569,15 +580,60 @@ where
 {
     // Without an edge of the right parity, no cycle can have the wanted least priority. The edges
     // below these priorities must not be removed, as they may be needed to reach a good cycle.
-    least_priority(left, priority, accepted.0)?;
-    least_priority(right, priority, accepted.1)?;
-    let initial = ProductIndex(left.initial(), right.initial());
-    let product = left.ts_product(right).with_initial(initial);
-    let priorities = Priorities {
-        priorities: |(l, r): &(L::EdgeColor, L::EdgeColor)| (priority(l), priority(r)),
-        accepted,
-    };
-    cycles::lasso(&product, initial, &priorities)
+    let possible: Vec<_> = accepted
+        .iter()
+        .copied()
+        .filter(|&(l, r)| {
+            least_priority(left, priority, l).is_some()
+                && least_priority(right, priority, r).is_some()
+        })
+        .collect();
+    if possible.is_empty() {
+        return None;
+    }
+    // The search decomposes the product repeatedly; a lazy product would recompute its edge
+    // labels (BDD intersections for propositional alphabets) every time.
+    let product = explore_product(left, right);
+    let initial = crate::ts::q(0);
+    possible.into_iter().find_map(|accepted| {
+        let priorities = Priorities {
+            priorities: |(l, r): &(L::EdgeColor, L::EdgeColor)| (priority(l), priority(r)),
+            accepted,
+        };
+        cycles::lasso(&product, initial, &priorities)
+    })
+}
+
+/// The part of the product of `left` and `right` that is reachable from the pair of initial
+/// states, stored with its edges (so that each edge label is computed once). The initial state
+/// has index 0.
+fn explore_product<L, R, S>(
+    left: &Automaton<L, S>,
+    right: &Automaton<R, S>,
+) -> NTS<L::Alphabet, Void, (L::EdgeColor, L::EdgeColor)>
+where
+    L: Deterministic + States,
+    R: Deterministic<Alphabet = L::Alphabet, EdgeColor = L::EdgeColor> + States,
+{
+    let product = left.ts_product(right);
+    let mut states = math::FxIndexSet::default();
+    states.insert(ProductIndex(left.initial(), right.initial()));
+    let mut edges = Vec::new();
+    let mut next = 0;
+    while let Some(&source) = states.get_index(next) {
+        next += 1;
+        for edge in product.edges_from(source).into_iter().flatten() {
+            let (source, expression, color, target) = edge.into_tuple();
+            states.insert(target);
+            edges.push((source, expression, color, target));
+        }
+    }
+    NTS::from_transitions(Parts {
+        alphabet: left.alphabet().clone(),
+        states: states.into_iter().map(|q| (q, Void)),
+        edges: edges.into_iter(),
+        initial: (),
+    })
 }
 
 #[cfg(test)]
