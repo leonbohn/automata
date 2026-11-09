@@ -37,8 +37,8 @@ pub use crate::{Color, Int, Lattice, Void};
 
 // Automata, acceptance and the language problems
 pub use crate::automaton::{
-    Automaton, DBA, DCW, DFA, DMA, DPA, DRA, DSA, Disjointness, Emptiness, Equivalence,
-    Existential, Inclusion, MealyMachine, MooreMachine, NBA, NCW, NFA, NMA, NPA, NRA, NSA,
+    Automaton, DBA, DCA, DFA, DMA, DPA, DRA, DSA, Disjointness, Emptiness, Equivalence,
+    Existential, Inclusion, MealyMachine, MooreMachine, NBA, NCA, NFA, NMA, NPA, NRA, NSA,
     Semantics,
 };
 pub use crate::minimization::Minimize;

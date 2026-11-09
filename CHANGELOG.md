@@ -10,19 +10,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 ### Added
+- Co-Büchi automata are named `DCA`, `NCA` and `HDCA` (and `into_dca`, `into_nca`, `NCA::from_dca`, ...) like the other types (acceptance condition + `A` for automaton); these names were never released.
 - Python bindings in `python/` (distribution `automatars`, import name `automata`, built with maturin,
   `abi3-py311`; #143, WP4 and WP5). Every automaton class exists over a `CharAlphabet` and, with
   the prefix `Prop`, over a `PropAlphabet`:
   - `CharAlphabet`, `PropAlphabet`, `OmegaWord(prefix, period)`.
   - Deterministic: `DFA` (union, intersection, complement, minimize, language problems with
-    counterexamples), `DBA`, `DCW`, `DPA` (min even; complement, inclusion, equivalence),
+    counterexamples), `DBA`, `DCA`, `DPA` (min even; complement, inclusion, equivalence),
     `DPAMaxEven`, `DPAMinOdd` and `DPAMaxOdd` (`to_min_even`, `complement`, `to_hoa`, `from_hoa`),
     `DRA`, `DSA`, `DMA`, `MooreMachine` and `MealyMachine` (minimize, bisimilarity). Nondeterministic: `NFA`
-    (`determinize`), `NBA`, `NCW`, `NPA`. All have `sccs()`, `states()`, `edges_from(q)`.
+    (`determinize`), `NBA`, `NCA`, `NPA`. All have `sccs()`, `states()`, `edges_from(q)`.
   - HOA input/output (`to_hoa`, `from_hoa`, `automata.parse_hoa`, `parse_hoa_all`) for Büchi,
     co-Büchi, all four parity conditions, Rabin and Streett (`PropDRA`/`PropDSA` number the sets
     of acceptance sets of the edges as colors), conversions
-    (`NFA.from_dfa`, `NBA.from_dba`, `NCW.from_dcw`, `NPA.from_dpa`, `DPA.from_dba`, `DPA.from_dcw`),
+    (`NFA.from_dfa`, `NBA.from_dba`, `NCA.from_dca`, `NPA.from_dpa`, `DPA.from_dba`, `DPA.from_dca`),
     DOT and SVG output (`to_dot`, `_repr_svg_`), builders (`DFABuilder`, `automata.builders`).
   - Exceptions: `automata.Error` with subclasses mirroring `crate::Error`; `NotYetImplemented` is
     `NotImplementedError`. Generated `.pyi` stubs (`cargo run --bin stub_gen`), `PANIC-AUDIT.md`
@@ -30,7 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - A `python` job in CI, an optional Python step in `scripts/check` and a release workflow
     (wheels via maturin-action, trusted publishing; first run on TestPyPI).
 - Nondeterministic automata as aliases over one generic semantics, `automaton::Existential<C>`:
-  a word is accepted if *some* run satisfies the acceptance condition `C` (#143). `NBA`, `NCW`,
+  a word is accepted if *some* run satisfies the acceptance condition `C` (#143). `NBA`, `NCA`,
   `NPA` (with the parity variant as a parameter), `NRA` and `NMA` for infinite words, `NFA` for
   finite ones. Any condition that implements `CycleCondition` (infinite words) or
   `FinalStateCondition` (finite words) works, so a new condition gets its nondeterministic
@@ -39,32 +40,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   Streett (`StreettCondition`) and exponential in the number of colors for Muller and for the
   Streett case of `OmegaAcceptanceCondition`.
 - History-deterministic automata as a promise in the type: `automaton::HistoryDeterministic<C>`
-  (same acceptance as `Existential<C>`) with the aliases `HDFA`, `HDBA`, `HDCW`, `HDPA`, `HDRA`
+  (same acceptance as `Existential<C>`) with the aliases `HDFA`, `HDBA`, `HDCA`, `HDPA`, `HDRA`
   and `HDMA`. `assume_history_deterministic()` turns a nondeterministic automaton into one
   (unchecked, the checks come with WP8 of #143), `into_existential()` drops the promise.
   `Emptiness` and HOA output work as for nondeterministic automata.
 - `Automaton::map_acceptance(f)` replaces the acceptance condition, e.g.
   `dba.map_acceptance(Existential)` is the `DBA` as an `NBA`.
-- The co-Büchi condition `CoBuchiCondition` with `DCW` and `NCW`.
+- The co-Büchi condition `CoBuchiCondition` with `DCA` and `NCA`.
 - The Streett condition `StreettCondition<C>`, dual to `RabinCondition<C>` and built from the same
   `RabinPair`s (`fin` disjoint from the colors seen infinitely often, or `inf` meets them; all pairs
   have to hold, no pair accepts everything), with `DSA` and `NSA`. It implements `Semantics` and
   `CycleCondition`, so `accepts`, `Emptiness` and HOA output (`HoaAcceptance`) work; emptiness
   refines the SCCs by removing the `fin` colors of violated pairs.
-- Builder shortcuts `into_nba`, `into_dcw`, `into_ncw`, `into_npa` and the generic
+- Builder shortcuts `into_nba`, `into_dca`, `into_nca`, `into_npa` and the generic
   `into_nondeterministic_automaton(initial, acceptance)`, each with a `try_` twin.
 - `Emptiness` with an accepted word as witness for every nondeterministic omega automaton
-  (`Automaton<T, Existential<C>>`) and for `DCW`, `DRA` and `DMA`; `Emptiness`, `Inclusion` and
+  (`Automaton<T, Existential<C>>`) and for `DCA`, `DRA` and `DMA`; `Emptiness`, `Inclusion` and
   `Equivalence` for `NFA` (via `NFA::determinize`). Inclusion and equivalence of nondeterministic
   omega automata are not offered, they need a determinization or complementation that does not
   exist yet.
-- Benchmark target `nondeterministic`: acceptance of lassos and emptiness for NPA, NBA, NCW, NRA
+- Benchmark target `nondeterministic`: acceptance of lassos and emptiness for NPA, NBA, NCA, NRA
   and NMA, and acceptance on fixtures read with the `Linked` storage. `automata-bench` runs it by
   default.
 - `automaton::ParityKind` (`MinEven`, `MaxEven`, `MinOdd`, `MaxOdd`) for the four variants of the
   parity condition, with `is_max` and `is_even`. `AcceptanceError::PriorityOverflow` and
   `HoaError::InconsistentAcceptance` are new (both enums are `#[non_exhaustive]`).
-- HOA output (`HoaAcceptance`) for `CoBuchiCondition` (so `DCW`, `NCW`, `HDCW`) and
+- HOA output (`HoaAcceptance`) for `CoBuchiCondition` (so `DCA`, `NCA`, `HDCA`) and
   `RabinCondition<Int>` (`DRA`, `NRA`, every edge color is the one acceptance set of its edge);
   `RabinCondition::pairs`. Muller automata have no HOA form.
 - `Storage::Semantics<C>`: the semantics of a condition on a storage, `C` for the deterministic

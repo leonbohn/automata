@@ -26,9 +26,9 @@ use pyo3::{prelude::*, types::PyAny};
 use pyo3_stub_gen::derive::gen_stub_pyfunction;
 
 use crate::error::PyError;
-use crate::nondet::{PyPropNba, PyPropNcw, PyPropNpa};
+use crate::nondet::{PyPropNba, PyPropNca, PyPropNpa};
 use crate::omega::{
-    PyPropDba, PyPropDcw, PyPropDpa, PyPropDpaMaxEven, PyPropDpaMaxOdd, PyPropDpaMinOdd, PyPropDra,
+    PyPropDba, PyPropDca, PyPropDpa, PyPropDpaMaxEven, PyPropDpaMaxOdd, PyPropDpaMinOdd, PyPropDra,
     PyPropDsa,
 };
 
@@ -373,7 +373,7 @@ pub fn dba(py: Python<'_>, text: &str) -> PyResult<BuchiDet> {
     run(py, || buchi_det(parse_first_det(text)?))
 }
 
-pub fn dcw(py: Python<'_>, text: &str) -> PyResult<CoBuchiDet> {
+pub fn dca(py: Python<'_>, text: &str) -> PyResult<CoBuchiDet> {
     run(py, || co_buchi_det(parse_first_det(text)?))
 }
 
@@ -409,7 +409,7 @@ pub fn nba(py: Python<'_>, text: &str) -> PyResult<BuchiNondet> {
     run(py, || buchi_nondet(parse_first(text)?))
 }
 
-pub fn ncw(py: Python<'_>, text: &str) -> PyResult<CoBuchiNondet> {
+pub fn nca(py: Python<'_>, text: &str) -> PyResult<CoBuchiNondet> {
     run(py, || co_buchi_nondet(parse_first(text)?))
 }
 
@@ -420,7 +420,7 @@ pub fn npa(py: Python<'_>, text: &str) -> PyResult<ParityNondet> {
 /// An automaton of the most specific class for its branching and acceptance condition.
 enum Any {
     Dba(PyPropDba),
-    Dcw(PyPropDcw),
+    Dca(PyPropDca),
     Dpa(PyPropDpa),
     DpaMaxEven(PyPropDpaMaxEven),
     DpaMinOdd(PyPropDpaMinOdd),
@@ -428,7 +428,7 @@ enum Any {
     Dra(PyPropDra),
     Dsa(PyPropDsa),
     Nba(PyPropNba),
-    Ncw(PyPropNcw),
+    Nca(PyPropNca),
     Npa(PyPropNpa),
 }
 
@@ -439,7 +439,7 @@ impl Any {
         match aut.try_into_deterministic() {
             Ok(det) => match det.acceptance().clone() {
                 Cond::Buchi => Ok(Self::Dba(PyPropDba(buchi_det(det)?))),
-                Cond::CoBuchi => Ok(Self::Dcw(PyPropDcw(co_buchi_det(det)?))),
+                Cond::CoBuchi => Ok(Self::Dca(PyPropDca(co_buchi_det(det)?))),
                 Cond::Parity(kind, ..) => match kind {
                     ParityKind::MinEven => Ok(Self::Dpa(PyPropDpa(parity_det(det)?))),
                     ParityKind::MaxEven => {
@@ -472,7 +472,7 @@ impl Any {
             },
             Err(aut) => match aut.acceptance().0.clone() {
                 Cond::Buchi => Ok(Self::Nba(PyPropNba(buchi_nondet(aut)?))),
-                Cond::CoBuchi => Ok(Self::Ncw(PyPropNcw(co_buchi_nondet(aut)?))),
+                Cond::CoBuchi => Ok(Self::Nca(PyPropNca(co_buchi_nondet(aut)?))),
                 Cond::Parity(..) => Ok(Self::Npa(PyPropNpa(parity_nondet(aut)?))),
                 _ => Err(unsupported(
                     "reading nondeterministic automata that are not Büchi, co-Büchi or parity",
@@ -484,7 +484,7 @@ impl Any {
     fn into_py(self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         Ok(match self {
             Self::Dba(a) => Py::new(py, a)?.into_any(),
-            Self::Dcw(a) => Py::new(py, a)?.into_any(),
+            Self::Dca(a) => Py::new(py, a)?.into_any(),
             Self::Dpa(a) => Py::new(py, a)?.into_any(),
             Self::DpaMaxEven(a) => Py::new(py, a)?.into_any(),
             Self::DpaMinOdd(a) => Py::new(py, a)?.into_any(),
@@ -492,17 +492,17 @@ impl Any {
             Self::Dra(a) => Py::new(py, a)?.into_any(),
             Self::Dsa(a) => Py::new(py, a)?.into_any(),
             Self::Nba(a) => Py::new(py, a)?.into_any(),
-            Self::Ncw(a) => Py::new(py, a)?.into_any(),
+            Self::Nca(a) => Py::new(py, a)?.into_any(),
             Self::Npa(a) => Py::new(py, a)?.into_any(),
         })
     }
 }
 
 /// Reads the first automaton in `text` (a HOA file may contain several) and returns it as an
-/// instance of the most specific class: `PropDBA` for a deterministic Büchi automaton, `PropDCW`
+/// instance of the most specific class: `PropDBA` for a deterministic Büchi automaton, `PropDCA`
 /// for co-Büchi, `PropDPA`, `PropDPAMaxEven`, `PropDPAMinOdd` or `PropDPAMaxOdd` for the parity
 /// kind of the file, `PropDRA` for Rabin and `PropDSA` for Streett. Automata that are not
-/// deterministic give `PropNBA`, `PropNCW` or `PropNPA` (min even only). Rabin and Streett
+/// deterministic give `PropNBA`, `PropNCA` or `PropNPA` (min even only). Rabin and Streett
 /// colors are renumbered, see `PropDRA.from_hoa`. Raises `HoaError` if the text is not a
 /// (supported) HOA automaton and `NotImplementedError` for acceptance conditions without a
 /// class (nondeterministic Rabin and Streett, generalized conditions, ...) and for

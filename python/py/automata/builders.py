@@ -14,14 +14,14 @@ from typing import Any, ClassVar, Generic, TypeVar
 
 from automata._automata import (
     DBA,
-    DCW,
+    DCA,
     DMA,
     DPA,
     DRA,
     CharAlphabet,
     PropAlphabet,
     PropDBA,
-    PropDCW,
+    PropDCA,
     PropDMA,
     PropDPA,
     PropDRA,
@@ -29,12 +29,12 @@ from automata._automata import (
 
 __all__ = [
     "DBABuilder",
-    "DCWBuilder",
+    "DCABuilder",
     "DMABuilder",
     "DPABuilder",
     "DRABuilder",
     "PropDBABuilder",
-    "PropDCWBuilder",
+    "PropDCABuilder",
     "PropDMABuilder",
     "PropDPABuilder",
     "PropDRABuilder",
@@ -183,18 +183,18 @@ class PropDBABuilder(_Builder[PropAlphabet, PropDBA]):
     _boolean_colors = True
 
 
-class DCWBuilder(_Builder[CharAlphabet, DCW]):
-    """Builds a ``DCW`` (edge colors are bools), see ``DBABuilder``."""
+class DCABuilder(_Builder[CharAlphabet, DCA]):
+    """Builds a ``DCA`` (edge colors are bools), see ``DBABuilder``."""
 
-    _target = DCW
+    _target = DCA
     _alphabet_type = CharAlphabet
     _boolean_colors = True
 
 
-class PropDCWBuilder(_Builder[PropAlphabet, PropDCW]):
-    """Builds a ``PropDCW``, see ``DCWBuilder``."""
+class PropDCABuilder(_Builder[PropAlphabet, PropDCA]):
+    """Builds a ``PropDCA``, see ``DCABuilder``."""
 
-    _target = PropDCW
+    _target = PropDCA
     _alphabet_type = PropAlphabet
     _boolean_colors = True
 

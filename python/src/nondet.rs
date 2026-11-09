@@ -1,4 +1,4 @@
-//! Python classes for nondeterministic automata: NFA and the omega automata NBA, NCW, NPA.
+//! Python classes for nondeterministic automata: NFA and the omega automata NBA, NCA, NPA.
 
 use automata::{
     NTS, Void,
@@ -15,7 +15,7 @@ use crate::alphabet::{PyCharAlphabet, PyPropAlphabet};
 use crate::class::automaton_class;
 use crate::dfa::{PyDfa, PyPropDfa, finite};
 use crate::kind::{Chars, Kind, Props, PyOmegaWord};
-use crate::omega::{PyDba, PyDcw, PyDpa, PyPropDba, PyPropDcw, PyPropDpa, colored};
+use crate::omega::{PyDba, PyDca, PyDpa, PyPropDba, PyPropDca, PyPropDpa, colored};
 
 /// Views a deterministic automaton as a nondeterministic one with the same transitions.
 fn existential<T, C>(det: &Automaton<automata::ts::Det<T>, C>) -> Automaton<T, Existential<C>>
@@ -272,18 +272,18 @@ nomega_class!(
 );
 
 nomega_class!(
-    PyNcw,
-    "NCW",
+    PyNca,
+    "NCA",
     Chars,
     PyCharAlphabet,
     bool,
     CoBuchiCondition,
-    "A nondeterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if some run uses edges with color `True` only finitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> finitely_many_a = NCW(a, 2, 0, [(0, \"a\", True, 0), (0, \"b\", True, 0), (0, \"b\", False, 1), (1, \"b\", False, 1)])\n>>> finitely_many_a.accepts(OmegaWord(\"ab\", \"b\"))\nTrue\n>>> finitely_many_a.accepts(OmegaWord(\"\", \"ab\"))\nFalse",
+    "A nondeterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if some run uses edges with color `True` only finitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> finitely_many_a = NCA(a, 2, 0, [(0, \"a\", True, 0), (0, \"b\", True, 0), (0, \"b\", False, 1), (1, \"b\", False, 1)])\n>>> finitely_many_a.accepts(OmegaWord(\"ab\", \"b\"))\nTrue\n>>> finitely_many_a.accepts(OmegaWord(\"\", \"ab\"))\nFalse",
     {
-        /// The NCW with the transitions of the DCW.
+        /// The NCA with the transitions of the DCA.
         #[classmethod]
-        fn from_dcw(_cls: &Bound<'_, PyType>, dcw: &PyDcw) -> Self {
-            Self(existential(&dcw.0))
+        fn from_dca(_cls: &Bound<'_, PyType>, dca: &PyDca) -> Self {
+            Self(existential(&dca.0))
         }
 
         /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
@@ -293,18 +293,18 @@ nomega_class!(
     }
 );
 nomega_class!(
-    PyPropNcw,
-    "PropNCW",
+    PyPropNca,
+    "PropNCA",
     Props,
     PyPropAlphabet,
     bool,
     CoBuchiCondition,
-    "A nondeterministic co-Büchi automaton over a `PropAlphabet`, see `NCW`.",
+    "A nondeterministic co-Büchi automaton over a `PropAlphabet`, see `NCA`.",
     {
-        /// The PropNCW with the transitions of the PropDCW.
+        /// The PropNCA with the transitions of the PropDCA.
         #[classmethod]
-        fn from_dcw(_cls: &Bound<'_, PyType>, dcw: &PyPropDcw) -> Self {
-            Self(existential(&dcw.0))
+        fn from_dca(_cls: &Bound<'_, PyType>, dca: &PyPropDca) -> Self {
+            Self(existential(&dca.0))
         }
 
         /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
@@ -316,7 +316,7 @@ nomega_class!(
         /// `HoaError` if its acceptance condition is not co-Büchi.
         #[classmethod]
         fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
-            crate::hoa::ncw(py, text).map(Self)
+            crate::hoa::nca(py, text).map(Self)
         }
     }
 );

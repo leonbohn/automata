@@ -6,7 +6,7 @@ use crate::word::OmegaWord;
 use crate::{DTS, NTS, Void, math};
 
 /// The co-Büchi condition, the dual of the [`super::BuchiCondition`]: a run is accepting if it
-/// takes edges colored with `true` only finitely often. See [`DCW`] and [`NCW`].
+/// takes edges colored with `true` only finitely often. See [`DCA`] and [`NCA`].
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, Copy)]
 pub struct CoBuchiCondition;
 
@@ -31,40 +31,40 @@ impl CycleCondition for CoBuchiCondition {
     }
 }
 
-/// A deterministic co-Büchi automaton (DCW): it accepts an infinite word if its run takes edges
+/// A deterministic co-Büchi automaton (DCA): it accepts an infinite word if its run takes edges
 /// colored with `true` only finitely often.
 ///
 /// ```
 /// use automata::prelude::*;
 ///
 /// // finitely many `a`
-/// let dcw = Builder::without_state_colors()
+/// let dca = Builder::without_state_colors()
 ///     .with_transitions([(0, 'a', true, 0), (0, 'b', false, 0)])
-///     .into_dcw(0);
-/// assert!(dcw.accepts(upw!("aa", "b")));
-/// assert!(!dcw.accepts(upw!("ab")));
+///     .into_dca(0);
+/// assert!(dca.accepts(upw!("aa", "b")));
+/// assert!(!dca.accepts(upw!("ab")));
 /// ```
-pub type DCW<T = DTS<CharAlphabet, Void, bool>> = Automaton<T, CoBuchiCondition>;
+pub type DCA<T = DTS<CharAlphabet, Void, bool>> = Automaton<T, CoBuchiCondition>;
 
-/// A nondeterministic co-Büchi automaton (NCW): it accepts an infinite word if *some* run on it
+/// A nondeterministic co-Büchi automaton (NCA): it accepts an infinite word if *some* run on it
 /// takes edges colored with `true` only finitely often, see [`Existential`].
 ///
 /// ```
 /// use automata::prelude::*;
 ///
 /// // eventually only `a` or eventually only `b`: guess when, then stay (waiting is `true`)
-/// let ncw = Builder::without_state_colors()
+/// let nca = Builder::without_state_colors()
 ///     .with_transitions([
 ///         (0, 'a', true, 0), (0, 'b', true, 0), (0, 'a', false, 1), (0, 'b', false, 2),
 ///         (1, 'a', false, 1), (1, 'b', true, 1), (2, 'b', false, 2), (2, 'a', true, 2),
 ///     ])
-///     .into_ncw(0);
-/// assert!(ncw.accepts(upw!("ab", "a")) && ncw.accepts(upw!("b")));
-/// assert!(!ncw.accepts(upw!("ab")));
+///     .into_nca(0);
+/// assert!(nca.accepts(upw!("ab", "a")) && nca.accepts(upw!("b")));
+/// assert!(!nca.accepts(upw!("ab")));
 /// ```
-pub type NCW<T = NTS<CharAlphabet, Void, bool>> = Automaton<T, Existential<CoBuchiCondition>>;
+pub type NCA<T = NTS<CharAlphabet, Void, bool>> = Automaton<T, Existential<CoBuchiCondition>>;
 
-/// A history-deterministic co-Büchi automaton, an [`NCW`] whose nondeterminism can be resolved on
+/// A history-deterministic co-Büchi automaton, an [`NCA`] whose nondeterminism can be resolved on
 /// the fly, see [`HistoryDeterministic`].
-pub type HDCW<T = NTS<CharAlphabet, Void, bool>> =
+pub type HDCA<T = NTS<CharAlphabet, Void, bool>> =
     Automaton<T, HistoryDeterministic<CoBuchiCondition>>;

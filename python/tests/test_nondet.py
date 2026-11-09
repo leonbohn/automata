@@ -4,7 +4,7 @@ from automata import (
     DBA,
     DFA,
     NBA,
-    NCW,
+    NCA,
     NFA,
     NPA,
     CharAlphabet,
@@ -13,7 +13,7 @@ from automata import (
     PropDBA,
     PropDFA,
     PropNBA,
-    PropNCW,
+    PropNCA,
     PropNFA,
     PropNPA,
 )
@@ -139,11 +139,11 @@ def test_nba_from_dba():
     assert PropNBA.from_dba(pd).accepts(OmegaWord([[True]], [[True]]))
 
 
-def test_ncw():
-    n = NCW(AB, 2, 0, [(0, "a", True, 0), (0, "b", True, 0), (0, "b", False, 1), (1, "b", False, 1)])
+def test_nca():
+    n = NCA(AB, 2, 0, [(0, "a", True, 0), (0, "b", True, 0), (0, "b", False, 1), (1, "b", False, 1)])
     assert n.accepts(OmegaWord("ab", "b")) and not n.accepts(OmegaWord("", "ab"))
     assert not n.is_empty() and n.accepts(n.accepting_word())
-    assert NCW(AB, 1, 0, [(0, "a", True, 0)]).is_empty()
+    assert NCA(AB, 1, 0, [(0, "a", True, 0)]).is_empty()
 
 
 def test_npa():
@@ -161,7 +161,7 @@ def test_prop_omega():
     a = PropAlphabet(["p"])
     t, f = [True], [False]
     edges = [(0, f, False, 0), (0, t, False, 0), (0, t, True, 1), (1, t, True, 1)]
-    for cls, colors in [(PropNBA, (False, True)), (PropNCW, (True, False)), (PropNPA, (1, 0))]:
+    for cls, colors in [(PropNBA, (False, True)), (PropNCA, (True, False)), (PropNPA, (1, 0))]:
         n = cls(a, 2, 0, [(s, x, colors[int(c)], q) for s, x, c, q in edges])
         assert n.accepts(OmegaWord([f], [t])), cls
         assert not n.accepts(OmegaWord([], [f, t])), cls

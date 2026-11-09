@@ -2,19 +2,19 @@ import pytest
 
 import automata
 from automata import (
-    DCW,
+    DCA,
     DMA,
     DPA,
     DRA,
     CharAlphabet,
-    DCWBuilder,
+    DCABuilder,
     DMABuilder,
     DPABuilder,
     DRABuilder,
     OmegaWord,
     PropAlphabet,
-    PropDCW,
-    PropDCWBuilder,
+    PropDCA,
+    PropDCABuilder,
     PropDMA,
     PropDMABuilder,
     PropDPA,
@@ -33,20 +33,20 @@ def w(prefix, period):
     return OmegaWord(prefix, period)
 
 
-def test_dcw():
-    d = DCW(AB, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)])
+def test_dca():
+    d = DCA(AB, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)])
     assert d.accepts(w("aa", "b")) and not d.accepts(w("", "ab"))
     assert d.accepting_word() is not None and d.accepts(d.accepting_word())
-    assert DCW(AB, 1, 0, [(0, "a", True, 0), (0, "b", True, 0)]).is_empty()
+    assert DCA(AB, 1, 0, [(0, "a", True, 0), (0, "b", True, 0)]).is_empty()
     assert (d.num_states, d.num_edges) == (1, 2)
     assert not hasattr(d, "complement")
 
 
-def test_prop_dcw():
-    d = PropDCW(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)])
+def test_prop_dca():
+    d = PropDCA(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)])
     assert d.accepts(w([T], [F])) and not d.accepts(w([], [T, F]))
     with pytest.raises(ValueError):
-        PropDCW(P, 1, 0, [(0, [True, True], True, 0)])
+        PropDCA(P, 1, 0, [(0, [True, True], True, 0)])
     with pytest.raises(TypeError):
         d.accepts(w("a", "b"))
 
@@ -110,8 +110,8 @@ def test_color_range():
 
 
 def test_invalid_construction():
-    for cls, args in [(DCW, ()), (DPA, ()), (DRA, ([],)), (DMA, ([],))]:
-        c = True if cls is DCW else 0
+    for cls, args in [(DCA, ()), (DPA, ()), (DRA, ([],)), (DMA, ([],))]:
+        c = True if cls is DCA else 0
         with pytest.raises(ValueError):
             cls(AB, 1, 1, [], *args)
         with pytest.raises(ValueError):
@@ -161,7 +161,7 @@ def test_prop_dma():
 
 
 def test_builders():
-    b = DCWBuilder(AB)
+    b = DCABuilder(AB)
     q = b.add_state()
     assert q == 0 and b.add_state() == 1 and b.num_states == 2
     b.add_edge(0, "a", True, 1)
@@ -172,7 +172,7 @@ def test_builders():
         b.build()
     b.set_initial(0)
     d = b.build()
-    assert isinstance(d, DCW) and d.num_states == 2 and d.accepts(w("a", "b"))
+    assert isinstance(d, DCA) and d.num_states == 2 and d.accepts(w("a", "b"))
     assert d.accepts(w("", "b")) and d.edges_from(0) == b.build().edges_from(0)
     b.add_edge(0, "a", False, 0)  # the builder can be used further and replaces edges
     assert b.build().num_edges == d.num_edges
@@ -204,10 +204,10 @@ def test_builder_validation():
     with pytest.raises(ValueError):
         b.set_initial(-1)
     with pytest.raises(TypeError):
-        DCWBuilder(P)
+        DCABuilder(P)
     with pytest.raises(TypeError):
-        PropDCWBuilder(AB)
-    c = DCWBuilder(AB)
+        PropDCABuilder(AB)
+    c = DCABuilder(AB)
     c.add_state()
     with pytest.raises(TypeError):
         c.add_edge(0, "a", 1, 0)
@@ -231,8 +231,8 @@ def test_all_builders_build():
     assert isinstance(d, DPA) and d.equivalent_to(DPA(AB, 1, 0, inf_b))
     d = run(PropDPABuilder(P), [(T, 1), (F, 0)])
     assert isinstance(d, PropDPA) and d.accepts(w([T], [F]))
-    d = run(PropDCWBuilder(P), [(T, True), (F, False)])
-    assert isinstance(d, PropDCW) and d.accepts(w([T], [F]))
+    d = run(PropDCABuilder(P), [(T, True), (F, False)])
+    assert isinstance(d, PropDCA) and d.accepts(w([T], [F]))
     d = run(DRABuilder(AB, [([], [1])]), [("a", 0), ("b", 1)])
     assert isinstance(d, DRA) and d.accepts(w("", "ab"))
     d = run(PropDRABuilder(P, [([], [1])]), [(T, 1), (F, 0)])
@@ -244,5 +244,5 @@ def test_all_builders_build():
 
 
 def test_exports():
-    for name in ["DCW", "PropDPA", "DRA", "PropDMA", "DBABuilder", "PropDMABuilder", "DRABuilder"]:
+    for name in ["DCA", "PropDPA", "DRA", "PropDMA", "DBABuilder", "PropDMABuilder", "DRABuilder"]:
         assert name in automata.__all__ and hasattr(automata, name)

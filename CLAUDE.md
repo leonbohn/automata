@@ -107,11 +107,11 @@ Two distinctions that recur everywhere:
     ids, hash containers otherwise), `state_index.rs` (`IdType`, `DenseId`, `EdgeId(u32)`,
     `DefaultIdType = u32`).
   - `model/`: a property-test harness for the storages (`#[cfg(test)]` only, uses proptest).
-- `automaton.rs` + `src/automaton/` — `Automaton<T, Sem>`; aliases `DFA`, `DBA`, `DCW`,
+- `automaton.rs` + `src/automaton/` — `Automaton<T, Sem>`; aliases `DFA`, `DBA`, `DCA`,
   `DPA<T, Sem>`, `DRA`, `DSA`, `DMA`, `MooreMachine`, `MealyMachine`, `OmegaAutomaton<A, S = Det<Linked>>`
   and its deterministic/nondeterministic spellings. The branching is part of `Sem`
   (`branching.rs`): a bare condition is deterministic, `Existential<C>` (some run accepts) gives
-  `NFA`, `NBA`, `NCW`, `NPA`, `NRA`, `NSA`, `NMA`, and `HistoryDeterministic<C>` `HDCW` (the only HD
+  `NFA`, `NBA`, `NCA`, `NPA`, `NRA`, `NSA`, `NMA`, and `HistoryDeterministic<C>` `HDCA` (the only HD
   alias so far). A
   condition gets these by implementing `CycleCondition` (omega; drives one SCC search for
   acceptance and emptiness) or `FinalStateCondition` (finite). `Semantics` has the single method

@@ -30,8 +30,8 @@ alphabets.
 
 | | finite words | infinite words |
 | --- | --- | --- |
-| deterministic | `DFA` | `DBA`, `DCW`, `DPA` (min even), `DPAMaxEven`, `DPAMinOdd`, `DPAMaxOdd`, `DRA`, `DSA`, `DMA` |
-| nondeterministic | `NFA` | `NBA`, `NCW`, `NPA` (min even) |
+| deterministic | `DFA` | `DBA`, `DCA`, `DPA` (min even), `DPAMaxEven`, `DPAMinOdd`, `DPAMaxOdd`, `DRA`, `DSA`, `DMA` |
+| nondeterministic | `NFA` | `NBA`, `NCA`, `NPA` (min even) |
 | output | `MooreMachine`, `MealyMachine` | |
 
 All of them have `accepts`/`output`, `num_states`, `num_edges`, `initial`, `states()`,
@@ -52,20 +52,20 @@ Automata can also be built step by step with `DFABuilder` (and the builders in `
 
 ## HOA
 
-`to_hoa()` writes `DBA`, `DCW`, the four parity classes, `DRA`, `DSA`, `NBA`, `NCW` and `NPA`
+`to_hoa()` writes `DBA`, `DCA`, the four parity classes, `DRA`, `DSA`, `NBA`, `NCA` and `NPA`
 (and their `Prop` variants); characters become propositions. `from_hoa(text)` and
 `automata.parse_hoa(text)` need propositional alphabets, so only the `Prop` classes have
 `from_hoa`:
 
 | class | reads |
 | --- | --- |
-| `PropDBA`, `PropDCW` | deterministic Büchi, co-Büchi |
+| `PropDBA`, `PropDCA` | deterministic Büchi, co-Büchi |
 | `PropDPA` | every parity kind, Büchi and co-Büchi, converted to min even (`NotImplementedError` for Rabin/Streett) |
 | `PropDPAMaxEven`, `PropDPAMinOdd`, `PropDPAMaxOdd` | exactly their own parity kind, the colors are kept |
 | `PropDRA`, `PropDSA` | deterministic Rabin, Streett |
-| `PropNBA`, `PropNCW`, `PropNPA` | also deterministic automata; `PropNPA` only min even |
+| `PropNBA`, `PropNCA`, `PropNPA` | also deterministic automata; `PropNPA` only min even |
 
-`parse_hoa` returns the most specific class (`PropDPAMaxEven` for `parity max even`, `PropNCW` for
+`parse_hoa` returns the most specific class (`PropDPAMaxEven` for `parity max even`, `PropNCA` for
 a nondeterministic co-Büchi automaton, ...); nondeterministic Rabin/Streett automata, generalized
 conditions and nondeterministic parity automata other than min even raise
 `NotImplementedError`. An edge of a HOA automaton belongs to a *set* of acceptance sets, an edge of

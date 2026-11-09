@@ -7,7 +7,7 @@ use automata::alphabet::CharAlphabet;
 use automata::alphabet::PropAlphabet;
 use automata::automaton::{
     Automaton, BuchiCondition, CoBuchiCondition, Emptiness, Existential, MinEvenParityCondition,
-    MullerCondition, NBA, NCW, NMA, NPA, NRA, NondeterministicOmegaAutomaton, RabinCondition,
+    MullerCondition, NBA, NCA, NMA, NPA, NRA, NondeterministicOmegaAutomaton, RabinCondition,
     RabinPair,
 };
 use automata::word::ReducedOmegaWord;
@@ -35,7 +35,7 @@ fn nba(n: usize) -> NBA {
     Automaton::from_parts_with_acceptance(ts, at(0), Existential(BuchiCondition))
 }
 
-fn ncw(n: usize) -> NCW {
+fn nca(n: usize) -> NCA {
     let ts = common::scrambled_omega_nts(n, |x| x % 5 == 0);
     Automaton::from_parts_with_acceptance(ts, at(0), Existential(CoBuchiCondition))
 }
@@ -87,9 +87,9 @@ fn nba_accepts((nba, words): (NBA, Vec<ReducedOmegaWord<char>>)) -> usize {
 }
 
 #[library_benchmark]
-#[bench::ncw_400(args = (ncw(400)), setup = with_lassos)]
-fn ncw_accepts((ncw, words): (NCW, Vec<ReducedOmegaWord<char>>)) -> usize {
-    black_box(words.iter().filter(|w| ncw.accepts(*w)).count())
+#[bench::nca_400(args = (nca(400)), setup = with_lassos)]
+fn nca_accepts((nca, words): (NCA, Vec<ReducedOmegaWord<char>>)) -> usize {
+    black_box(words.iter().filter(|w| nca.accepts(*w)).count())
 }
 
 type NondeterministicFixture = NondeterministicOmegaAutomaton<PropAlphabet>;
@@ -132,9 +132,9 @@ fn nba_witness(nba: NBA) -> bool {
 }
 
 #[library_benchmark]
-#[bench::ncw_4000(args = (4_000), setup = ncw)]
-fn ncw_witness(ncw: NCW) -> bool {
-    black_box(Emptiness::of(&ncw).witness().is_some())
+#[bench::nca_4000(args = (4_000), setup = nca)]
+fn nca_witness(nca: NCA) -> bool {
+    black_box(Emptiness::of(&nca).witness().is_some())
 }
 
 #[library_benchmark]
@@ -151,8 +151,8 @@ fn nma_witness(nma: NMA<NTS<CharAlphabet, Void, Int>>) -> bool {
 
 library_benchmark_group!(
     name = nondeterministic;
-    benchmarks = npa_accepts, nba_accepts, ncw_accepts, fixture_accepts, npa_witness,
-        nba_witness, ncw_witness, nra_witness, nma_witness
+    benchmarks = npa_accepts, nba_accepts, nca_accepts, fixture_accepts, npa_witness,
+        nba_witness, nca_witness, nra_witness, nma_witness
 );
 
 main!(library_benchmark_groups = nondeterministic);

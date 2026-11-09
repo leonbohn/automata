@@ -3,8 +3,8 @@ use crate::TransitionSystem;
 use crate::alphabet::{FromSymbols, Symbol, WrongAlphabetSize};
 use crate::automaton::WithInitial;
 use crate::automaton::{
-    Automaton, CoBuchiCondition, DBA, DCW, DFA, DPA, Existential, MealyMachine, MooreMachine, NBA,
-    NCW, NFA, NPA,
+    Automaton, CoBuchiCondition, DBA, DCA, DFA, DPA, Existential, MealyMachine, MooreMachine, NBA,
+    NCA, NFA, NPA,
 };
 use crate::automaton::{
     BuchiCondition, MealySemantics, MinEvenParityCondition, MooreSemantics, ReachabilityCondition,
@@ -617,15 +617,15 @@ impl Builder<Void, bool> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_build`].
     #[track_caller]
-    pub fn into_dcw(self, initial: u32) -> DCW<DTS<CharAlphabet, Void, bool>> {
-        or_panic(self.try_into_dcw(initial))
+    pub fn into_dca(self, initial: u32) -> DCA<DTS<CharAlphabet, Void, bool>> {
+        or_panic(self.try_into_dca(initial))
     }
 
-    /// Fallible version of [`Self::into_dcw`].
-    pub fn try_into_dcw(
+    /// Fallible version of [`Self::into_dca`].
+    pub fn try_into_dca(
         self,
         initial: u32,
-    ) -> Result<DCW<DTS<CharAlphabet, Void, bool>>, BuilderError> {
+    ) -> Result<DCA<DTS<CharAlphabet, Void, bool>>, BuilderError> {
         self.default_color(Void)
             .try_into_automaton(initial, CoBuchiCondition)
     }
@@ -635,15 +635,15 @@ impl Builder<Void, bool> {
     /// # Panics
     /// Panics if the builder is inconsistent, see [`Self::try_build`].
     #[track_caller]
-    pub fn into_ncw(self, initial: u32) -> NCW<NTS<CharAlphabet, Void, bool>> {
-        or_panic(self.try_into_ncw(initial))
+    pub fn into_nca(self, initial: u32) -> NCA<NTS<CharAlphabet, Void, bool>> {
+        or_panic(self.try_into_nca(initial))
     }
 
-    /// Fallible version of [`Self::into_ncw`].
-    pub fn try_into_ncw(
+    /// Fallible version of [`Self::into_nca`].
+    pub fn try_into_nca(
         self,
         initial: u32,
-    ) -> Result<NCW<NTS<CharAlphabet, Void, bool>>, BuilderError> {
+    ) -> Result<NCA<NTS<CharAlphabet, Void, bool>>, BuilderError> {
         self.default_color(Void)
             .try_into_nondeterministic_automaton(initial, Existential(CoBuchiCondition))
     }

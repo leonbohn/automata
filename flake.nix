@@ -52,14 +52,17 @@
               pkgs.rustfmt
               pkgs.cargo-hack
               pkgs.valgrind
-              self.packages.${system}.gungraun-runner
-              self.packages.${system}.automata-bench
+              pkgs.maturin
+              # self.packages.${system}.gungraun-runner
+              # self.packages.${system}.automata-bench
               pkgs.python3
               self.packages.${system}.spot-platform
             ];
             # `import spot` in python3
             shellHook = ''
-              export PYTHONPATH="${self.packages.${system}.spot-platform}/${pkgs.python3.sitePackages}''${PYTHONPATH:+:$PYTHONPATH}"
+              export PYTHONPATH="${
+                self.packages.${system}.spot-platform
+              }/${pkgs.python3.sitePackages}''${PYTHONPATH:+:$PYTHONPATH}"
             '';
           };
         }

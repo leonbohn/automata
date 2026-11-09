@@ -441,7 +441,7 @@ where
     EdgeColor<T>: Hash + Eq,
 {
     /// Returns an ultimately periodic word that is accepted, or `None` if the language is empty.
-    /// This works for every nondeterministic omega automaton ([`super::NBA`], [`super::NCW`],
+    /// This works for every nondeterministic omega automaton ([`super::NBA`], [`super::NCA`],
     /// [`super::NPA`], [`super::NRA`], [`super::NMA`], ...), see [`CycleCondition`].
     ///
     /// ```
@@ -492,7 +492,7 @@ macro_rules! emptiness_via_cycles {
     )*};
 }
 emptiness_via_cycles!(
-    DCW => super::CoBuchiCondition,
+    DCA => super::CoBuchiCondition,
     DRA => super::RabinCondition<EdgeColor<D>>,
     DSA => super::StreettCondition<EdgeColor<D>>,
     DMA => super::MullerCondition<EdgeColor<D>>

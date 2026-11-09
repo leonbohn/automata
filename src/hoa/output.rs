@@ -638,11 +638,11 @@ State: 1
             ParityKind::MaxOdd,
         );
 
-        // an NCW is written like a DCW
-        let ncw = Builder::without_state_colors()
+        // an NCA is written like a DCA
+        let nca = Builder::without_state_colors()
             .with_transitions([(0, 'a', true, 0), (0, 'a', false, 0), (0, 'b', false, 0)])
-            .into_ncw(0);
-        let hoa = ncw.to_hoa().unwrap();
+            .into_nca(0);
+        let hoa = nca.to_hoa().unwrap();
         assert!(
             hoa.contains("acc-name: co-Buchi\nAcceptance: 1 Fin(0)\n"),
             "{hoa}"

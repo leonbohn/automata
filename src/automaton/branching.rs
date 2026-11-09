@@ -5,7 +5,7 @@
 //!
 //! Wrapping works for every condition that implements [`CycleCondition`] (infinite words) or
 //! [`FinalStateCondition`] (finite words), so each nondeterministic automaton type is just an
-//! alias, see [`super::NFA`], [`super::NBA`], [`super::NCW`], [`super::NPA`], [`super::NRA`], [`super::NSA`] and
+//! alias, see [`super::NFA`], [`super::NBA`], [`super::NCA`], [`super::NPA`], [`super::NRA`], [`super::NSA`] and
 //! [`super::NMA`].
 
 use super::Semantics;
@@ -130,7 +130,7 @@ where
 /// knows the prefix read so far, without losing accepted words. A word is accepted under the same
 /// condition as for [`Existential`], so `HistoryDeterministic` mainly serves as a promise in the
 /// type: algorithms that need history-determinism (such as minimization of history-deterministic
-/// co-Büchi automata) can require it. For now, the only alias is [`super::HDCW`].
+/// co-Büchi automata) can require it. For now, the only alias is [`super::HDCA`].
 ///
 /// The promise is not checked: use [`super::Automaton::assume_history_deterministic`] on a
 /// nondeterministic automaton that is known to be history-deterministic. Deterministic automata are
@@ -138,14 +138,14 @@ where
 ///
 /// ```
 /// use automata::prelude::*;
-/// use automata::automaton::{HDCW, HistoryDeterministic};
+/// use automata::automaton::{HDCA, HistoryDeterministic};
 ///
 /// // finitely many `a`
-/// let dcw = Builder::without_state_colors()
+/// let dca = Builder::without_state_colors()
 ///     .with_transitions([(0, 'a', true, 0), (0, 'b', false, 0)])
-///     .into_dcw(0);
-/// let hdcw: HDCW<_> = dcw.map_acceptance(HistoryDeterministic);
-/// assert!(hdcw.accepts(upw!("a", "b")) && !hdcw.accepts(upw!("ab")));
+///     .into_dca(0);
+/// let hdca: HDCA<_> = dca.map_acceptance(HistoryDeterministic);
+/// assert!(hdca.accepts(upw!("a", "b")) && !hdca.accepts(upw!("ab")));
 /// ```
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct HistoryDeterministic<C>(pub C);
@@ -421,9 +421,9 @@ mod tests {
             let dba = Builder::without_state_colors()
                 .with_transitions(bools.clone())
                 .into_dba(0);
-            let dcw = Builder::without_state_colors()
+            let dca = Builder::without_state_colors()
                 .with_transitions(bools)
-                .into_dcw(0);
+                .into_dca(0);
             for word in words() {
                 let some_run = |sem_accepts: bool, existential: bool| {
                     assert_eq!(sem_accepts, existential, "seed {seed}, {word:?}");
@@ -440,9 +440,9 @@ mod tests {
                     dba.accepts(&word),
                     Existential(BuchiCondition).output(ts, q, &word).unwrap(),
                 );
-                let (ts, q) = (dcw.ts(), dcw.initial());
+                let (ts, q) = (dca.ts(), dca.initial());
                 some_run(
-                    dcw.accepts(&word),
+                    dca.accepts(&word),
                     Existential(CoBuchiCondition).output(ts, q, &word).unwrap(),
                 );
             }

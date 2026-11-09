@@ -34,9 +34,9 @@ pub use branching::{CycleCondition, Existential, FinalStateCondition, HistoryDet
 
 mod omega;
 pub use omega::{
-    AcceptanceError, AcceptanceMask, BuchiCondition, CoBuchiCondition, DBA, DCW, DMA, DPA, DRA,
-    DSA, DeterministicOmegaAutomaton, HDCW, MaxEvenParityCondition, MaxOddParityCondition,
-    MinEvenParityCondition, MinOddParityCondition, MullerCondition, NBA, NCW, NMA, NPA, NRA, NSA,
+    AcceptanceError, AcceptanceMask, BuchiCondition, CoBuchiCondition, DBA, DCA, DMA, DPA, DRA,
+    DSA, DeterministicOmegaAutomaton, HDCA, MaxEvenParityCondition, MaxOddParityCondition,
+    MinEvenParityCondition, MinOddParityCondition, MullerCondition, NBA, NCA, NMA, NPA, NRA, NSA,
     NondeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton, ParityKind,
     RabinCondition, RabinPair, StreettCondition,
 };

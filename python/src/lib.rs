@@ -33,8 +33,8 @@ fn _automata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<kind::PyOmegaWord>()?;
     m.add_class::<omega::PyDba>()?;
     m.add_class::<omega::PyPropDba>()?;
-    m.add_class::<omega::PyDcw>()?;
-    m.add_class::<omega::PyPropDcw>()?;
+    m.add_class::<omega::PyDca>()?;
+    m.add_class::<omega::PyPropDca>()?;
     m.add_class::<omega::PyDpa>()?;
     m.add_class::<omega::PyPropDpa>()?;
     m.add_class::<omega::PyDpaMaxEven>()?;
@@ -53,8 +53,8 @@ fn _automata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<nondet::PyPropNfa>()?;
     m.add_class::<nondet::PyNba>()?;
     m.add_class::<nondet::PyPropNba>()?;
-    m.add_class::<nondet::PyNcw>()?;
-    m.add_class::<nondet::PyPropNcw>()?;
+    m.add_class::<nondet::PyNca>()?;
+    m.add_class::<nondet::PyPropNca>()?;
     m.add_class::<nondet::PyNpa>()?;
     m.add_class::<nondet::PyPropNpa>()?;
     m.add_class::<machines::PyMooreMachine>()?;

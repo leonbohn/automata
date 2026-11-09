@@ -20,7 +20,7 @@ from automata import (
     PropDPAMaxOdd,
     PropDPAMinOdd,
     PropDBA,
-    PropDCW,
+    PropDCA,
     parse_hoa,
     parse_hoa_all,
 )
@@ -240,7 +240,7 @@ def test_from_hoa_reads_exactly_its_own_kind(_cls, prop, _pick, _parity):
     if prop is not PropDPA:
         for text in (
             PropDBA(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)]).to_hoa(),
-            PropDCW(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)]).to_hoa(),
+            PropDCA(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)]).to_hoa(),
         ):
             with pytest.raises(HoaError):
                 prop.from_hoa(text)
@@ -261,8 +261,8 @@ def test_prop_dpa_normalizes_every_kind_to_min_even():
 
 def test_prop_dpa_reads_buchi_and_co_buchi():
     dba = PropDBA(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)])
-    dcw = PropDCW(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)])
-    for aut in (dba, dcw):
+    dca = PropDCA(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)])
+    for aut in (dba, dca):
         dpa = PropDPA.from_hoa(aut.to_hoa())
         assert type(dpa) is PropDPA and prop_verdicts(dpa) == prop_verdicts(aut)
 

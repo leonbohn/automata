@@ -958,7 +958,7 @@ State: 1
         use crate::hoa::{HoaString, WriteHoa};
         let aut = crate::ts::Builder::without_state_colors()
             .with_transitions([(0, 'a', true, 0), (0, 'b', false, 0)])
-            .into_dcw(0);
+            .into_dca(0);
         let hoa = aut.to_hoa().unwrap();
         assert!(
             hoa.contains("acc-name: co-Buchi\nAcceptance: 1 Fin(0)\n"),

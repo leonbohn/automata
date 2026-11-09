@@ -5,11 +5,11 @@ import pytest
 import automata
 from automata import (
     DBA,
-    DCW,
+    DCA,
     DFA,
     DPA,
     NBA,
-    NCW,
+    NCA,
     NFA,
     NPA,
     CharAlphabet,
@@ -19,11 +19,11 @@ from automata import (
     OmegaWord,
     PropAlphabet,
     PropDBA,
-    PropDCW,
+    PropDCA,
     PropDFA,
     PropDPA,
     PropNBA,
-    PropNCW,
+    PropNCA,
     PropNPA,
     parse_hoa,
     parse_hoa_all,
@@ -284,25 +284,25 @@ def test_to_hoa_of_character_automata():
 def test_only_classes_that_the_crate_can_write_have_to_hoa():
     for cls in (DBA, DPA, NBA, NPA, PropDBA, PropDPA, PropNBA, PropNPA):
         assert hasattr(cls, "to_hoa"), cls
-    for cls in (DCW, NCW, PropDCW, PropNCW):
+    for cls in (DCA, NCA, PropDCA, PropNCA):
         assert hasattr(cls, "to_hoa"), cls
     for cls in (DFA, NFA, MooreMachine, MealyMachine, PropDFA):
         assert not hasattr(cls, "to_hoa"), cls
-    for cls in (PropDBA, PropDCW, PropDPA, PropNBA, PropNCW, PropNPA):
+    for cls in (PropDBA, PropDCA, PropDPA, PropNBA, PropNCA, PropNPA):
         assert hasattr(cls, "from_hoa"), cls
     # the classes over a CharAlphabet cannot be read, HOA automata have propositions
-    for cls in (DBA, DPA, NBA, NPA, DCW, NCW, DFA, NFA, PropDFA):
+    for cls in (DBA, DPA, NBA, NPA, DCA, NCA, DFA, NFA, PropDFA):
         assert not hasattr(cls, "from_hoa"), cls
 
 
 def test_conversions_keep_the_language():
-    dcw = PropDCW(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)])
+    dca = PropDCA(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)])
     dba_ = PropDBA.from_hoa(DBA_TEXT)
     dpa_from_dba = PropDPA.from_dba(dba_)
     assert verdicts(dpa_from_dba) == verdicts(dba_)
     assert (dpa_from_dba.num_states, dpa_from_dba.num_edges) == (1, 2)
-    assert verdicts(PropDPA.from_dcw(dcw)) == verdicts(dcw)
-    assert verdicts(PropNCW.from_dcw(dcw)) == verdicts(dcw)
+    assert verdicts(PropDPA.from_dca(dca)) == verdicts(dca)
+    assert verdicts(PropNCA.from_dca(dca)) == verdicts(dca)
     dpa = PropDPA.from_hoa(DPA_TEXT)
     assert verdicts(PropNPA.from_dpa(dpa)) == verdicts(dpa)
     assert PropNPA.from_dpa(dpa).num_edges == dpa.num_edges
@@ -313,11 +313,11 @@ def test_conversions_of_character_automata():
     dpa = DPA.from_dba(dba_)
     for w in [OmegaWord("", "a"), OmegaWord("a", "b"), OmegaWord("", "ab")]:
         assert dpa.accepts(w) == dba_.accepts(w)
-    dcw = DCW(AB, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)])
-    assert DPA.from_dcw(dcw).accepts(OmegaWord("aa", "b"))
-    assert not DPA.from_dcw(dcw).accepts(OmegaWord("", "ab"))
-    assert NCW.from_dcw(dcw).accepts(OmegaWord("aa", "b"))
-    assert not NCW.from_dcw(dcw).accepts(OmegaWord("", "ab"))
+    dca = DCA(AB, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)])
+    assert DPA.from_dca(dca).accepts(OmegaWord("aa", "b"))
+    assert not DPA.from_dca(dca).accepts(OmegaWord("", "ab"))
+    assert NCA.from_dca(dca).accepts(OmegaWord("aa", "b"))
+    assert not NCA.from_dca(dca).accepts(OmegaWord("", "ab"))
     assert NPA.from_dpa(dpa).accepts(OmegaWord("b", "a")) == dpa.accepts(OmegaWord("b", "a"))
 
 
@@ -351,7 +351,7 @@ def test_repr_svg_draws_an_svg_image():
 
 
 def test_classes_without_a_dot_style_in_the_crate_have_no_dot_output():
-    for cls in (DCW, NBA, NCW, NPA, NFA, PropNBA):
+    for cls in (DCA, NBA, NCA, NPA, NFA, PropNBA):
         assert not hasattr(cls, "to_dot") and not hasattr(cls, "_repr_svg_"), cls
 
 
@@ -361,37 +361,37 @@ def test_module_exports():
 
 
 def test_co_buchi_round_trips_and_parse_hoa_returns_it():
-    dcw = PropDCW(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)])
-    text = dcw.to_hoa()
+    dca = PropDCA(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)])
+    text = dca.to_hoa()
     assert "acc-name: co-Buchi" in text
-    assert verdicts(PropDCW.from_hoa(text)) == verdicts(dcw) == [False, True, False, True, False]
-    assert type(parse_hoa(text)) is PropDCW
+    assert verdicts(PropDCA.from_hoa(text)) == verdicts(dca) == [False, True, False, True, False]
+    assert type(parse_hoa(text)) is PropDCA
     # characters become propositions
-    assert "acc-name: co-Buchi" in DCW(AB, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)]).to_hoa()
+    assert "acc-name: co-Buchi" in DCA(AB, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)]).to_hoa()
     # the nondeterministic class reads deterministic text too
-    assert verdicts(PropNCW.from_hoa(text)) == verdicts(dcw)
+    assert verdicts(PropNCA.from_hoa(text)) == verdicts(dca)
 
-    ncw = PropNCW(P, 2, 0, [(0, T, True, 0), (0, F, True, 0), (0, F, False, 1), (1, F, False, 1)])
-    ncw_text = ncw.to_hoa()
-    assert "acc-name: co-Buchi" in ncw_text and "acc-name: co-Buchi" in NCW(AB, 1, 0, [(0, "a", True, 0)]).to_hoa()
-    assert verdicts(PropNCW.from_hoa(ncw_text)) == verdicts(ncw) == [False, True, False, True, False]
-    assert type(parse_hoa(ncw_text)) is PropNCW
-    assert [type(a) for a in parse_hoa_all(text + ncw_text)] == [PropDCW, PropNCW]
+    nca = PropNCA(P, 2, 0, [(0, T, True, 0), (0, F, True, 0), (0, F, False, 1), (1, F, False, 1)])
+    nca_text = nca.to_hoa()
+    assert "acc-name: co-Buchi" in nca_text and "acc-name: co-Buchi" in NCA(AB, 1, 0, [(0, "a", True, 0)]).to_hoa()
+    assert verdicts(PropNCA.from_hoa(nca_text)) == verdicts(nca) == [False, True, False, True, False]
+    assert type(parse_hoa(nca_text)) is PropNCA
+    assert [type(a) for a in parse_hoa_all(text + nca_text)] == [PropDCA, PropNCA]
     with pytest.raises(HoaError, match="not deterministic"):
-        PropDCW.from_hoa(ncw_text)
+        PropDCA.from_hoa(nca_text)
 
 
 def test_co_buchi_is_not_confused_with_buchi():
-    dcw_text = PropDCW(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)]).to_hoa()
+    dca_text = PropDCA(P, 1, 0, [(0, T, True, 0), (0, F, False, 0)]).to_hoa()
     with pytest.raises(HoaError, match="Büchi"):
-        PropDBA.from_hoa(dcw_text)
+        PropDBA.from_hoa(dca_text)
     with pytest.raises(HoaError, match="co-Büchi"):
-        PropDCW.from_hoa(DBA_TEXT)
+        PropDCA.from_hoa(DBA_TEXT)
     with pytest.raises(HoaError, match="co-Büchi"):
-        PropNCW.from_hoa(NBA_TEXT)
+        PropNCA.from_hoa(NBA_TEXT)
     with pytest.raises(HoaError):
-        PropNBA.from_hoa(dcw_text)
-    # a DPA reads it as `from_dcw` does
-    assert verdicts(PropDPA.from_hoa(dcw_text)) == verdicts(PropDCW.from_hoa(dcw_text))
+        PropNBA.from_hoa(dca_text)
+    # a DPA reads it as `from_dca` does
+    assert verdicts(PropDPA.from_hoa(dca_text)) == verdicts(PropDCA.from_hoa(dca_text))
     with pytest.raises(HoaError):
-        PropDCW.from_hoa("garbage")
+        PropDCA.from_hoa("garbage")

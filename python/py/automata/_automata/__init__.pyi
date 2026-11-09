@@ -9,7 +9,7 @@ __all__ = [
     "BuilderError",
     "CharAlphabet",
     "DBA",
-    "DCW",
+    "DCA",
     "DFA",
     "DFABuilder",
     "DMA",
@@ -23,7 +23,7 @@ __all__ = [
     "MealyMachine",
     "MooreMachine",
     "NBA",
-    "NCW",
+    "NCA",
     "NFA",
     "NPA",
     "NotPeriodicError",
@@ -31,7 +31,7 @@ __all__ = [
     "PropAlphabet",
     "PropAlphabetError",
     "PropDBA",
-    "PropDCW",
+    "PropDCA",
     "PropDFA",
     "PropDFABuilder",
     "PropDMA",
@@ -44,7 +44,7 @@ __all__ = [
     "PropMealyMachine",
     "PropMooreMachine",
     "PropNBA",
-    "PropNCW",
+    "PropNCA",
     "PropNFA",
     "PropNPA",
     "parse_hoa",
@@ -207,12 +207,12 @@ class DBA:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class DCW:
+class DCA:
     r"""
     A deterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` only finitely often.
     
     >>> a = CharAlphabet("ab")
-    >>> fin_a = DCW(a, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)])
+    >>> fin_a = DCA(a, 1, 0, [(0, "a", True, 0), (0, "b", False, 0)])
     >>> fin_a.accepts(OmegaWord("aa", "b"))
     True
     >>> fin_a.accepts(OmegaWord("", "ab"))
@@ -220,12 +220,12 @@ class DCW:
     >>> fin_a.is_empty()
     False
     
-    The HOA format writes the characters as propositions and reads them back as a `PropDCW`.
+    The HOA format writes the characters as propositions and reads them back as a `PropDCA`.
     
-    >>> PropDCW.from_hoa(fin_a.to_hoa()).num_edges
+    >>> PropDCA.from_hoa(fin_a.to_hoa()).num_edges
     2
     >>> type(parse_hoa(fin_a.to_hoa())).__name__
-    'PropDCW'
+    'PropDCA'
     """
     @property
     def num_states(self) -> builtins.int:
@@ -259,7 +259,7 @@ class DCW:
         r"""
         An accepted word, or `None` if the language is empty.
         """
-    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]) -> DCW:
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]) -> DCA:
         r"""
         Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
         `(source, symbol, color, target)`; a later edge replaces an earlier one with
@@ -620,9 +620,9 @@ class DPA:
         `False`, which accepts the same language.
         """
     @classmethod
-    def from_dcw(cls, dcw: DCW) -> DPA:
+    def from_dca(cls, dca: DCA) -> DPA:
         r"""
-        The DPA with the colors `1` and `2` for the edges of the DCW with color `True`
+        The DPA with the colors `1` and `2` for the edges of the DCA with color `True`
         and `False`, which accepts the same language.
         """
     def complement(self) -> DPA:
@@ -1418,12 +1418,12 @@ class NBA:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class NCW:
+class NCA:
     r"""
     A nondeterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if some run uses edges with color `True` only finitely often.
     
     >>> a = CharAlphabet("ab")
-    >>> finitely_many_a = NCW(a, 2, 0, [(0, "a", True, 0), (0, "b", True, 0), (0, "b", False, 1), (1, "b", False, 1)])
+    >>> finitely_many_a = NCA(a, 2, 0, [(0, "a", True, 0), (0, "b", True, 0), (0, "b", False, 1), (1, "b", False, 1)])
     >>> finitely_many_a.accepts(OmegaWord("ab", "b"))
     True
     >>> finitely_many_a.accepts(OmegaWord("", "ab"))
@@ -1449,7 +1449,7 @@ class NCW:
         r"""
         The alphabet of the automaton.
         """
-    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]) -> NCW:
+    def __new__(cls, alphabet: CharAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, builtins.str, builtins.bool, builtins.int]]) -> NCA:
         r"""
         Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
         `(source, symbol, color, target)`; several edges with the same source and
@@ -1469,9 +1469,9 @@ class NCW:
         An accepted word, or `None` if the language is empty.
         """
     @classmethod
-    def from_dcw(cls, dcw: DCW) -> NCW:
+    def from_dca(cls, dca: DCA) -> NCA:
         r"""
-        The NCW with the transitions of the DCW.
+        The NCA with the transitions of the DCA.
         """
     def to_hoa(self) -> builtins.str:
         r"""
@@ -1849,9 +1849,9 @@ class PropDBA:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class PropDCW:
+class PropDCA:
     r"""
-    A deterministic co-Büchi automaton over a `PropAlphabet`, see `DCW`.
+    A deterministic co-Büchi automaton over a `PropAlphabet`, see `DCA`.
     """
     @property
     def num_states(self) -> builtins.int:
@@ -1885,7 +1885,7 @@ class PropDCW:
         r"""
         An accepted word, or `None` if the language is empty.
         """
-    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.bool, builtins.int]]) -> PropDCW:
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.bool, builtins.int]]) -> PropDCA:
         r"""
         Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
         `(source, symbol, color, target)`; a later edge replaces an earlier one with
@@ -1897,7 +1897,7 @@ class PropDCW:
         The automaton in the HOA format. Raises `HoaError` if it cannot be written.
         """
     @classmethod
-    def from_hoa(cls, text: builtins.str) -> PropDCW:
+    def from_hoa(cls, text: builtins.str) -> PropDCA:
         r"""
         Reads the first automaton in the HOA text. Raises `HoaError` if the text is not a
         (supported) deterministic co-Büchi automaton.
@@ -2226,9 +2226,9 @@ class PropDPA:
         `False`, which accepts the same language.
         """
     @classmethod
-    def from_dcw(cls, dcw: PropDCW) -> PropDPA:
+    def from_dca(cls, dca: PropDCA) -> PropDPA:
         r"""
-        The DPA with the colors `1` and `2` for the edges of the DCW with color `True`
+        The DPA with the colors `1` and `2` for the edges of the DCA with color `True`
         and `False`, which accepts the same language.
         """
     @classmethod
@@ -2979,9 +2979,9 @@ class PropNBA:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class PropNCW:
+class PropNCA:
     r"""
-    A nondeterministic co-Büchi automaton over a `PropAlphabet`, see `NCW`.
+    A nondeterministic co-Büchi automaton over a `PropAlphabet`, see `NCA`.
     """
     @property
     def num_states(self) -> builtins.int:
@@ -3003,7 +3003,7 @@ class PropNCW:
         r"""
         The alphabet of the automaton.
         """
-    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.bool, builtins.int]]) -> PropNCW:
+    def __new__(cls, alphabet: PropAlphabet, num_states: builtins.int, initial: builtins.int, edges: typing.Sequence[tuple[builtins.int, typing.Sequence[builtins.bool], builtins.bool, builtins.int]]) -> PropNCA:
         r"""
         Creates the automaton with states `0, ..., num_states - 1`. `edges` are tuples
         `(source, symbol, color, target)`; several edges with the same source and
@@ -3023,16 +3023,16 @@ class PropNCW:
         An accepted word, or `None` if the language is empty.
         """
     @classmethod
-    def from_dcw(cls, dcw: PropDCW) -> PropNCW:
+    def from_dca(cls, dca: PropDCA) -> PropNCA:
         r"""
-        The PropNCW with the transitions of the PropDCW.
+        The PropNCA with the transitions of the PropDCA.
         """
     def to_hoa(self) -> builtins.str:
         r"""
         The automaton in the HOA format. Raises `HoaError` if it cannot be written.
         """
     @classmethod
-    def from_hoa(cls, text: builtins.str) -> PropNCW:
+    def from_hoa(cls, text: builtins.str) -> PropNCA:
         r"""
         Reads the first automaton in the HOA text, which may be deterministic. Raises
         `HoaError` if its acceptance condition is not co-Büchi.
@@ -3235,10 +3235,10 @@ class PropNPA:
 def parse_hoa(text: builtins.str) -> typing.Any:
     r"""
     Reads the first automaton in `text` (a HOA file may contain several) and returns it as an
-    instance of the most specific class: `PropDBA` for a deterministic Büchi automaton, `PropDCW`
+    instance of the most specific class: `PropDBA` for a deterministic Büchi automaton, `PropDCA`
     for co-Büchi, `PropDPA`, `PropDPAMaxEven`, `PropDPAMinOdd` or `PropDPAMaxOdd` for the parity
     kind of the file, `PropDRA` for Rabin and `PropDSA` for Streett. Automata that are not
-    deterministic give `PropNBA`, `PropNCW` or `PropNPA` (min even only). Rabin and Streett
+    deterministic give `PropNBA`, `PropNCA` or `PropNPA` (min even only). Rabin and Streett
     colors are renumbered, see `PropDRA.from_hoa`. Raises `HoaError` if the text is not a
     (supported) HOA automaton and `NotImplementedError` for acceptance conditions without a
     class (nondeterministic Rabin and Streett, generalized conditions, ...) and for

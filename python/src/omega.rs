@@ -252,13 +252,13 @@ omega_class!(
 );
 
 omega_class!(
-    PyDcw,
-    "DCW",
+    PyDca,
+    "DCA",
     Chars,
     PyCharAlphabet,
     bool,
     CoBuchiCondition,
-    "A deterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` only finitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> fin_a = DCW(a, 1, 0, [(0, \"a\", True, 0), (0, \"b\", False, 0)])\n>>> fin_a.accepts(OmegaWord(\"aa\", \"b\"))\nTrue\n>>> fin_a.accepts(OmegaWord(\"\", \"ab\"))\nFalse\n>>> fin_a.is_empty()\nFalse\n\nThe HOA format writes the characters as propositions and reads them back as a `PropDCW`.\n\n>>> PropDCW.from_hoa(fin_a.to_hoa()).num_edges\n2\n>>> type(parse_hoa(fin_a.to_hoa())).__name__\n'PropDCW'",
+    "A deterministic co-Büchi automaton over a `CharAlphabet`. An infinite word is accepted if its run uses edges with color `True` only finitely often.\n\n>>> a = CharAlphabet(\"ab\")\n>>> fin_a = DCA(a, 1, 0, [(0, \"a\", True, 0), (0, \"b\", False, 0)])\n>>> fin_a.accepts(OmegaWord(\"aa\", \"b\"))\nTrue\n>>> fin_a.accepts(OmegaWord(\"\", \"ab\"))\nFalse\n>>> fin_a.is_empty()\nFalse\n\nThe HOA format writes the characters as propositions and reads them back as a `PropDCA`.\n\n>>> PropDCA.from_hoa(fin_a.to_hoa()).num_edges\n2\n>>> type(parse_hoa(fin_a.to_hoa())).__name__\n'PropDCA'",
     plain,
     {
         /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
@@ -268,13 +268,13 @@ omega_class!(
     }
 );
 omega_class!(
-    PyPropDcw,
-    "PropDCW",
+    PyPropDca,
+    "PropDCA",
     Props,
     PyPropAlphabet,
     bool,
     CoBuchiCondition,
-    "A deterministic co-Büchi automaton over a `PropAlphabet`, see `DCW`.",
+    "A deterministic co-Büchi automaton over a `PropAlphabet`, see `DCA`.",
     plain,
     {
         /// The automaton in the HOA format. Raises `HoaError` if it cannot be written.
@@ -286,7 +286,7 @@ omega_class!(
         /// (supported) deterministic co-Büchi automaton.
         #[classmethod]
         fn from_hoa(_cls: &Bound<'_, PyType>, py: Python<'_>, text: &str) -> PyResult<Self> {
-            crate::hoa::dcw(py, text).map(Self)
+            crate::hoa::dca(py, text).map(Self)
         }
     }
 );
@@ -295,7 +295,7 @@ omega_class!(
 /// color its run uses infinitely often is even), which has the extra methods of `DPA` of the
 /// crate.
 macro_rules! dpa_class {
-    ($name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $dba:ident, $dcw:ident, $doc:expr, { $($more:tt)* }) => {
+    ($name:ident, $py_name:literal, $kind:ty, $pyalpha:ty, $dba:ident, $dca:ident, $doc:expr, { $($more:tt)* }) => {
         omega_class!(
             $name,
             $py_name,
@@ -329,11 +329,11 @@ macro_rules! dpa_class {
                     Self(parity_of(&dba.0, |accepting| Int::from(!accepting)))
                 }
 
-                /// The DPA with the colors `1` and `2` for the edges of the DCW with color `True`
+                /// The DPA with the colors `1` and `2` for the edges of the DCA with color `True`
                 /// and `False`, which accepts the same language.
                 #[classmethod]
-                fn from_dcw(_cls: &Bound<'_, PyType>, dcw: &$dcw) -> Self {
-                    Self(parity_of(&dcw.0, |bad| if bad { 1 } else { 2 }))
+                fn from_dca(_cls: &Bound<'_, PyType>, dca: &$dca) -> Self {
+                    Self(parity_of(&dca.0, |bad| if bad { 1 } else { 2 }))
                 }
 
                 $($more)*
@@ -375,7 +375,7 @@ dpa_class!(
     Chars,
     PyCharAlphabet,
     PyDba,
-    PyDcw,
+    PyDca,
     "A deterministic parity automaton over a `CharAlphabet` with colors `0..=255` on the edges (others raise `OverflowError`) (min-even: a word is accepted if the least color that its run uses infinitely often is even; the other parity conditions are the classes `DPAMaxEven`, `DPAMinOdd` and `DPAMaxOdd`).\n\n>>> a = CharAlphabet(\"ab\")\n>>> inf_b = DPA(a, 1, 0, [(0, \"a\", 1, 0), (0, \"b\", 0, 0)])\n>>> inf_b.accepts(OmegaWord(\"a\", \"ab\"))\nTrue\n>>> inf_b.accepts(OmegaWord(\"b\", \"a\"))\nFalse\n>>> inf_b.complement().accepts(OmegaWord(\"b\", \"a\"))\nTrue\n>>> inf_b.complement().complement().equivalent_to(inf_b)\nTrue\n>>> inf_b.rejected_word() is not None\nTrue",
     {}
 );
@@ -385,7 +385,7 @@ dpa_class!(
     Props,
     PyPropAlphabet,
     PyPropDba,
-    PyPropDcw,
+    PyPropDca,
     "A deterministic parity automaton over a `PropAlphabet`, see `DPA`.",
     {
         /// Reads the first automaton in the HOA text and converts it to a min-even DPA: every
