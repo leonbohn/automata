@@ -18,3 +18,9 @@ dynamic = ["version"]
 python-source = "py"
 module-name = "automata._automata"
 features = ["extension-module"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "spot: differential tests against Spot (skipped if `import spot` fails); `pytest -m 'not spot'` leaves them out",
+]
