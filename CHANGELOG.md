@@ -11,6 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 ### Added
 - Co-Büchi automata are named `DCA`, `NCA` and `HDCA` (and `into_dca`, `into_nca`, `NCA::from_dca`, ...) like the other types (acceptance condition + `A` for automaton); these names were never released.
+- `Dottable` for automata with co-Büchi (`DCA`), Rabin, Streett and Muller conditions, for the three
+  parity conditions other than min even and for the nondeterministic `NFA`, `NBA`, `NCA`, `NPA`,
+  `NRA`, `NSA` and `NMA`: edges show their color, the accepting states of an `NFA` are double
+  circles and the pairs (Rabin, Streett) or sets (Muller) of the condition are written in an extra
+  `acceptance` node. `DotStyle::dot_header_statements` adds statements to the header of the graph
+  and `MullerCondition::sets` returns the sets of the condition.
 - Python bindings in `python/` (distribution `automatars`, import name `automata`, built with maturin,
   `abi3-py311`; #143, WP4 and WP5). Every automaton class exists over a `CharAlphabet` and, with
   the prefix `Prop`, over a `PropAlphabet`:

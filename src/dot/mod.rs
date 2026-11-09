@@ -32,6 +32,12 @@ pub trait DotStyle<T: States> {
     /// The name of the graph, if any.
     fn dot_name(&self) -> Option<String>;
 
+    /// Additional statements for the header of the graph, for example a node that shows the
+    /// acceptance condition. None by default.
+    fn dot_header_statements(&self) -> Vec<String> {
+        Vec::new()
+    }
+
     /// The attributes of the node that represents the state `q` of `ts`.
     fn dot_state_attributes(&self, _ts: &T, q: StateIndex<T>) -> Vec<DotStateAttribute> {
         vec![DotStateAttribute::Label(format!("q{q:?}"))]
@@ -281,5 +287,99 @@ mod tests {
         let dot = omega.dot_representation();
         assert!(dot.contains("q0 -> q1"), "{dot}");
         assert!(dot.contains("init -> q0"), "{dot}");
+    }
+
+    /// The automata with Rabin, Streett and Muller conditions list the condition in an extra node, the nondeterministic ones are named with an `N`.
+    #[test]
+    fn dot_representation_of_the_remaining_conditions() {
+        use crate::Automaton;
+        use crate::automaton::{
+            CoBuchiCondition, Existential, MaxOddParityCondition, MullerCondition, RabinCondition,
+            RabinPair, StreettCondition,
+        };
+
+        let ts = || {
+            Builder::without_state_colors()
+                .with_transitions([(0, 'a', 1, 0), (0, 'b', 0, 0)])
+                .into_dts()
+        };
+        let pair = RabinPair::<crate::Int>::from_iters([0], [1]);
+
+        let dra =
+            Automaton::from_parts_with_acceptance(ts(), q(0), RabinCondition::from([pair.clone()]));
+        let dot = dra.dot_representation();
+        assert!(dot.starts_with("digraph DRA"), "{dot}");
+        assert!(
+            dot.contains(r#"acceptance [shape="plaintext", label="Rabin: (fin {0}, inf {1})"]"#),
+            "{dot}"
+        );
+        assert!(dot.contains(r#"q0 -> q0 [label="a|1"]"#), "{dot}");
+
+        let dsa = Automaton::from_parts_with_acceptance(ts(), q(0), StreettCondition::from([pair]));
+        let dot = dsa.dot_representation();
+        assert!(dot.starts_with("digraph DSA"), "{dot}");
+        assert!(
+            dot.contains(r#"acceptance [shape="plaintext", label="Streett: (fin {0}, inf {1})"]"#),
+            "{dot}"
+        );
+
+        let condition = MullerCondition::from_iter_iter([vec![0], vec![0, 1]]);
+        let dma = Automaton::from_parts_with_acceptance(ts(), q(0), condition);
+        let dot = dma.dot_representation();
+        assert!(dot.starts_with("digraph DMA"), "{dot}");
+        assert!(
+            dot.contains(r#"acceptance [shape="plaintext", label="Muller: [0], [0, 1]"]"#),
+            "{dot}"
+        );
+
+        let dpa = Automaton::from_parts_with_acceptance(ts(), q(0), MaxOddParityCondition);
+        assert!(dpa.dot_representation().starts_with("digraph DPA"));
+
+        let dca = Builder::without_state_colors()
+            .with_transitions([(0, 'a', true, 0)])
+            .into_dca(0);
+        assert!(dca.dot_representation().starts_with("digraph DCA"));
+
+        let nts = Builder::without_state_colors()
+            .with_edges([(0, 'a', true, 0), (0, 'a', false, 0)])
+            .into_nts();
+        let nca =
+            Automaton::from_parts_with_acceptance(nts.clone(), q(0), Existential(CoBuchiCondition));
+        assert!(nca.dot_representation().starts_with("digraph NCA"));
+        let nba = Automaton::from_parts_with_acceptance(
+            nts,
+            q(0),
+            Existential(crate::automaton::BuchiCondition),
+        );
+        let dot = nba.dot_representation();
+        assert!(dot.starts_with("digraph NBA"), "{dot}");
+        assert!(dot.contains(r#"q0 -> q0 [label="a|true"]"#), "{dot}");
+    }
+
+    #[test]
+    fn dot_representation_of_an_nfa() {
+        let nfa = Builder::without_edge_colors()
+            .with_state_colors([false, true])
+            .with_transitions([(0, 'a', 0), (0, 'a', 1)])
+            .into_nfa(0);
+        let dot = nfa.dot_representation();
+        assert!(dot.starts_with("digraph NFA"), "{dot}");
+        assert!(dot.contains(r#"q0 [shape="circle""#), "{dot}");
+        assert!(dot.contains(r#"q1 [shape="doublecircle""#), "{dot}");
+    }
+
+    #[cfg(feature = "render")]
+    #[test]
+    fn the_condition_node_of_a_rabin_automaton_renders() {
+        use crate::automaton::{RabinCondition, RabinPair};
+        let dra = crate::Automaton::from_parts_with_acceptance(
+            Builder::without_state_colors()
+                .with_transitions([(0, 'a', 1, 0), (0, 'b', 0, 0)])
+                .into_dts(),
+            q(0),
+            RabinCondition::from([RabinPair::<crate::Int>::from_iters([0], [1])]),
+        );
+        let svg = dra.try_svg().expect("rendering to SVG works");
+        assert!(svg.contains("<svg") && svg.contains("Rabin"), "{svg}");
     }
 }
