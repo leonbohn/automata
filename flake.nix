@@ -23,6 +23,8 @@
           };
           # Spot incl. Python bindings; used to generate benchmark fixtures.
           spot-platform = pkgs.callPackage ./nix/spot-platform.nix { };
+          # Parity game solver for the differential tests and benchmarks of `automata::game`.
+          oink = pkgs.callPackage ./nix/oink.nix { };
           default = automata-bench;
         }
       );
@@ -56,6 +58,7 @@
               # self.packages.${system}.gungraun-runner
               # self.packages.${system}.automata-bench
               pkgs.python3
+              self.packages.${system}.oink
               self.packages.${system}.spot-platform
             ];
             # `import spot` in python3

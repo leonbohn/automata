@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 ### Added
+- `ParityGame::from_pgsolver` and `ParityGame::to_pgsolver` read and write games in the PGSolver format (`GameError::PgSolver`, `PgSolverError`); in Python `from_pgsolver` and `to_pgsolver`.
+- Python: the parity games `MaxEvenParityGame`, `MinEvenParityGame`, `MaxOddParityGame` and `MinOddParityGame` (`add_vertex`, `add_edge`, `solve`) and the exception `GameError`.
+- Differential tests of `automata::game` against the solver [Oink](https://github.com/trolando/oink) (`tests/oink.rs`; skipped if `oink` is not found), the benchmark `game`, and the flake package `oink` (also in the dev shell). The package `oink` of nixpkgs is an unrelated DDNS client, so `nix/oink.nix` builds the solver.
 - `game` module with parity games: `ParityGame<T, C>` over any `TransitionSystem` whose state colors are `Vertex { owner, priority }` (default arena `Arena`, a `LinkedTs` over a one-letter alphabet), for all four parity conditions (`MaxEvenParityGame`, `MinEvenParityGame`, `MaxOddParityGame`, `MinOddParityGame`). `ParityGame::solve` uses Zielonka's algorithm and returns a `Solution`; it fails with `GameError::NotTotal` (which converts into `Error`) if a vertex has no successor.
 - Co-Büchi automata are named `DCA`, `NCA` and `HDCA` (and `into_dca`, `into_nca`, `NCA::from_dca`, ...) like the other types (acceptance condition + `A` for automaton); these names were never released.
 - `Dottable` for automata with co-Büchi (`DCA`), Rabin, Streett and Muller conditions, for the three
