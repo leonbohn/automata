@@ -23,14 +23,14 @@
 use super::branching::{CycleCondition, Existential, HistoryDeterministic};
 use super::cycles::{self, Colors, Priorities};
 use super::{Automaton, DBA, DFA, DPA, NFA};
+use crate::color::Void;
+use crate::representation::{FromTransitions, Parts};
 use crate::ts::EdgeColor;
 use crate::ts::States;
 use crate::ts::operations::{Product, ProductIndex};
-use crate::representation::{FromTransitions, Parts};
 use crate::ts::{Deterministic, Pointed, StateIndex, SymbolOf, TransitionSystem};
 use crate::word::ReducedOmegaWord;
 use crate::{Int, NTS, math};
-use crate::color::Void;
 use std::hash::Hash;
 
 /// The problem of deciding whether the language of an automaton is empty, see the
@@ -336,7 +336,12 @@ where
     /// Returns an ultimately periodic word that is accepted by exactly one of the two automata,
     /// or `None` if they are equivalent.
     pub fn counterexample(&self) -> Option<ReducedOmegaWord<SymbolOf<DPA<D>>>> {
-        product_lasso(self.left, self.right, |&c| c, &[(true, false), (false, true)])
+        product_lasso(
+            self.left,
+            self.right,
+            |&c| c,
+            &[(true, false), (false, true)],
+        )
     }
 
     /// Returns true if and only if the two automata accept the same language.
@@ -370,7 +375,12 @@ where
     /// Returns an ultimately periodic word that is accepted by exactly one of the two automata,
     /// or `None` if they are equivalent.
     pub fn counterexample(&self) -> Option<ReducedOmegaWord<SymbolOf<DBA<D>>>> {
-        product_lasso(self.left, self.right, |&c| buchi(c), &[(true, false), (false, true)])
+        product_lasso(
+            self.left,
+            self.right,
+            |&c| buchi(c),
+            &[(true, false), (false, true)],
+        )
     }
 
     /// Returns true if and only if the two automata accept the same language.

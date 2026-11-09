@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fmt::{Display, Write as _},
     hash::Hash,
     marker::PhantomData,
@@ -93,7 +94,16 @@ pub struct PropSymbol<RawTy: RawSymbolRepr = u32> {
 impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
     /// Turns the symbol into the expression that is satisfied by exactly this valuation.
     pub fn as_expression(&self) -> PropExpression<RawTy> {
-        PropExpression::from_parts(self.num_aps, self.as_bdd_valuation().into())
+        let repr = if self.num_aps > TABLE_APS {
+            Repr::Bdd(self.as_bdd_valuation().into())
+        } else {
+            Repr::Table(1 << self.raw.as_usize())
+        };
+        PropExpression {
+            num_aps: self.num_aps,
+            repr,
+            _ty: PhantomData,
+        }
     }
     /// Returns the letter `a`, `b`, ... that represents the valuation (its bits as a number).
     pub fn as_char(&self) -> char {
@@ -183,8 +193,87 @@ impl<RawTy: RawSymbolRepr> Display for PropSymbol<RawTy> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PropExpression<RawTy: RawSymbolRepr = u32> {
     num_aps: u8,
-    bdd: Bdd,
+    repr: Repr,
     _ty: PhantomData<RawTy>,
+}
+
+/// The number of atomic propositions up to which expressions are stored as truth tables.
+const TABLE_APS: u8 = 6;
+
+/// How an expression is stored. It is always a [`Repr::Table`] for at most [`TABLE_APS`]
+/// propositions and a [`Repr::Bdd`] otherwise, so that equal expressions have equal
+/// representations.
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+enum Repr {
+    /// A truth table: bit `r` is set if the symbol with raw value `r` satisfies the expression.
+    Table(u64),
+    Bdd(Bdd),
+}
+
+/// The truth table that is satisfied by every symbol over `num_aps <= TABLE_APS` propositions.
+fn full_table(num_aps: u8) -> u64 {
+    if num_aps >= TABLE_APS {
+        u64::MAX
+    } else {
+        (1u64 << (1u32 << num_aps)) - 1
+    }
+}
+
+impl Repr {
+    fn from_bdd(num_aps: u8, bdd: Bdd) -> Self {
+        if num_aps > TABLE_APS {
+            return Repr::Bdd(bdd);
+        }
+        Repr::Table(bdd.sat_valuations().fold(0, |table, valuation| {
+            table | 1 << bool_index(&valuation.into_vector())
+        }))
+    }
+
+    fn to_bdd(&self, num_aps: u8) -> Cow<'_, Bdd> {
+        match self {
+            Repr::Bdd(bdd) => Cow::Borrowed(bdd),
+            Repr::Table(table) => {
+                let vars = BddVariableSet::new_anonymous(num_aps as u16);
+                let mut bdd = vars.mk_false();
+                for raw in (0..1usize << num_aps).filter(|r| table >> r & 1 == 1) {
+                    let bools = (0..num_aps as usize)
+                        .map(|k| raw >> (num_aps as usize - 1 - k) & 1 == 1)
+                        .collect();
+                    bdd = bdd.or(&Bdd::from(BddValuation::new(bools)));
+                }
+                Cow::Owned(bdd)
+            }
+        }
+    }
+
+    fn and(&self, other: &Self) -> Self {
+        match (self, other) {
+            (Repr::Table(a), Repr::Table(b)) => Repr::Table(a & b),
+            (Repr::Bdd(a), Repr::Bdd(b)) => Repr::Bdd(a.and(b)),
+            _ => unreachable!("expressions over the same propositions are stored alike"),
+        }
+    }
+
+    fn or(&self, other: &Self) -> Self {
+        match (self, other) {
+            (Repr::Table(a), Repr::Table(b)) => Repr::Table(a | b),
+            (Repr::Bdd(a), Repr::Bdd(b)) => Repr::Bdd(a.or(b)),
+            _ => unreachable!("expressions over the same propositions are stored alike"),
+        }
+    }
+
+    fn is_unsatisfiable(&self) -> bool {
+        match self {
+            Repr::Table(table) => *table == 0,
+            Repr::Bdd(bdd) => bdd.is_false(),
+        }
+    }
+}
+
+/// The raw value of the symbol with the given valuation (the first proposition is the most
+/// significant bit), which is also its position in a truth table.
+fn bool_index(bools: &[bool]) -> usize {
+    bools.iter().fold(0, |n, &b| n << 1 | b as usize)
 }
 
 impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
@@ -192,7 +281,7 @@ impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
     pub fn from_parts(num_aps: u8, bdd: Bdd) -> Self {
         Self {
             num_aps,
-            bdd,
+            repr: Repr::from_bdd(num_aps, bdd),
             _ty: PhantomData,
         }
     }
@@ -208,21 +297,32 @@ impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
     }
     /// Returns the underlying BDD.
     pub fn into_bdd(self) -> Bdd {
-        self.bdd
+        self.repr.to_bdd(self.num_aps).into_owned()
     }
     /// Returns the expression that is satisfied by every symbol over `num_aps` atomic propositions.
     pub fn universal(num_aps: u8) -> Self {
-        let vars = BddVariableSet::new_anonymous(num_aps as u16);
+        let repr = if num_aps > TABLE_APS {
+            Repr::Bdd(BddVariableSet::new_anonymous(num_aps as u16).mk_true())
+        } else {
+            Repr::Table(full_table(num_aps))
+        };
         Self {
             num_aps,
-            bdd: vars.mk_true(),
+            repr,
             _ty: PhantomData,
         }
     }
-    /// Iterates over the symbols that satisfy the expression.
+    /// Iterates over the symbols that satisfy the expression, for at most 6 atomic propositions in
+    /// ascending order of their raw values.
     pub fn sat_vals(&self) -> PropExpressionSymbols<'_, RawTy> {
         PropExpressionSymbols {
-            iter: self.bdd.sat_valuations(),
+            iter: match &self.repr {
+                Repr::Table(table) => SymbolsIter::Table {
+                    table: *table,
+                    num_aps: self.num_aps,
+                },
+                Repr::Bdd(bdd) => SymbolsIter::Bdd(bdd.sat_valuations()),
+            },
             _ty: PhantomData,
         }
     }
@@ -232,22 +332,15 @@ impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
     ///
     /// Panics if the BDD has more than 255 variables.
     pub fn from_bdd(bdd: Bdd) -> Self {
-        Self {
-            num_aps: bdd
-                .num_vars()
-                .try_into()
-                .expect("Number of variables does not fit into u8"),
-            bdd,
-            _ty: PhantomData,
-        }
+        let num_aps = bdd
+            .num_vars()
+            .try_into()
+            .expect("Number of variables does not fit into u8");
+        Self::from_parts(num_aps, bdd)
     }
     /// Iterates over the letters that represent the symbols satisfying the expression.
     pub fn chars_iter(&self) -> impl Iterator<Item = char> + '_ {
-        PropExpressionSymbols {
-            iter: self.bdd.sat_valuations(),
-            _ty: PhantomData,
-        }
-        .map(|e: PropSymbol<RawTy>| e.as_char())
+        self.sat_vals().map(|e: PropSymbol<RawTy>| e.as_char())
     }
 }
 
@@ -258,7 +351,7 @@ impl<RawTy: RawSymbolRepr> std::ops::BitAnd for PropExpression<RawTy> {
         assert_eq!(self.num_aps, rhs.num_aps);
         PropExpression {
             num_aps: self.num_aps,
-            bdd: self.bdd.and(&rhs.bdd),
+            repr: self.repr.and(&rhs.repr),
             _ty: PhantomData,
         }
     }
@@ -267,7 +360,15 @@ impl<RawTy: RawSymbolRepr> std::ops::Not for PropExpression<RawTy> {
     type Output = PropExpression<RawTy>;
 
     fn not(self) -> Self::Output {
-        Self::from_parts(self.num_aps, self.bdd.not())
+        let repr = match &self.repr {
+            Repr::Table(table) => Repr::Table(!table & full_table(self.num_aps)),
+            Repr::Bdd(bdd) => Repr::Bdd(bdd.not()),
+        };
+        Self {
+            num_aps: self.num_aps,
+            repr,
+            _ty: PhantomData,
+        }
     }
 }
 
@@ -275,21 +376,25 @@ impl<RawTy: RawSymbolRepr> std::ops::BitOr for PropExpression<RawTy> {
     type Output = PropExpression<RawTy>;
     fn bitor(self, rhs: Self) -> Self::Output {
         assert_eq!(self.num_aps, rhs.num_aps);
-        Self::from_parts(self.num_aps, self.bdd.or(&rhs.bdd))
+        Self {
+            num_aps: self.num_aps,
+            repr: self.repr.or(&rhs.repr),
+            _ty: PhantomData,
+        }
     }
 }
 
 impl<RawTy: RawSymbolRepr> std::ops::BitAndAssign for PropExpression<RawTy> {
     fn bitand_assign(&mut self, rhs: Self) {
         assert_eq!(self.num_aps, rhs.num_aps);
-        *self = Self::from_parts(self.num_aps, self.bdd.and(&rhs.bdd));
+        self.repr = self.repr.and(&rhs.repr);
     }
 }
 
 impl<RawTy: RawSymbolRepr> std::ops::BitOrAssign for PropExpression<RawTy> {
     fn bitor_assign(&mut self, rhs: Self) {
         assert_eq!(self.num_aps, rhs.num_aps);
-        *self = Self::from_parts(self.num_aps, self.bdd.or(&rhs.bdd));
+        self.repr = self.repr.or(&rhs.repr);
     }
 }
 
@@ -300,10 +405,10 @@ impl<RawTy: RawSymbolRepr> PartialOrd for PropExpression<RawTy> {
 }
 impl<RawTy: RawSymbolRepr> Ord for PropExpression<RawTy> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.bdd
-            .sat_valuations()
+        self.sat_vals()
+            .map(|symbol| symbol.as_bools())
             .min()
-            .cmp(&other.bdd.sat_valuations().min())
+            .cmp(&other.sat_vals().map(|symbol| symbol.as_bools()).min())
     }
 }
 
@@ -342,7 +447,7 @@ impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
     /// Renders the expression as a label in the HOA format, i.e. over the indices of the atomic
     /// propositions, for example `0 & !1` or `(0 & 1) | (!0 & !1)`.
     pub fn to_hoa_label(&self) -> String {
-        bdd_to_string(&self.bdd, |i| i.to_string(), " & ")
+        bdd_to_string(&self.repr.to_bdd(self.num_aps), |i| i.to_string(), " & ")
     }
 }
 
@@ -350,7 +455,7 @@ impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
 impl<RawTy: RawSymbolRepr> Display for PropExpression<RawTy> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&bdd_to_string(
-            &self.bdd,
+            &self.repr.to_bdd(self.num_aps),
             |i| ((b'a' + i as u8) as char).to_string(),
             "&",
         ))
@@ -360,7 +465,10 @@ impl<RawTy: RawSymbolRepr> Display for PropExpression<RawTy> {
 impl<RawTy: RawSymbolRepr> Matcher<PropExpression<RawTy>> for PropSymbol<RawTy> {
     fn matches(&self, expression: &PropExpression<RawTy>) -> bool {
         assert_eq!(self.num_aps, expression.num_aps);
-        expression.bdd.eval_in(&self.as_bdd_valuation())
+        match &expression.repr {
+            Repr::Table(table) => table >> self.raw.as_usize() & 1 == 1,
+            Repr::Bdd(bdd) => bdd.eval_in(&self.as_bdd_valuation()),
+        }
     }
 }
 
@@ -369,7 +477,11 @@ impl<RawTy: RawSymbolRepr> Matcher<PropExpression<RawTy>> for PropExpression<Raw
         assert_eq!(self.num_aps, expression.num_aps);
         // all values in self should also be in expression
         // we share nothing with the complement of the expression
-        expression.bdd.not().and(&self.bdd).sat_witness().is_none()
+        match (&self.repr, &expression.repr) {
+            (Repr::Table(a), Repr::Table(b)) => a & !b == 0,
+            (Repr::Bdd(a), Repr::Bdd(b)) => b.not().and(a).sat_witness().is_none(),
+            _ => unreachable!("expressions over the same propositions are stored alike"),
+        }
     }
 }
 
@@ -382,20 +494,17 @@ impl<RawTy: RawSymbolRepr> Expression for PropExpression<RawTy> {
         Self: 'this;
 
     fn symbols(&self) -> Self::SymbolsIter<'_> {
-        PropExpressionSymbols {
-            iter: self.bdd.sat_valuations(),
-            _ty: PhantomData::<RawTy>,
-        }
+        self.sat_vals()
     }
 
     fn intersection(&self, other: &Self) -> Option<Self> {
         if self.num_aps != other.num_aps {
             return None;
         }
-        let bdd = self.bdd.and(&other.bdd);
-        bdd.sat_witness().is_some().then_some(PropExpression {
+        let repr = self.repr.and(&other.repr);
+        (!repr.is_unsatisfiable()).then_some(PropExpression {
             num_aps: self.num_aps,
-            bdd,
+            repr,
             _ty: PhantomData,
         })
     }
@@ -403,21 +512,43 @@ impl<RawTy: RawSymbolRepr> Expression for PropExpression<RawTy> {
     /// Two expressions overlap if some symbol satisfies both. Expressions over a different
     /// number of atomic propositions never overlap.
     fn overlaps(&self, other: &Self) -> bool {
-        self.num_aps == other.num_aps && self.bdd.and(&other.bdd).sat_witness().is_some()
+        self.num_aps == other.num_aps && !self.repr.and(&other.repr).is_unsatisfiable()
     }
 }
 
 /// An iterator over the [`PropSymbol`]s that satisfy a [`PropExpression`].
 pub struct PropExpressionSymbols<'a, RawTy: RawSymbolRepr> {
-    iter: BddSatisfyingValuations<'a>,
+    iter: SymbolsIter<'a>,
     _ty: PhantomData<RawTy>,
+}
+
+enum SymbolsIter<'a> {
+    /// The remaining set bits of a truth table.
+    Table {
+        table: u64,
+        num_aps: u8,
+    },
+    Bdd(BddSatisfyingValuations<'a>),
 }
 
 impl<RawTy: RawSymbolRepr> Iterator for PropExpressionSymbols<'_, RawTy> {
     type Item = PropSymbol<RawTy>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(PropSymbol::from_bdd_valuation(self.iter.next()?))
+        match &mut self.iter {
+            SymbolsIter::Table { table, num_aps } => {
+                if *table == 0 {
+                    return None;
+                }
+                let raw = table.trailing_zeros() as usize;
+                *table &= *table - 1;
+                Some(PropSymbol {
+                    num_aps: *num_aps,
+                    raw: RawTy::from_usize(raw),
+                })
+            }
+            SymbolsIter::Bdd(iter) => Some(PropSymbol::from_bdd_valuation(iter.next()?)),
+        }
     }
 }
 
@@ -586,11 +717,7 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
         if symbol.num_aps as usize != self.aps.len() {
             return None;
         }
-        let expr = PropExpression {
-            bdd: Bdd::from(symbol.as_bdd_valuation()),
-            num_aps: symbol.num_aps,
-            _ty: PhantomData,
-        };
+        let expr = symbol.as_expression();
         let mut expressions = self.expressions.lock().unwrap();
         expressions.insert(expr.clone());
         Some(expr)
@@ -697,6 +824,66 @@ mod tests {
         // symbol over a different number of atomic propositions
         let other: PropAlphabet = PropAlphabet::new(vec!["a".into(), "b".into(), "c".into()]);
         assert!(!alphabet.contains(other.char_to_symbol('a')));
+    }
+
+    #[test]
+    fn truth_tables_agree_with_bdds() {
+        // every function over two propositions and a spread over three
+        for n in [2u8, 3] {
+            let all: Vec<PropExpression<u32>> = (0..1u32 << (1 << n))
+                .step_by(if n == 2 { 1 } else { 7 })
+                .map(|table| {
+                    let vars = BddVariableSet::new_anonymous(n as u16);
+                    let bdd = (0..1usize << n)
+                        .filter(|raw| table >> raw & 1 == 1)
+                        .map(|raw| {
+                            let bools =
+                                (0..n as usize).map(|i| raw >> (n as usize - 1 - i) & 1 == 1);
+                            Bdd::from(BddValuation::new(bools.collect()))
+                        })
+                        .fold(vars.mk_false(), |acc, b| acc.or(&b));
+                    PropExpression::from_bdd(bdd)
+                })
+                .collect();
+            for a in &all {
+                let bdd_a = a.clone().into_bdd();
+                let mut from_bdd: Vec<_> = bdd_a
+                    .sat_valuations()
+                    .map(PropSymbol::<u32>::from_bdd_valuation)
+                    .collect();
+                from_bdd.sort();
+                assert_eq!(a.sat_vals().collect::<Vec<_>>(), from_bdd);
+                assert_eq!(PropExpression::<u32>::from_bdd(bdd_a.not()), !a.clone());
+                for b in &all {
+                    let bdd_b = b.clone().into_bdd();
+                    assert_eq!(a.overlaps(b), bdd_a.and(&bdd_b).sat_witness().is_some());
+                    assert_eq!(
+                        a.intersection(b).map(PropExpression::into_bdd),
+                        bdd_a.and(&bdd_b).sat_witness().map(|_| bdd_a.and(&bdd_b))
+                    );
+                    assert_eq!(
+                        a.clone() | b.clone(),
+                        PropExpression::from_bdd(bdd_a.or(&bdd_b))
+                    );
+                    assert_eq!(
+                        a.matches(b),
+                        bdd_b.not().and(&bdd_a).sat_witness().is_none()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn expressions_over_many_propositions_use_bdds() {
+        let (x, y) = (
+            PropExpression::<u32>::new(8, "x_0 & x_7"),
+            PropExpression::new(8, "!x_0"),
+        );
+        assert!(!x.overlaps(&y));
+        assert!(x.overlaps(&PropExpression::universal(8)));
+        assert_eq!(x.sat_vals().count(), 64);
+        assert_eq!((x.clone() | y.clone()).sat_vals().count(), 128 + 64);
     }
 
     #[test]
