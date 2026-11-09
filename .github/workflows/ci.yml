@@ -129,6 +129,32 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
 
+  python:
+    name: Python bindings (ubuntu-latest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy --no-self-update
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: python
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - name: The generated stubs are up to date
+        run: |
+          cargo run --bin stub_gen
+          git diff --exit-code -- py
+      - run: python -m venv .venv && .venv/bin/pip install maturin pytest
+      - run: .venv/bin/maturin develop
+      - run: .venv/bin/python -m pytest
+
   nix:
     name: Nix flake
     runs-on: ubuntu-latest

@@ -10,32 +10,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 ### Added
+- Co-Büchi automata are named `DCA`, `NCA` and `HDCA` (and `into_dca`, `into_nca`, `NCA::from_dca`, ...) like the other types (acceptance condition + `A` for automaton); these names were never released.
+- Python bindings in `python/` (distribution `automatars`, import name `automata`, built with maturin,
+  `abi3-py311`; #143, WP4 and WP5). Every automaton class exists over a `CharAlphabet` and, with
+  the prefix `Prop`, over a `PropAlphabet`:
+  - `CharAlphabet`, `PropAlphabet`, `OmegaWord(prefix, period)`.
+  - Deterministic: `DFA` (union, intersection, complement, minimize, language problems with
+    counterexamples), `DBA`, `DCA`, `DPA` (min even; complement, inclusion, equivalence),
+    `DPAMaxEven`, `DPAMinOdd` and `DPAMaxOdd` (`to_min_even`, `complement`, `to_hoa`, `from_hoa`),
+    `DRA`, `DSA`, `DMA`, `MooreMachine` and `MealyMachine` (minimize, bisimilarity). Nondeterministic: `NFA`
+    (`determinize`), `NBA`, `NCA`, `NPA`. All have `sccs()`, `states()`, `edges_from(q)`.
+  - HOA input/output (`to_hoa`, `from_hoa`, `automata.parse_hoa`, `parse_hoa_all`) for Büchi,
+    co-Büchi, all four parity conditions, Rabin and Streett (`PropDRA`/`PropDSA` number the sets
+    of acceptance sets of the edges as colors), conversions
+    (`NFA.from_dfa`, `NBA.from_dba`, `NCA.from_dca`, `NPA.from_dpa`, `DPA.from_dba`, `DPA.from_dca`),
+    DOT and SVG output (`to_dot`, `_repr_svg_`), builders (`DFABuilder`, `automata.builders`).
+  - Exceptions: `automata.Error` with subclasses mirroring `crate::Error`; `NotYetImplemented` is
+    `NotImplementedError`. Generated `.pyi` stubs (`cargo run --bin stub_gen`), `PANIC-AUDIT.md`
+    lists the guards for Python input.
+  - A `python` job in CI, an optional Python step in `scripts/check` and a release workflow
+    (wheels via maturin-action, trusted publishing; first run on TestPyPI).
 - Nondeterministic automata as aliases over one generic semantics, `automaton::Existential<C>`:
-  a word is accepted if *some* run satisfies the acceptance condition `C` (#143). `NBA`, `NCW`,
+  a word is accepted if *some* run satisfies the acceptance condition `C` (#143). `NBA`, `NCA`,
   `NPA` (with the parity variant as a parameter), `NRA` and `NMA` for infinite words, `NFA` for
   finite ones. Any condition that implements `CycleCondition` (infinite words) or
   `FinalStateCondition` (finite words) works, so a new condition gets its nondeterministic
   automaton for free. Infinite words are decided on the product with the word's cycle by an SCC
-  decomposition, which is linear for Büchi, co-Büchi, parity and Rabin conditions (exponential in
-  the number of colors for Muller and Streett).
+  decomposition, which is linear for Büchi, co-Büchi, parity and Rabin conditions, polynomial for
+  Streett (`StreettCondition`) and exponential in the number of colors for Muller and for the
+  Streett case of `OmegaAcceptanceCondition`.
 - History-deterministic automata as a promise in the type: `automaton::HistoryDeterministic<C>`
-  (same acceptance as `Existential<C>`) with the aliases `HDFA`, `HDBA`, `HDCW`, `HDPA`, `HDRA`
+  (same acceptance as `Existential<C>`) with the aliases `HDFA`, `HDBA`, `HDCA`, `HDPA`, `HDRA`
   and `HDMA`. `assume_history_deterministic()` turns a nondeterministic automaton into one
   (unchecked, the checks come with WP8 of #143), `into_existential()` drops the promise.
   `Emptiness` and HOA output work as for nondeterministic automata.
 - `Automaton::map_acceptance(f)` replaces the acceptance condition, e.g.
   `dba.map_acceptance(Existential)` is the `DBA` as an `NBA`.
-- The co-Büchi condition `CoBuchiCondition` with `DCW` and `NCW`.
-- Builder shortcuts `into_nba`, `into_dcw`, `into_ncw`, `into_npa` and the generic
+- The co-Büchi condition `CoBuchiCondition` with `DCA` and `NCA`.
+- The Streett condition `StreettCondition<C>`, dual to `RabinCondition<C>` and built from the same
+  `RabinPair`s (`fin` disjoint from the colors seen infinitely often, or `inf` meets them; all pairs
+  have to hold, no pair accepts everything), with `DSA` and `NSA`. It implements `Semantics` and
+  `CycleCondition`, so `accepts`, `Emptiness` and HOA output (`HoaAcceptance`) work; emptiness
+  refines the SCCs by removing the `fin` colors of violated pairs.
+- Builder shortcuts `into_nba`, `into_dca`, `into_nca`, `into_npa` and the generic
   `into_nondeterministic_automaton(initial, acceptance)`, each with a `try_` twin.
 - `Emptiness` with an accepted word as witness for every nondeterministic omega automaton
-  (`Automaton<T, Existential<C>>`) and for `DCW`, `DRA` and `DMA`; `Emptiness`, `Inclusion` and
+  (`Automaton<T, Existential<C>>`) and for `DCA`, `DRA` and `DMA`; `Emptiness`, `Inclusion` and
   `Equivalence` for `NFA` (via `NFA::determinize`). Inclusion and equivalence of nondeterministic
   omega automata are not offered, they need a determinization or complementation that does not
   exist yet.
-- Benchmark target `nondeterministic`: acceptance of lassos and emptiness for NPA, NBA, NCW, NRA
+- Benchmark target `nondeterministic`: acceptance of lassos and emptiness for NPA, NBA, NCA, NRA
   and NMA, and acceptance on fixtures read with the `Linked` storage. `automata-bench` runs it by
   default.
+- `automaton::ParityKind` (`MinEven`, `MaxEven`, `MinOdd`, `MaxOdd`) for the four variants of the
+  parity condition, with `is_max` and `is_even`. `AcceptanceError::PriorityOverflow` and
+  `HoaError::InconsistentAcceptance` are new (both enums are `#[non_exhaustive]`).
+- HOA output (`HoaAcceptance`) for `CoBuchiCondition` (so `DCA`, `NCA`, `HDCA`) and
+  `RabinCondition<Int>` (`DRA`, `NRA`, every edge color is the one acceptance set of its edge);
+  `RabinCondition::pairs`. Muller automata have no HOA form.
 - `Storage::Semantics<C>`: the semantics of a condition on a storage, `C` for the deterministic
   storages and `Existential<C>` for `Linked`.
 
@@ -57,10 +89,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   |---|---|
   | `type Observer = O;` plus `fn observe(..)` and `fn evaluate(observed)` | `fn output(&self, ts, initial, word) -> Option<Self::Output>` |
   | `sem.evaluate(sem.observe(ts, q, w)?)` | `sem.output(ts, q, w)` |
+- **Breaking:** the parity condition of `OmegaAcceptanceCondition` carries its `ParityKind`:
+  `Parity(ParityKind, low, high)`; `MaxParity` is gone. `satisfied`, `into_dpa` (a DPA is
+  min-even, so priorities are renumbered, `AcceptanceError::PriorityOverflow` if the result does
+  not fit into an `Int`), HOA input and HOA output work for all four kinds. HOA input reads the
+  kind and the number of sets from `acc-name: parity <min|max> <even|odd> <n>` (before, every
+  parity automaton was read as min even); a missing, malformed or inconsistent name is
+  `HoaError::InconsistentAcceptance`. HOA output writes the name and the matching formula, and
+  `HoaAcceptance` exists for `MaxEvenParityCondition`, `MinOddParityCondition` and
+  `MaxOddParityCondition` like for `MinEvenParityCondition`.
+
+  | Before | After |
+  |---|---|
+  | `Parity(low, high)` | `Parity(ParityKind::MinEven, low, high)` |
+  | `MaxParity(low, high)`, `high` even | `Parity(ParityKind::MaxEven, low, high)` |
+  | `MaxParity(low, high)`, `high` odd | `Parity(ParityKind::MaxOdd, low, high)` |
+  | `acc-name: parity` without kind and sets | add `min even <n>` (or the actual kind) |
+
+  `MaxParity` accepted when `high - max` was even, i.e. when `max` had the parity of `high`; this
+  is the table's second and third row.
 - The dependency `hoars` is 0.4. It validates the header while parsing, so a missing `Acceptance:`
   item is a parse error (`HoaError::Parse`) instead of `HoaError::MissingAcceptanceSets`, which now
   only occurs for headers built by hand. Since `hoars` no longer caps labels at six variables, HOA
   input accepts up to 31 atomic propositions (the limit of `PropAlphabet`) instead of 6.
+
+### Fixed
+- The HOA writer put no parentheses around the pairs of Rabin and Streett conditions with two or more pairs (`(Fin(0)) | (Inf(1)) & ...`), so the written formula meant something else and could not be read back. `RabinPair` has the getters `fin()` and `inf()`.
+- `OmegaAcceptanceCondition::into_dpa` converted co-Büchi and safety automata to the wrong
+  language when edges of acceptance set `0` and edges outside of it both occur infinitely often
+  (the priority `0` for the good edges won). The bad edges now get priority `1` and all others `2`.
+- HOA input reads `acc-name: co-Buchi` (it was rejected although the output writes it). An edge
+  or `Start:` item that refers to a state that is not in the body panicked when the header had no
+  `States:` item, it is now `HoaError::UnknownState`.
+- HOA output of Rabin and Streett conditions declares enough acceptance sets for the edges (before,
+  only the sets of the pairs, which made the output invalid if an edge was in a larger set) and
+  only writes `acc-name: Rabin n` if the condition is the standard one over exactly `2n` sets.
 
 ## [0.2.1] - 2026-11-04
 

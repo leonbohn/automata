@@ -1,6 +1,7 @@
 use crate::automaton::{
-    AcceptanceMask, Automaton, BuchiCondition, MinEvenParityCondition, OmegaAcceptanceCondition,
-    RabinPair,
+    AcceptanceMask, Automaton, BuchiCondition, CoBuchiCondition, MaxEvenParityCondition,
+    MaxOddParityCondition, MinEvenParityCondition, MinOddParityCondition, OmegaAcceptanceCondition,
+    ParityKind, RabinCondition, RabinPair, StreettCondition,
 };
 use crate::ts::States;
 use itertools::Itertools;
@@ -120,15 +121,23 @@ impl<T: States<EdgeColor = bool>> HoaAcceptance<T> for BuchiCondition {
     }
 }
 
-impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for MinEvenParityCondition {
+impl<T: States<EdgeColor = bool>> HoaAcceptance<T> for CoBuchiCondition {
+    fn write_acceptance<W: Write>(&self, _ts: &T, w: &mut W) -> Result<(), HoaError> {
+        Ok(write_co_buchi_hoa(w)?)
+    }
+
+    fn write_edge_color<W: Write>(&self, color: &bool, w: &mut W) -> Result<(), HoaError> {
+        if *color {
+            w.write_str(" {0}")?;
+        }
+        Ok(())
+    }
+}
+
+/// Every edge belongs to the one acceptance set that is its color, the pairs refer to these sets.
+impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for RabinCondition<Int> {
     fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError> {
-        let mut colors = ts
-            .states()
-            .flat_map(|q| ts.edges_from(q).into_iter().flatten())
-            .map(|edge| *edge.color());
-        let first = colors.next().unwrap_or(0);
-        let high = colors.fold(first, Int::max);
-        Ok(write_parity_hoa(w, high)?)
+        write_typed_pairs_hoa(ts, w, "Rabin", self.pairs(), " | ", "f", " & ")
     }
 
     fn write_edge_color<W: Write>(&self, color: &Int, w: &mut W) -> Result<(), HoaError> {
@@ -136,23 +145,104 @@ impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for MinEvenParityCondition {
     }
 }
 
+/// Like for [`RabinCondition`], every edge belongs to the one acceptance set that is its color.
+impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for StreettCondition<Int> {
+    fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError> {
+        write_typed_pairs_hoa(ts, w, "Streett", self.pairs(), " & ", "t", " | ")
+    }
+
+    fn write_edge_color<W: Write>(&self, color: &Int, w: &mut W) -> Result<(), HoaError> {
+        Ok(write!(w, " {{{color}}}")?)
+    }
+}
+
+/// Writes the pairs of a typed Rabin or Streett condition, see [`write_pairs_hoa`], declaring
+/// the acceptance sets of the edge colors of `ts`.
+fn write_typed_pairs_hoa<'a, T: States<EdgeColor = Int>, W: Write>(
+    ts: &T,
+    w: &mut W,
+    name: &str,
+    pairs: impl Iterator<Item = &'a RabinPair<Int>>,
+    pair_join: &str,
+    empty: &str,
+    pair_op: &str,
+) -> Result<(), HoaError> {
+    let pairs: Vec<_> = pairs.cloned().collect();
+    let edge_sets = ts
+        .states()
+        .flat_map(|q| ts.edges_from(q).into_iter().flatten())
+        .map(|edge| usize::from(*edge.color()) + 1)
+        .max()
+        .unwrap_or(0);
+    Ok(write_pairs_hoa(
+        w, name, &pairs, edge_sets, pair_join, empty, pair_op,
+    )?)
+}
+
+/// The typed parity conditions write the sets `0..=high`, where `high` is the greatest color on
+/// an edge.
+macro_rules! typed_parity_hoa {
+    ($cond:ty, $kind:expr) => {
+        impl<T: States<EdgeColor = Int>> HoaAcceptance<T> for $cond {
+            fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError> {
+                let high = ts
+                    .states()
+                    .flat_map(|q| ts.edges_from(q).into_iter().flatten())
+                    .map(|edge| *edge.color())
+                    .max()
+                    .unwrap_or(0);
+                Ok(write_parity_hoa(w, $kind, high)?)
+            }
+
+            fn write_edge_color<W: Write>(&self, color: &Int, w: &mut W) -> Result<(), HoaError> {
+                Ok(write!(w, " {{{color}}}")?)
+            }
+        }
+    };
+}
+typed_parity_hoa!(MinEvenParityCondition, ParityKind::MinEven);
+typed_parity_hoa!(MaxEvenParityCondition, ParityKind::MaxEven);
+typed_parity_hoa!(MinOddParityCondition, ParityKind::MinOdd);
+typed_parity_hoa!(MaxOddParityCondition, ParityKind::MaxOdd);
+
 impl<T: States<EdgeColor = AcceptanceMask>> HoaAcceptance<T> for OmegaAcceptanceCondition {
-    fn write_acceptance<W: Write>(&self, _ts: &T, w: &mut W) -> Result<(), HoaError> {
+    fn write_acceptance<W: Write>(&self, ts: &T, w: &mut W) -> Result<(), HoaError> {
+        let edge_sets = |ts: &T| {
+            ts.states()
+                .flat_map(|q| ts.edges_from(q).into_iter().flatten())
+                .filter_map(|edge| edge.color().max())
+                .map(|set| usize::from(set) + 1)
+                .max()
+                .unwrap_or(0)
+        };
         match self {
-            OmegaAcceptanceCondition::Parity(_, high) => Ok(write_parity_hoa(w, *high)?),
-            OmegaAcceptanceCondition::MaxParity(_, high) => Ok(write_max_parity_hoa(w, *high)?),
+            OmegaAcceptanceCondition::Parity(kind, _, high) => {
+                Ok(write_parity_hoa(w, *kind, *high)?)
+            }
             OmegaAcceptanceCondition::Buchi | OmegaAcceptanceCondition::Reachability => {
                 Ok(write_buchi_hoa(w)?)
             }
             OmegaAcceptanceCondition::CoBuchi | OmegaAcceptanceCondition::Safety => {
-                Ok(write!(w, "acc-name: co-Buchi\nAcceptance: 1 Fin(0)\n")?)
+                Ok(write_co_buchi_hoa(w)?)
             }
-            OmegaAcceptanceCondition::Rabin(pairs) => {
-                Ok(write_pairs_hoa(w, "Rabin", pairs, " | ", "f", " & ")?)
-            }
-            OmegaAcceptanceCondition::Streett(pairs) => {
-                Ok(write_pairs_hoa(w, "Streett", pairs, " & ", "t", " | ")?)
-            }
+            OmegaAcceptanceCondition::Rabin(pairs) => Ok(write_pairs_hoa(
+                w,
+                "Rabin",
+                pairs,
+                edge_sets(ts),
+                " | ",
+                "f",
+                " & ",
+            )?),
+            OmegaAcceptanceCondition::Streett(pairs) => Ok(write_pairs_hoa(
+                w,
+                "Streett",
+                pairs,
+                edge_sets(ts),
+                " & ",
+                "t",
+                " | ",
+            )?),
         }
     }
 
@@ -168,45 +258,37 @@ fn write_buchi_hoa<W: Write>(w: &mut W) -> std::fmt::Result {
     write!(w, "acc-name: Buchi\nAcceptance: 1 Inf(0)\n")
 }
 
-fn write_parity_hoa<W: Write>(w: &mut W, high: Int) -> std::fmt::Result {
-    // the edges are labeled with their priorities as they are, so the sets are `0..=high` even if
-    // the sets below the least priority are unused
-    write!(
-        w,
-        "acc-name: parity min even {}\nAcceptance: {} {}\n",
-        high as usize + 1,
-        high as usize + 1,
-        build_parity_condition_hoa(0, high)
-    )
+fn write_co_buchi_hoa<W: Write>(w: &mut W) -> std::fmt::Result {
+    write!(w, "acc-name: co-Buchi\nAcceptance: 1 Fin(0)\n")
 }
 
-/// Writes a max parity condition over the acceptance sets `0..=high` in which the largest set
-/// seen infinitely often is accepting if it has the same parity as `high`.
-fn write_max_parity_hoa<W: Write>(w: &mut W, high: Int) -> std::fmt::Result {
-    let accepting_parity = high % 2;
-    let mut formula = if accepting_parity == 0 { "Inf(0)" } else { "f" }.to_string();
-    for set in 1..=high {
-        formula = if set % 2 == accepting_parity {
-            format!("Inf({set}) | ({formula})")
-        } else {
-            format!("Fin({set}) & ({formula})")
-        };
-    }
+/// Writes a parity condition over the acceptance sets `0..=high`. The edges are labeled with their
+/// priorities as they are, so the sets are `0..=high` even if the sets below the least priority
+/// are unused.
+fn write_parity_hoa<W: Write>(w: &mut W, kind: ParityKind, high: Int) -> std::fmt::Result {
+    let sets = usize::from(high) + 1;
+    let order: Vec<Int> = if kind.is_max() {
+        (0..=high).rev().collect()
+    } else {
+        (0..=high).collect()
+    };
     write!(
         w,
-        "acc-name: parity max {} {}\nAcceptance: {} {formula}\n",
-        if accepting_parity == 0 { "even" } else { "odd" },
-        high + 1,
-        high + 1,
+        "acc-name: parity {} {} {sets}\nAcceptance: {sets} {}\n",
+        if kind.is_max() { "max" } else { "min" },
+        if kind.is_even() { "even" } else { "odd" },
+        build_parity_condition_hoa(&order, kind.is_even())
     )
 }
 
 /// Writes a Rabin or Streett condition. A pair is `Fin(..) <pair_op> Inf(..)`, the pairs are
-/// joined by `pair_join`, `empty` is the condition without pairs.
+/// joined by `pair_join`, `empty` is the condition without pairs. At least `edge_sets` acceptance
+/// sets are declared, so that all sets that edges belong to exist.
 fn write_pairs_hoa<W: Write>(
     w: &mut W,
     name: &str,
     pairs: &[RabinPair<Int>],
+    edge_sets: usize,
     pair_join: &str,
     empty: &str,
     pair_op: &str,
@@ -216,14 +298,15 @@ fn write_pairs_hoa<W: Write>(
         let i = (2 * i) as Int;
         p.fin.iter().eq([&i]) && p.inf.iter().eq([&(i + 1)])
     });
-    if standard {
-        writeln!(w, "acc-name: {name} {}", pairs.len())?;
-    }
     let sets = pairs
         .iter()
         .flat_map(|p| p.fin.iter().chain(&p.inf))
         .max()
-        .map_or(0, |m| m + 1);
+        .map_or(0, |m| usize::from(*m) + 1)
+        .max(edge_sets);
+    if standard && sets == 2 * pairs.len() {
+        writeln!(w, "acc-name: {name} {}", pairs.len())?;
+    }
     let term = |set: &BTreeSet<Int>, name: &str, op: &str, none: &str| {
         if set.is_empty() {
             none.to_string()
@@ -237,11 +320,17 @@ fn write_pairs_hoa<W: Write>(
         pairs
             .iter()
             .map(|p| {
-                format!(
+                let pair = format!(
                     "({}){pair_op}({})",
                     term(&p.fin, "Fin", " & ", "t"),
                     term(&p.inf, "Inf", " | ", "f")
-                )
+                );
+                // `&` binds tighter than `|`, so the pairs need their own parentheses
+                if pairs.len() > 1 {
+                    format!("({pair})")
+                } else {
+                    pair
+                }
             })
             .join(pair_join)
     };
@@ -302,39 +391,21 @@ impl HoaSuitableAlphabet for PropAlphabet {
     }
 }
 
-/// Assumes that `low` is the least occurring and `high` is the highest occurring priority,
-/// *inclusive*.
-fn build_parity_condition_hoa(low: Int, high: Int) -> String {
-    let parity = low % 2;
-
-    let even = parity == 0;
-
-    if high <= low {
-        return if even { "t" } else { "f" }.to_string();
-    }
-
-    match high - low {
-        0 => {
-            if even {
-                format!("Inf({low})")
-            } else {
-                format!("Fin({low})")
-            }
+/// The parity formula over the acceptance sets in `order`, which lists them from the one that
+/// decides first to the one that decides last (increasing for min, decreasing for max). A set is
+/// accepting if its parity is even (`even`) or odd (`!even`).
+fn build_parity_condition_hoa(order: &[Int], even: bool) -> String {
+    let accepting = |set: Int| set.is_multiple_of(2) == even;
+    match order {
+        [] => "f".to_string(),
+        [only] => if accepting(*only) { "t" } else { "f" }.to_string(),
+        [set, last] if accepting(*set) => format!("Inf({set}) | Fin({last})"),
+        [set, last] => format!("Fin({set}) & Inf({last})"),
+        [set, rest @ ..] if accepting(*set) => {
+            format!("Inf({set}) | ({})", build_parity_condition_hoa(rest, even))
         }
-        1 => {
-            if even {
-                format!("Inf({low}) | Fin({high})")
-            } else {
-                format!("Fin({low}) & Inf({high})")
-            }
-        }
-        _ => {
-            let rest = build_parity_condition_hoa(low + 1, high);
-            if even {
-                format!("Inf({low}) | ({rest})")
-            } else {
-                format!("Fin({low}) & ({rest})")
-            }
+        [set, rest @ ..] => {
+            format!("Fin({set}) & ({})", build_parity_condition_hoa(rest, even))
         }
     }
 }
@@ -402,14 +473,14 @@ State: 1
 
     #[test]
     fn omega_acceptance_conditions_are_written() {
-        use crate::automaton::{OmegaAcceptanceCondition::*, RabinPair};
-        let header = |acc| {
+        use crate::automaton::{OmegaAcceptanceCondition::*, ParityKind, RabinPair};
+        let header_with = |mask: &[crate::Int], acc| {
             let aut = Builder::default()
                 .with_state_colors([crate::Void])
                 .with_edges([(
                     0,
                     'a',
-                    crate::automaton::AcceptanceMask::from_iter([0, 2]),
+                    crate::automaton::AcceptanceMask::from_iter(mask.iter().copied()),
                     0,
                 )])
                 .into_automaton(0, acc);
@@ -417,11 +488,20 @@ State: 1
             let acceptance = hoa.lines().skip(4).take_while(|l| *l != "--BODY--");
             acceptance.collect::<Vec<_>>().join("\n")
         };
+        let header = |acc| header_with(&[0, 2], acc);
         assert_eq!(header(Buchi), "acc-name: Buchi\nAcceptance: 1 Inf(0)");
         assert_eq!(header(CoBuchi), "acc-name: co-Buchi\nAcceptance: 1 Fin(0)");
         assert_eq!(
-            header(MaxParity(0, 2)),
-            "acc-name: parity max even 3\nAcceptance: 3 Inf(2) | (Fin(1) & (Inf(0)))"
+            header(Parity(ParityKind::MaxEven, 0, 2)),
+            "acc-name: parity max even 3\nAcceptance: 3 Inf(2) | (Fin(1) & Inf(0))"
+        );
+        assert_eq!(
+            header(Parity(ParityKind::MinOdd, 0, 2)),
+            "acc-name: parity min odd 3\nAcceptance: 3 Fin(0) & (Inf(1) | Fin(2))"
+        );
+        assert_eq!(
+            header(Parity(ParityKind::MaxOdd, 0, 2)),
+            "acc-name: parity max odd 3\nAcceptance: 3 Fin(2) & (Inf(1) | Fin(0))"
         );
         assert_eq!(
             header(Rabin(vec![RabinPair::from_iters([0], [1, 2])])),
@@ -432,13 +512,18 @@ State: 1
                 RabinPair::from_iters([0], [1]),
                 RabinPair::from_iters([], [2])
             ])),
-            "Acceptance: 3 (Fin(0)) | (Inf(1)) & (t) | (Inf(2))"
+            "Acceptance: 3 ((Fin(0)) | (Inf(1))) & ((t) | (Inf(2)))"
         );
-        assert_eq!(header(Rabin(vec![])), "acc-name: Rabin 0\nAcceptance: 0 f");
         assert_eq!(
-            header(Streett(vec![])),
+            header_with(&[], Rabin(vec![])),
+            "acc-name: Rabin 0\nAcceptance: 0 f"
+        );
+        assert_eq!(
+            header_with(&[], Streett(vec![])),
             "acc-name: Streett 0\nAcceptance: 0 t"
         );
+        // the sets of the edges have to exist, and then the pairs are not the standard ones
+        assert_eq!(header(Rabin(vec![])), "Acceptance: 3 f");
     }
 
     #[test]
@@ -479,11 +564,11 @@ State: 1
     #[test]
     fn build_parity_hoa_string() {
         assert_eq!(
-            crate::hoa::output::build_parity_condition_hoa(0, 4),
+            crate::hoa::output::build_parity_condition_hoa(&[0, 1, 2, 3, 4], true),
             "Inf(0) | (Fin(1) & (Inf(2) | (Fin(3) & Inf(4))))"
         );
         assert_eq!(
-            crate::hoa::output::build_parity_condition_hoa(0, 2),
+            crate::hoa::output::build_parity_condition_hoa(&[0, 1, 2], true),
             "Inf(0) | (Fin(1) & Inf(2))"
         );
     }
@@ -508,6 +593,96 @@ State: 1
         let hoa = dpa.to_hoa().unwrap();
         assert!(hoa.contains("Acceptance: 4 "), "{hoa}");
         assert!(hoa.contains("{2}\n") && hoa.contains("{3}\n"), "{hoa}");
+    }
+
+    #[test]
+    fn typed_conditions_are_written_and_read_back() {
+        use crate::automaton::{
+            Existential, MaxEvenParityCondition, MaxOddParityCondition, MinEvenParityCondition,
+            MinOddParityCondition, OmegaAcceptanceCondition, ParityKind, RabinCondition, RabinPair,
+            StreettCondition,
+        };
+        use crate::hoa::HoaString;
+        use crate::ts::{Det, Linked};
+        let read = |hoa: String| {
+            HoaString::from(hoa.clone())
+                .pop::<Det<Linked>>()
+                .unwrap_or_else(|| panic!("unreadable HOA\n{hoa}"))
+        };
+        let dpa = Builder::without_state_colors()
+            .with_edges([(0, 'a', 1, 0), (0, 'b', 3, 0)])
+            .into_dpa(0);
+        let parity = |hoa: String, kind| {
+            let acceptance = read(hoa).acceptance().clone();
+            assert_eq!(acceptance, OmegaAcceptanceCondition::Parity(kind, 0, 3));
+        };
+        parity(dpa.to_hoa().unwrap(), ParityKind::MinEven);
+        parity(
+            dpa.clone()
+                .map_acceptance(|_: MinEvenParityCondition| MaxEvenParityCondition)
+                .to_hoa()
+                .unwrap(),
+            ParityKind::MaxEven,
+        );
+        parity(
+            dpa.clone()
+                .map_acceptance(|_: MinEvenParityCondition| MinOddParityCondition)
+                .to_hoa()
+                .unwrap(),
+            ParityKind::MinOdd,
+        );
+        parity(
+            dpa.map_acceptance(|_: MinEvenParityCondition| MaxOddParityCondition)
+                .to_hoa()
+                .unwrap(),
+            ParityKind::MaxOdd,
+        );
+
+        // an NCA is written like a DCA
+        let nca = Builder::without_state_colors()
+            .with_transitions([(0, 'a', true, 0), (0, 'a', false, 0), (0, 'b', false, 0)])
+            .into_nca(0);
+        let hoa = nca.to_hoa().unwrap();
+        assert!(
+            hoa.contains("acc-name: co-Buchi\nAcceptance: 1 Fin(0)\n"),
+            "{hoa}"
+        );
+        assert!(hoa.contains(" {0}\n"), "{hoa}");
+
+        let pair = RabinPair::from_iters([0], [1]);
+        let edges = [(0, 'a', 0u8, 0), (0, 'b', 1, 0)];
+        let dra = Builder::without_state_colors()
+            .with_edges(edges)
+            .into_automaton(0, RabinCondition::from([pair.clone()]));
+        let nra = Builder::without_state_colors()
+            .with_edges(edges)
+            .into_nondeterministic_automaton(0, Existential(RabinCondition::from([pair.clone()])));
+        for hoa in [dra.to_hoa().unwrap(), nra.to_hoa().unwrap()] {
+            assert!(hoa.contains("acc-name: Rabin 1\nAcceptance: 2 "), "{hoa}");
+            assert_eq!(
+                *read(hoa).acceptance(),
+                OmegaAcceptanceCondition::Rabin(vec![pair.clone()])
+            );
+        }
+        let dsa = Builder::without_state_colors()
+            .with_edges(edges)
+            .into_automaton(0, StreettCondition::from([pair.clone()]));
+        let hoa = dsa.to_hoa().unwrap();
+        assert!(
+            hoa.contains("acc-name: Streett 1\nAcceptance: 2 (Fin(0)) | (Inf(1))\n"),
+            "{hoa}"
+        );
+        assert_eq!(
+            *read(hoa).acceptance(),
+            OmegaAcceptanceCondition::Streett(vec![pair.clone()])
+        );
+        // edge colors above the pairs are declared as acceptance sets
+        let wide = Builder::without_state_colors()
+            .with_edges([(0, 'a', 0u8, 0), (0, 'b', 4, 0)])
+            .into_automaton(0, RabinCondition::from([pair.clone()]));
+        let hoa = wide.to_hoa().unwrap();
+        assert!(hoa.contains("\nAcceptance: 5 "), "{hoa}");
+        assert!(!hoa.contains("acc-name"), "{hoa}");
     }
 
     #[test]

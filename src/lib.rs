@@ -140,7 +140,7 @@
 //! | [`MooreMachine`](automaton::MooreMachine), [`MealyMachine`](automaton::MealyMachine) | finite | state / edge | (computes an output) |
 //! | [`DBA`](automaton::DBA) | infinite | edge: `bool` | an accepting edge is seen infinitely often |
 //! | [`DPA`](automaton::DPA) | infinite | edge: `Int` | the least priority seen infinitely often is even |
-//! | [`DRA`](automaton::DRA), [`DMA`](automaton::DMA) | infinite | edge | Rabin / Muller condition on the infinity set |
+//! | [`DRA`](automaton::DRA), [`DSA`](automaton::DSA), [`DMA`](automaton::DMA) | infinite | edge | Rabin / Streett / Muller condition on the infinity set |
 //!
 //! For omega automata acceptance looks at the *edges* taken infinitely often. The word
 //! passed to [`accepts`](Automaton::accepts) selects the semantics:

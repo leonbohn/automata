@@ -43,3 +43,21 @@ Everything that a caller can trigger with a wrong input now returns a `LearningE
 | `prefixtree.rs` | `debug_assert!` | only called with the non-empty words of a sample |
 
 `passive/sample/characterize.rs` (dead code, never compiled) was deleted; it stays in `automata-learning`.
+
+## Python bindings (`python/`)
+
+Python input must never reach a panic. The bindings validate before they call the crate, a Rust
+panic that gets through would surface as `pyo3_runtime.PanicException`.
+
+| entry point | crate function that can panic | guard |
+| ----------- | ----------------------------- | ----- |
+| `PropAlphabet(aps)` | `PropAlphabet::new` | uses `try_new` (`PropAlphabetError`) |
+| symbols of `PropAlphabet` automata | `PropSymbol::from_bools` (too many booleans) | the length is checked against the number of propositions |
+| symbols of `CharAlphabet` automata | `Alphabet::make_expression` (symbol not in the alphabet) | `CharAlphabet::contains` check, `ValueError` |
+| `OmegaWord(prefix, period)` | `ReducedOmegaWord::ultimately_periodic` (empty period) | `ValueError` |
+| constructors and builders | indexing by state, `add_edge` | every state is checked against `num_states` before |
+| `union`, `intersection`, comparisons, `bisimilar` | products of automata over different alphabets | the alphabet sizes are compared, `ValueError` |
+| `edges_from`, `is_accepting` | state lookups | `IndexError` for unknown states |
+| `from_hoa`, `parse_hoa` of the parity classes | `AcceptanceMask::as_priority` (edge without exactly one acceptance set) | the priorities are validated first (`check_priorities`, `AcceptanceError`), `into_dpa` validates itself |
+| `PropDRA.from_hoa`, `PropDSA.from_hoa` | none: the masks are numbered by the bindings | more than 256 different masks are a `HoaError`, every mask of an edge is in the index by construction |
+| `to_min_even`, `is_empty`, `accepting_word` of the parity variants | `u8` overflow of the renumbered colors | computed in `usize` and checked against `255`, `ValueError` |

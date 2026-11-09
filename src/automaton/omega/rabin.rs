@@ -46,7 +46,25 @@ where
     }
 }
 
+impl<C: Color + Ord> RabinCondition<C> {
+    /// Iterates over the pairs of the condition, in increasing order.
+    pub fn pairs(&self) -> impl Iterator<Item = &RabinPair<C>> {
+        self.0.iter()
+    }
+}
+
 impl<C: Color + Ord> RabinPair<C> {
+    /// The colors that must not be seen infinitely often (Rabin) or whose appearance requires an
+    /// `inf` color (Streett).
+    pub fn fin(&self) -> &BTreeSet<C> {
+        &self.fin
+    }
+
+    /// The colors of which at least one has to be seen infinitely often.
+    pub fn inf(&self) -> &BTreeSet<C> {
+        &self.inf
+    }
+
     /// Creates a new pair from the given set of finite and infinite colors.
     pub fn new(fin: BTreeSet<C>, inf: BTreeSet<C>) -> Self {
         Self { fin, inf }

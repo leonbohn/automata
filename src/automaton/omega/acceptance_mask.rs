@@ -24,6 +24,15 @@ pub enum AcceptanceError {
         /// The highest priority allowed by the condition.
         high: Int,
     },
+    /// A conversion needs a priority that does not fit into an [`Int`].
+    #[error(
+        "the conversion needs the priority {needed}, but the largest supported one is {}",
+        Int::MAX
+    )]
+    PriorityOverflow {
+        /// The largest priority that the result would need.
+        needed: usize,
+    },
 }
 
 /// The set of acceptance sets (numbered `0, 1, ...`) that an edge belongs to, as they are used

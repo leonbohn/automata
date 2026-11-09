@@ -38,3 +38,22 @@ cargo test --all-features
 (cd tools/bench && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test)
 echo "benchmark tooling passed"
 echo "cargo test passed (default, no default, all features)"
+if command -v maturin >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    (
+        cd python
+        cargo fmt --check
+        cargo clippy --all-targets -- -D warnings
+        cargo test
+        cargo run -q --bin stub_gen
+        git diff --exit-code -- py
+        venv="$(mktemp -d)"
+        trap 'rm -rf "$venv"' EXIT
+        python3 -m venv "$venv"
+        "$venv/bin/pip" install -q pytest
+        VIRTUAL_ENV="$venv" PATH="$venv/bin:$PATH" maturin develop -q
+        "$venv/bin/python" -m pytest -q
+    )
+    echo "python bindings passed"
+else
+    echo "maturin (or python3) not installed, skipping the Python bindings (CI runs them)"
+fi

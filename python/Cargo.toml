@@ -1,0 +1,25 @@
+[package]
+name = "automata-py"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Python bindings for the automata crate."
+license = "MIT"
+authors = ["León Bohn <bohn@lics.rwth-aachen.de>"]
+repository = "https://github.com/leonbohn/automata"
+publish = false
+
+[lib]
+name = "_automata"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+automata = { path = "..", features = ["render"] }
+pyo3 = { version = "0.27", features = ["abi3-py311"] }
+pyo3-stub-gen = "0.23"
+
+[features]
+# set by maturin, not by plain `cargo build`/`cargo test`
+extension-module = ["pyo3/extension-module"]
+
+[workspace]
