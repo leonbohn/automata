@@ -741,4 +741,70 @@ mod tests {
         assert!(Equivalence::of(&inf_a).and(&inf_a).holds());
         assert!(!Equivalence::of(&inf_a).and(&inf_b).holds());
     }
+
+    /// A parity automaton over `aps` atomic propositions with the given body, in which a priority
+    /// of 0 is accepting.
+    #[cfg(feature = "hoa")]
+    fn prop_dpa(
+        aps: usize,
+        body: &str,
+    ) -> DPA<crate::DTS<crate::alphabet::PropAlphabet, crate::Void, Int>> {
+        use crate::hoa::HoaString;
+        let names = (0..aps)
+            .map(|i| format!("\"p{i}\""))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let text = format!(
+            "HOA: v1\nStates: 2\nStart: 0\nacc-name: parity min even 2\nAcceptance: 2 Inf(0) | Fin(1)\nAP: {aps} {names}\n--BODY--\n{body}\n--END--\n"
+        );
+        HoaString::from(text)
+            .pop::<crate::ts::Det<crate::ts::Linked>>()
+            .and_then(|a| a.into_dpa().ok())
+            .expect("a valid parity automaton")
+    }
+
+    #[cfg(feature = "hoa")]
+    #[test]
+    fn omega_problems_with_edges_labeled_by_formulas_that_are_no_valuations() {
+        // the `t`-labeled edges overlap with the edges of the others without being equal to them
+        let a = prop_dpa(1, "State: 0\n[t] 1 {0}\nState: 1\n[0] 0 {1}\n[!0] 1 {1}");
+        let never = prop_dpa(1, "State: 0\n[t] 1 {1}\nState: 1\n[t] 0 {1}");
+        assert!(Emptiness::of(&never).holds());
+        assert!(!Emptiness::of(&a).holds());
+        let a_split = prop_dpa(
+            1,
+            "State: 0\n[0] 1 {0}\n[!0] 1 {0}\nState: 1\n[0] 0 {1}\n[!0] 1 {1}",
+        );
+        assert!(Equivalence::of(&a).and(&a_split).holds());
+        assert!(Inclusion::of(&a_split).within(&a).holds());
+        let cex = Inclusion::of(&a).within(&never).counterexample();
+        assert!(cex.is_some_and(|w| a.accepts(&w) && !never.accepts(&w)));
+        assert!(!Inclusion::of(&a).within(&never).holds());
+        assert!(!Equivalence::of(&a).and(&never).holds());
+        assert!(Inclusion::of(&never).within(&a).holds());
+    }
+
+    #[cfg(feature = "hoa")]
+    #[test]
+    fn omega_problems_with_partially_overlapping_formulas() {
+        // over two propositions, `p0` and `p1` overlap without one containing the other
+        let left = prop_dpa(2, "State: 0\n[0] 0 {0}\n[!0] 1 {1}\nState: 1\n[t] 1 {1}");
+        let right = prop_dpa(2, "State: 0\n[1] 0 {0}\n[!1] 1 {1}\nState: 1\n[t] 1 {1}");
+        let cex = Inclusion::of(&left)
+            .within(&right)
+            .counterexample()
+            .unwrap();
+        assert!(left.accepts(&cex) && !right.accepts(&cex));
+        let cex = Equivalence::of(&left).and(&right).counterexample().unwrap();
+        assert_ne!(left.accepts(&cex), right.accepts(&cex));
+        assert!(Equivalence::of(&left).and(&left).holds());
+    }
+
+    #[cfg(feature = "hoa")]
+    #[test]
+    fn prefix_partition_with_edges_labeled_by_formulas_that_are_no_valuations() {
+        // state 0 accepts only p0^ω, state 1 nothing, and the edges of state 1 are labeled `t`
+        let dpa = prop_dpa(1, "State: 0\n[0] 0 {0}\n[!0] 1 {1}\nState: 1\n[t] 1 {1}");
+        assert_eq!(dpa.prefix_partition().len(), 2);
+    }
 }

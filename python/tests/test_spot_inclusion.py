@@ -94,11 +94,6 @@ Acceptance: 1 Inf(0)
 """
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: DBA/DPA inclusion and equivalence are wrong if an edge is labeled `t` instead of "
-    "split into valuations: the non-empty A is reported as included in the empty B",
-)
 def test_inclusion_of_automata_with_true_labels():
     a = automata.parse_hoa(HOA_BUCHI.format("State: 0\n[t] 1 {0}\nState: 1\n[0] 0\n[!0] 1"))
     b = automata.parse_hoa(HOA_BUCHI.format("State: 0\n[t] 1\nState: 1\n[t] 0"))

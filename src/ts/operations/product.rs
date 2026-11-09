@@ -1,4 +1,4 @@
-use crate::alphabet::Alphabet;
+use crate::alphabet::{Alphabet, Expression};
 use crate::ts::predecessors::PredecessorIterable;
 use crate::ts::{EdgeExpression, EdgeOf, EdgeRef, IdType, StateIndex, SymbolOf};
 use crate::{Pointed, TransitionSystem};
@@ -45,7 +45,9 @@ impl<L: std::fmt::Display, R: std::fmt::Display> std::fmt::Display for ProductIn
 }
 
 /// A product of two transition systems, which only permits transitions on matching symbols, while
-/// ignoring all others.
+/// ignoring all others. For every pair of edges whose expressions overlap, the product has an edge
+/// labeled with their [intersection](crate::alphabet::Expression::intersection); this matters for
+/// propositional alphabets, where expressions may overlap without being equal.
 #[derive(Copy, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MatchingProduct<L, R>(pub L, pub R);
 
@@ -192,14 +194,26 @@ where
             }
             let left = self.current.as_ref()?;
             for right in self.right_edges.as_mut()?.by_ref() {
-                if left.expression() == right.expression() {
-                    return Some(EdgeRef::owned(
+                // equal expressions are the common case and need no new expression
+                let intersection = if left.expression() == right.expression() {
+                    None
+                } else if let Some(both) = left.expression().intersection(right.expression()) {
+                    Some(both)
+                } else {
+                    continue;
+                };
+                let color = (left.color().clone(), right.color().clone());
+                let edge = left
+                    .clone()
+                    .with_states(
                         ProductIndex(left.source(), right.source()),
-                        left.expression(),
-                        (left.color().clone(), right.color().clone()),
                         ProductIndex(left.target(), right.target()),
-                    ));
-                }
+                    )
+                    .map_color(|_, _, _, _| color);
+                return Some(match intersection {
+                    Some(both) => edge.with_expression(both),
+                    None => edge,
+                });
             }
             self.right_edges = None;
         }

@@ -48,6 +48,12 @@ pub trait Expression: Hash + Clone + Debug + Eq + Ord + Display + Matcher<Self> 
     /// means that the two expressions share a common satisfying valuation.
     fn overlaps(&self, other: &Self) -> bool;
 
+    /// Returns the expression that is matched by exactly the symbols that match both `self` and
+    /// `other`, or `None` if there is no such symbol. For simple alphabets, where an expression is
+    /// a single symbol, this is `self` if the two are equal. For a propositional alphabet it is
+    /// the conjunction of the two formulas, if it is satisfiable.
+    fn intersection(&self, other: &Self) -> Option<Self>;
+
     /// Checks whether the given [`Symbol`] matches the expression `self`. For [`CharAlphabet`] alphabets, this just
     /// means that the expression equals the given symbol. For a propositional alphabet, this means that
     /// the expression is satisfied by the given symbol, an example of this is illustrated in propositional.

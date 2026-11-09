@@ -226,11 +226,10 @@ impl<'a, T: TransitionSystem + 'a> Iterator for CycleProductEdges<'a, T> {
         let edge = self
             .it
             .find(|edge| self.symbol.matches(edge.expression()))?;
-        Some(EdgeRef::owned(
-            ProductIndex(edge.source(), self.position),
-            edge.expression(),
-            edge.color().clone(),
-            ProductIndex(edge.target(), self.next),
+        let (source, target) = (edge.source(), edge.target());
+        Some(edge.with_states(
+            ProductIndex(source, self.position),
+            ProductIndex(target, self.next),
         ))
     }
 }

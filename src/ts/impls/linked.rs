@@ -826,13 +826,13 @@ impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for LinkedTs<A, Q, C> 
 
 impl<A: Alphabet, Q, C: Clone + Hash + Eq> LinkedTs<A, Q, C> {
     /// The edges leaving `q` as a set, to compare systems regardless of the order of their edges.
-    fn edge_set(&self, q: usize) -> math::FxIndexSet<(&A::Expression, Cow<'_, C>, StateId)>
+    fn edge_set(&self, q: usize) -> math::FxIndexSet<(A::Expression, Cow<'_, C>, StateId)>
     where
         A::Expression: Hash + Eq,
     {
         LinkedEdgesFrom::new(&self.edges, self.states[q].first_out_edge())
             .map(|e| {
-                let (expression, target) = (e.expression(), e.target());
+                let (expression, target) = (e.expression().clone(), e.target());
                 (expression, e.into_color(), target)
             })
             .collect()

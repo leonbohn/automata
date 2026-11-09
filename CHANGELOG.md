@@ -125,6 +125,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   input accepts up to 31 atomic propositions (the limit of `PropAlphabet`) instead of 6.
 
 ### Fixed
+- Products (`ts_product`, `MatchingProduct`) only paired edges with equal expressions. Over a
+  `PropAlphabet`, where edges may be labeled with any formula (`[t]`, `[0]`, ...), this lost
+  transitions: `Inclusion`/`Equivalence` and their counterexamples, `DPA::prefix_partition`,
+  union and intersection gave wrong answers for automata with edges that are not labeled by
+  single valuations (for example, a non-empty DBA was reported as included in an empty one). The
+  product now has an edge for each pair of overlapping edges, labeled with the intersection of the
+  expressions, for which `Expression` has the new method `intersection`.
+  **Breaking:** custom implementations of `Expression` have to implement `intersection`;
+  `EdgeRef::expression` no longer returns a reference with the lifetime of the system but one
+  that is bound to the edge, as an edge can own a computed expression (`EdgeRef::with_expression`).
 - The HOA writer put no parentheses around the pairs of Rabin and Streett conditions with two or more pairs (`(Fin(0)) | (Inf(1)) & ...`), so the written formula meant something else and could not be read back. `RabinPair` has the getters `fin()` and `inf()`.
 - `OmegaAcceptanceCondition::into_dpa` converted co-Büchi and safety automata to the wrong
   language when edges of acceptance set `0` and edges outside of it both occur infinitely often

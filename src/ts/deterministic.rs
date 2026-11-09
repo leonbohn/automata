@@ -5,7 +5,7 @@ use super::operations::RestrictByStateIndex;
 use super::operations::StateIndexFilter;
 use super::run::Run;
 use crate::congruence::MinimalRepresentative;
-use crate::ts::{EdgeColor, EdgeExpression, EdgeOf, EdgeRef, StateColor, StateIndex, SymbolOf};
+use crate::ts::{EdgeColor, EdgeExpression, EdgeOf, StateColor, StateIndex, SymbolOf};
 use crate::{Pointed, States, TransitionSystem};
 use crate::{
     alphabet::{Alphabet, Expression},
@@ -264,12 +264,19 @@ where
 
         let ll = self.0.edge(l, symbol)?;
         let rr = self.1.edge(r, symbol)?;
-        Some(EdgeRef::owned(
-            ProductIndex(l, r),
-            ll.expression(),
-            (ll.color().clone(), rr.color().clone()),
-            ProductIndex(ll.target(), rr.target()),
-        ))
+        let color = (ll.color().clone(), rr.color().clone());
+        let (target_l, target_r) = (ll.target(), rr.target());
+        // the edge of the product is labeled with the expressions that both edges have in common
+        let intersection = (ll.expression() != rr.expression())
+            .then(|| ll.expression().intersection(rr.expression()))
+            .flatten();
+        let edge = ll
+            .with_states(ProductIndex(l, r), ProductIndex(target_l, target_r))
+            .map_color(|_, _, _, _| color);
+        Some(match intersection {
+            Some(both) => edge.with_expression(both),
+            None => edge,
+        })
     }
 }
 

@@ -417,7 +417,8 @@ impl From<DeterministicOmegaAutomaton<PropAlphabet>> for DeterministicOmegaAutom
                     let (source, target) = (ids[&edge.source()], ids[&edge.target()]);
                     edge.expression()
                         .chars_iter()
-                        .map(move |sym| (source, sym, edge.color().clone(), target))
+                        .map(|sym| (source, sym, edge.color().clone(), target))
+                        .collect::<Vec<_>>()
                 })
             }))
             .into_dts();

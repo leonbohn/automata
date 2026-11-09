@@ -388,6 +388,18 @@ impl<RawTy: RawSymbolRepr> Expression for PropExpression<RawTy> {
         }
     }
 
+    fn intersection(&self, other: &Self) -> Option<Self> {
+        if self.num_aps != other.num_aps {
+            return None;
+        }
+        let bdd = self.bdd.and(&other.bdd);
+        bdd.sat_witness().is_some().then_some(PropExpression {
+            num_aps: self.num_aps,
+            bdd,
+            _ty: PhantomData,
+        })
+    }
+
     /// Two expressions overlap if some symbol satisfies both. Expressions over a different
     /// number of atomic propositions never overlap.
     fn overlaps(&self, other: &Self) -> bool {
@@ -619,6 +631,21 @@ mod tests {
         let never = PropExpression::<u32>::new(2, "x_0 & !x_0");
         assert_eq!(never.to_hoa_label(), "f");
         assert_eq!(never.to_string(), "f");
+    }
+
+    #[test]
+    fn intersection_of_expressions_is_their_conjunction_if_satisfiable() {
+        let expression = |s| PropExpression::<u32>::new(2, s);
+        let (first, second) = (expression("x_0"), expression("x_1"));
+        assert_eq!(first.intersection(&second), Some(expression("x_0 & x_1")));
+        assert_eq!(
+            PropExpression::universal(2).intersection(&first),
+            Some(first.clone())
+        );
+        assert_eq!(first.intersection(&expression("!x_0")), None);
+        assert_eq!(first.intersection(&PropExpression::universal(1)), None);
+        assert_eq!('a'.intersection(&'a'), Some('a'));
+        assert_eq!('a'.intersection(&'b'), None);
     }
 
     #[test]

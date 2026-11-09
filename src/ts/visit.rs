@@ -285,12 +285,11 @@ impl<'a, Ts: TransitionSystem> AccessWords<'a, Ts> {
         let Some(edges) = self.ts.edges_from(state) else {
             return;
         };
-        let mut successors: Vec<(SymbolOf<Ts>, StateIndex<Ts>)> = edges
-            .flat_map(|edge| {
-                let target = edge.target();
-                edge.expression().symbols().map(move |sym| (sym, target))
-            })
-            .collect();
+        let mut successors: Vec<(SymbolOf<Ts>, StateIndex<Ts>)> = Vec::new();
+        for edge in edges {
+            let target = edge.target();
+            successors.extend(edge.expression().symbols().map(|sym| (sym, target)));
+        }
         successors.sort_unstable();
         for (sym, target) in successors {
             if !self.nodes.contains_key(&target) {
