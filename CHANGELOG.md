@@ -90,6 +90,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   storages and `Existential<C>` for `Linked`.
 
 ### Changed
+- `Equivalence` and `Inclusion` of deterministic parity and Büchi automata build the product once (equivalence used to build it twice) and store its edges, so edge labels (BDD intersections on propositional alphabets) are computed once and not again in every refinement round; 10 to 40 % fewer instructions on the `dpa` benchmarks.
 - **Breaking:** `NFA<T>` is `Automaton<T, Existential<ReachabilityCondition>>`; `NfaCondition` is
   gone. Code that names the alias is unaffected, `NfaCondition` becomes
   `Existential(ReachabilityCondition)`.
