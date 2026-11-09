@@ -19,6 +19,9 @@ pub enum Error {
     /// A reduced omega word has a non-empty prefix and cannot be turned into a periodic one.
     #[error(transparent)]
     NotPeriodic(#[from] crate::word::NotPeriodicError),
+    /// A game could not be solved.
+    #[error(transparent)]
+    Game(#[from] crate::game::GameError),
     /// A learning algorithm failed.
     #[cfg(feature = "learning")]
     #[error(transparent)]

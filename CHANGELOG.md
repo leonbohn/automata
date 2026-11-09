@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 ### Added
+- `game` module with parity games: `ParityGame<T, C>` over any `TransitionSystem` whose state colors are `Vertex { owner, priority }` (default arena `Arena`, a `LinkedTs` over a one-letter alphabet), for all four parity conditions (`MaxEvenParityGame`, `MinEvenParityGame`, `MaxOddParityGame`, `MinOddParityGame`). `ParityGame::solve` uses Zielonka's algorithm and returns a `Solution`; it fails with `GameError::NotTotal` (which converts into `Error`) if a vertex has no successor.
 - Co-Büchi automata are named `DCA`, `NCA` and `HDCA` (and `into_dca`, `into_nca`, `NCA::from_dca`, ...) like the other types (acceptance condition + `A` for automaton); these names were never released.
 - `Dottable` for automata with co-Büchi (`DCA`), Rabin, Streett and Muller conditions, for the three
   parity conditions other than min even and for the nondeterministic `NFA`, `NBA`, `NCA`, `NPA`,
