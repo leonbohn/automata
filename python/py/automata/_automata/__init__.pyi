@@ -413,7 +413,7 @@ class DFA:
         """
     def minimize(self) -> DFA:
         r"""
-        The minimal DFA for the same language (Hopcroft).
+        The minimal DFA for the same language (Hopcroft). Unreachable states are removed.
         """
     def to_dot(self) -> builtins.str:
         r"""
@@ -1306,7 +1306,7 @@ class MealyMachine:
     def minimize(self) -> MealyMachine:
         r"""
         The minimal Mealy machine with the same output on every non-empty word
-        (Hopcroft). Unreachable states are minimized as well and kept.
+        (Hopcroft). Unreachable states are removed.
         """
     def to_dot(self) -> builtins.str:
         r"""
@@ -1409,7 +1409,8 @@ class MooreMachine:
         """
     def minimize(self) -> MooreMachine:
         r"""
-        The minimal Moore machine with the same output on every word (Hopcroft).
+        The minimal Moore machine with the same output on every word (Hopcroft). Unreachable states
+        are removed.
         """
     def push_colors_to_outgoing_edges(self) -> MealyMachine:
         r"""
@@ -2179,7 +2180,7 @@ class PropDFA:
         """
     def minimize(self) -> PropDFA:
         r"""
-        The minimal DFA for the same language (Hopcroft).
+        The minimal DFA for the same language (Hopcroft). Unreachable states are removed.
         """
     def to_dot(self) -> builtins.str:
         r"""
@@ -3010,7 +3011,7 @@ class PropMealyMachine:
     def minimize(self) -> PropMealyMachine:
         r"""
         The minimal Mealy machine with the same output on every non-empty word
-        (Hopcroft). Unreachable states are minimized as well and kept.
+        (Hopcroft). Unreachable states are removed.
         """
     def to_dot(self) -> builtins.str:
         r"""
@@ -3109,7 +3110,8 @@ class PropMooreMachine:
         """
     def minimize(self) -> PropMooreMachine:
         r"""
-        The minimal Moore machine with the same output on every word (Hopcroft).
+        The minimal Moore machine with the same output on every word (Hopcroft). Unreachable states
+        are removed.
         """
     def push_colors_to_outgoing_edges(self) -> PropMealyMachine:
         r"""

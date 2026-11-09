@@ -172,7 +172,7 @@ macro_rules! dfa_class {
                     Ok(Self(py.detach(|| self.0.intersection(&other.0).reachable_part().collect_dfa())))
                 }
 
-                /// The minimal DFA for the same language (Hopcroft).
+                /// The minimal DFA for the same language (Hopcroft). Unreachable states are removed.
                 fn minimize(&self, py: Python<'_>) -> Self {
                     Self(py.detach(|| self.0.clone().minimize()))
                 }

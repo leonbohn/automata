@@ -195,10 +195,13 @@ pub(crate) type MinimizedMealy<D> = MealyMachine<
 >;
 
 /// Builds the transition system of the quotient of `ts` by `partition` directly, without going
-/// through a [`Quotient`](crate::ts::operations::Quotient). The states of the result are the
-/// classes of `partition`, a class has the edges of one of its states (all states of a class
-/// agree on them) and the state color `state_color(colors)` computed from the colors of its
-/// states. Returns the system and the state of the class containing the initial state.
+/// through a [`Quotient`](crate::ts::operations::Quotient), and only for the states that are
+/// reachable from the initial state. The states of the result are the classes of `partition` that
+/// contain a reachable state, a class has the edges of one of its reachable states (all states of a
+/// class agree on them) and the state color `state_color(colors)` computed from the colors of its
+/// reachable states. The classes are numbered in the order in which a breadth-first search from the
+/// initial state discovers them, so the state of the class containing the initial state is the
+/// first one (`0`), which is also returned.
 fn from_partition<D, Q, C>(
     ts: &D,
     partition: &Partition<D::StateIndex>,
@@ -215,35 +218,43 @@ where
         .enumerate()
         .flat_map(|(i, class)| class.iter().map(move |q| (*q, i)))
         .collect();
-    let mut colors = vec![Vec::new(); partition.len()];
-    for (q, c) in ts.states_with_color() {
-        if let Some(&class) = class_of.get(&q) {
-            colors[class].push(c);
+    // number of a class in the result, its colors and a reachable state that represents it
+    let mut number: math::FxIndexMap<usize, usize> = math::FxIndexMap::default();
+    let mut colors: Vec<Vec<StateColor<D>>> = Vec::new();
+    let mut representatives = Vec::new();
+    for q in ts.reachable_state_indices() {
+        let (Some(&class), Some(color)) = (class_of.get(&q), ts.state_color(q)) else {
+            continue;
+        };
+        let next = number.len();
+        let n = *number.entry(class).or_insert(next);
+        if n == colors.len() {
+            colors.push(Vec::new());
+            representatives.push(q);
         }
+        colors[n].push(color.into_owned());
     }
     let mut out = DTS::for_alphabet(ts.alphabet().clone());
     let ids: Vec<crate::ts::StateId> = colors
         .into_iter()
         .map(|c| out.add_state(state_color(c)))
         .collect();
-    for (class, members) in partition.iter().enumerate() {
-        let Some(&rep) = members.iter().next() else {
-            continue;
-        };
+    for (n, rep) in representatives.into_iter().enumerate() {
         for e in ts.edges_from(rep).into_iter().flatten() {
-            if let Some(&target) = class_of.get(&e.target()) {
+            if let Some(target) = class_of
+                .get(&e.target())
+                .and_then(|class| number.get(class))
+            {
                 out.add_edge((
-                    ids[class],
+                    ids[n],
                     e.expression().clone(),
                     edge_color(e.color()),
-                    ids[target],
+                    ids[*target],
                 ));
             }
         }
     }
-    let initial = class_of
-        .get(&ts.initial())
-        .map_or(crate::ts::q(0), |&c| ids[c]);
+    let initial = ids.first().copied().unwrap_or(crate::ts::q(0));
     (out, initial)
 }
 

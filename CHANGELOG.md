@@ -125,6 +125,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   input accepts up to 31 atomic propositions (the limit of `PropAlphabet`) instead of 6.
 
 ### Fixed
+- `DFA::minimize`, `MooreMachine::minimize`, `MealyMachine::minimize` and `Minimize::on(..).run()`
+  kept the unreachable states (merged into classes), although the result is documented as the
+  minimal machine. They are removed now, and the states of the result are numbered in the order in
+  which a breadth-first search from the initial state discovers them, so the initial state is `0`.
+  **Breaking:** the result can have fewer states than before and other state numbers; this also
+  applies to `DPA::streamlined`. The benchmark results of the minimization benchmarks (`dfa`)
+  may change, as the quotient is built from the reachable states only.
 - `DPA::give_rejected_word` (and `rejected_word()` in Python) returned `None` for automata that
   are not universal if the rejecting loop can only be reached through edges of a smaller priority:
   the way to the loop was searched in the automaton without these edges.

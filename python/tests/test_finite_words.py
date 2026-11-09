@@ -26,11 +26,10 @@ def random_nfa(seed):
     return NFA(AB, n, 0, [q for q in range(n) if rng.random() < 0.4], edges)
 
 
-def moore_classes(dfa, n, edges, only_reachable):
-    """Number of classes of Moore's partition refinement (of the states reachable from 0 or of
-    all states)."""
+def moore_classes(dfa, edges):
+    """Number of classes of Moore's partition refinement of the states reachable from 0."""
     delta = {(q, s): t for q, s, t in edges}
-    states, todo = ({0}, [0]) if only_reachable else (set(range(n)), [])
+    states, todo = {0}, [0]
     while todo:
         q = todo.pop()
         for s in "ab":
@@ -50,16 +49,11 @@ def moore_classes(dfa, n, edges, only_reachable):
 def test_minimize_matches_moore_partition_refinement(seed):
     dfa, n, edges = random_dfa(seed)
     minimal = dfa.minimize()
-    # unreachable states are merged with each other (and with reachable ones) but not removed
-    assert minimal.num_states == moore_classes(dfa, n, edges, only_reachable=False), edges
+    assert minimal.num_states == moore_classes(dfa, edges), edges
     assert all(minimal.accepts(w) == dfa.accepts(w) for w in WORDS), f"language changed: {edges}"
     assert minimal.minimize().num_states == minimal.num_states
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="DOC MISMATCH: `DFA.minimize` is documented as 'the minimal DFA' but keeps unreachable states",
-)
 def test_minimize_removes_unreachable_states():
     dfa = DFA(AB, 3, 0, [0], [(0, "a", 0), (0, "b", 0), (1, "a", 2), (1, "b", 1), (2, "a", 1), (2, "b", 1)])
     assert dfa.minimize().num_states == 1

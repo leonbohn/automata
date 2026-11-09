@@ -171,7 +171,8 @@ macro_rules! moore_class {
                         .map(<$kind as Kind>::word_out))
                 }
 
-                /// The minimal Moore machine with the same output on every word (Hopcroft).
+                /// The minimal Moore machine with the same output on every word (Hopcroft). Unreachable states
+                /// are removed.
                 fn minimize(&self, py: Python<'_>) -> Self {
                     Self(py.detach(|| self.0.minimize()))
                 }
@@ -279,7 +280,7 @@ macro_rules! mealy_class {
                 }
 
                 /// The minimal Mealy machine with the same output on every non-empty word
-                /// (Hopcroft). Unreachable states are minimized as well and kept.
+                /// (Hopcroft). Unreachable states are removed.
                 fn minimize(&self, py: Python<'_>) -> Self {
                     Self(py.detach(|| {
                         self.0.minimize().erase_state_colors().collect_mealy()
