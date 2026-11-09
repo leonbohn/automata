@@ -53,16 +53,10 @@ def test_rejected_word(seed):
     if spot.dualize(sa).is_empty():
         assert w is None, msg(f"the automaton is universal in Spot, but we found {w!r}", sa)
     else:
-        if w is None:
-            pytest.xfail("BUG: rejected_word is None for a non-universal DPA, see `test_rejected_word_is_found`")
+        assert w is not None, msg("no rejected word although the automaton is not universal", sa)
         assert not o.accepts(w) and not spot_accepts(sa, w, o.alphabet.aps), msg(f"{w!r} is accepted", sa)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: `DPA::give_rejected_word` (src/automaton/omega/parity.rs) finds no word although the "
-    "complement accepts a^w (the loop of color 1 is only reachable through an edge of color 0)",
-)
 def test_rejected_word_is_found():
     ab = automata.CharAlphabet("ab")
     d = automata.DPA(ab, 2, 0, [(0, "a", 0, 1), (0, "b", 0, 1), (1, "b", 2, 0), (1, "a", 1, 1)])

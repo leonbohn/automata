@@ -125,6 +125,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   input accepts up to 31 atomic propositions (the limit of `PropAlphabet`) instead of 6.
 
 ### Fixed
+- `DPA::give_rejected_word` (and `rejected_word()` in Python) returned `None` for automata that
+  are not universal if the rejecting loop can only be reached through edges of a smaller priority:
+  the way to the loop was searched in the automaton without these edges.
 - HOA input ignored state-based acceptance (`State: 0 {0}`), so the automaton got no acceptance
   sets on the edges of that state and accepted another language. The sets of a state are now put on
   all its outgoing edges (united with the sets of the edge, so parity automata with a set on the
