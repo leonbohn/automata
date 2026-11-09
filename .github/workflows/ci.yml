@@ -158,7 +158,33 @@ jobs:
   nix:
     name: Nix flake
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/magic-nix-cache-action@v15
       - run: nix flake check
+
+  # The parity game solver Oink comes from the flake (nix/oink.nix); without it the tests skip.
+  oink:
+    name: Parity games vs Oink
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/magic-nix-cache-action@v15
+      - uses: Swatinem/rust-cache@v2
+      - name: Differential tests against Oink
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            command -v oink
+            cargo test --test oink -- --nocapture | tee oink.log
+            # the tests skip themselves without oink, which must not pass here
+            ! grep -q skipped oink.log
+          '

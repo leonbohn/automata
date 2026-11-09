@@ -1,7 +1,8 @@
 name: Python bindings vs Spot
 
 # Differential tests of the Python bindings against Spot (python/tests/test_spot_*.py). Spot comes
-# from the flake's dev shell (nix/spot-platform.nix); building it is slow if it is not cached.
+# from the flake's dev shell (nix/spot-platform.nix); the
+# magic nix cache keeps the build (slow otherwise) between runs.
 on:
   workflow_dispatch:
   schedule:
@@ -19,9 +20,13 @@ jobs:
     name: pytest -m spot
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/magic-nix-cache-action@v15
       - name: Differential tests against Spot
         run: |
           nix develop --command bash -c '
