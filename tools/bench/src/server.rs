@@ -266,6 +266,7 @@ pub fn route(cfg: &Config, db: &Db, req: &Req) -> Reply {
                     &cfg.logs().join(format!("{id}.log")),
                 )))
             }
+            ("GET", ["versus"]) => Reply::html(site.versus()?),
             ("GET", ["run", id]) => {
                 let page = match id.parse::<i64>() {
                     Ok(id) => site.run(id, &cfg.logs())?,
@@ -495,6 +496,7 @@ mod tests {
                 work_dir: PathBuf::new(),
                 benches: vec![],
                 wallclock_bench: None,
+                versus_script: None,
                 criterion_args: vec![],
                 cpu: None,
             },
@@ -640,6 +642,7 @@ mod tests {
         for url in [
             "/",
             "/fragments/queue",
+            "/versus",
             "/fragments/history?metric=heap_bytes&q=x",
             "/data.json",
             "/static/style.css",
@@ -650,6 +653,52 @@ mod tests {
         }
         assert_eq!(route(&cfg(), &db, &req("GET", "/run/99")).status, 404);
         assert_eq!(route(&cfg(), &db, &req("GET", "/nothing")).status, 404);
+    }
+
+    #[test]
+    fn versus_page_shows_the_comparison() {
+        use crate::model::{EnvInfo, Measured, Versus, VersusRow};
+        let db = memory_db();
+        let id = db
+            .enqueue(&crate::db::NewRun {
+                kind: "main".into(),
+                pr: None,
+                title: "t".into(),
+                head_sha: "abcdef0123".into(),
+            })
+            .unwrap()
+            .unwrap();
+        db.claim().unwrap();
+        let versus = Versus {
+            settings: serde_json::json!({"spot": "2.16"}),
+            rows: vec![VersusRow {
+                bench: "game/solve/ladder_1".into(),
+                reference: "oink-zlk".into(),
+                ours_ns: 3e6,
+                ref_ns: 1e6,
+                ours_size: Some(1),
+                ref_size: Some(1),
+                equivalent: false,
+                runs: 3,
+            }],
+        };
+        let measured = std::collections::BTreeMap::from([(
+            "head".to_string(),
+            Measured {
+                versus,
+                ..Default::default()
+            },
+        )]);
+        db.finish(id, None, &EnvInfo::default(), &measured).unwrap();
+        for url in ["/versus".to_string(), format!("/run/{id}")] {
+            let reply = route(&cfg(), &db, &req("GET", &url));
+            assert_eq!(reply.status, 200);
+            let body = String::from_utf8(reply.body.to_vec()).unwrap();
+            assert!(
+                body.contains("oink-zlk") && body.contains("3.00×") && body.contains("NO"),
+                "{url}"
+            );
+        }
     }
 
     #[test]

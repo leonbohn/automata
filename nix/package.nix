@@ -10,6 +10,10 @@
   coreutils,
   valgrind,
   gungraun-runner,
+  maturin,
+  python3,
+  spot-platform,
+  oink,
 }:
 
 rustPlatform.buildRustPackage {
@@ -30,7 +34,7 @@ rustPlatform.buildRustPackage {
   nativeBuildInputs = [ makeWrapper ];
 
   postInstall = ''
-    wrapProgram $out/bin/automata-bench --prefix PATH : ${
+    wrapProgram $out/bin/automata-bench --prefix PYTHONPATH : ${spot-platform}/${python3.sitePackages} --prefix PATH : ${
       lib.makeBinPath [
         cargo
         rustc
@@ -40,6 +44,10 @@ rustPlatform.buildRustPackage {
         coreutils
         valgrind # the benchmarks run under callgrind and DHAT
         gungraun-runner # must match the version of the gungraun dependency
+        # `benches/versus/compare.py`: builds the Python bindings, compares with Spot and Oink
+        maturin
+        python3
+        oink
       ]
     }
   '';

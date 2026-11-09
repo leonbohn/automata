@@ -35,6 +35,13 @@ struct EngineArgs {
     /// Do not run the wall-clock target.
     #[arg(long)]
     no_wallclock: bool,
+    /// The script comparing with Spot and Oink (path inside the repository); needs `maturin`,
+    /// `python3` with Spot and optionally `oink`. Shown on the dashboard's Versus page.
+    #[arg(long, default_value = "benches/versus/compare.py")]
+    versus_script: String,
+    /// Do not compare with Spot and Oink.
+    #[arg(long)]
+    no_versus: bool,
     /// Arguments passed to criterion.
     #[arg(long = "criterion-arg", default_values_t = ["--quick".to_string()], allow_hyphen_values = true)]
     criterion_args: Vec<String>,
@@ -164,6 +171,7 @@ fn engine_from(git_dir: PathBuf, args: &EngineArgs) -> Engine {
         benches: args.benches.clone(),
         wallclock_bench: (!args.no_wallclock).then(|| args.wallclock_bench.clone()),
         criterion_args: args.criterion_args.clone(),
+        versus_script: (!args.no_versus).then(|| args.versus_script.clone()),
         cpu: args.cpu.clone(),
     }
 }
@@ -239,6 +247,22 @@ fn main() -> Result<()> {
                 "\n{} · {} · {} · {}",
                 m.env.host, m.env.cpu, m.env.rustc, m.env.valgrind
             );
+            if !measured.versus.rows.is_empty() {
+                println!(
+                    "\n| versus | reference | ours | reference | ratio | same |\n|---|---|--:|--:|--:|---|"
+                );
+                for v in &measured.versus.rows {
+                    println!(
+                        "| `{}` | {} | {} | {} | {:.1}× | {} |",
+                        v.bench,
+                        v.reference,
+                        model::fmt_ns(v.ours_ns),
+                        model::fmt_ns(v.ref_ns),
+                        v.ours_ns / v.ref_ns.max(1.0),
+                        if v.equivalent { "yes" } else { "NO" }
+                    );
+                }
+            }
             if !measured.wall.is_empty() {
                 println!("\n| wall clock | mean |\n|---|--:|");
                 for (name, w) in &measured.wall {
@@ -255,6 +279,7 @@ fn main() -> Result<()> {
         } => {
             // wall-clock times are not part of this check
             engine.no_wallclock = true;
+            engine.no_versus = true;
             let engine = local_engine(&repo, &engine)?;
             let rev = engine.resolve(&rev)?;
             let mut all = Vec::new();

@@ -19,7 +19,7 @@
           # revision, so all commits are measured with the same compiler.
           gungraun-runner = pkgs.callPackage ./nix/gungraun-runner.nix { };
           automata-bench = pkgs.callPackage ./nix/package.nix {
-            inherit (self.packages.${system}) gungraun-runner;
+            inherit (self.packages.${system}) gungraun-runner spot-platform oink;
           };
           # Spot incl. Python bindings; used to generate benchmark fixtures.
           spot-platform = pkgs.callPackage ./nix/spot-platform.nix { };

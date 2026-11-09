@@ -4,7 +4,7 @@
 //! gungraun targets give the numbers that are compared; the criterion target is run afterwards
 //! for the wall-clock times that only appear in the detail view.
 
-use crate::model::{EnvInfo, Measured};
+use crate::model::{EnvInfo, Measured, Versus};
 use crate::{criterion, gungraun};
 use anyhow::{Context, Result, bail};
 use std::fs::OpenOptions;
@@ -24,6 +24,8 @@ pub struct Engine {
     /// The criterion target with the wall-clock times, if the revision defines it.
     pub wallclock_bench: Option<String>,
     pub criterion_args: Vec<String>,
+    /// The script comparing with Spot and Oink (path inside the repository), if the revision has it.
+    pub versus_script: Option<String>,
     pub cpu: Option<String>,
 }
 
@@ -258,17 +260,100 @@ impl Engine {
             control.run(&mut cmd, &format!("benchmarking {bench} of {role}"))?;
             measured.wall = criterion::collect(&criterion_dir)?;
         }
+        if let Some(script) = &self.versus_script
+            && src.join(script).exists()
+        {
+            // informational like the wall-clock times: a missing tool must not fail the run
+            match self.run_versus(&src, role, script, control) {
+                Ok(versus) => measured.versus = versus,
+                Err(e) => {
+                    control.note(&format!("{role}: comparison with Spot/Oink skipped: {e:#}"))
+                }
+            }
+        }
         let _ = self
             .git()
             .args(["worktree", "remove", "--force"])
             .arg(&src)
             .output();
         control.note(&format!(
-            "{role}: {} benchmarks, {} wall-clock measurements",
+            "{role}: {} benchmarks, {} wall-clock measurements, {} comparisons",
             measured.results.len(),
-            measured.wall.len()
+            measured.wall.len(),
+            measured.versus.rows.len()
         ));
         Ok(measured)
+    }
+
+    /// Builds the Python bindings of this revision as a wheel, unpacks it (no virtualenv, no pip)
+    /// and runs the comparison script with it. `python3` has to find Spot (`PYTHONPATH`), `oink`
+    /// is optional; `maturin` and `python3` must be on the `PATH`.
+    fn run_versus(
+        &self,
+        src: &Path,
+        role: &str,
+        script: &str,
+        control: &Control,
+    ) -> Result<Versus> {
+        let dir = self.work_dir.join(format!("versus-{role}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        let (wheels, package) = (dir.join("wheels"), dir.join("package"));
+        std::fs::create_dir_all(&wheels)?;
+        control.note(&format!("{role}: building the Python bindings"));
+        let mut build = Command::new("maturin");
+        build
+            .current_dir(src)
+            .env(
+                "CARGO_TARGET_DIR",
+                self.work_dir.join(format!("target-{role}-python")),
+            )
+            .args([
+                "build",
+                "--release",
+                "--manifest-path",
+                "python/Cargo.toml",
+                "--out",
+            ])
+            .arg(&wheels);
+        control.run(
+            &mut build,
+            &format!("building the Python bindings of {role}"),
+        )?;
+        let wheel = std::fs::read_dir(&wheels)?
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .find(|p| p.extension().is_some_and(|e| e == "whl"))
+            .context("maturin built no wheel")?;
+        let mut unpack = Command::new("python3");
+        unpack
+            .args(["-I", "-m", "zipfile", "-e"])
+            .arg(&wheel)
+            .arg(&package);
+        control.run(&mut unpack, "unpacking the wheel")?;
+
+        control.note(&format!("{role}: running {script} (Spot, Oink)"));
+        let json = dir.join("versus.json");
+        let python_path = match std::env::var_os("PYTHONPATH") {
+            Some(old) => std::env::join_paths(
+                std::iter::once(package.clone()).chain(std::env::split_paths(&old)),
+            )?,
+            None => package.into(),
+        };
+        let mut cmd = match &self.cpu {
+            Some(cpu) => {
+                let mut c = Command::new("taskset");
+                c.args(["-c", cpu, "python3"]);
+                c
+            }
+            None => Command::new("python3"),
+        };
+        cmd.current_dir(src)
+            .env("PYTHONPATH", python_path)
+            .arg(script)
+            .arg("--out")
+            .arg(&json);
+        control.run(&mut cmd, &format!("comparing {role}"))?;
+        let text = std::fs::read_to_string(&json)?;
+        serde_json::from_str(&text).context("parsing the output of the comparison")
     }
 
     pub fn env_info(&self) -> EnvInfo {

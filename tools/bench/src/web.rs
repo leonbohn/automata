@@ -55,6 +55,7 @@ pub fn page(title: &str, body: &str) -> String {
 </head>
 <body>
 <h1><a href="/">automata benchmarks</a></h1>
+<p class="mut"><a href="/">History</a> · <a href="/versus">Versus Spot and Oink</a></p>
 {body}
 </body>
 </html>
@@ -359,9 +360,80 @@ impl Site<'_> {
                 None => body += &metrics_table(&head),
             }
             body += &self.wall_clock(id, run.base_sha.is_some())?;
+            body += &versus_table(&self.db.versus(id, "head")?.rows);
         }
         body += &log_section(&run, log_dir);
         Ok(Some(page(&format!("run {id}"), &body)))
+    }
+
+    /// The comparison with Spot and Oink of the latest finished commit of `main`, and how the
+    /// ratio of every operation developed.
+    pub fn versus(&self) -> Result<String> {
+        let latest = self
+            .db
+            .recent_main_runs(50)?
+            .into_iter()
+            .filter(|r| r.status == "done")
+            .find_map(|r| {
+                let v = self.db.versus(r.id, "head").ok()?;
+                (!v.rows.is_empty()).then_some((r, v))
+            });
+        let Some((run, versus)) = latest else {
+            return Ok(page(
+                "versus",
+                r#"<h2>Versus Spot and Oink</h2><p class="mut">No comparison on <code>main</code> yet.</p>"#,
+            ));
+        };
+        let mut body = format!(
+            r#"<h2>Versus Spot and Oink</h2><p class="mut">Wall-clock medians of the same operation on the same input in <code>automata</code> (through its Python bindings, like Spot) and in the reference, from <a href="/run/{id}">main · {sha}</a>. The ratio is ours / reference: above 1 we are slower. They depend on the machine and are never compared automatically.</p>"#,
+            id = run.id,
+            sha = sha_link(self.repo, &run.head_sha),
+        );
+        if !versus.settings.is_null() {
+            let _ = write!(
+                body,
+                r#"<p class="mut">Settings: <code>{}</code></p>"#,
+                esc(&versus.settings.to_string())
+            );
+        }
+        // geometric mean of the ratio per group (the first two path components) and reference
+        let mut groups: BTreeMap<(String, String), RatioSeries> = BTreeMap::new();
+        for (key, points) in self.db.versus_history(HISTORY)? {
+            let Some((bench, reference)) = key.split_once(" vs ") else {
+                continue;
+            };
+            let group = group_of(bench);
+            for p in points {
+                let e = groups
+                    .entry((group.to_string(), reference.to_string()))
+                    .or_default()
+                    .entry(p.run)
+                    .or_insert((0.0, 0, p.clone()));
+                e.0 += (p.value.max(1) as f64).ln();
+                e.1 += 1;
+            }
+        }
+        body += &versus_table(&versus.rows);
+        body += r#"<h3>History of the ratio</h3><p class="mut">Geometric mean of ours / reference over the inputs of an operation, one point per commit of <code>main</code>; the values in the tooltips are per mille (1.5 is 1500).</p><div class="grid">"#;
+        for ((group, reference), runs) in &groups {
+            let points: Vec<_> = runs
+                .values()
+                .map(|(sum, n, p)| crate::db::Point {
+                    value: (sum / *n as f64).exp() as u64,
+                    ..p.clone()
+                })
+                .collect();
+            let _ = write!(
+                body,
+                r#"<div class="card"><b>{} vs {}</b><br>{:.2}×{}</div>"#,
+                esc(group),
+                esc(reference),
+                points.last().map_or(0.0, |p| p.value as f64 / 1000.0),
+                charts::line(&points, self.threshold),
+            );
+        }
+        body += "</div>";
+        Ok(page("versus", &body))
     }
 
     fn wall_clock(&self, id: i64, has_base: bool) -> Result<String> {
@@ -406,6 +478,63 @@ impl Site<'_> {
         out += "</table>";
         Ok(out)
     }
+}
+
+/// Per run: sum of the logarithms of the ratios, their number, and a point to take the commit from.
+type RatioSeries = BTreeMap<i64, (f64, usize, crate::db::Point)>;
+
+/// `dpa/equivalence/ltl/gh-r-3` belongs to the operation `dpa/equivalence`.
+fn group_of(bench: &str) -> &str {
+    bench
+        .match_indices('/')
+        .nth(1)
+        .map_or(bench, |(i, _)| &bench[..i])
+}
+
+fn versus_table(rows: &[crate::model::VersusRow]) -> String {
+    if rows.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from("<h3>Versus Spot and Oink</h3>");
+    let mut group = "";
+    for r in rows {
+        if group_of(&r.bench) != group {
+            if !group.is_empty() {
+                out += "</table>";
+            }
+            group = group_of(&r.bench);
+            let _ = write!(
+                out,
+                "<h4>{}</h4><table><tr><th>input</th><th>reference</th><th>ours</th><th>reference</th><th>ours / reference</th><th>size (ours / reference)</th><th>same result</th></tr>",
+                esc(group)
+            );
+        }
+        let ratio = r.ours_ns / r.ref_ns.max(1.0);
+        let class = if ratio > 1.1 {
+            "bad"
+        } else if ratio < 0.9 {
+            "good"
+        } else {
+            "mut"
+        };
+        let size = |s: Option<i64>| s.map_or("–".to_string(), |s| s.to_string());
+        let _ = write!(
+            out,
+            r#"<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td class="{class}">{ratio:.2}×</td><td>{} / {}</td><td>{}</td></tr>"#,
+            esc(r.bench[group.len()..].trim_start_matches('/')),
+            esc(&r.reference),
+            fmt_ns(r.ours_ns),
+            fmt_ns(r.ref_ns),
+            size(r.ours_size),
+            size(r.ref_size),
+            if r.equivalent {
+                "yes"
+            } else {
+                r#"<b class="bad">NO</b>"#
+            },
+        );
+    }
+    out + "</table>"
 }
 
 fn metrics_table(results: &Results) -> String {

@@ -118,7 +118,9 @@ in
         "dfa"
         "dpa"
         "storage"
+        "nondeterministic"
         "learning"
+        "game"
       ];
       description = "Gungraun bench targets to run, those a revision does not define are skipped.";
     };
@@ -127,6 +129,16 @@ in
       type = types.nullOr types.str;
       default = "wallclock";
       description = "The criterion target with wall-clock times, shown in the detail view of a run only. `null` skips it.";
+    };
+
+    versusScript = mkOption {
+      type = types.nullOr types.str;
+      default = "benches/versus/compare.py";
+      description = ''
+        Script (path inside the repository) that compares wall-clock times with Spot and Oink,
+        shown on the dashboard's "Versus" page. It builds the Python bindings of every revision
+        it measures (maturin), so the first run takes a while. `null` skips it.
+      '';
     };
 
     criterionArgs = mkOption {
@@ -182,6 +194,9 @@ in
               [ "--no-wallclock" ]
             else
               [ "--wallclock-bench=${cfg.wallclockBench}" ]
+          )
+          ++ (
+            if cfg.versusScript == null then [ "--no-versus" ] else [ "--versus-script=${cfg.versusScript}" ]
           )
           ++ lib.optional (cfg.virtualHost != null) "--public-url=https://${cfg.virtualHost}/"
           ++ lib.optional (cfg.cpu != null) "--cpu=${cfg.cpu}"

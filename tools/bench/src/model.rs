@@ -78,11 +78,40 @@ pub struct WallClock {
 
 pub type WallResults = BTreeMap<String, WallClock>;
 
+/// One comparison with a reference tool (Spot, Oink) from `benches/versus/compare.py`: wall-clock
+/// medians of both sides on the same input. Depends on the machine like [`WallClock`], never
+/// blocks anything.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VersusRow {
+    /// `operation/input`, e.g. `game/solve/ladder_10000`.
+    pub bench: String,
+    /// `spot`, `oink-zlk`, ...
+    pub reference: String,
+    pub ours_ns: f64,
+    pub ref_ns: f64,
+    pub ours_size: Option<i64>,
+    pub ref_size: Option<i64>,
+    /// Both sides computed the same result.
+    pub equivalent: bool,
+    pub runs: i64,
+}
+
+/// The output of `compare.py`: rows and the settings of the tools (versions, flags), as JSON.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Versus {
+    #[serde(default)]
+    pub settings: serde_json::Value,
+    #[serde(default)]
+    pub rows: Vec<VersusRow>,
+}
+
 /// Everything measured for one revision.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Measured {
     pub results: Results,
     pub wall: WallResults,
+    #[serde(default)]
+    pub versus: Versus,
 }
 
 /// Describes the machine and toolchain a run happened on.
