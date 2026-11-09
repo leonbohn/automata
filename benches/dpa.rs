@@ -38,6 +38,7 @@ fn normalized(dpa: DPA) -> usize {
 #[library_benchmark]
 #[bench::ltl(setup = common::ltl_dpas)]
 #[bench::synthetic(setup = common::synthetic_dpas)]
+#[bench::many_aps(setup = common::many_aps_dpas)]
 fn normalized_fixtures(dpas: Vec<FixtureDpa>) -> usize {
     black_box(dpas.iter().map(|dpa| dpa.normalized().state_count()).sum())
 }
@@ -66,6 +67,7 @@ fn complement_without_normalizing(dpa: DPA) -> Option<usize> {
 #[library_benchmark]
 #[bench::ltl(setup = common::ltl_dpas)]
 #[bench::synthetic(setup = common::synthetic_dpas)]
+#[bench::many_aps(setup = common::many_aps_dpas)]
 fn complement_fixtures(dpas: Vec<FixtureDpa>) -> usize {
     let mut size = 0;
     for dpa in dpas {
@@ -220,6 +222,27 @@ fn map_edge_colors_collect(dpa: DPA) -> usize {
     )
 }
 
+// Product-based problems on fixtures with many atomic propositions.
+#[library_benchmark]
+#[bench::many_aps(setup = common::many_aps_pairs)]
+fn equivalent_fixtures(pairs: Vec<(FixtureDpa, FixtureDpa)>) -> usize {
+    black_box(
+        pairs
+            .iter()
+            .filter(|(a, b)| Equivalence::of(a).and(b).holds())
+            .count(),
+    )
+}
+#[library_benchmark]
+#[bench::many_aps(setup = common::many_aps_pairs)]
+fn included_fixtures(pairs: Vec<(FixtureDpa, FixtureDpa)>) -> usize {
+    black_box(
+        pairs
+            .iter()
+            .filter(|(a, b)| Inclusion::of(a).within(b).holds())
+            .count(),
+    )
+}
 // ---- HOA ---------------------------------------------------------------------------------------
 
 fn ltl_texts() -> Vec<String> {
@@ -228,10 +251,14 @@ fn ltl_texts() -> Vec<String> {
 fn synthetic_texts() -> Vec<String> {
     common::fixture_texts(common::SYNTHETIC)
 }
+fn many_aps_texts() -> Vec<String> {
+    common::fixture_texts(common::MANY_APS)
+}
 
 #[library_benchmark]
 #[bench::ltl(setup = ltl_texts)]
 #[bench::synthetic(setup = synthetic_texts)]
+#[bench::many_aps(setup = many_aps_texts)]
 fn hoa_parse(texts: Vec<String>) -> usize {
     black_box(
         texts
@@ -244,6 +271,7 @@ fn hoa_parse(texts: Vec<String>) -> usize {
 #[library_benchmark]
 #[bench::ltl(setup = common::ltl_dpas)]
 #[bench::synthetic(setup = common::synthetic_dpas)]
+#[bench::many_aps(setup = common::many_aps_dpas)]
 fn hoa_print(dpas: Vec<FixtureDpa>) -> usize {
     black_box(
         dpas.iter()
@@ -256,7 +284,7 @@ library_benchmark_group!(
     name = dpa;
     benchmarks = normalized, normalized_fixtures, complement, complement_without_normalizing,
         complement_fixtures, accepted_word, rejected_word, witnesses_fixtures, witness_colors,
-        language_equivalent, included_in, witness_not_subset_of, witness_inequivalence, sccs,
+        language_equivalent, included_in, equivalent_fixtures, included_fixtures, witness_not_subset_of, witness_inequivalence, sccs,
         prefix_partition, collect_dpa, map_edge_colors_collect, hoa_parse, hoa_print
 );
 

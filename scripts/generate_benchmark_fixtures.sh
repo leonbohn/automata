@@ -32,7 +32,7 @@ to_dpa() {
 }
 
 rm -rf "$OUT"
-mkdir -p "$OUT"/{ltl,random,hard}
+mkdir -p "$OUT"/{ltl,random,hard,many_aps}
 
 # ---------------------------------------------------------------------------------------------
 # 1. LTL formulas
@@ -137,8 +137,43 @@ for case in "${hard_cases[@]}"; do
   done
 done
 
+# ---------------------------------------------------------------------------------------------
+# 4. Many atomic propositions
+# ---------------------------------------------------------------------------------------------
+# Everything above has at most 5 atomic propositions. These are for the propositional alphabet
+# with more than 6, where edge labels cannot be truth tables. Same as above, the LTL families are
+# parametrised by the number of atomic propositions (n of `and-gf` has n of them).
+# "name  genltl-option  n"
+many_ap_ltl=(
+  "and-gf     --and-gf     12"
+  "gf-equiv   --gf-equiv   12"
+  "r-right    --r-right    10"
+)
+for family in "${many_ap_ltl[@]}"; do
+  read -r name option n <<<"$family"
+  genltl "$option=$n" \
+    | translate --deterministic --generic \
+    | to_dpa --name="$name-$n" \
+    | autfilt --hoaf=t --ap="7..$MAX_APS" --states="2..$MAX_STATES" --output="$OUT/many_aps/$name-$n.hoa"
+done
+# "states  atomic-propositions  priorities  edge-density  seed". randaut only uses as many
+# propositions as the edges need, so the file may have fewer than requested (the name has the
+# requested number). A high density gives more edges and hence uses more of them.
+random_many_ap=(
+  "16  8  4  0.90  1"
+  "24  12 4  0.99  1"
+  "32  16 4  0.99  1"
+)
+for config in "${random_many_ap[@]}"; do
+  read -r states aps priorities density seed <<<"$config"
+  name="n$states-a$aps-p$priorities-s$seed"
+  randaut --deterministic --colored --states="$states" --density="$density" \
+          --acceptance="parity min even $priorities" --seed="$seed" "$aps" \
+    | autfilt --hoaf=t --invert-match --is-empty --states="$((states / 2))".. --unique \
+    | to_dpa --name="random-$name" --output="$OUT/many_aps/random-$name.hoa"
+done
 # Everything above is a superset. The benchmarks only read the fixtures listed here (the
-# selections `LTL` and `SYNTHETIC` in benches/common/mod.rs, keep both in sync), because parsing
+# selections `LTL`, `SYNTHETIC` and `MANY_APS` in benches/common/mod.rs, keep them in sync), because parsing
 # HOA is slow under valgrind. All others are deleted.
 used=(
   "hard/l-dsa-3"
@@ -159,6 +194,12 @@ used=(
   "ltl/sejk-k-2"
   "ltl/tv-uu-3"
   "ltl/u-left-3"
+  "many_aps/and-gf-12"
+  "many_aps/gf-equiv-12"
+  "many_aps/r-right-10"
+  "many_aps/random-n16-a8-p4-s1"
+  "many_aps/random-n24-a12-p4-s1"
+  "many_aps/random-n32-a16-p4-s1"
   "random/n128-a2-p6-s1"
   "random/n16-a1-p3-s1"
   "random/n256-a2-p8-s1"

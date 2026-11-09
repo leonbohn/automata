@@ -389,6 +389,17 @@ pub const SYNTHETIC: &[&str] = &[
     "hard/l-dsa-3",
 ];
 
+/// Fixtures with 8 to 13 atomic propositions, `benches/fixtures/many_aps`. Everything in [`LTL`]
+/// and [`SYNTHETIC`] has at most 5, so their edge labels fit into truth tables; these do not.
+/// Separate so that the existing selections (and the history of their benchmarks) stay as they are.
+pub const MANY_APS: &[&str] = &[
+    "many_aps/and-gf-12",
+    "many_aps/gf-equiv-12",
+    "many_aps/r-right-10",
+    "many_aps/random-n16-a8-p4-s1",
+    "many_aps/random-n24-a12-p4-s1",
+    "many_aps/random-n32-a16-p4-s1",
+];
 fn fixtures_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("benches/fixtures")
 }
@@ -427,6 +438,20 @@ pub fn ltl_dpas() -> Vec<FixtureDpa> {
 
 pub fn synthetic_dpas() -> Vec<FixtureDpa> {
     fixture_dpas(SYNTHETIC)
+}
+pub fn many_aps_dpas() -> Vec<FixtureDpa> {
+    fixture_dpas(MANY_APS)
+}
+/// Every DPA of [`MANY_APS`] together with its normalization, an equivalent automaton with
+/// (usually) different colors, to compare against. Same inputs as `benches/versus`.
+pub fn many_aps_pairs() -> Vec<(FixtureDpa, FixtureDpa)> {
+    many_aps_dpas()
+        .into_iter()
+        .map(|dpa| {
+            let other = dpa.normalized().collect();
+            (dpa, other)
+        })
+        .collect()
 }
 
 /// A lasso over the symbols of the alphabet of a fixture. Symbols are chosen by an index
