@@ -7,7 +7,7 @@ use automata::{
     representation::CollectPointed,
     ts::{ForAlphabet, IntoEdgeTuple, Sproutable, TransitionSystem, q},
 };
-use pyo3::{exceptions::PyValueError, prelude::*};
+use pyo3::prelude::*;
 
 use crate::alphabet::{PyCharAlphabet, PyPropAlphabet};
 use crate::class::{Edge, assemble, automaton_class, check_state};
@@ -193,11 +193,7 @@ macro_rules! moore_class {
 
         impl $name {
             fn same_alphabet(&self, other: &Self) -> PyResult<()> {
-                if self.0.ts().alphabet().size() == other.0.ts().alphabet().size() {
-                    Ok(())
-                } else {
-                    Err(PyValueError::new_err("the machines have different alphabets"))
-                }
+                crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())
             }
         }
     };
@@ -291,11 +287,7 @@ macro_rules! mealy_class {
 
         impl $name {
             fn same_alphabet(&self, other: &Self) -> PyResult<()> {
-                if self.0.ts().alphabet().size() == other.0.ts().alphabet().size() {
-                    Ok(())
-                } else {
-                    Err(PyValueError::new_err("the machines have different alphabets"))
-                }
+                crate::class::same_alphabet(self.0.ts().alphabet(), other.0.ts().alphabet())
             }
         }
     };

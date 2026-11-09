@@ -4,7 +4,7 @@ Inputs are the DPAs of `benches/fixtures`. Spot reads the files itself; our side
 `automata.parse_hoa`. The second automaton of a comparison is our `normalized()` variant of the
 first (same language, other priorities), which both libraries read from HOA. (Spot's own
 `postprocess` would be more interesting, but Spot permutes the atomic propositions of its HOA
-output depending on what it has seen before, and `equivalent_to` compares alphabets by position.)
+output depending on what it has seen before, and `equivalent_to` rejects alphabets whose propositions are in another order.)
 """
 
 import automata

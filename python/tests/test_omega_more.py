@@ -246,3 +246,20 @@ def test_all_builders_build():
 def test_exports():
     for name in ["DCA", "PropDPA", "DRA", "PropDMA", "DBABuilder", "PropDMABuilder", "DRABuilder"]:
         assert name in automata.__all__ and hasattr(automata, name)
+
+
+def test_different_alphabets_are_rejected():
+    # same size, but the symbols are bit vectors indexed by position: a permutation of the
+    # propositions or other names are different alphabets, not silently the same one
+    hoa = (
+        'HOA: v1\nStates: 1\nStart: 0\nAP: 2 "{}" "{}"\nacc-name: parity min even 1\n'
+        "Acceptance: 1 Inf(0)\nproperties: trans-labels explicit-labels trans-acc deterministic\n"
+        "--BODY--\nState: 0\n[t] 0 {{0}}\n--END--\n"
+    )
+    a = automata.parse_hoa(hoa.format("p", "q"))
+    assert a.equivalent_to(automata.parse_hoa(hoa.format("p", "q")))
+    for other in (hoa.format("q", "p"), hoa.format("p", "r")):
+        b = automata.parse_hoa(other)
+        for call in (a.equivalent_to, a.included_in, a.equivalence_counterexample):
+            with pytest.raises(ValueError, match="different alphabets"):
+                call(b)

@@ -447,6 +447,16 @@ pub struct PropAlphabet<RawTy: RawSymbolRepr = u32> {
     expressions: Arc<Mutex<BTreeSet<PropExpression<RawTy>>>>,
 }
 
+/// Two alphabets are equal if they have the same atomic propositions in the same order: symbols
+/// are bit vectors indexed by position, so a permutation is a different alphabet.
+impl<RawTy: RawSymbolRepr> PartialEq for PropAlphabet<RawTy> {
+    fn eq(&self, other: &Self) -> bool {
+        self.aps == other.aps
+    }
+}
+
+impl<RawTy: RawSymbolRepr> Eq for PropAlphabet<RawTy> {}
+
 impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
     /// Creates a new alphabet over the atomic propositions with the given names.
     ///

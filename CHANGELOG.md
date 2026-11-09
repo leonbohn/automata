@@ -131,6 +131,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   input accepts up to 31 atomic propositions (the limit of `PropAlphabet`) instead of 6.
 
 ### Fixed
+- Python: binary operations (`equivalent_to`, `included_in`, counterexamples, `product`-style methods of DFAs, machines and NFAs) compared alphabets by size only, so automata over the same atomic propositions in another order (as Spot writes them) or over other characters silently gave wrong answers. They now raise `ValueError` unless the alphabets are equal. `PropAlphabet` implements `PartialEq`/`Eq` (same propositions in the same order).
 - `DFA::minimize`, `MooreMachine::minimize`, `MealyMachine::minimize` and `Minimize::on(..).run()`
   kept the unreachable states (merged into classes), although the result is documented as the
   minimal machine. They are removed now, and the states of the result are numbered in the order in
