@@ -7,7 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
-use automata::alphabet::{CharAlphabet, PropAlphabet};
+use automata::alphabet::{CharAlphabet, PropAlphabet, PropExpression};
 use automata::automaton::{DFA, DPA};
 use automata::hoa::HoaString;
 use automata::representation::IntoTransitions;
@@ -500,6 +500,33 @@ pub fn scrambled_omega_nts<C: automata::Color>(
         ts.add_edge((at(q), 'a', color(q + 2), at((q + 1) % n)));
     }
     ts
+}
+
+/// A nondeterministic automaton over `aps` atomic propositions with `n` states, three edges per
+/// state and the last state accepting. Every edge is labeled by a conjunction of two literals, so
+/// the labels overlap. The initial state is `q(0)`.
+pub fn prop_nfa(n: usize, aps: u8) -> automata::automaton::NFA<NTS<PropAlphabet, bool, Void>> {
+    let alphabet = PropAlphabet::<u32>::from_apnames((0..aps).map(|i| format!("p{i}")));
+    let mut ts = NTS::<PropAlphabet, bool, Void>::for_alphabet(alphabet);
+    let states: Vec<_> = (0..n).map(|i| ts.add_state(i == n - 1)).collect();
+    for i in 0..n {
+        for k in 0..3 {
+            let a = (i * 7 + k * 3) % aps as usize;
+            let b = (i * 5 + k * 11 + 1) % aps as usize;
+            let (na, nb) = (
+                if (i + k) % 2 == 0 { "!" } else { "" },
+                if i % 3 == k { "!" } else { "" },
+            );
+            let label = format!("{na}{a} & {nb}{b}");
+            ts.add_edge((
+                states[i],
+                PropExpression::new(aps, &label),
+                Void,
+                states[(i * 3 + k * 5 + 1) % n],
+            ));
+        }
+    }
+    automata::automaton::NFA::from_parts(ts, states[0])
 }
 
 /// Parses a fixture with the nondeterministic storage, so that its semantics are existential.
