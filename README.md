@@ -3,7 +3,7 @@
 [![CI](https://github.com/leonbohn/automata/actions/workflows/ci.yml/badge.svg)](https://github.com/leonbohn/automata/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/automata.svg)](https://crates.io/crates/automata)
 [![docs.rs](https://img.shields.io/docsrs/automata)](https://docs.rs/automata)
-![MSRV](https://img.shields.io/badge/rustc-1.88+-blue.svg)
+![MSRV](https://img.shields.io/badge/rustc-1.91+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 A Rust crate for topics from [automata theory](https://en.wikipedia.org/wiki/Automata_theory), in particular it provides tools to work with [transition systems](https://en.wikipedia.org/wiki/Transition_system) and [finite state machines](https://en.wikipedia.org/wiki/Finite-state_machine).
@@ -29,7 +29,7 @@ To achieve this, the crate follows the style of the standard library, providing 
 
 ## Getting Started
 
-Since `automata` has been published on crates.io, it is as easy as using Rust version *1.88* or newer, and adding the following to the manifest:
+Since `automata` has been published on crates.io, it is as easy as using Rust version *1.91* or newer, and adding the following to the manifest:
 ```toml
 [dependencies]
 automata = { version = "0.2" }
@@ -196,7 +196,7 @@ assert_eq!(collected.state_count(), 3);
 
 ### Reading and writing HOA
 
-With the `hoa` feature (enabled by default), deterministic Büchi and parity automata can be read from and written to the [HOA format](https://adl.github.io/hoaf/), which is understood by [Spot](https://spot.lre.epita.fr/) and many other tools. See the [`hoa` module](https://docs.rs/automata/latest/automata/hoa/index.html) for a complete example. The `oai` tool in the [frieda](https://github.com/leonbohn/frieda) repository is a small command line program built on top of it.
+With the `hoa` feature (enabled by default), deterministic Büchi and parity automata can be read from and written to the [HOA format](https://adl.github.io/hoaf/), which is understood by [Spot](https://spot.lre.epita.fr/) and many other tools. See the [`hoa` module](https://docs.rs/automata/latest/automata/hoa/index.html) for a complete example.
 
 ### DOT output and rendering
 

@@ -26,8 +26,7 @@ version can only be yanked, never overwritten).
 - [ ] `cargo update` is optional; if you do it, run everything again afterwards. Check outdated
       dependencies: `cargo outdated -R` (or `cargo upgrade --dry-run`).
 - [ ] Sibling crates:
-      - `hoars` and `biodivine-lib-bdd` must stay on the same `Bdd`-compatible major (see
-        `CLAUDE.md`); both must be **published versions on crates.io**, no `git`/`path`
+      - `hoars` must be a **published version on crates.io**, no `git`/`path`
         dependencies (publishing fails otherwise). `grep -n 'git =\|path =' Cargo.toml`.
       - `hoars` must be released first if this release needs a new `hoars`.
 - [ ] `cargo deny check` / `cargo audit` (if configured) for advisories and licenses.
@@ -65,8 +64,8 @@ version can only be yanked, never overwritten).
 Run everything CI runs, then the release-specific checks.
 
 - [ ] `./scripts/check` (fmt, clippy in 3 configurations, docs with `-D warnings`,
-      `cargo hack check --each-feature --no-dev-deps`, MSRV 1.88, tests in 3 configurations,
-      examples, bench tooling). Make sure `cargo-hack` and the 1.88 toolchain are installed so
+      `cargo hack check --each-feature --no-dev-deps`, MSRV 1.91, tests in 3 configurations,
+      examples, bench tooling). Make sure `cargo-hack` and the 1.91 toolchain are installed so
       nothing is silently skipped.
 - [ ] `cargo bench --no-run` builds all benches; optionally run the benchmark suite once and
       compare with the previous release via `tools/bench` (`docs/benchmarking.md`) and note

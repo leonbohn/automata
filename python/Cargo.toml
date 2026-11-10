@@ -2,7 +2,7 @@
 name = "automata-py"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.91"
 description = "Python bindings for the automata crate."
 license = "MIT"
 authors = ["León Bohn <bohn@lics.rwth-aachen.de>"]

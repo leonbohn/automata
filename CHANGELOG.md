@@ -90,6 +90,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   storages and `Existential<C>` for `Linked`.
 
 ### Changed
+- **Breaking:** (#156) `PropExpression` uses [oxidd](https://github.com/OxiDD/oxidd) instead of `biodivine-lib-bdd` for more than 6 atomic propositions (truth tables below). All BDDs live in one global manager, so equality, hashing and cloning are cheap and independently built expressions can be combined. No BDD type appears in the public API any more; the manager panics if its 2^24 nodes are exhausted. Labels are written and parsed in HOA syntax (`0 & !1`, `t`, `f`); `PropExpression::try_new`/`new`, `proposition` and `unsatisfiable` are new, as are `PropAlphabetError::{InvalidExpression, UnknownProposition}` and `HoaError::{UnknownProposition, UnresolvedAlias}`. The text of a written label can differ from before (same meaning). `PropAlphabet` no longer keeps a lock-protected set of expressions. Requires `hoars` 0.5 and Rust 1.91.
+  | 0.2 | 0.3 |
+  |---|---|
+  | `PropExpression::from_parts(n, bdd)`, `from_bdd(bdd)` | `universal`, `unsatisfiable`, `proposition`, `!`/`&`/`\|`, or `PropExpression::new(n, "0 & !1")` |
+  | `PropExpression::new(n, "x_0 & !x_1")` | `PropExpression::new(n, "0 & !1")` (HOA syntax), fallible: `try_new` |
+  | `into_bdd()` | `sat_vals()`, `to_hoa_label()` |
+  | `PropSymbol::as_bdd_valuation` / `from_bdd_valuation` | `as_bools` / `from_bools` |
+  | `hoa::HoaExpression`, `hoa::LabelExpression::Expression` | removed (hoars 0.5), `Label` derefs to `AbstractLabelExpression` |
+  | `HoaError::InvalidLabel(String)` | `HoaError::UnknownProposition`, `HoaError::UnresolvedAlias` |
+  | MSRV 1.88 | 1.91 |
 - `Equivalence` and `Inclusion` of deterministic parity and Büchi automata build the product once (equivalence used to build it twice) and store its edges, so edge labels (BDD intersections on propositional alphabets) are computed once and not again in every refinement round; 10 to 40 % fewer instructions on the `dpa` benchmarks.
 - `PropExpression` stores expressions over at most 6 atomic propositions as truth tables (a `u64`) instead of BDDs: conjunction, disjunction, overlap and matching are bit operations, equality and hashing are integer comparisons. Larger expressions still use BDDs; `from_parts`, `from_bdd` and `into_bdd` convert. For these small expressions `sat_vals`/`symbols` yield the symbols in ascending order of their raw values. 2 to 5 times fewer instructions on the `dpa` benchmarks over HOA fixtures.
 - **Breaking:** `NFA<T>` is `Automaton<T, Existential<ReachabilityCondition>>`; `NfaCondition` is

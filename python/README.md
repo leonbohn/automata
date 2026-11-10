@@ -7,7 +7,7 @@ module is imported as `automata`. See [Installation](#installation).
 ## Installation
 
 The package is not on PyPI. Install it from GitHub, which builds the extension module, so a Rust
-toolchain (1.88 or newer) and `maturin` are needed:
+toolchain (1.91 or newer) and `maturin` are needed:
 
 ```shell
 pip install maturin

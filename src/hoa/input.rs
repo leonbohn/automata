@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, io::BufRead, ops::Deref};
+use std::{collections::BTreeSet, io::BufRead};
 
 use crate::automaton::{
     AcceptanceMask, DeterministicOmegaAutomaton, OmegaAcceptanceCondition, OmegaAutomaton,
@@ -9,7 +9,7 @@ use crate::{
     Int,
     alphabet::{PropAlphabet, PropExpression},
 };
-use hoars::HoaRepresentation;
+use hoars::{AbstractLabelExpression, HoaRepresentation};
 use tracing::{trace, warn};
 
 use super::{HoaError, HoaString};
@@ -475,6 +475,45 @@ impl TryFrom<HoaRepresentation> for OmegaAutomaton<PropAlphabet, Det<Linked>> {
     }
 }
 
+/// Folds a label (whose aliases are resolved) into an expression over `aps` propositions.
+fn label_to_expression(
+    aps: u8,
+    label: &AbstractLabelExpression,
+) -> Result<PropExpression, HoaError> {
+    let fold = |parts: &[AbstractLabelExpression], unit: bool| {
+        parts.iter().try_fold(
+            if unit {
+                PropExpression::universal(aps)
+            } else {
+                PropExpression::unsatisfiable(aps)
+            },
+            |acc, part| {
+                let part = label_to_expression(aps, part)?;
+                Ok::<_, HoaError>(if unit { acc & part } else { acc | part })
+            },
+        )
+    };
+    Ok(match label {
+        AbstractLabelExpression::Boolean(true) => PropExpression::universal(aps),
+        AbstractLabelExpression::Boolean(false) => PropExpression::unsatisfiable(aps),
+        AbstractLabelExpression::Integer(ap) if *ap < aps as u16 => {
+            PropExpression::proposition(aps, *ap as u8)
+        }
+        AbstractLabelExpression::Integer(ap) => {
+            return Err(HoaError::UnknownProposition {
+                ap: *ap as usize,
+                num_aps: aps,
+            });
+        }
+        AbstractLabelExpression::Alias(name) => {
+            return Err(hoars::AliasError::Undefined(name.clone()).into());
+        }
+        AbstractLabelExpression::Negated(inner) => !label_to_expression(aps, inner)?,
+        AbstractLabelExpression::Conjunction(parts) => fold(parts, true)?,
+        AbstractLabelExpression::Disjunction(parts) => fold(parts, false)?,
+    })
+}
+
 /// The parts of an omega automaton: transition system, initial state and acceptance condition.
 type HoaParts = (
     LinkedTs<PropAlphabet, Int, AcceptanceMask>,
@@ -485,10 +524,11 @@ type HoaParts = (
 /// Converts a [`HoaRepresentation`] into the parts of an omega automaton: a [`crate::NTS`] with the same
 /// semantics, the initial state and the acceptance condition. This creates the appropriate
 /// number of states and inserts transitions with the appropriate labels and colors.
-fn hoa_automaton_parts(aut: HoaRepresentation) -> Result<HoaParts, HoaError> {
-    let aps = aut.num_aps();
+fn hoa_automaton_parts(mut aut: HoaRepresentation) -> Result<HoaParts, HoaError> {
+    aut.unalias()?;
     // The number of atomic propositions is limited by [`PropAlphabet`], which rejects too many.
     let alphabet = PropAlphabet::try_from_apnames(aut.aps().iter())?;
+    let aps = alphabet.aps();
     let mut ts: LinkedTs<PropAlphabet, Int, AcceptanceMask> = LinkedTs::for_alphabet(alphabet);
 
     for (position, state) in aut.body().iter().enumerate() {
@@ -513,16 +553,12 @@ fn hoa_automaton_parts(aut: HoaRepresentation) -> Result<HoaParts, HoaError> {
             if !state_exists(target) {
                 return Err(HoaError::UnknownState(target));
             }
-            let label = edge.label().deref().clone();
-
-            let expr = label
-                .try_into_hoa_expression(aps)
-                .map_err(HoaError::InvalidLabel)?;
+            let expr = label_to_expression(aps, edge.label())?;
             let color: AcceptanceMask = (&edge.effective_acceptance(state)).into();
 
             ts.add_edge((
                 StateId::from(state.id()),
-                PropExpression::from_bdd(expr),
+                expr,
                 color,
                 StateId::from(target),
             ));
@@ -552,6 +588,7 @@ mod tests {
     use tracing::debug;
 
     use crate::hoa::{HoaString, WriteHoa};
+    use hoars::AbstractLabelExpression;
 
     #[test]
     fn edge_labels_with_disjunction() {
@@ -631,6 +668,43 @@ mod tests {
         assert_eq!(n, 2);
         let written = aut.to_hoa().expect("cannot write hoa");
         assert_eq!(edge_count(&written).0, 2);
+    }
+
+    #[test]
+    fn labels_with_aliases_unknown_propositions_and_many_propositions() {
+        let parse = |header: &str, body: &str| {
+            let hoa = hoa_with_states(1, header, "Start: 0", body);
+            super::parse_omega_automaton_range::<Linked>(&hoa, 0, hoa.len())
+        };
+        let names = (0..8)
+            .map(|i| format!("\"p{i}\""))
+            .collect::<Vec<_>>()
+            .join(" ");
+        use crate::ts::TransitionSystem;
+        // aliases are resolved, here over 8 propositions, i.e. BDDs
+        let aut = parse(
+            &format!("AP: 8 {names}\nAlias: @x 0 & !7"),
+            "State: 0\n[@x | 3] 0 {0}",
+        )
+        .expect("aliases must be resolved");
+        let edge = aut
+            .edges_from(0u32.into())
+            .into_iter()
+            .flatten()
+            .next()
+            .unwrap();
+        assert_eq!(edge.expression().sat_vals().count(), 128 + 64 - 32);
+        // the parser already rejects these in files; the conversion reports them with types
+        assert!(parse("AP: 1 \"a\"", "State: 0\n[1] 0 {0}").is_err());
+        assert!(parse("AP: 1 \"a\"", "State: 0\n[@nope] 0 {0}").is_err());
+        assert!(matches!(
+            super::label_to_expression(1, &AbstractLabelExpression::Integer(1)),
+            Err(HoaError::UnknownProposition { ap: 1, num_aps: 1 })
+        ));
+        assert!(matches!(
+            super::label_to_expression(1, &AbstractLabelExpression::Alias("x".into())),
+            Err(HoaError::UnresolvedAlias(hoars::AliasError::Undefined(_)))
+        ));
     }
 
     #[test]

@@ -12,18 +12,15 @@ Before committing, you confer with me.
 ## What this is
 
 `automata` is a single crate for transition systems and automata over finite and infinite (omega)
-words, extracted with history from `leonbohn/frieda`. Version 0.2.1 is on crates.io; the tree is
-heading for 0.3.0. Edition 2024, MSRV 1.88 (floor set by `biodivine-lib-bdd` and let-chains,
+words. Version 0.2.1 is on crates.io; the tree is
+heading for 0.3.0. Edition 2024, MSRV 1.91 (floor set by `oxidd`;
 checked by the `msrv` CI job). Published on crates.io under the same name.
 
 Sibling crates that stay elsewhere:
 
-- `hoars` (crates.io, currently 0.3): HOA format parsing. Optional dependency behind the `hoa`
-  feature; its `Bdd` type is shared with `biodivine-lib-bdd` (both must stay on the same major).
-- `automata-learning` (in `leonbohn/frieda`): now lives in this crate as `automata::learning`
-  (feature `learning`); the old crate is to be deprecated. `frieda` still has to migrate. A PR that
-  changes the API should keep the migration path in mind (see CHANGELOG entries that spell out
-  its migration steps).
+- `hoars` (crates.io, currently 0.5): HOA format parsing, without any BDD library. Optional
+  dependency behind the `hoa` feature; `src/hoa/input.rs` folds its `AbstractLabelExpression`s
+  into `PropExpression`s itself.
 
 ## Commands
 
@@ -51,7 +48,8 @@ To ensure code quality, run the following before committing:
 Data flows through four layers; a task usually lives in exactly one of them:
 
 1. `alphabet` — `Symbol`, `Expression`, `Matcher`, `Alphabet`. Simple alphabets (`CharAlphabet`,
-   `Fixed<S, N>`, `Directional`) and BDD-backed propositional ones (`PropAlphabet`, used for HOA).
+   `Fixed<S, N>`, `Directional`) and propositional ones (`PropAlphabet`, used for HOA; truth tables
+   up to 6 APs, otherwise an oxidd BDD in one global manager, only `propositional/bdd.rs` knows oxidd).
 2. `word` — `Word` with `FiniteWord` and `OmegaWord` subtraits; ultimately periodic words
    `u v^ω` via the `upw!` macro (`PeriodicOmegaWord`, `ReducedOmegaWord`, `NormalizedOmegaWord`);
    adapters `Concat`, `Repeat`, `Skip`/`Infix`, `Rotate`. `Word::Kind` (`word::Finite` /

@@ -2,7 +2,7 @@
 name = "automata-bench"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.91"
 description = "Benchmark runner, history database, dashboard and webhook service for the automata crate."
 license = "MIT"
 publish = false
