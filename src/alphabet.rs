@@ -6,6 +6,9 @@ use std::{
 mod simple;
 pub use simple::*;
 
+mod atoms;
+pub use atoms::*;
+
 mod propositional;
 pub use propositional::*;
 
