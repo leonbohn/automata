@@ -57,6 +57,13 @@ pub trait Expression: Hash + Clone + Debug + Eq + Ord + Display + Matcher<Self> 
     /// the conjunction of the two formulas, if it is satisfiable.
     fn intersection(&self, other: &Self) -> Option<Self>;
 
+    /// Returns the expression that is matched by exactly the symbols that match `self` or
+    /// `other`, or `None` if the alphabet cannot express that (the default, which is right for
+    /// simple alphabets where an expression is a single symbol).
+    fn union(&self, _other: &Self) -> Option<Self> {
+        None
+    }
+
     /// Checks whether the given [`Symbol`] matches the expression `self`. For [`CharAlphabet`] alphabets, this just
     /// means that the expression equals the given symbol. For a propositional alphabet, this means that
     /// the expression is satisfied by the given symbol, an example of this is illustrated in propositional.
@@ -68,6 +75,16 @@ pub trait Expression: Hash + Clone + Debug + Eq + Ord + Display + Matcher<Self> 
     fn for_each<F: Fn(Self::S)>(&self, f: F) {
         self.symbols().for_each(f)
     }
+}
+
+/// A partition of the symbols of an alphabet into classes that edges with the given labels cannot
+/// tell apart, see [`Alphabet::letter_classes`].
+#[derive(Debug, Clone)]
+pub struct LetterClasses<E> {
+    /// The expressions of the classes, which are pairwise disjoint.
+    pub classes: Vec<E>,
+    /// For each label the classes were computed from, the indices of the classes it consists of.
+    pub covers: crate::math::FxIndexMap<E, Vec<usize>>,
 }
 
 /// An alphabet abstracts a collection of [`Symbol`]s and complex [`Expression`]s over those.
@@ -143,6 +160,18 @@ pub trait Alphabet: Clone + Debug {
     fn is_empty(&self) -> bool {
         self.size() == 0
     }
+
+    /// Experimental. Algorithms that handle every letter of the alphabet separately (like the
+    /// subset construction) can handle a whole [class](LetterClasses) of symbols at once if
+    /// edges only distinguish classes. This returns such a partition for the edge labels that
+    /// `labels` produces, or `None` if it is cheaper to go through the symbols one by one, which
+    /// is the default. `labels` is only evaluated if the answer depends on it.
+    fn letter_classes(
+        &self,
+        _labels: &dyn Fn() -> Vec<Self::Expression>,
+    ) -> Option<LetterClasses<Self::Expression>> {
+        None
+    }
 }
 
 /// Implemented by [`Alphabet`]s that can be indexed, i.e. where we can associate each
@@ -205,6 +234,12 @@ impl<A: Alphabet> Alphabet for &A {
     }
     fn size(&self) -> usize {
         A::size(self)
+    }
+    fn letter_classes(
+        &self,
+        labels: &dyn Fn() -> Vec<Self::Expression>,
+    ) -> Option<LetterClasses<Self::Expression>> {
+        A::letter_classes(self, labels)
     }
 }
 

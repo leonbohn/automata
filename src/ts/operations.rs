@@ -12,7 +12,7 @@ mod restricted;
 pub use restricted::*;
 
 mod subset;
-pub use subset::{Determinize, Determinized, SubsetConstruction};
+pub use subset::{Determinize, Determinized, SubsetConstruction, merge_parallel_edges};
 
 mod reachable;
 pub use reachable::ReachablePart;

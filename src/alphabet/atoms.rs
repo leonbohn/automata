@@ -1,22 +1,23 @@
+use crate::math::{FxIndexMap, FxIndexSet};
 use crate::{
     Color,
     alphabet::{
-        CharAlphabet, Expression, Matcher, PropAlphabet, PropExpression, PropSymbol, RawSymbolRepr,
+        CharAlphabet, Expression, LetterClasses, Matcher, PropAlphabet, PropExpression, PropSymbol,
+        RawSymbolRepr,
     },
     representation::{FromTransitions, Parts},
     ts::{StateIndex, States},
 };
-use std::collections::BTreeSet;
+use std::borrow::Cow;
 
-/// The atoms (minterms) of a set of propositional expressions: the coarsest partition of the
+/// **Experimental.** The atoms (minterms) of a set of propositional expressions: the coarsest partition of the
 /// symbol space such that every one of the expressions is a union of parts. Two symbols in the
 /// same atom cannot be told apart by any of the expressions.
 ///
 /// Algorithms that only look at edge labels can run over the (usually few) atoms instead of the
 /// exponentially many symbols or over expressions: [`Self::split_edges`] relabels a system to the
 /// indexed alphabet [`Self::alphabet`] with one letter per atom, where intersecting labels is an
-/// equality test and the storages [`DenseTs`](crate::ts::DenseTs) and
-/// [`CsrTs`](crate::ts::CsrTs) apply. Words over the atom alphabet are translated back with
+/// equality test. Words over the atom alphabet are translated back with
 /// [`Self::symbol`] (and forth with [`Self::letter_of`]).
 ///
 /// The letter of atom `i` is `'a'` advanced by `i` code points, like in
@@ -35,33 +36,77 @@ use std::collections::BTreeSet;
 pub struct Atoms<R: RawSymbolRepr = u32> {
     num_aps: u8,
     atoms: Vec<PropExpression<R>>,
+    /// For every label the atoms were computed from, the indices of the atoms it is made of.
+    covers: FxIndexMap<PropExpression<R>, Vec<usize>>,
 }
 
 impl<R: RawSymbolRepr> Atoms<R> {
     /// Computes the atoms of the given labels over `num_aps` atomic propositions by partition
     /// refinement: starting from the single atom `true`, every label splits each atom it cuts into
     /// two. Unsatisfiable atoms are dropped, so the atoms are nonempty and pairwise disjoint and
-    /// cover all symbols. Their order is deterministic.
+    /// cover all symbols. Their order is deterministic. The atoms of each label are recorded on
+    /// the way, which makes [`Self::split_edges`] independent of the number of atoms.
     pub fn new(num_aps: u8, labels: impl IntoIterator<Item = PropExpression<R>>) -> Self {
-        // the Bdd handle is only interior-mutable for its manager, Ord/Eq are structural
+        // the Bdd handle is only interior-mutable for its manager, Hash/Eq are structural
         #[allow(clippy::mutable_key_type)]
-        let labels: BTreeSet<_> = labels.into_iter().collect();
-        let mut atoms = vec![PropExpression::universal(num_aps)];
-        for label in labels {
+        let labels: FxIndexSet<_> = labels.into_iter().collect();
+        // The refinement forest: an atom that is cut keeps its node and gets two children.
+        let mut nodes = vec![(PropExpression::universal(num_aps), None::<[usize; 2]>)];
+        let mut leaves = vec![0usize];
+        let mut inside: Vec<Vec<usize>> = Vec::with_capacity(labels.len());
+        for label in &labels {
             let negated = !label.clone();
-            let mut refined = Vec::with_capacity(atoms.len() + 1);
-            for atom in atoms {
-                match (atom.intersection(&label), atom.intersection(&negated)) {
-                    (Some(inside), Some(outside)) => {
-                        refined.push(inside);
-                        refined.push(outside);
-                    }
-                    _ => refined.push(atom),
+            let mut next = Vec::with_capacity(leaves.len() + 1);
+            let mut label_nodes = Vec::new();
+            for &node in &leaves {
+                let atom = nodes[node].0.clone();
+                match atom.intersection(label) {
+                    None => next.push(node),
+                    Some(common) => match atom.intersection(&negated) {
+                        None => {
+                            label_nodes.push(node);
+                            next.push(node);
+                        }
+                        Some(outside) => {
+                            let (c, o) = (nodes.len(), nodes.len() + 1);
+                            nodes.push((common, None));
+                            nodes.push((outside, None));
+                            nodes[node].1 = Some([c, o]);
+                            label_nodes.push(c);
+                            next.extend([c, o]);
+                        }
+                    },
                 }
             }
-            atoms = refined;
+            leaves = next;
+            inside.push(label_nodes);
         }
-        Self { num_aps, atoms }
+        let mut index = vec![usize::MAX; nodes.len()];
+        for (i, &leaf) in leaves.iter().enumerate() {
+            index[leaf] = i;
+        }
+        let covers = labels
+            .into_iter()
+            .zip(inside)
+            .map(|(label, roots)| {
+                let mut atoms = Vec::new();
+                let mut stack = roots;
+                while let Some(node) = stack.pop() {
+                    match nodes[node].1 {
+                        None => atoms.push(index[node]),
+                        Some(children) => stack.extend(children),
+                    }
+                }
+                atoms.sort_unstable();
+                (label, atoms)
+            })
+            .collect();
+        let atoms = leaves.iter().map(|&l| nodes[l].0.clone()).collect();
+        Self {
+            num_aps,
+            atoms,
+            covers,
+        }
     }
 
     /// Computes the atoms of all edge labels of the given systems, which must share the alphabet.
@@ -86,6 +131,14 @@ impl<R: RawSymbolRepr> Atoms<R> {
                 .flatten()
                 .map(|e| e.expression().clone())
         })
+    }
+
+    /// The atoms and the atoms of each label as [`LetterClasses`].
+    pub(crate) fn into_letter_classes(self) -> LetterClasses<PropExpression<R>> {
+        LetterClasses {
+            classes: self.atoms,
+            covers: self.covers,
+        }
     }
 
     /// The number of atoms.
@@ -157,19 +210,9 @@ impl<R: RawSymbolRepr> Atoms<R> {
             ts.edges_from(q).into_iter().flatten().flat_map(move |e| {
                 let color = e.color().clone();
                 let target = e.target();
-                self.atoms
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, a)| {
-                        if a.overlaps(e.expression()) {
-                            Some(i)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .into_iter()
-                    .map(move |i| (q, Self::letter(i), color.clone(), target))
+                let covered = self.covered(e.expression());
+                (0..covered.len())
+                    .map(move |k| (q, Self::letter(covered[k]), color.clone(), target))
             })
         });
         U::from_transitions(Parts {
@@ -178,6 +221,19 @@ impl<R: RawSymbolRepr> Atoms<R> {
             edges,
             initial: (),
         })
+    }
+
+    /// The atoms an expression is made of: looked up for the labels that the atoms were computed
+    /// from, otherwise all atoms that overlap with it.
+    fn covered(&self, expression: &PropExpression<R>) -> Cow<'_, [usize]> {
+        match self.covers.get(expression) {
+            Some(covered) => Cow::Borrowed(covered),
+            None => Cow::Owned(
+                (0..self.atoms.len())
+                    .filter(|&i| self.atoms[i].overlaps(expression))
+                    .collect(),
+            ),
+        }
     }
 
     /// The number of atomic propositions.

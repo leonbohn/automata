@@ -23,10 +23,10 @@
 use super::branching::{CycleCondition, Existential, HistoryDeterministic};
 use super::cycles::{self, Colors, Priorities};
 use super::{Automaton, DBA, DFA, DPA, NFA};
-use crate::DTS;
 use crate::alphabet::{Atoms, CharAlphabet, PropAlphabet, PropSymbol, RawSymbolRepr};
 use crate::color::Void;
 use crate::representation::{FromTransitions, Parts};
+use crate::ts::DenseTs;
 use crate::ts::States;
 use crate::ts::operations::{Product, ProductIndex};
 use crate::ts::{Deterministic, Pointed, StateIndex, SymbolOf, TransitionSystem};
@@ -641,7 +641,7 @@ where
 
 // ---- propositional alphabets over atoms ---------------------------------------------------------
 //
-// The methods `*_by_atoms` solve a problem on automata over a `PropAlphabet` by relabeling them
+// Experimental: the methods `*_by_atoms` solve a problem on automata over a `PropAlphabet` by relabeling them
 // to the indexed alphabet of the atoms of all their edge labels (see `Atoms`), which makes
 // the intersection of labels an equality test. Words are translated back to propositional
 // symbols. The automata must be over the same atomic propositions.
@@ -651,13 +651,13 @@ where
 fn split_automaton<R, T, S>(
     atoms: &Atoms<R>,
     automaton: &Automaton<T, S>,
-) -> Automaton<DTS<CharAlphabet, StateColor<T>, EdgeColor<T>>, S>
+) -> Automaton<DenseTs<CharAlphabet, StateColor<T>, EdgeColor<T>>, S>
 where
     R: RawSymbolRepr,
     T: States<Alphabet = PropAlphabet<R>>,
     S: Clone,
 {
-    let ts: DTS<CharAlphabet, StateColor<T>, EdgeColor<T>> = atoms.split_edges(automaton.ts());
+    let ts: DenseTs<CharAlphabet, StateColor<T>, EdgeColor<T>> = atoms.split_edges(automaton.ts());
     // states are numbered in the order of `states()`, which may skip removed ones
     let initial = automaton
         .ts()
@@ -707,7 +707,8 @@ where
     R: RawSymbolRepr,
     D: Deterministic<Alphabet = PropAlphabet<R>, StateColor = bool> + States,
 {
-    /// Like [`Self::witness`], but works over the atoms of the edge labels instead of over
+    /// **Experimental**, slower than [`Self::witness`] in all benchmarks so far (the number of
+    /// atoms is often exponential). Works over the atoms of the edge labels instead of over
     /// expressions. The word is not necessarily length-lexicographically minimal.
     pub fn witness_by_atoms(&self) -> Option<Vec<PropSymbol<R>>> {
         let atoms = Atoms::of(self.0.alphabet(), [self.0.ts()]);
@@ -728,7 +729,8 @@ where
     R: RawSymbolRepr,
     D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = Int> + States,
 {
-    /// Like [`Self::witness`], but works over the atoms of the edge labels instead of over
+    /// **Experimental**, slower than [`Self::witness`] in all benchmarks so far (the number of
+    /// atoms is often exponential). Works over the atoms of the edge labels instead of over
     /// expressions.
     pub fn witness_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
         let atoms = Atoms::of(self.0.alphabet(), [self.0.ts()]);
@@ -749,7 +751,8 @@ where
     R: RawSymbolRepr,
     D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = bool> + States,
 {
-    /// Like [`Self::witness`], but works over the atoms of the edge labels instead of over
+    /// **Experimental**, slower than [`Self::witness`] in all benchmarks so far (the number of
+    /// atoms is often exponential). Works over the atoms of the edge labels instead of over
     /// expressions.
     pub fn witness_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
         let atoms = Atoms::of(self.0.alphabet(), [self.0.ts()]);
@@ -771,7 +774,8 @@ where
     D: Deterministic<Alphabet = PropAlphabet<R>, StateColor = bool> + States,
     O: Deterministic<Alphabet = PropAlphabet<R>, StateColor = bool> + States,
 {
-    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// **Experimental**, slower than [`Self::counterexample`] in all benchmarks so far (the number
+    /// of atoms is often exponential). Works over the atoms of the edge labels of both
     /// automata instead of over expressions. Both must be over the same atomic propositions.
     pub fn counterexample_by_atoms(&self) -> Option<Vec<PropSymbol<R>>> {
         let atoms = joint_atoms(self.subset, self.superset);
@@ -797,7 +801,8 @@ where
     D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = Int> + States,
     O: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = Int> + States,
 {
-    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// **Experimental**, slower than [`Self::counterexample`] in all benchmarks so far (the number
+    /// of atoms is often exponential). Works over the atoms of the edge labels of both
     /// automata instead of over expressions. Both must be over the same atomic propositions.
     pub fn counterexample_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
         let atoms = joint_atoms(self.subset, self.superset);
@@ -823,7 +828,8 @@ where
     D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = bool> + States,
     O: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = bool> + States,
 {
-    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// **Experimental**, slower than [`Self::counterexample`] in all benchmarks so far (the number
+    /// of atoms is often exponential). Works over the atoms of the edge labels of both
     /// automata instead of over expressions. Both must be over the same atomic propositions.
     pub fn counterexample_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
         let atoms = joint_atoms(self.subset, self.superset);
@@ -849,7 +855,8 @@ where
     D: Deterministic<Alphabet = PropAlphabet<R>, StateColor = bool> + States,
     O: Deterministic<Alphabet = PropAlphabet<R>, StateColor = bool> + States,
 {
-    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// **Experimental**, slower than [`Self::counterexample`] in all benchmarks so far (the number
+    /// of atoms is often exponential). Works over the atoms of the edge labels of both
     /// automata instead of over expressions. Both must be over the same atomic propositions.
     pub fn counterexample_by_atoms(&self) -> Option<Vec<PropSymbol<R>>> {
         let atoms = joint_atoms(self.left, self.right);
@@ -876,7 +883,8 @@ where
     D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = Int> + States,
     O: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = Int> + States,
 {
-    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// **Experimental**, slower than [`Self::counterexample`] in all benchmarks so far (the number
+    /// of atoms is often exponential). Works over the atoms of the edge labels of both
     /// automata instead of over expressions. Both must be over the same atomic propositions.
     pub fn counterexample_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
         let atoms = joint_atoms(self.left, self.right);
@@ -903,7 +911,8 @@ where
     D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = bool> + States,
     O: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = bool> + States,
 {
-    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// **Experimental**, slower than [`Self::counterexample`] in all benchmarks so far (the number
+    /// of atoms is often exponential). Works over the atoms of the edge labels of both
     /// automata instead of over expressions. Both must be over the same atomic propositions.
     pub fn counterexample_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
         let atoms = joint_atoms(self.left, self.right);

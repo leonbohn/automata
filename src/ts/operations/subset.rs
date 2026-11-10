@@ -1,6 +1,9 @@
-use crate::DTS;
+use crate::Color;
+use crate::alphabet::Expression;
+use crate::representation::{FromTransitions, IntoTransitions, Parts};
 use crate::ts::SymbolOf;
 use crate::ts::{DenseId, EdgeOf, ForAlphabet, Sproutable, StateId};
+use crate::{DTS, NTS};
 use std::borrow::Cow;
 use std::{cell::RefCell, fmt::Debug};
 
@@ -289,6 +292,20 @@ impl<Ts: TransitionSystem> Determinized<Ts> {
         &self.subsets
     }
 
+    /// Merges the edges that lead from a state to the same state with the same colors into one
+    /// edge, see [`merge_parallel_edges`]. [`Determinize::run`] does not do this, it labels
+    /// the edges by classes of symbols (single atoms for propositional alphabets), of which there
+    /// can be very many.
+    pub fn merge_edges(self) -> Self
+    where
+        Ts::EdgeColor: PartialEq,
+    {
+        Self {
+            ts: merge_parallel_edges(self.ts),
+            subsets: self.subsets,
+        }
+    }
+
     /// Discards the subsets and returns the deterministic transition system.
     pub fn into_dts(self) -> DeterminizedTs<Ts> {
         self.ts
@@ -300,20 +317,102 @@ impl<Ts: TransitionSystem> Determinized<Ts> {
     }
 }
 
+/// The labels of all edges that are reachable from the initial state of `ts`.
+fn reachable_labels<Ts: Pointed>(ts: &Ts) -> Vec<EdgeExpression<Ts>> {
+    let mut seen = math::FxIndexSet::default();
+    seen.insert(ts.initial());
+    let mut labels = Vec::new();
+    let mut next = 0;
+    while let Some(&q) = seen.get_index(next) {
+        next += 1;
+        for e in ts.edges_from(q).into_iter().flatten() {
+            labels.push(e.expression().clone());
+            seen.insert(e.target());
+        }
+    }
+    labels
+}
+
+/// Merges the edges of `ts` that lead from a state to the same state with the same color into one
+/// edge, which is labeled by the union of their expressions where the alphabet can express it (see
+/// [`Expression::union`]). For propositional alphabets this turns many edges, one per atom, into few.
+/// Like Spot's `merge_edges` this is a separate step that costs time, but pays off for what
+/// follows.
+pub fn merge_parallel_edges<A, Q, C>(ts: DTS<A, Q, C>) -> DTS<A, Q, C>
+where
+    A: Alphabet,
+    Q: Color,
+    C: Color + PartialEq,
+{
+    // alphabets whose expressions cannot be united have nothing to merge
+    let probe = ts
+        .alphabet()
+        .universe()
+        .next()
+        .map(|symbol| ts.alphabet().make_expression(symbol));
+    if probe.is_none_or(|expression| expression.union(&expression).is_none()) {
+        return ts;
+    }
+    let Parts {
+        alphabet,
+        states,
+        edges,
+        initial: (),
+    } = ts.into_transitions();
+    let mut merged: Vec<(StateId, A::Expression, C, StateId)> = Vec::new();
+    // the merged edges of the current source start here
+    let (mut from, mut current) = (None, 0);
+    for (source, expression, color, target) in edges {
+        if from != Some(source) {
+            from = Some(source);
+            current = merged.len();
+        }
+        let same = merged[current..]
+            .iter_mut()
+            .find(|(_, _, c, t)| *t == target && *c == color);
+        match same.and_then(|m| m.1.union(&expression).map(|u| (m, u))) {
+            Some((m, union)) => m.1 = union,
+            None => merged.push((source, expression, color, target)),
+        }
+    }
+    // the edges of a state are still labeled by disjoint expressions
+    crate::ts::Det(NTS::from_transitions(Parts {
+        alphabet,
+        states,
+        edges: merged.into_iter(),
+        initial: (),
+    }))
+}
+
 impl<Ts: Pointed> Determinize<'_, Ts> {
     /// Runs the subset construction from the initial state of the system.
     pub fn run(self) -> Determinized<Ts> {
         let ts = self.0;
         let alphabet = ts.alphabet();
-        let symbols: Vec<_> = alphabet
-            .universe()
-            .map(|sym| (sym, alphabet.make_expression(sym)))
-            .collect();
+        // Either every symbol of the alphabet, or the classes of symbols that the edge labels
+        // reachable from the initial state cannot tell apart (propositional alphabets, see
+        // `Alphabet::letter_classes`) together with the classes each label consists of.
+        let classes = alphabet.letter_classes(&|| reachable_labels(ts));
+        let (symbols, covers): (Vec<_>, _) = match classes {
+            Some(classes) => (
+                classes.classes.into_iter().map(|e| (None, e)).collect(),
+                Some(classes.covers),
+            ),
+            None => (
+                alphabet
+                    .universe()
+                    .map(|sym| (Some(sym), alphabet.make_expression(sym)))
+                    .collect(),
+                None,
+            ),
+        };
 
-        let mut out = DTS::for_alphabet(alphabet.clone());
+        // The edges of a subset are labeled by disjoint expressions, so there is nothing to replace
+        // and the overlap check of `DTS` (quadratic for many classes) is skipped.
+        let mut out = NTS::for_alphabet(alphabet.clone());
         let mut subsets: Vec<Vec<Ts::StateIndex>> = Vec::new();
         let mut ids: math::FxIndexMap<Vec<Ts::StateIndex>, StateId> = math::FxIndexMap::default();
-        let mut discover = |out: &mut DTS<_, _, _>,
+        let mut discover = |out: &mut NTS<_, _, _>,
                             subsets: &mut Vec<Vec<Ts::StateIndex>>,
                             subset: Vec<Ts::StateIndex>| {
             if let Some(&id) = ids.get(&subset) {
@@ -341,8 +440,15 @@ impl<Ts: Pointed> Determinize<'_, Ts> {
             }
             for q in &subsets[next] {
                 for e in ts.edges_from(*q).into_iter().flatten() {
+                    if let Some(covers) = &covers {
+                        for &i in covers.get(e.expression()).map_or(&[][..], Vec::as_slice) {
+                            targets[i].push(e.target());
+                            colors[i].push(e.color().clone());
+                        }
+                        continue;
+                    }
                     for (i, (sym, _)) in symbols.iter().enumerate() {
-                        if sym.matches(e.expression()) {
+                        if sym.is_some_and(|sym| sym.matches(e.expression())) {
                             targets[i].push(e.target());
                             colors[i].push(e.color().clone());
                         }
@@ -363,7 +469,10 @@ impl<Ts: Pointed> Determinize<'_, Ts> {
             }
             next += 1;
         }
-        Determinized { ts: out, subsets }
+        Determinized {
+            ts: crate::ts::Det(out),
+            subsets,
+        }
     }
 }
 
