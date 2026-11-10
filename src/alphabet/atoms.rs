@@ -137,7 +137,7 @@ impl<R: RawSymbolRepr> Atoms<R> {
     /// per atom it covers. `ts` must only have labels that were passed when computing the atoms
     /// (then each label is a union of atoms), otherwise atoms that merely overlap a label are
     /// included. The result is in any [`FromTransitions`] target without initial state (use
-    /// [`TransitionSystem::with_initial`] afterwards); states keep their order.
+    /// [`TransitionSystem::with_initial`](crate::ts::TransitionSystem::with_initial) afterwards); states keep their order.
     pub fn split_edges<T, U>(&self, ts: &T) -> U
     where
         T: States<Alphabet = PropAlphabet<R>>,

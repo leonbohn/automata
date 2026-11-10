@@ -843,6 +843,87 @@ where
     }
 }
 
+impl<R, D, O> EquivalenceCheck<'_, '_, DFA<D>, DFA<O>>
+where
+    R: RawSymbolRepr,
+    D: Deterministic<Alphabet = PropAlphabet<R>, StateColor = bool> + States,
+    O: Deterministic<Alphabet = PropAlphabet<R>, StateColor = bool> + States,
+{
+    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// automata instead of over expressions. Both must be over the same atomic propositions.
+    pub fn counterexample_by_atoms(&self) -> Option<Vec<PropSymbol<R>>> {
+        let atoms = joint_atoms(self.left, self.right);
+        let (left, right) = (
+            split_automaton(&atoms, self.left),
+            split_automaton(&atoms, self.right),
+        );
+        Equivalence::of(&left)
+            .and(&right)
+            .counterexample()
+            .map(|w| lift_word(&atoms, w))
+    }
+
+    /// Returns true if and only if the automata are equivalent, see
+    /// [`Self::counterexample_by_atoms`].
+    pub fn holds_by_atoms(&self) -> bool {
+        self.counterexample_by_atoms().is_none()
+    }
+}
+
+impl<R, D, O> EquivalenceCheck<'_, '_, DPA<D>, DPA<O>>
+where
+    R: RawSymbolRepr,
+    D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = Int> + States,
+    O: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = Int> + States,
+{
+    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// automata instead of over expressions. Both must be over the same atomic propositions.
+    pub fn counterexample_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
+        let atoms = joint_atoms(self.left, self.right);
+        let (left, right) = (
+            split_automaton(&atoms, self.left),
+            split_automaton(&atoms, self.right),
+        );
+        Equivalence::of(&left)
+            .and(&right)
+            .counterexample()
+            .map(|w| lift_lasso(&atoms, w))
+    }
+
+    /// Returns true if and only if the automata are equivalent, see
+    /// [`Self::counterexample_by_atoms`].
+    pub fn holds_by_atoms(&self) -> bool {
+        self.counterexample_by_atoms().is_none()
+    }
+}
+
+impl<R, D, O> EquivalenceCheck<'_, '_, DBA<D>, DBA<O>>
+where
+    R: RawSymbolRepr,
+    D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = bool> + States,
+    O: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = bool> + States,
+{
+    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// automata instead of over expressions. Both must be over the same atomic propositions.
+    pub fn counterexample_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
+        let atoms = joint_atoms(self.left, self.right);
+        let (left, right) = (
+            split_automaton(&atoms, self.left),
+            split_automaton(&atoms, self.right),
+        );
+        Equivalence::of(&left)
+            .and(&right)
+            .counterexample()
+            .map(|w| lift_lasso(&atoms, w))
+    }
+
+    /// Returns true if and only if the automata are equivalent, see
+    /// [`Self::counterexample_by_atoms`].
+    pub fn holds_by_atoms(&self) -> bool {
+        self.counterexample_by_atoms().is_none()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1050,6 +1131,20 @@ mod tests {
         assert!(Inclusion::of(&never).within(&a).holds_by_atoms());
         let cex = Inclusion::of(&a).within(&never).counterexample_by_atoms();
         assert!(cex.is_some_and(|w| a.accepts(&w) && !never.accepts(&w)));
+    }
+
+    #[cfg(feature = "hoa")]
+    #[test]
+    fn equivalence_by_atoms_agrees_with_expressions() {
+        let a = prop_dpa(1, "State: 0\n[t] 1 {0}\nState: 1\n[0] 0 {1}\n[!0] 1 {1}");
+        let never = prop_dpa(1, "State: 0\n[t] 1 {1}\nState: 1\n[t] 0 {1}");
+        let a_split = prop_dpa(
+            1,
+            "State: 0\n[0] 1 {0}\n[!0] 1 {0}\nState: 1\n[0] 0 {1}\n[!0] 1 {1}",
+        );
+        assert!(Equivalence::of(&a).and(&a_split).holds_by_atoms());
+        let cex = Equivalence::of(&a).and(&never).counterexample_by_atoms();
+        assert!(cex.is_some_and(|w| a.accepts(&w) != never.accepts(&w)));
     }
 
     #[cfg(feature = "hoa")]
