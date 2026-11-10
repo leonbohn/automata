@@ -71,15 +71,21 @@ impl<R: RawSymbolRepr> Atoms<R> {
     {
         Self::new(
             alphabet.aps(),
-            systems.into_iter().flat_map(|ts| {
-                ts.states().flat_map(move |q| {
-                    ts.edges_from(q)
-                        .into_iter()
-                        .flatten()
-                        .map(|e| e.expression().clone())
-                })
-            }),
+            systems.into_iter().flat_map(|ts| Self::labels(ts)),
         )
+    }
+
+    /// The labels of all edges of `ts`.
+    pub(crate) fn labels<T>(ts: &T) -> impl Iterator<Item = PropExpression<R>> + '_
+    where
+        T: States<Alphabet = PropAlphabet<R>>,
+    {
+        ts.states().flat_map(move |q| {
+            ts.edges_from(q)
+                .into_iter()
+                .flatten()
+                .map(|e| e.expression().clone())
+        })
     }
 
     /// The number of atoms.

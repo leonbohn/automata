@@ -23,12 +23,15 @@
 use super::branching::{CycleCondition, Existential, HistoryDeterministic};
 use super::cycles::{self, Colors, Priorities};
 use super::{Automaton, DBA, DFA, DPA, NFA};
+use crate::DTS;
+use crate::alphabet::{Atoms, CharAlphabet, PropAlphabet, PropSymbol, RawSymbolRepr};
 use crate::color::Void;
 use crate::representation::{FromTransitions, Parts};
-use crate::ts::EdgeColor;
 use crate::ts::States;
 use crate::ts::operations::{Product, ProductIndex};
 use crate::ts::{Deterministic, Pointed, StateIndex, SymbolOf, TransitionSystem};
+use crate::ts::{EdgeColor, StateColor};
+use crate::word::OmegaWord;
 use crate::word::ReducedOmegaWord;
 use crate::{Int, NTS, math};
 use std::hash::Hash;
@@ -636,6 +639,119 @@ where
     })
 }
 
+// ---- propositional alphabets over atoms ---------------------------------------------------------
+//
+// The methods `*_by_atoms` solve a problem on automata over a `PropAlphabet` by relabeling them
+// to the indexed alphabet of the atoms of all their edge labels (see `Atoms`), which makes
+// the intersection of labels an equality test. Words are translated back to propositional
+// symbols. The automata must be over the same atomic propositions.
+
+/// Relabels `automaton` to the letters of `atoms`, see [`Atoms::split_edges`]. The labels of
+/// `automaton` must be unions of atoms.
+fn split_automaton<R, T, S>(
+    atoms: &Atoms<R>,
+    automaton: &Automaton<T, S>,
+) -> Automaton<DTS<CharAlphabet, StateColor<T>, EdgeColor<T>>, S>
+where
+    R: RawSymbolRepr,
+    T: States<Alphabet = PropAlphabet<R>>,
+    S: Clone,
+{
+    let ts: DTS<CharAlphabet, StateColor<T>, EdgeColor<T>> = atoms.split_edges(automaton.ts());
+    // states are numbered in the order of `states()`, which may skip removed ones
+    let initial = automaton
+        .ts()
+        .states()
+        .position(|q| q == automaton.initial())
+        .expect("the initial state is a state");
+    Automaton::from_parts_with_acceptance(
+        ts,
+        crate::ts::q(initial as u32),
+        automaton.acceptance().clone(),
+    )
+}
+
+/// Translates a word over the letters of `atoms` to propositional symbols.
+fn lift_word<R: RawSymbolRepr>(atoms: &Atoms<R>, word: Vec<char>) -> Vec<PropSymbol<R>> {
+    word.into_iter()
+        .map(|c| atoms.symbol_of(c).expect("the letter belongs to an atom"))
+        .collect()
+}
+
+/// Translates an ultimately periodic word over the letters of `atoms` to propositional symbols.
+fn lift_lasso<R: RawSymbolRepr>(
+    atoms: &Atoms<R>,
+    word: ReducedOmegaWord<char>,
+) -> ReducedOmegaWord<PropSymbol<R>> {
+    ReducedOmegaWord::from_raw_parts(
+        lift_word(atoms, word.raw_word().to_vec()),
+        word.loop_index(),
+    )
+}
+
+impl<R, D> Emptiness<'_, DFA<D>>
+where
+    R: RawSymbolRepr,
+    D: Deterministic<Alphabet = PropAlphabet<R>, StateColor = bool> + States,
+{
+    /// Like [`Self::witness`], but works over the atoms of the edge labels instead of over
+    /// expressions. The word is not necessarily length-lexicographically minimal.
+    pub fn witness_by_atoms(&self) -> Option<Vec<PropSymbol<R>>> {
+        let atoms = Atoms::of(self.0.alphabet(), [self.0.ts()]);
+        let split = split_automaton(&atoms, self.0);
+        Emptiness::of(&split)
+            .witness()
+            .map(|w| lift_word(&atoms, w))
+    }
+
+    /// Returns true if and only if the language is empty, see [`Self::witness_by_atoms`].
+    pub fn holds_by_atoms(&self) -> bool {
+        self.witness_by_atoms().is_none()
+    }
+}
+
+impl<R, D> Emptiness<'_, DPA<D>>
+where
+    R: RawSymbolRepr,
+    D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = Int> + States,
+{
+    /// Like [`Self::witness`], but works over the atoms of the edge labels instead of over
+    /// expressions.
+    pub fn witness_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
+        let atoms = Atoms::of(self.0.alphabet(), [self.0.ts()]);
+        let split = split_automaton(&atoms, self.0);
+        Emptiness::of(&split)
+            .witness()
+            .map(|w| lift_lasso(&atoms, w))
+    }
+
+    /// Returns true if and only if the language is empty, see [`Self::witness_by_atoms`].
+    pub fn holds_by_atoms(&self) -> bool {
+        self.witness_by_atoms().is_none()
+    }
+}
+
+impl<R, D> Emptiness<'_, DBA<D>>
+where
+    R: RawSymbolRepr,
+    D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = bool> + States,
+{
+    /// Like [`Self::witness`], but works over the atoms of the edge labels instead of over
+    /// expressions.
+    pub fn witness_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
+        let atoms = Atoms::of(self.0.alphabet(), [self.0.ts()]);
+        let split = split_automaton(&atoms, self.0);
+        Emptiness::of(&split)
+            .witness()
+            .map(|w| lift_lasso(&atoms, w))
+    }
+
+    /// Returns true if and only if the language is empty, see [`Self::witness_by_atoms`].
+    pub fn holds_by_atoms(&self) -> bool {
+        self.witness_by_atoms().is_none()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -817,6 +933,17 @@ mod tests {
             .pop::<crate::ts::Det<crate::ts::Linked>>()
             .and_then(|a| a.into_dpa().ok())
             .expect("a valid parity automaton")
+    }
+
+    #[cfg(feature = "hoa")]
+    #[test]
+    fn emptiness_by_atoms_agrees_with_expressions() {
+        let a = prop_dpa(1, "State: 0\n[t] 1 {0}\nState: 1\n[0] 0 {1}\n[!0] 1 {1}");
+        let never = prop_dpa(1, "State: 0\n[t] 1 {1}\nState: 1\n[t] 0 {1}");
+        assert!(Emptiness::of(&never).holds_by_atoms());
+        let word = Emptiness::of(&a).witness_by_atoms().unwrap();
+        assert!(a.accepts(&word));
+        assert!(!Emptiness::of(&a).holds_by_atoms());
     }
 
     #[cfg(feature = "hoa")]
