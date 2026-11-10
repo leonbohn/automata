@@ -298,6 +298,18 @@ fn determinize(nts: automata::NTS<CharAlphabet, bool, Void>) -> usize {
     )
 }
 
+// Determinization over a propositional alphabet, which has 2^aps symbols. Larger inputs than these
+// take tens of seconds, which is too slow under Valgrind.
+#[library_benchmark]
+#[bench::aps_6_n_6(args = (6, 6), setup = common::prop_nfa)]
+#[bench::aps_7_n_6(args = (6, 7), setup = common::prop_nfa)]
+#[bench::aps_8_n_6(args = (6, 8), setup = common::prop_nfa)]
+fn determinize_propositional(
+    nfa: automata::automaton::NFA<automata::NTS<automata::alphabet::PropAlphabet, bool, Void>>,
+) -> usize {
+    black_box(nfa.determinize().state_count())
+}
+
 library_benchmark_group!(
     name = ts;
     benchmarks = add_edges_in_order, add_edges_in_reverse, builder_with_edges,
@@ -305,7 +317,8 @@ library_benchmark_group!(
         reachable_states, minimal_representatives, scc_minimal_representatives,
         minimal_representative_of_all_states, canonical_naming, predecessors_of_all_states,
         clone, collect_dts, map_edge_colors_collect, erase_state_colors_collect, into_dfa,
-        remove_edges_from_matching, remove_state, subset_construction, determinize
+        remove_edges_from_matching, remove_state, subset_construction, determinize,
+        determinize_propositional
 );
 
 main!(
