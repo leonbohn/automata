@@ -689,6 +689,19 @@ fn lift_lasso<R: RawSymbolRepr>(
     )
 }
 
+/// The atoms of the edge labels of both automata.
+fn joint_atoms<R, T, O, S>(left: &Automaton<T, S>, right: &Automaton<O, S>) -> Atoms<R>
+where
+    R: RawSymbolRepr,
+    T: States<Alphabet = PropAlphabet<R>>,
+    O: States<Alphabet = PropAlphabet<R>>,
+{
+    Atoms::new(
+        left.alphabet().aps(),
+        Atoms::labels(left.ts()).chain(Atoms::labels(right.ts())),
+    )
+}
+
 impl<R, D> Emptiness<'_, DFA<D>>
 where
     R: RawSymbolRepr,
@@ -749,6 +762,84 @@ where
     /// Returns true if and only if the language is empty, see [`Self::witness_by_atoms`].
     pub fn holds_by_atoms(&self) -> bool {
         self.witness_by_atoms().is_none()
+    }
+}
+
+impl<R, D, O> InclusionCheck<'_, '_, DFA<D>, DFA<O>>
+where
+    R: RawSymbolRepr,
+    D: Deterministic<Alphabet = PropAlphabet<R>, StateColor = bool> + States,
+    O: Deterministic<Alphabet = PropAlphabet<R>, StateColor = bool> + States,
+{
+    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// automata instead of over expressions. Both must be over the same atomic propositions.
+    pub fn counterexample_by_atoms(&self) -> Option<Vec<PropSymbol<R>>> {
+        let atoms = joint_atoms(self.subset, self.superset);
+        let (subset, superset) = (
+            split_automaton(&atoms, self.subset),
+            split_automaton(&atoms, self.superset),
+        );
+        Inclusion::of(&subset)
+            .within(&superset)
+            .counterexample()
+            .map(|w| lift_word(&atoms, w))
+    }
+
+    /// Returns true if and only if the inclusion holds, see [`Self::counterexample_by_atoms`].
+    pub fn holds_by_atoms(&self) -> bool {
+        self.counterexample_by_atoms().is_none()
+    }
+}
+
+impl<R, D, O> InclusionCheck<'_, '_, DPA<D>, DPA<O>>
+where
+    R: RawSymbolRepr,
+    D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = Int> + States,
+    O: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = Int> + States,
+{
+    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// automata instead of over expressions. Both must be over the same atomic propositions.
+    pub fn counterexample_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
+        let atoms = joint_atoms(self.subset, self.superset);
+        let (subset, superset) = (
+            split_automaton(&atoms, self.subset),
+            split_automaton(&atoms, self.superset),
+        );
+        Inclusion::of(&subset)
+            .within(&superset)
+            .counterexample()
+            .map(|w| lift_lasso(&atoms, w))
+    }
+
+    /// Returns true if and only if the inclusion holds, see [`Self::counterexample_by_atoms`].
+    pub fn holds_by_atoms(&self) -> bool {
+        self.counterexample_by_atoms().is_none()
+    }
+}
+
+impl<R, D, O> InclusionCheck<'_, '_, DBA<D>, DBA<O>>
+where
+    R: RawSymbolRepr,
+    D: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = bool> + States,
+    O: Deterministic<Alphabet = PropAlphabet<R>, EdgeColor = bool> + States,
+{
+    /// Like [`Self::counterexample`], but works over the atoms of the edge labels of both
+    /// automata instead of over expressions. Both must be over the same atomic propositions.
+    pub fn counterexample_by_atoms(&self) -> Option<ReducedOmegaWord<PropSymbol<R>>> {
+        let atoms = joint_atoms(self.subset, self.superset);
+        let (subset, superset) = (
+            split_automaton(&atoms, self.subset),
+            split_automaton(&atoms, self.superset),
+        );
+        Inclusion::of(&subset)
+            .within(&superset)
+            .counterexample()
+            .map(|w| lift_lasso(&atoms, w))
+    }
+
+    /// Returns true if and only if the inclusion holds, see [`Self::counterexample_by_atoms`].
+    pub fn holds_by_atoms(&self) -> bool {
+        self.counterexample_by_atoms().is_none()
     }
 }
 
@@ -944,6 +1035,21 @@ mod tests {
         let word = Emptiness::of(&a).witness_by_atoms().unwrap();
         assert!(a.accepts(&word));
         assert!(!Emptiness::of(&a).holds_by_atoms());
+    }
+
+    #[cfg(feature = "hoa")]
+    #[test]
+    fn inclusion_by_atoms_agrees_with_expressions() {
+        let a = prop_dpa(1, "State: 0\n[t] 1 {0}\nState: 1\n[0] 0 {1}\n[!0] 1 {1}");
+        let never = prop_dpa(1, "State: 0\n[t] 1 {1}\nState: 1\n[t] 0 {1}");
+        let a_split = prop_dpa(
+            1,
+            "State: 0\n[0] 1 {0}\n[!0] 1 {0}\nState: 1\n[0] 0 {1}\n[!0] 1 {1}",
+        );
+        assert!(Inclusion::of(&a_split).within(&a).holds_by_atoms());
+        assert!(Inclusion::of(&never).within(&a).holds_by_atoms());
+        let cex = Inclusion::of(&a).within(&never).counterexample_by_atoms();
+        assert!(cex.is_some_and(|w| a.accepts(&w) && !never.accepts(&w)));
     }
 
     #[cfg(feature = "hoa")]
