@@ -42,9 +42,17 @@ pub enum HoaError {
     /// `Acceptance` item.
     #[error("inconsistent acceptance condition: {0}")]
     InconsistentAcceptance(String),
-    /// A label of an edge could not be converted into an expression over the atomic propositions.
-    #[error("invalid edge label: {0}")]
-    InvalidLabel(String),
+    /// A label of an edge refers to an atomic proposition that the automaton does not declare.
+    #[error("the label mentions the atomic proposition {ap}, but there are only {num_aps}")]
+    UnknownProposition {
+        /// The index of the proposition.
+        ap: usize,
+        /// The number of atomic propositions of the automaton.
+        num_aps: u8,
+    },
+    /// A label refers to an alias that is not defined or defined in terms of itself.
+    #[error("unresolved alias: {0}")]
+    UnresolvedAlias(#[from] hoars::AliasError),
     /// A deterministic automaton was requested, but the input is not deterministic.
     #[error("the automaton is not deterministic")]
     NotDeterministic,

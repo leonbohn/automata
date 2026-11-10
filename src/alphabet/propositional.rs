@@ -1,17 +1,16 @@
 use std::{
-    borrow::Cow,
     fmt::{Display, Write as _},
     hash::Hash,
     marker::PhantomData,
-    sync::{Arc, Mutex},
 };
 
-use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddValuation, BddVariableSet};
 use itertools::Itertools;
 use thiserror::Error;
 use tracing::trace;
 
-use std::collections::BTreeSet;
+mod bdd;
+
+use bdd::{Bdd, Cube};
 
 use super::{Alphabet, CharAlphabet, Expression, Matcher};
 
@@ -34,6 +33,20 @@ pub enum PropAlphabetError {
         count: usize,
         /// The maximum number of atomic propositions that is supported.
         max: usize,
+    },
+    /// An expression could not be parsed.
+    #[error("invalid expression, unexpected input at position {position}")]
+    InvalidExpression {
+        /// The byte offset of the offending input.
+        position: usize,
+    },
+    /// An expression mentions an atomic proposition that does not exist.
+    #[error("the atomic proposition {ap} does not exist, there are only {num_aps}")]
+    UnknownProposition {
+        /// The index of the proposition.
+        ap: usize,
+        /// The number of atomic propositions.
+        num_aps: u8,
     },
 }
 
@@ -95,7 +108,14 @@ impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
     /// Turns the symbol into the expression that is satisfied by exactly this valuation.
     pub fn as_expression(&self) -> PropExpression<RawTy> {
         let repr = if self.num_aps > TABLE_APS {
-            Repr::Bdd(self.as_bdd_valuation().into())
+            Repr::Bdd((0..self.num_aps).fold(Bdd::top(), |acc, ap| {
+                let var = Bdd::var(ap);
+                acc.and(&if self.raw.bit(raw_bit(self.num_aps, ap)) {
+                    var
+                } else {
+                    var.not()
+                })
+            }))
         } else {
             Repr::Table(1 << self.raw.as_usize())
         };
@@ -170,14 +190,6 @@ impl<RawTy: RawSymbolRepr> PropSymbol<RawTy> {
             raw,
         }
     }
-    /// Converts the symbol into a valuation of the variables of a BDD.
-    pub fn as_bdd_valuation(&self) -> BddValuation {
-        BddValuation::new(self.as_bools())
-    }
-    /// Creates a symbol from a valuation of the variables of a BDD.
-    pub fn from_bdd_valuation(val: BddValuation) -> Self {
-        Self::from_bools(val.into_vector())
-    }
 }
 
 impl<RawTy: RawSymbolRepr> Display for PropSymbol<RawTy> {
@@ -189,7 +201,7 @@ impl<RawTy: RawSymbolRepr> Display for PropSymbol<RawTy> {
 }
 
 /// An expression over the atomic propositions of a [`PropAlphabet`]: a boolean formula,
-/// represented as a BDD. It is satisfied by a set of [`PropSymbol`]s.
+/// represented as a truth table for few atomic propositions and as a BDD otherwise. It is satisfied by a set of [`PropSymbol`]s.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PropExpression<RawTy: RawSymbolRepr = u32> {
     num_aps: u8,
@@ -219,33 +231,39 @@ fn full_table(num_aps: u8) -> u64 {
     }
 }
 
+/// The position of the proposition `ap` in the raw value of a symbol: the first proposition is
+/// the most significant bit.
+fn raw_bit(num_aps: u8, ap: u8) -> usize {
+    (num_aps - 1 - ap) as usize
+}
+
+/// Reverses the bits `0..num_aps` of `bits`, which turns bits indexed by proposition into bits of
+/// a raw value and vice versa.
+fn flip(num_aps: u8, bits: u128) -> u128 {
+    if num_aps == 0 {
+        0
+    } else {
+        bits.reverse_bits() >> (128 - num_aps as u32)
+    }
+}
+
+/// The BDD of a truth table over `num_aps` propositions.
+fn table_to_bdd(num_aps: u8, table: u64) -> Bdd {
+    (0..1u64 << num_aps)
+        .filter(|raw| table >> raw & 1 == 1)
+        .fold(Bdd::bottom(), |acc, raw| {
+            acc.or(&(0..num_aps).fold(Bdd::top(), |cube, ap| {
+                let var = Bdd::var(ap);
+                cube.and(&if raw >> raw_bit(num_aps, ap) & 1 == 1 {
+                    var
+                } else {
+                    var.not()
+                })
+            }))
+        })
+}
+
 impl Repr {
-    fn from_bdd(num_aps: u8, bdd: Bdd) -> Self {
-        if num_aps > TABLE_APS {
-            return Repr::Bdd(bdd);
-        }
-        Repr::Table(bdd.sat_valuations().fold(0, |table, valuation| {
-            table | 1 << bool_index(&valuation.into_vector())
-        }))
-    }
-
-    fn to_bdd(&self, num_aps: u8) -> Cow<'_, Bdd> {
-        match self {
-            Repr::Bdd(bdd) => Cow::Borrowed(bdd),
-            Repr::Table(table) => {
-                let vars = BddVariableSet::new_anonymous(num_aps as u16);
-                let mut bdd = vars.mk_false();
-                for raw in (0..1usize << num_aps).filter(|r| table >> r & 1 == 1) {
-                    let bools = (0..num_aps as usize)
-                        .map(|k| raw >> (num_aps as usize - 1 - k) & 1 == 1)
-                        .collect();
-                    bdd = bdd.or(&Bdd::from(BddValuation::new(bools)));
-                }
-                Cow::Owned(bdd)
-            }
-        }
-    }
-
     fn and(&self, other: &Self) -> Self {
         match (self, other) {
             (Repr::Table(a), Repr::Table(b)) => Repr::Table(a & b),
@@ -270,47 +288,86 @@ impl Repr {
     }
 }
 
-/// The raw value of the symbol with the given valuation (the first proposition is the most
-/// significant bit), which is also its position in a truth table.
-fn bool_index(bools: &[bool]) -> usize {
-    bools.iter().fold(0, |n, &b| n << 1 | b as usize)
-}
-
 impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
-    /// Creates an expression over `num_aps` atomic propositions from the given BDD.
-    pub fn from_parts(num_aps: u8, bdd: Bdd) -> Self {
-        Self {
-            num_aps,
-            repr: Repr::from_bdd(num_aps, bdd),
-            _ty: PhantomData,
-        }
-    }
-    /// Parses an expression over `num_aps` atomic propositions, whose variables are named `x_0`,
-    /// `x_1`, ..., for example `x_0 & !x_1`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `string` is not a valid expression.
-    pub fn new(num_aps: u8, string: &str) -> PropExpression<RawTy> {
-        let vars = BddVariableSet::new_anonymous(num_aps as u16);
-        Self::from_parts(num_aps, vars.eval_expression_string(string))
-    }
-    /// Returns the underlying BDD.
-    pub fn into_bdd(self) -> Bdd {
-        self.repr.to_bdd(self.num_aps).into_owned()
-    }
-    /// Returns the expression that is satisfied by every symbol over `num_aps` atomic propositions.
-    pub fn universal(num_aps: u8) -> Self {
-        let repr = if num_aps > TABLE_APS {
-            Repr::Bdd(BddVariableSet::new_anonymous(num_aps as u16).mk_true())
-        } else {
-            Repr::Table(full_table(num_aps))
-        };
+    fn with_repr(num_aps: u8, repr: Repr) -> Self {
         Self {
             num_aps,
             repr,
             _ty: PhantomData,
         }
+    }
+    /// Parses an expression over `num_aps` atomic propositions in the syntax of labels in the HOA
+    /// format: `t`, `f`, the index of a proposition, `!`, `&`, `|` (with decreasing precedence) and
+    /// parentheses, for example `0 & !1` or `(0 & 1) | !2`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `string` is not a valid expression, see [`Self::try_new`].
+    pub fn new(num_aps: u8, string: &str) -> PropExpression<RawTy> {
+        Self::try_new(num_aps, string).expect("invalid expression")
+    }
+    /// Parses an expression like [`Self::new`].
+    ///
+    /// # Errors
+    /// Returns [`PropAlphabetError::InvalidExpression`] if `string` is not an expression,
+    /// [`PropAlphabetError::UnknownProposition`] if it mentions a proposition that is not smaller
+    /// than `num_aps` and [`PropAlphabetError::TooManyAtomicPropositions`] if `num_aps` is larger
+    /// than 128.
+    pub fn try_new(num_aps: u8, string: &str) -> Result<Self, PropAlphabetError> {
+        if num_aps as usize > MAX_APS {
+            return Err(PropAlphabetError::TooManyAtomicPropositions {
+                count: num_aps as usize,
+                max: MAX_APS,
+            });
+        }
+        let mut parser = Parser {
+            input: string,
+            position: 0,
+            num_aps,
+        };
+        let expression = parser.or()?;
+        parser.skip_whitespace();
+        if parser.position < string.len() {
+            return Err(parser.invalid());
+        }
+        Ok(expression)
+    }
+    /// Returns the expression that is satisfied by every symbol over `num_aps` atomic propositions.
+    pub fn universal(num_aps: u8) -> Self {
+        let repr = if num_aps > TABLE_APS {
+            Repr::Bdd(Bdd::top())
+        } else {
+            Repr::Table(full_table(num_aps))
+        };
+        Self::with_repr(num_aps, repr)
+    }
+    /// Returns the expression that is satisfied by no symbol over `num_aps` atomic propositions.
+    pub fn unsatisfiable(num_aps: u8) -> Self {
+        let repr = if num_aps > TABLE_APS {
+            Repr::Bdd(Bdd::bottom())
+        } else {
+            Repr::Table(0)
+        };
+        Self::with_repr(num_aps, repr)
+    }
+    /// Returns the expression that is satisfied by the symbols for which the atomic proposition
+    /// with index `ap` holds.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `ap >= num_aps` or `num_aps` is larger than 128.
+    pub fn proposition(num_aps: u8, ap: u8) -> Self {
+        assert!(ap < num_aps && num_aps as usize <= MAX_APS);
+        let repr = if num_aps > TABLE_APS {
+            Repr::Bdd(Bdd::var(ap))
+        } else {
+            Repr::Table(
+                (0..1u64 << num_aps)
+                    .filter(|raw| raw >> raw_bit(num_aps, ap) & 1 == 1)
+                    .fold(0, |table, raw| table | 1 << raw),
+            )
+        };
+        Self::with_repr(num_aps, repr)
     }
     /// Iterates over the symbols that satisfy the expression, for at most 6 atomic propositions in
     /// ascending order of their raw values.
@@ -321,26 +378,109 @@ impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
                     table: *table,
                     num_aps: self.num_aps,
                 },
-                Repr::Bdd(bdd) => SymbolsIter::Bdd(bdd.sat_valuations()),
+                Repr::Bdd(bdd) => SymbolsIter::Bdd {
+                    cubes: Box::new(bdd.cubes()),
+                    num_aps: self.num_aps,
+                    current: None,
+                },
             },
             _ty: PhantomData,
         }
     }
-    /// Creates an expression from a BDD over the atomic propositions.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the BDD has more than 255 variables.
-    pub fn from_bdd(bdd: Bdd) -> Self {
-        let num_aps = bdd
-            .num_vars()
-            .try_into()
-            .expect("Number of variables does not fit into u8");
-        Self::from_parts(num_aps, bdd)
-    }
     /// Iterates over the letters that represent the symbols satisfying the expression.
     pub fn chars_iter(&self) -> impl Iterator<Item = char> + '_ {
         self.sat_vals().map(|e: PropSymbol<RawTy>| e.as_char())
+    }
+    /// The expression as cubes (paths to `true` of a BDD): propositions that are fixed and their
+    /// values, indexed by proposition.
+    fn cubes(&self) -> Vec<Cube> {
+        match &self.repr {
+            Repr::Table(table) => table_to_bdd(self.num_aps, *table).cubes().collect(),
+            Repr::Bdd(bdd) => bdd.cubes().collect(),
+        }
+    }
+}
+
+/// The largest number of atomic propositions of an expression, the number of variables of the BDD
+/// manager.
+const MAX_APS: usize = 128;
+
+/// A recursive descent parser for labels in HOA syntax.
+struct Parser<'a> {
+    input: &'a str,
+    position: usize,
+    num_aps: u8,
+}
+
+impl Parser<'_> {
+    fn skip_whitespace(&mut self) {
+        self.position += self.input[self.position..]
+            .len()
+            .saturating_sub(self.input[self.position..].trim_start().len());
+    }
+    fn invalid(&self) -> PropAlphabetError {
+        PropAlphabetError::InvalidExpression {
+            position: self.position,
+        }
+    }
+    /// Consumes `c` if it is next.
+    fn eat(&mut self, c: char) -> bool {
+        self.skip_whitespace();
+        let found = self.input[self.position..].starts_with(c);
+        if found {
+            self.position += c.len_utf8();
+        }
+        found
+    }
+    fn or<RawTy: RawSymbolRepr>(&mut self) -> Result<PropExpression<RawTy>, PropAlphabetError> {
+        let mut left = self.and()?;
+        while self.eat('|') {
+            left |= self.and()?;
+        }
+        Ok(left)
+    }
+    fn and<RawTy: RawSymbolRepr>(&mut self) -> Result<PropExpression<RawTy>, PropAlphabetError> {
+        let mut left = self.not()?;
+        while self.eat('&') {
+            left &= self.not()?;
+        }
+        Ok(left)
+    }
+    fn not<RawTy: RawSymbolRepr>(&mut self) -> Result<PropExpression<RawTy>, PropAlphabetError> {
+        if self.eat('!') {
+            return Ok(!self.not()?);
+        }
+        self.atom()
+    }
+    fn atom<RawTy: RawSymbolRepr>(&mut self) -> Result<PropExpression<RawTy>, PropAlphabetError> {
+        if self.eat('(') {
+            let inner = self.or()?;
+            return if self.eat(')') {
+                Ok(inner)
+            } else {
+                Err(self.invalid())
+            };
+        }
+        if self.eat('t') {
+            return Ok(PropExpression::universal(self.num_aps));
+        }
+        if self.eat('f') {
+            return Ok(PropExpression::unsatisfiable(self.num_aps));
+        }
+        let rest = &self.input[self.position..];
+        let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+        if digits == 0 {
+            return Err(self.invalid());
+        }
+        let ap: usize = rest[..digits].parse().map_err(|_| self.invalid())?;
+        if ap >= self.num_aps as usize {
+            return Err(PropAlphabetError::UnknownProposition {
+                ap,
+                num_aps: self.num_aps,
+            });
+        }
+        self.position += digits;
+        Ok(PropExpression::proposition(self.num_aps, ap as u8))
     }
 }
 
@@ -412,53 +552,46 @@ impl<RawTy: RawSymbolRepr> Ord for PropExpression<RawTy> {
     }
 }
 
-/// Renders a BDD as a disjunction of conjunctions (its optimized DNF). The variable with index
-/// `i` is rendered as `name(i)`, conjunctions are joined by `and`. The constants are rendered as
-/// `t` and `f`.
-fn bdd_to_string(bdd: &Bdd, name: impl Fn(usize) -> String, and: &str) -> String {
-    if bdd.is_true() {
-        return "t".to_string();
-    }
-    if bdd.is_false() {
-        return "f".to_string();
-    }
-    let dnf = bdd.to_optimized_dnf();
-    let clauses = dnf
-        .iter()
-        .map(|clause| {
-            let mut vals = clause.to_values();
-            vals.sort();
-            vals.into_iter()
-                .map(|(v, b)| {
-                    let name = name(v.to_index());
-                    if b { name } else { format!("!{name}") }
-                })
-                .join(and)
-        })
-        .collect_vec();
-    if clauses.len() > 1 {
-        clauses.into_iter().map(|c| format!("({c})")).join(" | ")
-    } else {
-        clauses.into_iter().next().unwrap_or_default()
-    }
-}
-
 impl<RawTy: RawSymbolRepr> PropExpression<RawTy> {
+    /// Renders the expression as a disjunction of conjunctions of literals, whose propositions are
+    /// named by `name`. The result follows the structure of the BDD, not the history of the BDD
+    /// manager. The constants are rendered as `t` and `f`.
+    fn render(&self, name: impl Fn(u8) -> String, and: &str) -> String {
+        let cubes = self.cubes();
+        let clauses = cubes
+            .iter()
+            .map(|cube| {
+                (0..self.num_aps)
+                    .filter(|&ap| cube.care >> ap & 1 == 1)
+                    .map(|ap| {
+                        if cube.value >> ap & 1 == 1 {
+                            name(ap)
+                        } else {
+                            format!("!{}", name(ap))
+                        }
+                    })
+                    .join(and)
+            })
+            .collect_vec();
+        match &clauses[..] {
+            [] => "f".to_string(),
+            [clause] if clause.is_empty() => "t".to_string(),
+            [clause] => clause.clone(),
+            _ => clauses.into_iter().map(|c| format!("({c})")).join(" | "),
+        }
+    }
     /// Renders the expression as a label in the HOA format, i.e. over the indices of the atomic
-    /// propositions, for example `0 & !1` or `(0 & 1) | (!0 & !1)`.
+    /// propositions, for example `0 & !1` or `(0 & 1) | (!0 & !1)`. The label is not minimal.
+    /// [`Self::try_new`] parses it back.
     pub fn to_hoa_label(&self) -> String {
-        bdd_to_string(&self.repr.to_bdd(self.num_aps), |i| i.to_string(), " & ")
+        self.render(|i| i.to_string(), " & ")
     }
 }
 
 /// Renders the expression over the letters `a`, `b`, ... instead of the proposition indices.
 impl<RawTy: RawSymbolRepr> Display for PropExpression<RawTy> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&bdd_to_string(
-            &self.repr.to_bdd(self.num_aps),
-            |i| ((b'a' + i as u8) as char).to_string(),
-            "&",
-        ))
+        f.write_str(&self.render(|i| ((b'a' + i) as char).to_string(), "&"))
     }
 }
 
@@ -467,7 +600,7 @@ impl<RawTy: RawSymbolRepr> Matcher<PropExpression<RawTy>> for PropSymbol<RawTy> 
         assert_eq!(self.num_aps, expression.num_aps);
         match &expression.repr {
             Repr::Table(table) => table >> self.raw.as_usize() & 1 == 1,
-            Repr::Bdd(bdd) => bdd.eval_in(&self.as_bdd_valuation()),
+            Repr::Bdd(bdd) => bdd.eval(self.num_aps, |ap| self.raw.bit(raw_bit(self.num_aps, ap))),
         }
     }
 }
@@ -479,7 +612,7 @@ impl<RawTy: RawSymbolRepr> Matcher<PropExpression<RawTy>> for PropExpression<Raw
         // we share nothing with the complement of the expression
         match (&self.repr, &expression.repr) {
             (Repr::Table(a), Repr::Table(b)) => a & !b == 0,
-            (Repr::Bdd(a), Repr::Bdd(b)) => b.not().and(a).sat_witness().is_none(),
+            (Repr::Bdd(a), Repr::Bdd(b)) => a.and(&b.not()).is_false(),
             _ => unreachable!("expressions over the same propositions are stored alike"),
         }
     }
@@ -524,11 +657,22 @@ pub struct PropExpressionSymbols<'a, RawTy: RawSymbolRepr> {
 
 enum SymbolsIter<'a> {
     /// The remaining set bits of a truth table.
-    Table {
-        table: u64,
+    Table { table: u64, num_aps: u8 },
+    /// The cubes of a BDD, of which the one that is currently expanded is `current`.
+    Bdd {
+        cubes: Box<dyn Iterator<Item = Cube> + 'a>,
         num_aps: u8,
+        current: Option<Expansion>,
     },
-    Bdd(BddSatisfyingValuations<'a>),
+}
+
+/// The symbols of a cube in raw form: `fixed` plus every subset `sub` of `free`. The next one to
+/// yield is `sub`.
+struct Expansion {
+    fixed: u128,
+    free: u128,
+    sub: u128,
+    done: bool,
 }
 
 impl<RawTy: RawSymbolRepr> Iterator for PropExpressionSymbols<'_, RawTy> {
@@ -547,7 +691,43 @@ impl<RawTy: RawSymbolRepr> Iterator for PropExpressionSymbols<'_, RawTy> {
                     raw: RawTy::from_usize(raw),
                 })
             }
-            SymbolsIter::Bdd(iter) => Some(PropSymbol::from_bdd_valuation(iter.next()?)),
+            SymbolsIter::Bdd {
+                cubes,
+                num_aps,
+                current,
+            } => loop {
+                let Some(expansion) = current else {
+                    let cube = cubes.next()?;
+                    let all = flip(*num_aps, !0);
+                    let care = flip(*num_aps, cube.care);
+                    let free = all & !care;
+                    *current = Some(Expansion {
+                        fixed: flip(*num_aps, cube.value),
+                        free,
+                        sub: free,
+                        done: false,
+                    });
+                    continue;
+                };
+                if expansion.done {
+                    *current = None;
+                    continue;
+                }
+                let raw = expansion.fixed | expansion.sub;
+                if expansion.sub == 0 {
+                    expansion.done = true;
+                } else {
+                    expansion.sub = (expansion.sub - 1) & expansion.free;
+                }
+                let mut symbol = RawTy::from_usize(0);
+                (0..*num_aps as usize)
+                    .filter(|bit| raw >> bit & 1 == 1)
+                    .for_each(|bit| symbol.set(bit));
+                return Some(PropSymbol {
+                    num_aps: *num_aps,
+                    raw: symbol,
+                });
+            },
         }
     }
 }
@@ -559,7 +739,7 @@ impl<RawTy: RawSymbolRepr> Iterator for PropExpressionSymbols<'_, RawTy> {
 /// the number of bits in the type parameter `RawTy`).
 ///
 /// An Expression is represented by a boolean formula over the atomic propositions. Here,
-/// we store it as a [`PropExpression`] which in turn contains a [`Bdd`].
+/// we store it as a [`PropExpression`], a truth table or a BDD.
 ///
 /// # Example
 /// Assume we have a propositional alphabet over the atomic propositions `a`, `b` and `c`.
@@ -575,7 +755,6 @@ impl<RawTy: RawSymbolRepr> Iterator for PropExpressionSymbols<'_, RawTy> {
 pub struct PropAlphabet<RawTy: RawSymbolRepr = u32> {
     aps: Vec<String>,
     universal: PropExpression<RawTy>,
-    expressions: Arc<Mutex<BTreeSet<PropExpression<RawTy>>>>,
 }
 
 /// Two alphabets are equal if they have the same atomic propositions in the same order: symbols
@@ -615,11 +794,7 @@ impl<RawTy: RawSymbolRepr> PropAlphabet<RawTy> {
         }
 
         let universal = PropExpression::<RawTy>::universal(aps.len() as u8);
-        Ok(Self {
-            expressions: Arc::new(Mutex::new(BTreeSet::from_iter([universal.clone()]))),
-            universal,
-            aps,
-        })
+        Ok(Self { universal, aps })
     }
 
     /// Returns the number of atomic propositions.
@@ -717,10 +892,7 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
         if symbol.num_aps as usize != self.aps.len() {
             return None;
         }
-        let expr = symbol.as_expression();
-        let mut expressions = self.expressions.lock().unwrap();
-        expressions.insert(expr.clone());
-        Some(expr)
+        Some(symbol.as_expression())
     }
 
     fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
@@ -748,14 +920,15 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn expressions_are_rendered_over_indices_for_hoa_and_letters_for_humans() {
-        let both = PropExpression::<u32>::new(2, "x_0 & !x_1");
+        let both = PropExpression::<u32>::new(2, "0 & !1");
         assert_eq!(both.to_hoa_label(), "0 & !1");
         assert_eq!(both.to_string(), "a&!b");
 
-        let either = PropExpression::<u32>::new(2, "x_0 | x_1");
+        let either = PropExpression::<u32>::new(2, "0 | 1");
         let label = either.to_hoa_label();
         assert!(label.contains(" | "), "{label}");
         assert!(
@@ -765,7 +938,7 @@ mod tests {
 
         let always = PropExpression::<u32>::universal(2);
         assert_eq!(always.to_hoa_label(), "t");
-        let never = PropExpression::<u32>::new(2, "x_0 & !x_0");
+        let never = PropExpression::<u32>::new(2, "0 & !0");
         assert_eq!(never.to_hoa_label(), "f");
         assert_eq!(never.to_string(), "f");
     }
@@ -773,13 +946,13 @@ mod tests {
     #[test]
     fn intersection_of_expressions_is_their_conjunction_if_satisfiable() {
         let expression = |s| PropExpression::<u32>::new(2, s);
-        let (first, second) = (expression("x_0"), expression("x_1"));
-        assert_eq!(first.intersection(&second), Some(expression("x_0 & x_1")));
+        let (first, second) = (expression("0"), expression("1"));
+        assert_eq!(first.intersection(&second), Some(expression("0 & 1")));
         assert_eq!(
             PropExpression::universal(2).intersection(&first),
             Some(first.clone())
         );
-        assert_eq!(first.intersection(&expression("!x_0")), None);
+        assert_eq!(first.intersection(&expression("!0")), None);
         assert_eq!(first.intersection(&PropExpression::universal(1)), None);
         assert_eq!('a'.intersection(&'a'), Some('a'));
         assert_eq!('a'.intersection(&'b'), None);
@@ -826,59 +999,174 @@ mod tests {
         assert!(!alphabet.contains(other.char_to_symbol('a')));
     }
 
-    #[test]
-    fn truth_tables_agree_with_bdds() {
-        // every function over two propositions and a spread over three
-        for n in [2u8, 3] {
-            let all: Vec<PropExpression<u32>> = (0..1u32 << (1 << n))
-                .step_by(if n == 2 { 1 } else { 7 })
-                .map(|table| {
-                    let vars = BddVariableSet::new_anonymous(n as u16);
-                    let bdd = (0..1usize << n)
-                        .filter(|raw| table >> raw & 1 == 1)
-                        .map(|raw| {
-                            let bools =
-                                (0..n as usize).map(|i| raw >> (n as usize - 1 - i) & 1 == 1);
-                            Bdd::from(BddValuation::new(bools.collect()))
-                        })
-                        .fold(vars.mk_false(), |acc, b| acc.or(&b));
-                    PropExpression::from_bdd(bdd)
-                })
-                .collect();
-            for a in &all {
-                let bdd_a = a.clone().into_bdd();
-                let mut from_bdd: Vec<_> = bdd_a
-                    .sat_valuations()
-                    .map(PropSymbol::<u32>::from_bdd_valuation)
-                    .collect();
-                from_bdd.sort();
-                assert_eq!(a.sat_vals().collect::<Vec<_>>(), from_bdd);
-                assert_eq!(PropExpression::<u32>::from_bdd(bdd_a.not()), !a.clone());
-                for b in &all {
-                    let bdd_b = b.clone().into_bdd();
-                    assert_eq!(a.overlaps(b), bdd_a.and(&bdd_b).sat_witness().is_some());
-                    assert_eq!(
-                        a.intersection(b).map(PropExpression::into_bdd),
-                        bdd_a.and(&bdd_b).sat_witness().map(|_| bdd_a.and(&bdd_b))
-                    );
-                    assert_eq!(
-                        a.clone() | b.clone(),
-                        PropExpression::from_bdd(bdd_a.or(&bdd_b))
-                    );
-                    assert_eq!(
-                        a.matches(b),
-                        bdd_b.not().and(&bdd_a).sat_witness().is_none()
-                    );
-                }
+    /// A random expression, to be compared against a brute-force evaluation.
+    #[derive(Debug, Clone)]
+    enum Tree {
+        True,
+        False,
+        Ap(u8),
+        Not(Box<Tree>),
+        And(Box<Tree>, Box<Tree>),
+        Or(Box<Tree>, Box<Tree>),
+    }
+
+    impl Tree {
+        /// Whether the symbol with raw value `raw` over `n` propositions satisfies the tree.
+        fn eval(&self, n: u8, raw: u32) -> bool {
+            match self {
+                Tree::True => true,
+                Tree::False => false,
+                Tree::Ap(ap) => raw >> (n - 1 - ap) & 1 == 1,
+                Tree::Not(t) => !t.eval(n, raw),
+                Tree::And(l, r) => l.eval(n, raw) && r.eval(n, raw),
+                Tree::Or(l, r) => l.eval(n, raw) || r.eval(n, raw),
             }
         }
+        fn build(&self, n: u8) -> PropExpression<u32> {
+            match self {
+                Tree::True => PropExpression::universal(n),
+                Tree::False => PropExpression::unsatisfiable(n),
+                Tree::Ap(ap) => PropExpression::proposition(n, *ap),
+                Tree::Not(t) => !t.build(n),
+                Tree::And(l, r) => l.build(n) & r.build(n),
+                Tree::Or(l, r) => l.build(n) | r.build(n),
+            }
+        }
+        fn text(&self) -> String {
+            match self {
+                Tree::True => "t".into(),
+                Tree::False => "f".into(),
+                Tree::Ap(ap) => ap.to_string(),
+                Tree::Not(t) => format!("!{}", t.text()),
+                Tree::And(l, r) => format!("({} & {})", l.text(), r.text()),
+                Tree::Or(l, r) => format!("({} | {})", l.text(), r.text()),
+            }
+        }
+    }
+
+    fn trees() -> impl Strategy<Value = (u8, Tree, Tree)> {
+        (1u8..=10).prop_flat_map(|n| {
+            let tree = prop_oneof![
+                Just(Tree::True),
+                Just(Tree::False),
+                (0..n).prop_map(Tree::Ap)
+            ]
+            .prop_recursive(5, 40, 2, |inner| {
+                prop_oneof![
+                    inner.clone().prop_map(|t| Tree::Not(Box::new(t))),
+                    (inner.clone(), inner.clone())
+                        .prop_map(|(l, r)| Tree::And(Box::new(l), Box::new(r))),
+                    (inner.clone(), inner).prop_map(|(l, r)| Tree::Or(Box::new(l), Box::new(r))),
+                ]
+            });
+            (Just(n), tree.clone(), tree)
+        })
+    }
+
+    proptest! {
+        /// Expressions behave like the truth table that is computed by brute force, for the table
+        /// representation (up to 6 propositions) and for BDDs (7 to 10).
+        #[test]
+        fn expressions_agree_with_brute_force((n, left, right) in trees()) {
+            let all: Vec<u32> = (0..1u32 << n).collect();
+            let sat = |t: &Tree| all.iter().copied().filter(|&r| t.eval(n, r)).collect::<Vec<_>>();
+            let (a, b) = (left.build(n), right.build(n));
+            let symbols = |e: &PropExpression<u32>| {
+                let mut raws = e.sat_vals().map(|s| s.raw).collect::<Vec<_>>();
+                raws.sort();
+                raws
+            };
+            prop_assert_eq!(symbols(&a), sat(&left));
+            prop_assert_eq!(a.repr.is_unsatisfiable(), sat(&left).is_empty());
+            // parsing, rendering and the operators
+            prop_assert_eq!(&PropExpression::<u32>::try_new(n, &left.text()).unwrap(), &a);
+            prop_assert_eq!(&PropExpression::<u32>::try_new(n, &a.to_hoa_label()).unwrap(), &a);
+            let and = Tree::And(Box::new(left.clone()), Box::new(right.clone()));
+            let or = Tree::Or(Box::new(left.clone()), Box::new(right.clone()));
+            prop_assert_eq!(symbols(&(a.clone() & b.clone())), sat(&and));
+            prop_assert_eq!(symbols(&(a.clone() | b.clone())), sat(&or));
+            prop_assert_eq!(symbols(&!a.clone()), sat(&Tree::Not(Box::new(left.clone()))));
+            let common = sat(&and);
+            prop_assert_eq!(a.overlaps(&b), !common.is_empty());
+            prop_assert_eq!(a.intersection(&b).map(|e| symbols(&e)), (!common.is_empty()).then_some(common));
+            prop_assert_eq!(a.matches(&b), sat(&left).iter().all(|&r| right.eval(n, r)));
+            for &raw in &all {
+                let symbol = PropSymbol { num_aps: n, raw };
+                prop_assert_eq!(symbol.matches(&a), left.eval(n, raw));
+            }
+            prop_assert_eq!(a == b, sat(&left) == sat(&right));
+        }
+    }
+
+    #[test]
+    fn parsing_rejects_invalid_expressions() {
+        let parse = |n, s| PropExpression::<u32>::try_new(n, s);
+        assert_eq!(
+            parse(2, "0 &"),
+            Err(PropAlphabetError::InvalidExpression { position: 3 })
+        );
+        assert!(matches!(
+            parse(2, "(0 | 1"),
+            Err(PropAlphabetError::InvalidExpression { .. })
+        ));
+        assert!(matches!(
+            parse(2, "0 1"),
+            Err(PropAlphabetError::InvalidExpression { .. })
+        ));
+        assert_eq!(
+            parse(2, "0 & 2"),
+            Err(PropAlphabetError::UnknownProposition { ap: 2, num_aps: 2 })
+        );
+        assert!(matches!(
+            parse(200, "t"),
+            Err(PropAlphabetError::TooManyAtomicPropositions { .. })
+        ));
+        // precedence: ! binds tighter than &, which binds tighter than |
+        assert_eq!(
+            parse(3, "0 | 1 & !2").unwrap(),
+            parse(3, "0 | (1 & (!2))").unwrap()
+        );
+        assert_eq!(parse(2, " ( 0 ) ").unwrap(), parse(2, "0").unwrap());
+    }
+
+    #[test]
+    fn rendering_does_not_depend_on_the_history_of_the_manager() {
+        let text = "(0 & !8) | (3 & 9) | (!5 & 7)";
+        let before = PropExpression::<u32>::new(10, text).to_hoa_label();
+        // unrelated BDD work changes the node ids that the next expression gets
+        let noise = PropExpression::<u32>::new(10, "(1 & 2 & !4) | (6 & !9)");
+        let _ = (noise.clone() | !noise).to_hoa_label();
+        assert_eq!(PropExpression::<u32>::new(10, text).to_hoa_label(), before);
+    }
+
+    #[test]
+    fn expressions_can_be_built_in_threads_and_combined() {
+        let parts: Vec<_> = (0..8u8)
+            .map(|ap| {
+                std::thread::spawn(move || {
+                    PropExpression::<u32>::proposition(9, ap)
+                        | PropExpression::proposition(9, ap + 1)
+                })
+            })
+            .collect();
+        let combined = parts
+            .into_iter()
+            .map(|t| t.join().unwrap())
+            .fold(PropExpression::universal(9), |acc, e| acc & e);
+        assert_eq!(
+            combined,
+            PropExpression::<u32>::new(
+                9,
+                "(0|1) & (1|2) & (2|3) & (3|4) & (4|5) & (5|6) & (6|7) & (7|8)"
+            )
+        );
     }
 
     #[test]
     fn expressions_over_many_propositions_use_bdds() {
         let (x, y) = (
-            PropExpression::<u32>::new(8, "x_0 & x_7"),
-            PropExpression::new(8, "!x_0"),
+            PropExpression::<u32>::new(8, "0 & 7"),
+            PropExpression::new(8, "!0"),
         );
         assert!(!x.overlaps(&y));
         assert!(x.overlaps(&PropExpression::universal(8)));
@@ -888,14 +1176,14 @@ mod tests {
 
     #[test]
     fn expression_overlaps() {
-        let a_and_b = PropExpression::<u32>::new(2, "x_0 & x_1");
-        let a = PropExpression::<u32>::new(2, "x_0");
-        let not_a = PropExpression::<u32>::new(2, "!x_0");
+        let a_and_b = PropExpression::<u32>::new(2, "0 & 1");
+        let a = PropExpression::<u32>::new(2, "0");
+        let not_a = PropExpression::<u32>::new(2, "!0");
         assert!(a_and_b.overlaps(&a));
         assert!(a.overlaps(&a_and_b));
         assert!(!a.overlaps(&not_a));
         // different numbers of atomic propositions never overlap
-        assert!(!a.overlaps(&PropExpression::<u32>::new(3, "x_0")));
+        assert!(!a.overlaps(&PropExpression::<u32>::new(3, "0")));
     }
 
     #[test]
@@ -922,7 +1210,7 @@ mod tests {
 
     #[test]
     fn prop_expression() {
-        let pe = PropExpression::<u32>::new(3, "x_0 | (x_1 & x_2)");
+        let pe = PropExpression::<u32>::new(3, "0 | (1 & 2)");
 
         assert!(PropSymbol::from_bools(vec![false, true, true]).matches(&pe));
         assert!(PropSymbol::from_bools(vec![false, true, true]).matches(&pe));

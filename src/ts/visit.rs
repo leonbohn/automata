@@ -572,25 +572,25 @@ mod tests {
         // reachable through a single, but lexicographically larger symbol later on
         ts.add_edge((
             states[0],
-            PropExpression::<u32>::new(3, "x_0 & !x_1"),
+            PropExpression::<u32>::new(3, "0 & !1"),
             Void,
             states[1],
         ));
         ts.add_edge((
             states[0],
-            PropExpression::<u32>::new(3, "x_1"),
+            PropExpression::<u32>::new(3, "1"),
             Void,
             states[2],
         ));
         ts.add_edge((
             states[1],
-            PropExpression::<u32>::new(3, "x_0 | x_2"),
+            PropExpression::<u32>::new(3, "0 | 2"),
             Void,
             states[3],
         ));
         ts.add_edge((
             states[2],
-            PropExpression::<u32>::new(3, "!x_0 & !x_1 & !x_2"),
+            PropExpression::<u32>::new(3, "!0 & !1 & !2"),
             Void,
             states[3],
         ));
