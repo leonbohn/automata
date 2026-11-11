@@ -55,6 +55,10 @@ learning = ["families"]
 graphviz = ["dep:tempfile", "dep:open", "dep:base64"]
 render = ["dep:layout-rs", "dep:base64", "dep:resvg", "dep:open", "dep:tempfile", "dep:usvg"]
 
+[profile.release]
+codegen-units = 1
+lto = "fat"
+
 [package.metadata.docs.rs]
 all-features = true
 

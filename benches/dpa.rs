@@ -296,11 +296,13 @@ fn hoa_parse(texts: Vec<String>) -> usize {
 #[bench::synthetic(setup = common::synthetic_dpas)]
 #[bench::many_aps(setup = common::many_aps_dpas)]
 fn hoa_print(dpas: Vec<FixtureDpa>) -> usize {
-    black_box(
-        dpas.iter()
-            .map(|dpa| dpa.to_hoa().expect("writable").len())
-            .sum(),
-    )
+    // A loop, not a closure: gungraun toggles collection on every function below the benchmark
+    // function, so a closure that is not inlined (one codegen unit) switches it off again.
+    let mut total = 0;
+    for dpa in &dpas {
+        total += dpa.to_hoa().expect("writable").len();
+    }
+    black_box(total)
 }
 
 library_benchmark_group!(
