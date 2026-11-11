@@ -210,7 +210,7 @@ states.
 
 **Impact/effort:** low–medium / low.
 
-## 12. `DenseTs`/`CsrTs` color storage wastes a word per slot and edges iteration scans all `k` slots
+## 12. `DenseTs` color storage wastes a word per slot and edges iteration scans all `k` slots
 
 **Location:** `src/ts/impls/dense.rs` — `colors: Vec<Option<C>>`, `DenseEdgesFrom`.
 
@@ -227,21 +227,7 @@ enumerated slice pair would generate tighter code.
 
 **Impact/effort:** low (memory footprint, large-alphabet iteration) / low–medium.
 
-## 13. Default `States::is_complete` builds B-tree sets per state
-
-**Location:** `src/ts.rs` — `States::is_complete` (line ~554).
-
-**Current behavior:** collects the universe into a `BTreeSet` once and then a `BTreeSet` of symbols
-per state (via `transitions_from`, which also expands expressions into symbols). `DenseTs`/`CsrTs`
-override it; `LinkedTs` (the default storage) does not, so `complete_with_colors` on linked systems
-pays for it.
-
-**Idea:** for `IndexedAlphabet` use a `FixedBitSet` of size `k` per state (the `Sproutable`
-completion already does exactly this) or count distinct covered symbol indices.
-
-**Impact/effort:** low / trivial.
-
-## 14. Smaller items
+## 13. Smaller items
 
 - `src/ts/transitions_from.rs` — `TransitionsFrom::next` clones the edge color twice per first
   symbol of an edge (`self.color = Some(color.clone())` then `color.clone()` into the tuple); one
@@ -267,7 +253,7 @@ completion already does exactly this) or count distinct covered symbol indices.
 1. #1 (lookup index) and #4 (in-place replace) — they define the speed of the default storage.
 2. #2 (subset memoization) — the worst offender in automaton-level algorithms.
 3. #3 (edge reordering in `compact`) — traversals.
-4. #6–#10 as benchmark-driven follow-ups; #11–#14 are cleanups with measurable but small wins.
+4. #6–#10 as benchmark-driven follow-ups; #11–#13 are cleanups with measurable but small wins.
 
 Every change should be validated with `./scripts/check` plus the instruction-count benchmarks
 (`tools/bench`), and benchmark names must stay stable so history remains comparable.
