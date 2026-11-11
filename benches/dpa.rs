@@ -243,6 +243,29 @@ fn included_fixtures(pairs: Vec<(FixtureDpa, FixtureDpa)>) -> usize {
             .count(),
     )
 }
+
+// Emptiness on the atoms of the edge labels (experimental), to compare with `witnesses_fixtures`.
+// Inclusion and equivalence by atoms are left out: on `many_aps` they take minutes under Valgrind.
+#[library_benchmark]
+#[bench::ltl(setup = common::ltl_dpas)]
+#[bench::synthetic(setup = common::synthetic_dpas)]
+fn accepted_word_fixtures(dpas: Vec<FixtureDpa>) -> usize {
+    black_box(
+        dpas.iter()
+            .filter(|&dpa| Emptiness::of(dpa).witness().is_some())
+            .count(),
+    )
+}
+#[library_benchmark]
+#[bench::ltl(setup = common::ltl_dpas)]
+#[bench::synthetic(setup = common::synthetic_dpas)]
+fn accepted_word_fixtures_by_atoms(dpas: Vec<FixtureDpa>) -> usize {
+    black_box(
+        dpas.iter()
+            .filter(|&dpa| Emptiness::of(dpa).witness_by_atoms().is_some())
+            .count(),
+    )
+}
 // ---- HOA ---------------------------------------------------------------------------------------
 
 fn ltl_texts() -> Vec<String> {
@@ -284,7 +307,7 @@ library_benchmark_group!(
     name = dpa;
     benchmarks = normalized, normalized_fixtures, complement, complement_without_normalizing,
         complement_fixtures, accepted_word, rejected_word, witnesses_fixtures, witness_colors,
-        language_equivalent, included_in, equivalent_fixtures, included_fixtures, witness_not_subset_of, witness_inequivalence, sccs,
+        language_equivalent, included_in, equivalent_fixtures, included_fixtures, accepted_word_fixtures, accepted_word_fixtures_by_atoms, witness_not_subset_of, witness_inequivalence, sccs,
         prefix_partition, collect_dpa, map_edge_colors_collect, hoa_parse, hoa_print
 );
 

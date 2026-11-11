@@ -642,6 +642,11 @@ impl<RawTy: RawSymbolRepr> Expression for PropExpression<RawTy> {
         })
     }
 
+    fn union(&self, other: &Self) -> Option<Self> {
+        (self.num_aps == other.num_aps)
+            .then(|| Self::with_repr(self.num_aps, self.repr.or(&other.repr)))
+    }
+
     /// Two expressions overlap if some symbol satisfies both. Expressions over a different
     /// number of atomic propositions never overlap.
     fn overlaps(&self, other: &Self) -> bool {
@@ -914,6 +919,24 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
 
     fn size(&self) -> usize {
         2usize.saturating_pow(self.aps.len() as u32)
+    }
+
+    /// The atoms of the labels, unless there are more than `256 * aps` distinct labels (the same
+    /// limit as Spot uses before it falls back to working on labels) or there are at most 5
+    /// propositions (also like Spot), where going through the symbols is as fast.
+    fn letter_classes(
+        &self,
+        labels: &dyn Fn() -> Vec<Self::Expression>,
+    ) -> Option<super::LetterClasses<Self::Expression>> {
+        if self.aps() <= 5 {
+            return None;
+        }
+        let limit = 256 * self.aps.len();
+        // the Bdd handle is only interior-mutable for its manager, Hash/Eq are structural
+        #[allow(clippy::mutable_key_type)]
+        let distinct: crate::math::FxIndexSet<_> = labels().into_iter().collect();
+        (distinct.len() <= limit)
+            .then(|| super::Atoms::new(self.aps(), distinct).into_letter_classes())
     }
 }
 
