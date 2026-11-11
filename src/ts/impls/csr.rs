@@ -1,40 +1,21 @@
 use std::borrow::Cow;
+use std::marker::PhantomData;
+use std::sync::OnceLock;
 
-use super::dense::TableIntoEdges;
-use crate::representation::{FromTransitions, IntoTransitions, Parts, Renumbering};
+use crate::alphabet::{Alphabet, CharAlphabet, Matcher};
+use crate::representation::{
+    FromTransitions, IntoTransitions, Parts, Renumbering, sprout_from_parts,
+};
 use crate::{
     Color, TransitionSystem, Void,
-    alphabet::{CharAlphabet, IndexedAlphabet},
     ts::{
-        DenseId, Deterministic, EdgeId, EdgeOf, EdgeRef, IdType, StateId, StateIndex, States,
-        SymbolOf, predecessors::PredecessorIterable,
+        DenseId, Det, Deterministic, EdgeId, EdgeOf, EdgeRef, IdType, LinkedTs, StateId,
+        StateIndex, States, SymbolOf, predecessors::PredecessorIterable,
     },
 };
 
 /// The sentinel that stands for "no edge" in the target slots of [`CsrTs`].
 pub(super) const NONE: u32 = u32::MAX;
-
-/// A deterministic transition system over an [`IndexedAlphabet`] that cannot be changed after it
-/// has been built, and keeps everything in a few flat vectors.
-///
-/// # Layout
-/// Like [`DenseTs`](crate::ts::DenseTs), the edge leaving state `q` on the symbol with index `a` is
-/// in slot `q * k + a` of a table (and has this slot as its [`EdgeId`]), so a lookup is one index
-/// computation and a load. The incoming edges are stored in compressed sparse row form: the slots
-/// that lead to a state are listed in increasing order, see `ReverseCsr`.
-/// Compared to the growable storages there are no tombstones, no links and one allocation per
-/// vector instead of one per state.
-///
-/// A system is built by collecting another one, see [`IntoTransitions::collect`], or by the [`Csr`](crate::ts::Csr) storage. State
-/// indices are consecutive, starting at 0, in the order of the system it was built from.
-#[derive(Clone)]
-pub struct CsrTs<A: IndexedAlphabet = CharAlphabet, Q = Void, C = Void> {
-    alphabet: A,
-    states: Vec<Q>,
-    targets: Vec<u32>,
-    colors: Vec<Option<C>>,
-    incoming: ReverseCsr,
-}
 
 /// The incoming edges of the states of a deterministic table in compressed sparse row form: the
 /// slots that lead to state `p` are `slots[offsets[p]..offsets[p + 1]]`, in increasing order.
@@ -47,20 +28,20 @@ pub(super) struct ReverseCsr {
 impl ReverseCsr {
     /// Collects the slots of the `n` states whose targets are given, where `NONE` marks an empty
     /// slot, in O(number of slots).
-    pub(super) fn build(targets: &[u32], n: usize) -> Self {
+    pub(super) fn build(targets: impl Iterator<Item = u32> + Clone, n: usize) -> Self {
         let mut offsets = vec![0_u32; n + 1];
-        for target in targets.iter().filter(|t| **t != NONE) {
-            offsets[*target as usize + 1] += 1;
+        for target in targets.clone().filter(|t| *t != NONE) {
+            offsets[target as usize + 1] += 1;
         }
         for p in 0..n {
             offsets[p + 1] += offsets[p];
         }
         let mut fill = offsets.clone();
         let mut slots = vec![NONE; offsets[n] as usize];
-        for (slot, target) in targets.iter().enumerate() {
-            if *target != NONE {
-                slots[fill[*target as usize] as usize] = slot as u32;
-                fill[*target as usize] += 1;
+        for (slot, target) in targets.enumerate() {
+            if target != NONE {
+                slots[fill[target as usize] as usize] = slot as u32;
+                fill[target as usize] += 1;
             }
         }
         Self { offsets, slots }
@@ -92,58 +73,125 @@ impl ReverseCsr {
     }
 }
 
-impl<A: IndexedAlphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
-    /// The edge in slot `slot` leaving `source` on the symbol with index `symbol_index`, if there
-    /// is one.
+/// An edge of a [`CsrTs`], expression, color and target next to each other so that a lookup
+/// touches one cache line.
+#[derive(Clone)]
+struct CsrEdge<E, C> {
+    expression: E,
+    color: C,
+    target: u32,
+}
+
+/// A transition system that cannot be changed after it has been built and keeps its edges in
+/// compressed sparse row form: the edges are sorted by their source, and `offsets[q]..offsets[q + 1]`
+/// is the range of the edges that leave state `q`. It is non-deterministic and works for any
+/// [`Alphabet`]; [`Det<CsrTs>`](crate::ts::Det) makes determinism part of the type.
+///
+/// # Layout
+/// One vector of edges (expression, color and target together) and one `u32` offset per state:
+/// no tombstones, no links and one allocation instead of one per state. The position of an edge in
+/// that vector is its [`EdgeId`]. Within a state, edges keep the order in which they were
+/// given.
+///
+/// Looking up the edge of a state for a symbol scans the (usually short) row of that state, so
+/// for small indexed alphabets [`DenseTs`](crate::ts::DenseTs) looks up faster. The incoming edges
+/// are not stored: they are collected (as compressed rows of edge ids) the first time
+/// [`PredecessorIterable::predecessors`] is called.
+///
+/// A system is built by collecting another one, see [`IntoTransitions::collect`], by the
+/// [`Csr`](crate::ts::Csr) storage or by [`Builder::into_csr`](crate::ts::Builder::into_csr). State
+/// indices are consecutive, starting at 0, in the order of the system it was built from.
+///
+/// # Panics
+/// Collecting panics if the system has more than `u32::MAX` edges.
+#[derive(Clone)]
+pub struct CsrTs<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
+    alphabet: A,
+    states: Vec<Q>,
+    /// `states.len() + 1` entries, the edges of state `q` are `offsets[q]..offsets[q + 1]`.
+    offsets: Vec<u32>,
+    edges: Vec<CsrEdge<A::Expression, C>>,
+    /// The edge ids that lead to each state, built on first use.
+    incoming: OnceLock<ReverseCsr>,
+}
+
+impl<A: Alphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
     #[inline(always)]
-    fn edge_in_slot(
-        &self,
-        source: StateId,
-        slot: usize,
-        symbol_index: usize,
-    ) -> Option<EdgeOf<'_, Self>> {
-        let target = self.targets[slot];
-        if target == NONE {
-            return None;
-        }
-        Some(
-            EdgeRef::borrowed(
-                source,
-                self.alphabet.expression_ref(symbol_index),
-                self.colors[slot].as_ref().expect("edge has a color"),
-                StateId::from(target),
-            )
-            .with_id(EdgeId(slot as u32)),
+    fn row(&self, state: StateId) -> Option<std::ops::Range<usize>> {
+        let q = state.into_usize();
+        (q < self.states.len()).then(|| self.offsets[q] as usize..self.offsets[q + 1] as usize)
+    }
+
+    #[inline(always)]
+    fn edge_at(&self, source: StateId, position: usize) -> EdgeOf<'_, Self> {
+        let edge = &self.edges[position];
+        EdgeRef::borrowed(
+            source,
+            &edge.expression,
+            &edge.color,
+            StateId::from(edge.target),
         )
+        .with_id(EdgeId(position as u32))
+    }
+
+    /// The position of the first edge of `state` that matches `matcher`.
+    #[inline(always)]
+    fn position_matching(
+        &self,
+        state: StateId,
+        matcher: impl Matcher<A::Expression>,
+    ) -> Option<usize> {
+        let row = self.row(state)?;
+        let start = row.start;
+        self.edges[row]
+            .iter()
+            .position(|edge| matcher.matches(&edge.expression))
+            .map(|i| start + i)
+    }
+
+    #[inline]
+    fn source_of(&self, position: usize) -> StateId {
+        StateId::from_usize(self.offsets.partition_point(|o| *o as usize <= position) - 1)
+    }
+
+    fn incoming(&self) -> &ReverseCsr {
+        self.incoming.get_or_init(|| {
+            ReverseCsr::build(self.edges.iter().map(|e| e.target), self.states.len())
+        })
     }
 
     /// Checks the invariants of the data structure and panics if one is violated: the sizes of
-    /// the vectors, that a slot has a color exactly if it has a target, that all targets exist,
-    /// and that the incoming slots of every state are those that lead to it, in increasing order.
+    /// the vectors, that the offsets are non-decreasing and cover all edges, that all targets
+    /// exist and, if the incoming edges have been collected, that they are those that lead to each
+    /// state, in increasing order.
     ///
     /// # Panics
     /// Panics if one of the invariants is violated.
     pub fn check_consistency(&self) {
-        let k = self.alphabet.size();
         let n = self.states.len();
-        assert_eq!(self.targets.len(), n * k, "wrong number of target slots");
-        assert_eq!(self.colors.len(), n * k, "wrong number of color slots");
-        for (slot, target) in self.targets.iter().enumerate() {
-            assert_eq!(
-                self.colors[slot].is_some(),
-                *target != NONE,
-                "slot {slot} has a color iff it has a target"
-            );
-            assert!(
-                *target == NONE || (*target as usize) < n,
-                "edge {slot} leads to a state that does not exist"
-            );
+        let m = self.edges.len();
+        assert_eq!(self.offsets.len(), n + 1, "wrong number of offsets");
+        assert_eq!(self.offsets[0], 0, "offsets do not start at 0");
+        assert_eq!(
+            self.offsets[n] as usize, m,
+            "offsets do not cover all edges"
+        );
+        assert!(
+            self.offsets.windows(2).all(|w| w[0] <= w[1]),
+            "offsets decrease"
+        );
+        assert!(
+            self.edges.iter().all(|e| (e.target as usize) < n),
+            "an edge leads to a state that does not exist"
+        );
+        if let Some(incoming) = self.incoming.get() {
+            let targets: Vec<_> = self.edges.iter().map(|e| e.target).collect();
+            incoming.check_against(&targets, n, false);
         }
-        self.incoming.check_against(&self.targets, n, false);
     }
 }
 
-impl<A: IndexedAlphabet, Q: Color, C: Color> TransitionSystem for CsrTs<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> TransitionSystem for CsrTs<A, Q, C> {
     type Alphabet = A;
     type StateIndex = StateId;
     type StateColor = Q;
@@ -158,11 +206,13 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> TransitionSystem for CsrTs<A, Q, C>
     }
 
     fn edges_from(&self, state: StateIndex<Self>) -> Option<Self::EdgesFromIter<'_>> {
-        let q = state.into_usize();
-        if q >= self.states.len() {
-            return None;
-        }
-        Some(CsrEdgesFrom::new(self, state))
+        let row = self.row(state)?;
+        Some(CsrEdgesFrom {
+            source: state,
+            position: row.start as u32,
+            edges: self.edges[row].iter(),
+            _ts: PhantomData,
+        })
     }
 
     fn state_color(&self, state: StateIndex<Self>) -> Option<Cow<'_, Self::StateColor>> {
@@ -174,71 +224,40 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> TransitionSystem for CsrTs<A, Q, C>
     }
 }
 
-/// Iterates over the edges that leave a state of a [`CsrTs`], in the order of the alphabet.
-pub struct CsrEdgesFrom<'ts, A: IndexedAlphabet, Q, C> {
-    alphabet: &'ts A,
+/// Iterates over the edges that leave a state of a [`CsrTs`], in the order they were given.
+pub struct CsrEdgesFrom<'ts, A: Alphabet, Q, C> {
     source: StateId,
-    /// The slot of the next edge to look at.
-    slot: usize,
-    /// The index of the symbol of the next edge to look at.
-    symbol_index: usize,
-    targets: std::slice::Iter<'ts, u32>,
-    colors: std::slice::Iter<'ts, Option<C>>,
-    _ts: std::marker::PhantomData<fn() -> Q>,
+    position: u32,
+    edges: std::slice::Iter<'ts, CsrEdge<A::Expression, C>>,
+    _ts: PhantomData<fn() -> Q>,
 }
 
-impl<'ts, A: IndexedAlphabet, Q, C> CsrEdgesFrom<'ts, A, Q, C> {
-    #[inline(always)]
-    fn new(ts: &'ts CsrTs<A, Q, C>, state: StateId) -> Self {
-        let k = ts.alphabet.size();
-        let slots = state.into_usize() * k..(state.into_usize() + 1) * k;
-        Self {
-            alphabet: &ts.alphabet,
-            source: state,
-            slot: slots.start,
-            symbol_index: 0,
-            targets: ts.targets[slots.clone()].iter(),
-            colors: ts.colors[slots].iter(),
-            _ts: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for CsrEdgesFrom<'ts, A, Q, C> {
+impl<'ts, A: Alphabet, Q: Color, C: Color> Iterator for CsrEdgesFrom<'ts, A, Q, C> {
     type Item = EdgeOf<'ts, CsrTs<A, Q, C>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        for (&target, color) in self.targets.by_ref().zip(self.colors.by_ref()) {
-            let (slot, symbol_index) = (self.slot, self.symbol_index);
-            self.slot += 1;
-            self.symbol_index += 1;
-            if target != NONE {
-                let color = color.as_ref().expect("edge has a color");
-                return Some(
-                    EdgeRef::borrowed(
-                        self.source,
-                        self.alphabet.expression_ref(symbol_index),
-                        color,
-                        StateId::from(target),
-                    )
-                    .with_id(EdgeId(slot as u32)),
-                );
-            }
-        }
-        None
+        let edge = self.edges.next()?;
+        let id = EdgeId(self.position);
+        self.position += 1;
+        Some(
+            EdgeRef::borrowed(
+                self.source,
+                &edge.expression,
+                &edge.color,
+                StateId::from(edge.target),
+            )
+            .with_id(id),
+        )
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.targets.len()))
-    }
-
-    #[inline]
-    fn count(self) -> usize {
-        self.targets.filter(|t| **t != NONE).count()
+        self.edges.size_hint()
     }
 }
+
+impl<A: Alphabet, Q: Color, C: Color> ExactSizeIterator for CsrEdgesFrom<'_, A, Q, C> {}
 
 /// Iterates over the indices of the states of a [`CsrTs`].
 #[derive(Clone, Debug)]
@@ -260,7 +279,7 @@ impl Iterator for CsrStateIndices {
 
 impl ExactSizeIterator for CsrStateIndices {}
 
-impl<A: IndexedAlphabet, Q: Color, C: Color> States for CsrTs<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> States for CsrTs<A, Q, C> {
     type StatesIter<'this>
         = CsrStateIndices
     where
@@ -277,22 +296,14 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> States for CsrTs<A, Q, C> {
     fn state_count(&self) -> usize {
         self.states.len()
     }
-
-    /// Checks that no slot is empty, which takes O(n * k) time.
-    fn is_complete(&self) -> bool {
-        self.targets.iter().all(|t| *t != NONE)
-    }
 }
 
-impl<A: IndexedAlphabet, Q: Color, C: Color> Deterministic for CsrTs<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> Deterministic for Det<CsrTs<A, Q, C>> {
+    /// Scans the row of `state` for an edge matching `symbol`.
     #[inline]
     fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
-        let index = self.alphabet.try_symbol_to_index(symbol)?;
-        let slot = state.into_usize() * self.alphabet.size() + index;
-        if slot >= self.targets.len() {
-            return None;
-        }
-        self.edge_in_slot(state, slot, index)
+        let position = self.0.position_matching(state, symbol)?;
+        Some(self.0.edge_at(state, position))
     }
 
     #[inline]
@@ -301,17 +312,12 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> Deterministic for CsrTs<A, Q, C> {
         state: StateIndex<Self>,
         symbol: SymbolOf<Self>,
     ) -> Option<StateIndex<Self>> {
-        let index = self.alphabet.try_symbol_to_index(symbol)?;
-        let slot = state.into_usize() * self.alphabet.size() + index;
-        self.targets
-            .get(slot)
-            .copied()
-            .filter(|t| *t != NONE)
-            .map(StateId::from)
+        let position = self.0.position_matching(state, symbol)?;
+        Some(StateId::from(self.0.edges[position].target))
     }
 }
 
-impl<A: IndexedAlphabet, Q: Color, C: Color> PredecessorIterable for CsrTs<A, Q, C> {
+impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for CsrTs<A, Q, C> {
     type EdgesToIter<'this>
         = CsrEdgesTo<'this, A, Q, C>
     where
@@ -321,28 +327,27 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> PredecessorIterable for CsrTs<A, Q,
         let p = state.into_usize();
         (p < self.states.len()).then(|| CsrEdgesTo {
             ts: self,
-            slots: self.incoming.to_state(p).iter(),
+            positions: self.incoming().to_state(p).iter(),
         })
     }
 }
 
-/// Iterates over the edges that enter a state of a [`CsrTs`], ordered by their slot.
-pub struct CsrEdgesTo<'ts, A: IndexedAlphabet, Q, C> {
+/// Iterates over the edges that enter a state of a [`CsrTs`], ordered by their position.
+pub struct CsrEdgesTo<'ts, A: Alphabet, Q, C> {
     ts: &'ts CsrTs<A, Q, C>,
-    slots: std::slice::Iter<'ts, u32>,
+    positions: std::slice::Iter<'ts, u32>,
 }
 
-impl<'ts, A: IndexedAlphabet, Q: Color, C: Color> Iterator for CsrEdgesTo<'ts, A, Q, C> {
+impl<'ts, A: Alphabet, Q: Color, C: Color> Iterator for CsrEdgesTo<'ts, A, Q, C> {
     type Item = EdgeOf<'ts, CsrTs<A, Q, C>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let slot = *self.slots.next()? as usize;
-        let k = self.ts.alphabet.size();
-        Some(
-            self.ts
-                .edge_in_slot(StateId::from_usize(slot / k), slot, slot % k)
-                .expect("listed edge exists"),
-        )
+        let position = *self.positions.next()? as usize;
+        Some(self.ts.edge_at(self.ts.source_of(position), position))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.positions.size_hint()
     }
 }
 
@@ -364,30 +369,70 @@ impl<Q> Iterator for CsrIntoStates<Q> {
     }
 }
 
-impl<A: IndexedAlphabet, Q: Color, C: Color> IntoTransitions for CsrTs<A, Q, C> {
+/// Iterator over the edges of a [`CsrTs`] that is consumed, ordered by source.
+pub struct CsrIntoEdges<E, C> {
+    offsets: Vec<u32>,
+    source: u32,
+    position: u32,
+    edges: std::vec::IntoIter<CsrEdge<E, C>>,
+}
+
+impl<E, C> Iterator for CsrIntoEdges<E, C> {
+    type Item = (StateId, E, C, StateId);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let edge = self.edges.next()?;
+        while self.offsets[self.source as usize + 1] <= self.position {
+            self.source += 1;
+        }
+        self.position += 1;
+        Some((
+            StateId::from(self.source),
+            edge.expression,
+            edge.color,
+            StateId::from(edge.target),
+        ))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.edges.size_hint()
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color> IntoTransitions for CsrTs<A, Q, C> {
     type Initial = ();
     type IntoStates = CsrIntoStates<Q>;
-    type IntoEdges = TableIntoEdges<A, C>;
+    type IntoEdges = CsrIntoEdges<A::Expression, C>;
 
     fn into_transitions(self) -> Parts<A, Self::IntoStates, Self::IntoEdges, ()> {
         Parts {
-            edges: TableIntoEdges::new(self.alphabet.clone(), self.targets, self.colors),
+            alphabet: self.alphabet,
             states: CsrIntoStates {
                 states: self.states.into_iter().enumerate(),
             },
-            alphabet: self.alphabet,
+            edges: CsrIntoEdges {
+                offsets: self.offsets,
+                source: 0,
+                position: 0,
+                edges: self.edges.into_iter(),
+            },
             initial: (),
         }
     }
 }
 
-impl<A: IndexedAlphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I, Init>
-    for CsrTs<A, Q, C>
-{
-    /// Edges that leave the same state on the same symbol replace each other.
-    ///
-    /// # Panics
-    /// Panics if there are too many states or edge slots for 32 bit ids.
+impl<A: Alphabet, Q: Color, C: Color> IntoTransitions for Det<CsrTs<A, Q, C>> {
+    type Initial = ();
+    type IntoStates = CsrIntoStates<Q>;
+    type IntoEdges = CsrIntoEdges<A::Expression, C>;
+
+    fn into_transitions(self) -> Parts<A, Self::IntoStates, Self::IntoEdges, ()> {
+        self.0.into_transitions()
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I, Init> for CsrTs<A, Q, C> {
     fn from_transitions<S, E>(parts: Parts<A, S, E, Init>) -> Self
     where
         S: Iterator<Item = (I, Q)>,
@@ -399,35 +444,61 @@ impl<A: IndexedAlphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I,
             edges,
             ..
         } = parts;
-        let k = alphabet.size();
         let mut numbering = Renumbering::new();
         let mut states = Vec::with_capacity(colored.size_hint().0);
         for (q, color) in colored {
             numbering.push(q);
             states.push(color);
         }
-        let n = states.len();
-        u32::try_from(n * k)
-            .ok()
-            .filter(|slots| *slots != NONE)
-            .expect("too many edge slots for 32 bit ids");
 
-        let mut targets = vec![NONE; n * k];
-        let mut colors = Vec::new();
-        colors.resize_with(n * k, || None);
+        let mut edges: Vec<_> = edges
+            .map(|(p, e, c, r)| (numbering.get(p), e, c, numbering.get(r)))
+            .collect();
+        u32::try_from(edges.len()).expect("too many edges for 32 bit ids");
+        // stable, so edges of one state keep their order; fast on input that is sorted already
+        edges.sort_by_key(|edge| edge.0);
+
+        let mut offsets = vec![0_u32; states.len() + 1];
+        let mut sorted = Vec::with_capacity(edges.len());
         for (p, expression, color, r) in edges {
-            let slot = numbering.get(p) as usize * k + alphabet.expression_to_index(&expression);
-            targets[slot] = numbering.get(r);
-            colors[slot] = Some(color);
+            offsets[p as usize + 1] += 1;
+            sorted.push(CsrEdge {
+                expression,
+                color,
+                target: r,
+            });
         }
-        let incoming = ReverseCsr::build(&targets, n);
+        for q in 0..states.len() {
+            offsets[q + 1] += offsets[q];
+        }
         Self {
             alphabet,
             states,
-            targets,
-            colors,
-            incoming,
+            offsets,
+            edges: sorted,
+            incoming: OnceLock::new(),
         }
+    }
+}
+
+impl<A: Alphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I, Init>
+    for Det<CsrTs<A, Q, C>>
+{
+    /// Edges that overlap with an earlier edge replace it, see [`Sproutable::add_edge`]. Sources
+    /// that are deterministic already are not copied again.
+    ///
+    /// [`Sproutable::add_edge`]: crate::ts::Sproutable::add_edge
+    fn from_transitions<S, E>(parts: Parts<A, S, E, Init>) -> Self
+    where
+        S: Iterator<Item = (I, Q)>,
+        E: Iterator<Item = (I, A::Expression, C, I)>,
+    {
+        let csr = CsrTs::from_transitions(parts);
+        if csr.is_deterministic() {
+            return Det(csr);
+        }
+        let linked: Det<LinkedTs<A, Q, C>> = sprout_from_parts(csr.into_transitions());
+        Det(CsrTs::from_transitions(linked.into_transitions()))
     }
 }
 
@@ -435,7 +506,9 @@ impl<A: IndexedAlphabet, Q: Color, C: Color, I: IdType, Init> FromTransitions<I,
 mod tests {
     use super::*;
     use crate::ts::q;
-    use crate::ts::{Csr, DenseTs, ForAlphabet, LinkedTs, Shrinkable, Sproutable, Storage};
+    use crate::ts::{
+        Builder, Csr, DenseTs, ForAlphabet, LinkedTs, Shrinkable, Sproutable, Storage,
+    };
 
     fn dense() -> DenseTs<CharAlphabet, bool, u32> {
         let mut ts = DenseTs::for_alphabet(CharAlphabet::of_size(2));
@@ -450,18 +523,18 @@ mod tests {
 
     #[test]
     fn lookups_and_predecessors() {
-        let ts: CsrTs<CharAlphabet, bool, u32> = (&dense()).collect();
-        ts.check_consistency();
+        let ts: Det<CsrTs<CharAlphabet, bool, u32>> = (&dense()).collect();
+        ts.inner().check_consistency();
         assert_eq!(ts.state_count(), 4);
         assert_eq!(ts.successor(q(0), 'a'), Some(q(1)));
         assert_eq!(ts.successor(q(0), 'b'), Some(q(0)));
         assert_eq!(ts.successor(q(1), 'b'), None);
         assert_eq!(ts.successor(q(0), 'z'), None);
         assert_eq!(ts.successor(q(9), 'a'), None);
-        assert_eq!(ts.edge(q(2), 'a').unwrap().id(), Some(EdgeId(4)));
+        assert_eq!(ts.edge(q(2), 'a').unwrap().id(), Some(EdgeId(3)));
         assert!(*ts.state_color(q(2)).unwrap());
         assert!(ts.edges_from(q(9)).is_none() && ts.predecessors(q(9)).is_none());
-        // incoming edges of 0, ordered by slot: (0, b), (2, a), (3, b)
+        // incoming edges of 0, ordered by position: (0, b), (2, a), (3, b)
         let into_zero: Vec<_> = ts
             .predecessors(q(0))
             .unwrap()
@@ -471,15 +544,48 @@ mod tests {
             into_zero,
             vec![(q(0), 'b', 4), (q(2), 'a', 3), (q(3), 'b', 5)]
         );
+        ts.inner().check_consistency();
         assert!(!ts.is_complete());
+    }
+
+    #[test]
+    fn nondeterministic_edges_keep_their_order() {
+        let ts = Builder::default()
+            .with_state_colors([false, true, false])
+            .with_edges([
+                (0, 'a', 7u32, 2),
+                (1, 'a', 1, 0),
+                (0, 'a', 8, 1),
+                (0, 'b', 9, 1),
+            ])
+            .into_csr();
+        ts.check_consistency();
+        let from_zero: Vec<_> = ts
+            .edges_from(q(0))
+            .unwrap()
+            .map(|e| (*e.expression(), *e.color(), e.target()))
+            .collect();
+        assert_eq!(
+            from_zero,
+            vec![('a', 7, q(2)), ('a', 8, q(1)), ('b', 9, q(1))]
+        );
+        assert!(!ts.is_deterministic());
+        // sources of predecessors are found for states without edges, too
+        let into_one: Vec<_> = ts.predecessors(q(1)).unwrap().map(|e| e.source()).collect();
+        assert_eq!(into_one, vec![q(0), q(0)]);
+        assert_eq!(ts.edges_from(q(2)).unwrap().count(), 0);
+        // round trip through the parts
+        let again: CsrTs<CharAlphabet, bool, u32> = ts.clone().collect();
+        assert_eq!(again.edges_from(q(0)).unwrap().count(), 3);
+        assert_eq!(again.state_count(), 3);
     }
 
     #[test]
     fn removed_states_are_dropped_and_the_rest_renumbered() {
         let mut source = dense();
         source.remove_state(q(1));
-        let ts: CsrTs<CharAlphabet, bool, u32> = (&source).collect();
-        ts.check_consistency();
+        let ts: Det<CsrTs<CharAlphabet, bool, u32>> = (&source).collect();
+        ts.inner().check_consistency();
         assert_eq!(ts.state_count(), 3);
         // the old states 0, 2, 3 are now 0, 1, 2
         assert_eq!(ts.successor(q(1), 'a'), Some(q(0)));
@@ -493,18 +599,31 @@ mod tests {
             DenseTs::for_alphabet(CharAlphabet::of_size(2)).collect();
         ts.check_consistency();
         assert_eq!(ts.state_count(), 0);
-        assert!(ts.is_complete());
     }
 
     #[test]
-    fn storage_converts_deterministic_linked() {
+    fn det_collect_replaces_overlapping_edges() {
+        let nts = Builder::default()
+            .with_state_colors([false, false])
+            .with_edges([(0, 'a', 1u32, 0), (0, 'a', 2, 1)])
+            .into_nts();
+        let det: Det<CsrTs<CharAlphabet, bool, u32>> = (&nts).collect();
+        det.inner().check_consistency();
+        assert_eq!(det.successor(q(0), 'a'), Some(q(1)));
+        assert_eq!(det.edges_from(q(0)).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn storage_converts_linked() {
         let mut linked = LinkedTs::for_alphabet(CharAlphabet::of_size(2));
         let (q0, q1) = (linked.add_state(true), linked.add_state(false));
         linked.add_edge((q0, 'a', Void, q1));
-        let csr = <Csr as Storage<_>>::try_from_linked(linked.clone()).unwrap();
+        let csr = <Det<Csr> as Storage<_>>::try_from_linked(linked.clone()).unwrap();
         assert_eq!(csr.successor(q(0), 'a'), Some(q(1)));
 
         linked.add_edge((q0, 'a', Void, q0));
-        assert!(<Csr as Storage<_>>::try_from_linked(linked).is_err());
+        assert!(<Det<Csr> as Storage<_>>::try_from_linked(linked.clone()).is_err());
+        let nondet = <Csr as Storage<_>>::try_from_linked(linked).unwrap();
+        assert_eq!(nondet.edges_from(q(0)).unwrap().count(), 2);
     }
 }

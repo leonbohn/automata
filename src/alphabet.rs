@@ -123,6 +123,23 @@ pub trait Alphabet: Clone + Debug {
     /// Returns true if there exists a valuation/symbol matched by both expressions.
     fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool;
 
+    /// Returns true if every symbol of the alphabet matches at least one of the given
+    /// expressions. This is what completeness of a state means, see
+    /// [`States::is_complete`](crate::ts::States::is_complete). The default collects the matched
+    /// symbols and compares their number with [`Self::size`]; alphabets with a cheaper way
+    /// (a union of formulas, for example) override it.
+    fn covers(&self, expressions: impl Iterator<Item = Self::Expression>) -> bool {
+        let size = self.size();
+        let mut seen = std::collections::BTreeSet::new();
+        for expression in expressions {
+            seen.extend(expression.symbols());
+            if seen.len() >= size {
+                return true;
+            }
+        }
+        seen.len() >= size
+    }
+
     /// This method is used for an optimization: If we have a [`CharAlphabet`] alphabet, then an edge list essentially
     /// boils down to a map from `Self::Symbol` to an edge. For more complicated alphabets, this may not always
     /// be so easy. To allow for an optimization (i.e. just lookup the corresponding edge in a [`crate::math::FxIndexMap`]),
@@ -228,6 +245,9 @@ impl<A: Alphabet> Alphabet for &A {
     }
     fn overlapping(&self, left: &Self::Expression, right: &Self::Expression) -> bool {
         A::overlapping(self, left, right)
+    }
+    fn covers(&self, expressions: impl Iterator<Item = Self::Expression>) -> bool {
+        A::covers(self, expressions)
     }
     fn contains(&self, symbol: Self::Symbol) -> bool {
         A::contains(self, symbol)

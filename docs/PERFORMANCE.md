@@ -26,8 +26,9 @@ built lazily on first lookup and invalidated on mutation, like `DenseTs::incomin
 one index computation and one load instead of an O(out-degree) pointer-chasing scan.
 
 **Impact/effort:** very high / medium. `LinkedTs` is the default storage (`DTS = Det<LinkedTs>`), so
-this speeds up essentially everything; the alternative is migrating hot code to `DenseTs`/`CsrTs`,
-which don't support all alphabets or in-place growth the same way.
+this speeds up essentially everything; the alternative is migrating hot code to `DenseTs` (indexed
+alphabets only, constant-time lookup) or the immutable `CsrTs` (any alphabet, but its lookup is a scan
+of the contiguous row of the state, see #3).
 
 ## 2. `SubsetConstruction` recomputes everything on every edge query
 
@@ -71,6 +72,14 @@ expression and color.
 - Consider singly linked lists plus O(d) unlink (walk to find predecessor) or tombstone-with-lazy-
   unlink to shrink the 24-byte overhead — a deliberate trade of removal cost for iteration speed;
   measure against the removal-heavy benchmarks before doing this.
+
+**Evidence:** `CsrTs` has exactly this layout (edges sorted by source, expression, color and target in
+one record, one offset per state). With `edges_from` summing the targets of all edges of 2000 states
+(`benches/storage.rs`, instruction counts / estimated cycles from the cache simulation), `Det<LinkedTs>`
+needs 88k / 111k for 2 symbols per state and 220k / 288k for 8, `CsrTs` 90k / 109k and 158k / 191k. The
+gain grows with the out-degree, because the linked list pays a dependent load per edge. The existing
+`edges_from_all_states_*` benchmarks only `count()` the edges, which the compiler turns into a length
+for `CsrTs`, so they do not show this.
 
 **Impact/effort:** high / medium (the reordering part is contained in `compact`).
 
@@ -239,15 +248,15 @@ states.
 
 **Impact/effort:** low–medium / low.
 
-## 14. `DenseTs`/`CsrTs` color storage wastes a word per slot and edges iteration scans all `k` slots
+## 14. `DenseTs` color storage wastes a word per slot and edges iteration scans all `k` slots
 
-**Location:** `src/ts/impls/dense.rs`, `src/ts/impls/csr.rs` — `colors: Vec<Option<C>>`,
-`DenseEdgesFrom`/`CsrEdgesFrom`.
+**Location:** `src/ts/impls/dense.rs` — `colors: Vec<Option<C>>`, `DenseEdgesFrom`.
 
 **Current behavior:** `Option<C>` stores a discriminant per slot even though `targets[slot] != NONE`
 already encodes presence (e.g. `DenseTs<char, u32>` spends 8 bytes per slot on the color array where
 4 would do). `edges_from` iterates all `k` slots of a state skipping `NONE`, which is O(k) even for
-near-empty rows (fine for small alphabets, wasteful for large `k`).
+near-empty rows (fine for small alphabets, wasteful for large `k`). `CsrTs` has neither problem (it
+stores only existing edges, without `Option`).
 
 **Idea:** store `colors: Vec<C>` (or `MaybeUninit<C>` behind the target sentinel — requires
 `unsafe`, weigh it) and, for large alphabets, a per-state list of occupied symbol indices. Also the
@@ -256,21 +265,7 @@ enumerated slice pair would generate tighter code.
 
 **Impact/effort:** low (memory footprint, large-alphabet iteration) / low–medium.
 
-## 15. Default `States::is_complete` builds B-tree sets per state
-
-**Location:** `src/ts.rs` — `States::is_complete` (line ~554).
-
-**Current behavior:** collects the universe into a `BTreeSet` once and then a `BTreeSet` of symbols
-per state (via `transitions_from`, which also expands expressions into symbols). `DenseTs`/`CsrTs`
-override it; `LinkedTs` (the default storage) does not, so `complete_with_colors` on linked systems
-pays for it.
-
-**Idea:** for `IndexedAlphabet` use a `FixedBitSet` of size `k` per state (the `Sproutable`
-completion already does exactly this) or count distinct covered symbol indices.
-
-**Impact/effort:** low / trivial.
-
-## 16. Smaller items
+## 15. Smaller items
 
 - `src/ts/transitions_from.rs` — `TransitionsFrom::next` clones the edge color twice per first
   symbol of an edge (`self.color = Some(color.clone())` then `color.clone()` into the tuple); one
@@ -297,7 +292,7 @@ completion already does exactly this) or count distinct covered symbol indices.
 2. #2 (subset memoization) and #6 (quotient edge) — the two worst offenders in automaton-level
    algorithms.
 3. #3 (edge reordering in `compact`) and #4 (Tarjan) — traversals.
-4. #8–#12 as benchmark-driven follow-ups; #13–#16 are cleanups with measurable but small wins.
+4. #8–#12 as benchmark-driven follow-ups; #13–#15 are cleanups with measurable but small wins.
 
 Every change should be validated with `./scripts/check` plus the instruction-count benchmarks
 (`tools/bench`), and benchmark names must stay stable so history remains comparable.

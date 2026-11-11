@@ -1148,8 +1148,8 @@ mod tests {
             Harness::new_deterministic(ts, Dense::check_consistency)
                 .run(&ops)
                 .assert_frozen_agrees(|ts| {
-                    let csr: CsrTs<CharAlphabet, u8, u8> = ts.collect();
-                    csr.check_consistency();
+                    let csr: Det<CsrTs<CharAlphabet, u8, u8>> = ts.collect();
+                    csr.inner().check_consistency();
                     csr
                 });
         }
@@ -1161,8 +1161,8 @@ mod tests {
                 .with_compaction(compact_det)
                 .run(&ops)
                 .assert_frozen_agrees(|ts| {
-                    let csr: CsrTs<CharAlphabet, u8, u8> = ts.collect();
-                    csr.check_consistency();
+                    let csr: Det<CsrTs<CharAlphabet, u8, u8>> = ts.collect();
+                    csr.inner().check_consistency();
                     csr
                 });
         }

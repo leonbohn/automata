@@ -147,7 +147,7 @@ impl<A: IndexedAlphabet, Q: Color, C: Color> DenseTs<A, Q, C> {
     /// The incoming edges, collected on first use.
     fn incoming(&self) -> &ReverseCsr {
         self.incoming
-            .get_or_init(|| ReverseCsr::build(&self.targets, self.states.len()))
+            .get_or_init(|| ReverseCsr::build(self.targets.iter().copied(), self.states.len()))
     }
 
     /// The slots of the edges that lead to `state`.

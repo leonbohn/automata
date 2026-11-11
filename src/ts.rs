@@ -8,7 +8,7 @@ use crate::{
     partition::Partition,
 };
 use crate::{DTS, congruence::StateNaming};
-use std::{collections::BTreeSet, hash::Hash};
+use std::hash::Hash;
 
 mod state_index;
 pub use state_index::{DenseId, EdgeId, IdType, StateId, q};
@@ -529,25 +529,14 @@ pub trait States: TransitionSystem {
     /// Checks whether `self` is complete, meaning every state has a transition for every symbol
     /// of the alphabet.
     fn is_complete(&self) -> bool {
-        let universe = self.alphabet().universe().collect::<BTreeSet<_>>();
-
-        for q in self.states() {
-            let syms = self
-                .transitions_from(q)
-                .into_iter()
-                .flatten()
-                .map(|(_q, a, _c, _p)| a)
-                .collect::<BTreeSet<_>>();
-
-            assert!(
-                syms.is_subset(&universe),
-                "Makes no sense to have more symbols on transitions than in the alphabet"
-            );
-            if !universe.is_subset(&syms) {
-                return false;
-            }
-        }
-        true
+        self.states().all(|q| {
+            self.alphabet().covers(
+                self.edges_from(q)
+                    .into_iter()
+                    .flatten()
+                    .map(|edge| edge.expression().clone()),
+            )
+        })
     }
 
     /// Returns the number of states of `self`, obtained by counting the elements yielded by [`Self::states`].
