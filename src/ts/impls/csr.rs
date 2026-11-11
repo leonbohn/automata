@@ -14,62 +14,43 @@ use crate::{
     },
 };
 
-/// The sentinel that stands for "no edge" in the target slots of [`CsrTs`].
-pub(super) const NONE: u32 = u32::MAX;
-
-/// The incoming edges of the states of a deterministic table in compressed sparse row form: the
-/// slots that lead to state `p` are `slots[offsets[p]..offsets[p + 1]]`, in increasing order.
-#[derive(Clone, Debug)]
-pub(super) struct ReverseCsr {
+/// The edges that enter each state in compressed sparse row form: `entries[offsets[p]..offsets[p + 1]]`
+/// are the `(source, position)` pairs of the edges into state `p`, by increasing position. Keeping
+/// the source next to the position avoids a search in the offsets of the system per edge.
+#[derive(Clone)]
+struct Incoming {
     offsets: Vec<u32>,
-    slots: Vec<u32>,
+    entries: Vec<(u32, u32)>,
 }
 
-impl ReverseCsr {
-    /// Collects the slots of the `n` states whose targets are given, where `NONE` marks an empty
-    /// slot, in O(number of slots).
-    pub(super) fn build(targets: impl Iterator<Item = u32> + Clone, n: usize) -> Self {
-        let mut offsets = vec![0_u32; n + 1];
-        for target in targets.clone().filter(|t| *t != NONE) {
-            offsets[target as usize + 1] += 1;
+impl Incoming {
+    fn build<E, C>(offsets: &[u32], edges: &[CsrEdge<E, C>]) -> Self {
+        let n = offsets.len() - 1;
+        let mut into = vec![0_u32; n + 1];
+        for edge in edges {
+            into[edge.target as usize + 1] += 1;
         }
         for p in 0..n {
-            offsets[p + 1] += offsets[p];
+            into[p + 1] += into[p];
         }
-        let mut fill = offsets.clone();
-        let mut slots = vec![NONE; offsets[n] as usize];
-        for (slot, target) in targets.enumerate() {
-            if target != NONE {
-                slots[fill[target as usize] as usize] = slot as u32;
-                fill[target as usize] += 1;
+        let mut fill = into.clone();
+        let mut entries = vec![(0, 0); edges.len()];
+        for source in 0..n {
+            for position in offsets[source]..offsets[source + 1] {
+                let target = edges[position as usize].target as usize;
+                entries[fill[target] as usize] = (source as u32, position);
+                fill[target] += 1;
             }
         }
-        Self { offsets, slots }
-    }
-
-    /// The slots that lead to state `p`.
-    #[inline]
-    pub(super) fn to_state(&self, p: usize) -> &[u32] {
-        &self.slots[self.offsets[p] as usize..self.offsets[p + 1] as usize]
-    }
-
-    /// Panics unless this is the table of the given targets. If `stale` is set, it may also list
-    /// slots that no longer lead to the state, as left behind by removing edges.
-    pub(super) fn check_against(&self, targets: &[u32], n: usize, stale: bool) {
-        assert_eq!(self.offsets.len(), n + 1, "wrong number of offsets");
-        for p in 0..n {
-            let expected: Vec<_> = (0..targets.len())
-                .filter(|slot| targets[*slot] as usize == p)
-                .map(|slot| slot as u32)
-                .collect();
-            let listed: Vec<_> = self
-                .to_state(p)
-                .iter()
-                .copied()
-                .filter(|slot| !stale || targets[*slot as usize] as usize == p)
-                .collect();
-            assert_eq!(listed, expected, "wrong incoming edges of state {p}");
+        Self {
+            offsets: into,
+            entries,
         }
+    }
+
+    #[inline]
+    fn to_state(&self, p: usize) -> &[(u32, u32)] {
+        &self.entries[self.offsets[p] as usize..self.offsets[p + 1] as usize]
     }
 }
 
@@ -95,7 +76,7 @@ struct CsrEdge<E, C> {
 ///
 /// Looking up the edge of a state for a symbol scans the (usually short) row of that state, so
 /// for small indexed alphabets [`DenseTs`](crate::ts::DenseTs) looks up faster. The incoming edges
-/// are not stored: they are collected (as compressed rows of edge ids) the first time
+/// are not stored: they are collected (as compressed rows of sources and edge ids) the first time
 /// [`PredecessorIterable::predecessors`] is called.
 ///
 /// A system is built by collecting another one, see [`IntoTransitions::collect`], by the
@@ -111,20 +92,25 @@ pub struct CsrTs<A: Alphabet = CharAlphabet, Q = Void, C = Void> {
     /// `states.len() + 1` entries, the edges of state `q` are `offsets[q]..offsets[q + 1]`.
     offsets: Vec<u32>,
     edges: Vec<CsrEdge<A::Expression, C>>,
-    /// The edge ids that lead to each state, built on first use.
-    incoming: OnceLock<ReverseCsr>,
+    /// The edges that lead to each state, built on first use.
+    incoming: OnceLock<Incoming>,
 }
 
 impl<A: Alphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
     #[inline(always)]
     fn row(&self, state: StateId) -> Option<std::ops::Range<usize>> {
         let q = state.into_usize();
-        (q < self.states.len()).then(|| self.offsets[q] as usize..self.offsets[q + 1] as usize)
+        // one bounds check for both offsets, and it fails exactly if the state does not exist
+        let bounds = self.offsets.get(q..q + 2)?;
+        Some(bounds[0] as usize..bounds[1] as usize)
     }
 
     #[inline(always)]
-    fn edge_at(&self, source: StateId, position: usize) -> EdgeOf<'_, Self> {
-        let edge = &self.edges[position];
+    fn edge_ref<'a>(
+        source: StateId,
+        position: usize,
+        edge: &'a CsrEdge<A::Expression, C>,
+    ) -> EdgeOf<'a, Self> {
         EdgeRef::borrowed(
             source,
             &edge.expression,
@@ -134,30 +120,25 @@ impl<A: Alphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
         .with_id(EdgeId(position as u32))
     }
 
-    /// The position of the first edge of `state` that matches `matcher`.
+    /// The position and the first edge of `state` that matches `matcher`.
     #[inline(always)]
-    fn position_matching(
+    fn edge_matching(
         &self,
         state: StateId,
         matcher: impl Matcher<A::Expression>,
-    ) -> Option<usize> {
+    ) -> Option<(usize, &CsrEdge<A::Expression, C>)> {
         let row = self.row(state)?;
         let start = row.start;
         self.edges[row]
             .iter()
-            .position(|edge| matcher.matches(&edge.expression))
-            .map(|i| start + i)
+            .enumerate()
+            .find(|(_, edge)| matcher.matches(&edge.expression))
+            .map(|(i, edge)| (start + i, edge))
     }
 
-    #[inline]
-    fn source_of(&self, position: usize) -> StateId {
-        StateId::from_usize(self.offsets.partition_point(|o| *o as usize <= position) - 1)
-    }
-
-    fn incoming(&self) -> &ReverseCsr {
-        self.incoming.get_or_init(|| {
-            ReverseCsr::build(self.edges.iter().map(|e| e.target), self.states.len())
-        })
+    fn incoming(&self) -> &Incoming {
+        self.incoming
+            .get_or_init(|| Incoming::build(&self.offsets, &self.edges))
     }
 
     /// Checks the invariants of the data structure and panics if one is violated: the sizes of
@@ -185,8 +166,18 @@ impl<A: Alphabet, Q: Color, C: Color> CsrTs<A, Q, C> {
             "an edge leads to a state that does not exist"
         );
         if let Some(incoming) = self.incoming.get() {
-            let targets: Vec<_> = self.edges.iter().map(|e| e.target).collect();
-            incoming.check_against(&targets, n, false);
+            for p in 0..n {
+                let expected: Vec<_> = (0..n)
+                    .flat_map(|q| {
+                        (self.offsets[q]..self.offsets[q + 1])
+                            .filter(|pos| self.edges[*pos as usize].target as usize == p)
+                            .map(move |pos| (q as u32, pos))
+                    })
+                    .collect();
+                let mut listed = incoming.to_state(p).to_vec();
+                listed.sort_by_key(|(_, pos)| *pos);
+                assert_eq!(listed, expected, "wrong incoming edges of state {p}");
+            }
         }
     }
 }
@@ -302,8 +293,8 @@ impl<A: Alphabet, Q: Color, C: Color> Deterministic for Det<CsrTs<A, Q, C>> {
     /// Scans the row of `state` for an edge matching `symbol`.
     #[inline]
     fn edge(&self, state: StateIndex<Self>, symbol: SymbolOf<Self>) -> Option<EdgeOf<'_, Self>> {
-        let position = self.0.position_matching(state, symbol)?;
-        Some(self.0.edge_at(state, position))
+        let (position, edge) = self.0.edge_matching(state, symbol)?;
+        Some(CsrTs::<A, Q, C>::edge_ref(state, position, edge))
     }
 
     #[inline]
@@ -312,8 +303,8 @@ impl<A: Alphabet, Q: Color, C: Color> Deterministic for Det<CsrTs<A, Q, C>> {
         state: StateIndex<Self>,
         symbol: SymbolOf<Self>,
     ) -> Option<StateIndex<Self>> {
-        let position = self.0.position_matching(state, symbol)?;
-        Some(StateId::from(self.0.edges[position].target))
+        let (_, edge) = self.0.edge_matching(state, symbol)?;
+        Some(StateId::from(edge.target))
     }
 }
 
@@ -327,7 +318,7 @@ impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for CsrTs<A, Q, C> {
         let p = state.into_usize();
         (p < self.states.len()).then(|| CsrEdgesTo {
             ts: self,
-            positions: self.incoming().to_state(p).iter(),
+            entries: self.incoming().to_state(p).iter(),
         })
     }
 }
@@ -335,19 +326,24 @@ impl<A: Alphabet, Q: Color, C: Color> PredecessorIterable for CsrTs<A, Q, C> {
 /// Iterates over the edges that enter a state of a [`CsrTs`], ordered by their position.
 pub struct CsrEdgesTo<'ts, A: Alphabet, Q, C> {
     ts: &'ts CsrTs<A, Q, C>,
-    positions: std::slice::Iter<'ts, u32>,
+    entries: std::slice::Iter<'ts, (u32, u32)>,
 }
 
 impl<'ts, A: Alphabet, Q: Color, C: Color> Iterator for CsrEdgesTo<'ts, A, Q, C> {
     type Item = EdgeOf<'ts, CsrTs<A, Q, C>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let position = *self.positions.next()? as usize;
-        Some(self.ts.edge_at(self.ts.source_of(position), position))
+        let &(source, position) = self.entries.next()?;
+        let position = position as usize;
+        Some(CsrTs::<A, Q, C>::edge_ref(
+            StateId::from(source),
+            position,
+            &self.ts.edges[position],
+        ))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.positions.size_hint()
+        self.entries.size_hint()
     }
 }
 
