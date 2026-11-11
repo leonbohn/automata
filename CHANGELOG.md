@@ -149,6 +149,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   input accepts up to 31 atomic propositions (the limit of `PropAlphabet`) instead of 6.
 
 ### Fixed
+- HOA: parity automata with edges that have no acceptance set (legal HOA, Spot's `randaut` writes them) are read instead of failing with `AcceptanceError` (#151). Such an edge gets a neutral priority with the parity the HOA formula gives on the empty set: `high + 1` for the min kinds, and `1` for the max kinds (all other priorities shift up by two). The condition's range grows accordingly, so such automata are written back with an additional acceptance set (same language); one that needs a priority above `Int::MAX` is `HoaError::Acceptance(AcceptanceError::PriorityOverflow)`. New `HoaError::Acceptance` variant.
 - Python: binary operations (`equivalent_to`, `included_in`, counterexamples, `product`-style methods of DFAs, machines and NFAs) compared alphabets by size only, so automata over the same atomic propositions in another order (as Spot writes them) or over other characters silently gave wrong answers. They now raise `ValueError` unless the alphabets are equal. `PropAlphabet` implements `PartialEq`/`Eq` (same propositions in the same order).
 - `DFA::minimize`, `MooreMachine::minimize`, `MealyMachine::minimize` and `Minimize::on(..).run()`
   kept the unreachable states (merged into classes), although the result is documented as the

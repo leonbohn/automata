@@ -279,7 +279,7 @@ def test_prop_dpa_reports_priorities_that_do_not_fit():
 
 def test_variants_validate_the_priorities_of_the_file():
     text = PropDPAMaxOdd(P, 1, 0, [(0, T, 1, 0), (0, F, 2, 0)]).to_hoa()
-    for bad in (text.replace("{2}", "{9}"), text.replace("{2}", "")):
+    for bad in (text.replace("{2}", "{9}"),):
         with pytest.raises((HoaError, automata.AcceptanceError)):
             PropDPAMaxOdd.from_hoa(bad)
 

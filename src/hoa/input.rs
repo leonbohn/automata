@@ -542,6 +542,29 @@ fn hoa_automaton_parts(mut aut: HoaRepresentation) -> Result<HoaParts, HoaError>
         debug_assert_eq!(added.into_usize(), position);
     }
 
+    let mut acceptance: OmegaAcceptanceCondition = aut.header().try_into()?;
+    // A parity edge without an acceptance set is legal HOA (Spot writes them): it contributes no
+    // priority. It gets one that never wins and has the parity that the HOA formula gives on the
+    // empty set: `high + 1` for the min kinds, and for the max kinds `-1`, i.e. all priorities are
+    // shifted up by two (keeping their parity) and the neutral one is `1`. `high` grows accordingly.
+    let mut shift = 0;
+    let mut neutral = None;
+    if let OmegaAcceptanceCondition::Parity(kind, _, high) = &mut acceptance {
+        let uncolored = aut.body().iter().any(|state| {
+            state
+                .edges()
+                .iter()
+                .any(|e| e.effective_acceptance(state).is_empty())
+        });
+        if uncolored {
+            shift = if kind.is_max() { 2 } else { 0 };
+            let needed = usize::from(*high) + shift.max(1) as usize;
+            *high = Int::try_from(needed)
+                .map_err(|_| crate::automaton::AcceptanceError::PriorityOverflow { needed })?;
+            neutral = Some(if shift > 0 { 1 } else { *high });
+        }
+    }
+
     // without a `States:` item nothing else checks that the targets exist
     let state_exists = |id: u32| (id as usize) < aut.body().len();
     for state in aut.body().iter() {
@@ -554,7 +577,14 @@ fn hoa_automaton_parts(mut aut: HoaRepresentation) -> Result<HoaParts, HoaError>
                 return Err(HoaError::UnknownState(target));
             }
             let expr = label_to_expression(aps, edge.label())?;
-            let color: AcceptanceMask = (&edge.effective_acceptance(state)).into();
+            let mut color: AcceptanceMask = (&edge.effective_acceptance(state)).into();
+            if let Some(neutral) = neutral {
+                color = if color.iter().next().is_none() {
+                    AcceptanceMask::from_iter([neutral])
+                } else {
+                    color.iter().map(|p| p + shift).collect()
+                };
+            }
 
             ts.add_edge((
                 StateId::from(state.id()),
@@ -575,8 +605,6 @@ fn hoa_automaton_parts(mut aut: HoaRepresentation) -> Result<HoaParts, HoaError>
     if !state_exists(initial) {
         return Err(HoaError::UnknownState(initial));
     }
-
-    let acceptance: OmegaAcceptanceCondition = aut.header().try_into()?;
 
     Ok((ts, StateId::from(initial), acceptance))
 }
@@ -1080,6 +1108,83 @@ State: 1
         let both = hoa("State: 0 {0}\n[0] 1 {1}\n[!0] 0\nState: 1\n[t] 1 {1}");
         let mut hoa = HoaString::from(both);
         assert!(hoa.pop::<Det<Linked>>().unwrap().into_dpa().is_err());
+    }
+
+    #[test]
+    fn uncolored_parity_edges_get_the_neutral_priority() {
+        use crate::alphabet::PropSymbol;
+        use crate::word::ReducedOmegaWord;
+
+        // (acc-name, Acceptance): the formula's value on the empty set is the expected result
+        let cases = [
+            ("min even 2", "Inf(0) | Fin(1)", true),
+            ("min even 3", "Inf(0) | (Fin(1) & Inf(2))", false),
+            ("min odd 2", "Fin(0) & Inf(1)", false),
+            ("max even 2", "Fin(1) & Inf(0)", false),
+            ("max odd 2", "Inf(1) | Fin(0)", true),
+        ];
+        let a = PropSymbol::from_bools(vec![true]);
+        for (name, formula, accepting) in cases {
+            let n = name.rsplit(' ').next().unwrap();
+            let hoa = |body: &str| {
+                let text = format!(
+                    "HOA: v1\nStates: 1\nStart: 0\nacc-name: parity {name}\nAcceptance: {n} {formula}\nAP: 1 \"a\"\n--BODY--\nState: 0\n{body}\n--END--\n"
+                );
+                HoaString::from(text).pop::<Det<Linked>>().unwrap()
+            };
+            // a cycle without any colored edge
+            let word = ReducedOmegaWord::periodic(vec![a]);
+            assert_eq!(hoa("[t] 0").accepts(word.clone()), accepting, "{name}");
+            assert_eq!(
+                hoa("[t] 0").into_dpa().unwrap().accepts(word),
+                accepting,
+                "{name} as DPA"
+            );
+        }
+
+        // a colored loop on `a` and an uncolored one on `!a`: the neutral priority never wins
+        // against a real one, so the colored one decides
+        let [a, not_a] = [true, false].map(|b| PropSymbol::from_bools(vec![b]));
+        for (name, formula, color, accepting) in [
+            ("min even 2", "Inf(0) | Fin(1)", 0, true),
+            ("min even 2", "Inf(0) | Fin(1)", 1, false),
+            ("max even 2", "Fin(1) & Inf(0)", 0, true),
+            ("max even 2", "Fin(1) & Inf(0)", 1, false),
+        ] {
+            let text = format!(
+                "HOA: v1\nStates: 1\nStart: 0\nacc-name: parity {name}\nAcceptance: 2 {formula}\nAP: 1 \"a\"\n--BODY--\nState: 0\n[0] 0 {{{color}}}\n[!0] 0\n--END--\n"
+            );
+            let aut = HoaString::from(text).pop::<Det<Linked>>().unwrap();
+            let both = ReducedOmegaWord::periodic(vec![a, not_a]);
+            assert_eq!(
+                aut.into_dpa().unwrap().accepts(both),
+                accepting,
+                "{name} {color}"
+            );
+        }
+
+        // the neutral priority needs a 257th acceptance set
+        let formula = (0..256).fold(String::new(), |acc, i| {
+            let atom = if i % 2 == 0 {
+                format!("Inf({i})")
+            } else {
+                format!("Fin({i})")
+            };
+            if acc.is_empty() {
+                atom
+            } else {
+                format!("{acc} | {atom}")
+            }
+        });
+        let text = format!(
+            "HOA: v1\nStates: 1\nStart: 0\nacc-name: parity min even 256\nAcceptance: 256 {formula}\nAP: 1 \"a\"\n--BODY--\nState: 0\n[t] 0\n--END--\n"
+        );
+        assert!(matches!(
+            failure(&text),
+            super::HoaError::Acceptance(crate::automaton::AcceptanceError::PriorityOverflow {
+                needed: 256
+            })
+        ));
     }
 
     #[test]
