@@ -23,3 +23,7 @@ pyo3-stub-gen = "0.23"
 extension-module = ["pyo3/extension-module"]
 
 [workspace]
+
+[profile.release]
+codegen-units = 1
+lto = "fat"

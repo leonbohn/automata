@@ -4,7 +4,8 @@ A ranked list (most impactful first) of places where the crate could be made fas
 reviewing the transition system storages (`LinkedTs`, `DenseTs`, `CsrTs`), the lazy adapters and the
 algorithms built on them. Every entry names the location, the current behavior, the idea, and a
 rough estimate of impact and effort. The existing `gungraun` benchmarks (`benches/ts.rs`,
-`benches/dfa.rs`, `benches/scc.rs`, `benches/runs.rs`) cover most of these paths and can measure
+`benches/dfa.rs`, `benches/scc.rs`, `benches/runs.rs`, `benches/storage.rs`,
+`benches/dpa.rs`) cover most of these paths and can measure
 every change.
 
 ---
@@ -83,28 +84,7 @@ for `CsrTs`, so they do not show this.
 
 **Impact/effort:** high / medium (the reordering part is contained in `compact`).
 
-## 4. Recursive Tarjan does redundant work and a quadratic stack scan
-
-**Location:** `src/ts/connected_components/tarjan.rs` — `Tarjan::visit`, exposed as
-`tarjan_scc_recursive` / `States::sccs_recursive`.
-
-**Current behavior:**
-
-- The relax step is nested inside `for _a in edge.expression().symbols()` — the identical update is
-  repeated once per symbol the expression matches. For `PropExpression`s matching many symbols this
-  is pure duplication (and `symbols()` on BDDs is not free).
-- When a root is found, the SCC boundary is located with `stack.iter().rposition(...)` — an
-  O(stack) scan per SCC root, i.e. O(n^2) on long chains (the `path`/`back_edges` bench shapes).
-- It recurses (stack overflow risk on deep graphs) and uses the hash-based `StateMap` when the
-  bound is unknown.
-
-**Idea:** drop the symbols loop; replace the `rposition` scan by tracking the stack segment
-explicitly (as the iterative variant does with `stack.pop` until the root); or simply delete the
-recursive variant and keep `tarjan_scc_iterative` (already the default for `States::sccs`).
-
-**Impact/effort:** high where `sccs_recursive` is used / low.
-
-## 5. `Det<LinkedTs>::add_edge` churns tombstones on replacement
+## 4. `Det<LinkedTs>::add_edge` churns tombstones on replacement
 
 **Location:** `src/ts/impls/linked.rs` — `Sproutable for Det<LinkedTs>::add_edge`.
 
@@ -121,25 +101,7 @@ no relinking. Only fall back to remove+insert when several edges overlap.
 **Impact/effort:** high for build/mutation-heavy workloads (`add_edges_*`, `builder_with_edges`
 benches) / low.
 
-## 6. `Quotient::edge` allocates and clones per query
-
-**Location:** `src/ts/operations/quotient.rs` — `Deterministic for Quotient::edge` (~line 203).
-
-**Current behavior:** every edge lookup iterates the whole class, queries the underlying system per
-member, hashes each target through `class_of` (an `FxIndexMap`), and collects into a `BTreeSet`
-plus a `Vec` of cloned colors — all to return one edge. Minimization builds a quotient and then
-collects it (`mealy_partition_refinement`), so this runs `n * k` times with several allocations per
-call.
-
-**Idea:** for deterministic systems a quotient edge only needs *one* class representative's edge
-(the others are equal by construction of the partition, as the commented-out `all_equal` asserts
-suggest): query the first member, map its target through `class_of`, done. Also replace
-`class_of: FxIndexMap<Idx, usize>` by a dense `Vec` when the state indices are dense (a
-`StateMap`-style choice at construction).
-
-**Impact/effort:** high for minimization (`minimize*` benches) / low–medium.
-
-## 7. `is_deterministic` is O(n * d^2)
+## 5. `is_deterministic` is O(n * d^2)
 
 **Location:** `src/ts.rs` — `States::is_deterministic` (line ~530).
 
@@ -154,12 +116,12 @@ overlapping candidates — O(d log d) per state. For single-symbol expressions (
 
 **Impact/effort:** medium (one-off per conversion, but conversions are common) / low.
 
-## 8. `MatchingProduct::edges_from` is a nested O(d_l * d_r) loop with expression equality
+## 6. `MatchingProduct::edges_from` is a nested O(d_l * d_r) loop
 
 **Location:** `src/ts/operations/product.rs` — `ProductEdges::next`.
 
-**Current behavior:** for each left edge the right edge iterator is restarted and expressions are
-compared with `==`. Exploration of a product (emptiness checks, `reachable_part`, the boolean-op
+**Current behavior:** for each left edge the right edge iterator is restarted; equal expressions take a fast
+path, all others are intersected. Exploration of a product (emptiness checks, `reachable_part`, the boolean-op
 benches `with_minimized`/`with_empty`/`deep_difference`) iterates `edges_from`, so each product
 state costs `d_l * d_r` comparisons plus color clones for every yielded edge.
 
@@ -170,7 +132,7 @@ iterator needs the same idea. Also avoid cloning both colors when the caller onl
 
 **Impact/effort:** medium–high (automata boolean operations) / medium.
 
-## 9. Omega-run cycle detection uses a hash map and keeps every pass
+## 7. Omega-run cycle detection uses a hash map and keeps every pass
 
 **Location:** `src/ts/run.rs` — `RunKind for Omega::run`.
 
@@ -185,7 +147,7 @@ distinct cycle-entry states.)
 
 **Impact/effort:** medium (every omega acceptance check) / trivial.
 
-## 10. Removal helpers on `LinkedTs` allocate and sort unnecessarily
+## 8. Removal helpers on `LinkedTs` allocate and sort unnecessarily
 
 **Location:** `src/ts/impls/linked.rs` — `linked_remove_state`, `filter_remove_edges`,
 `out_edge_ids`/`in_edge_ids`.
@@ -201,7 +163,7 @@ already validates for `remove_edges_*`). No allocation, no sort, better locality
 
 **Impact/effort:** medium (shrink-heavy code, e.g. `remove_state` in a loop) / low.
 
-## 11. `DenseTs` removals build the full reverse CSR
+## 9. `DenseTs` removals build the full reverse CSR
 
 **Location:** `src/ts/impls/dense.rs` — `remove_state`, `remove_edges_to`, `slots_into`.
 
@@ -217,7 +179,7 @@ build the CSR only when `predecessors` is actually iterated. Reuse a scratch `Ve
 
 **Impact/effort:** medium (mutation-heavy `DenseTs` use) / low.
 
-## 12. Hopcroft refinement: sort per splitter and tree-based partitions
+## 10. Hopcroft refinement: sort per splitter and tree-based partitions
 
 **Location:** `src/minimization/partition_refinement.rs` — `refine`, `collect_partition`;
 `src/partition.rs` — `Partition<I> = Vec<BTreeSet<I>>`.
@@ -235,7 +197,7 @@ array with a counting pass.
 
 **Impact/effort:** medium (the `minimize*` benches) / medium.
 
-## 13. `LinkedTs` equality builds two hash sets per state
+## 11. `LinkedTs` equality builds two hash sets per state
 
 **Location:** `src/ts/impls/linked.rs` — `PartialEq for LinkedTs`, `edge_set`.
 
@@ -248,7 +210,7 @@ states.
 
 **Impact/effort:** low–medium / low.
 
-## 14. `DenseTs` color storage wastes a word per slot and edges iteration scans all `k` slots
+## 12. `DenseTs`/`CsrTs` color storage wastes a word per slot and edges iteration scans all `k` slots
 
 **Location:** `src/ts/impls/dense.rs` — `colors: Vec<Option<C>>`, `DenseEdgesFrom`.
 
@@ -265,7 +227,21 @@ enumerated slice pair would generate tighter code.
 
 **Impact/effort:** low (memory footprint, large-alphabet iteration) / low–medium.
 
-## 15. Smaller items
+## 13. Default `States::is_complete` builds B-tree sets per state
+
+**Location:** `src/ts.rs` — `States::is_complete` (line ~554).
+
+**Current behavior:** collects the universe into a `BTreeSet` once and then a `BTreeSet` of symbols
+per state (via `transitions_from`, which also expands expressions into symbols). `DenseTs`/`CsrTs`
+override it; `LinkedTs` (the default storage) does not, so `complete_with_colors` on linked systems
+pays for it.
+
+**Idea:** for `IndexedAlphabet` use a `FixedBitSet` of size `k` per state (the `Sproutable`
+completion already does exactly this) or count distinct covered symbol indices.
+
+**Impact/effort:** low / trivial.
+
+## 14. Smaller items
 
 - `src/ts/transitions_from.rs` — `TransitionsFrom::next` clones the edge color twice per first
   symbol of an edge (`self.color = Some(color.clone())` then `color.clone()` into the tuple); one
@@ -288,11 +264,10 @@ enumerated slice pair would generate tighter code.
 
 ## Suggested order of attack
 
-1. #1 (lookup index) and #5 (in-place replace) — they define the speed of the default storage.
-2. #2 (subset memoization) and #6 (quotient edge) — the two worst offenders in automaton-level
-   algorithms.
-3. #3 (edge reordering in `compact`) and #4 (Tarjan) — traversals.
-4. #8–#12 as benchmark-driven follow-ups; #13–#15 are cleanups with measurable but small wins.
+1. #1 (lookup index) and #4 (in-place replace) — they define the speed of the default storage.
+2. #2 (subset memoization) — the worst offender in automaton-level algorithms.
+3. #3 (edge reordering in `compact`) — traversals.
+4. #6–#10 as benchmark-driven follow-ups; #11–#14 are cleanups with measurable but small wins.
 
 Every change should be validated with `./scripts/check` plus the instruction-count benchmarks
 (`tools/bench`), and benchmark names must stay stable so history remains comparable.
