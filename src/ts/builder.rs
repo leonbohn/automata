@@ -1,4 +1,4 @@
-use super::{ForAlphabet, Sproutable, StateId, Storage};
+use super::{CsrTs, Det, ForAlphabet, Sproutable, StateId, Storage};
 use crate::TransitionSystem;
 use crate::alphabet::{FromSymbols, Symbol, WrongAlphabetSize};
 use crate::automaton::WithInitial;
@@ -9,7 +9,7 @@ use crate::automaton::{
 use crate::automaton::{
     BuchiCondition, MealySemantics, MinEvenParityCondition, MooreSemantics, ReachabilityCondition,
 };
-use crate::representation::IntoTransitions;
+use crate::representation::{FromTransitions, IntoTransitions, Parts};
 use crate::{Color, Int, Void, alphabet::CharAlphabet};
 use crate::{DTS, NTS, RightCongruence};
 use std::collections::{BTreeSet, HashMap};
@@ -226,7 +226,50 @@ impl<Q: Color, C: Color, S: Symbol> Builder<Q, C, S> {
             + ForAlphabet<<T as TransitionSystem>::Alphabet>,
         <T as TransitionSystem>::Alphabet: FromSymbols<Symbol = S>,
     {
-        let alphabet = <<T as TransitionSystem>::Alphabet>::try_from_symbols(
+        let (alphabet, states, edges) = self.prepare::<<T as TransitionSystem>::Alphabet>(
+            <<T as Sproutable>::Storage as Storage<<T as TransitionSystem>::Alphabet>>::DETERMINISTIC,
+        )?;
+        let mut ts = T::for_alphabet_size_hint(alphabet, states.len());
+        for color in states {
+            ts.add_state(color);
+        }
+        // linked storages iterate the edges of a state in reverse order of insertion, so we insert
+        // them back to front to get them in the order in which they were given
+        for (q, e, c, p) in edges.into_iter().rev() {
+            ts.add_edge((StateId::from(q), e, c, StateId::from(p)));
+        }
+        Ok(ts)
+    }
+
+    /// Builds the immutable [`CsrTs`] in one pass over the edges, without a growable system in
+    /// between. If `deterministic`, overlapping edges are an error.
+    fn try_build_csr<A>(self, deterministic: bool) -> Result<CsrTs<A, Q, C>, BuilderError>
+    where
+        A: FromSymbols<Symbol = S>,
+    {
+        let (alphabet, states, edges) = self.prepare::<A>(deterministic)?;
+        Ok(CsrTs::from_transitions(Parts {
+            alphabet,
+            states: states
+                .into_iter()
+                .enumerate()
+                .map(|(i, color)| (i as u32, color)),
+            edges: edges.into_iter(),
+            initial: (),
+        }))
+    }
+
+    /// The alphabet, the colors of the states `0..=m` (`m` the largest id on an edge) and the
+    /// edges, after checking that the builder is consistent.
+    #[allow(clippy::type_complexity)]
+    fn prepare<A>(
+        self,
+        deterministic: bool,
+    ) -> Result<(A, Vec<Q>, Vec<(u32, S, C, u32)>), BuilderError>
+    where
+        A: FromSymbols<Symbol = S>,
+    {
+        let alphabet = A::try_from_symbols(
             self.edges
                 .iter()
                 .map(|(_, e, _, _)| *e)
@@ -241,7 +284,6 @@ impl<Q: Color, C: Color, S: Symbol> Builder<Q, C, S> {
             .flat_map(|(q, _, _, p)| [*p, *q])
             .max()
             .map_or(0, |max| max as usize + 1);
-        let mut ts = T::for_alphabet_size_hint(alphabet, num_states);
 
         // if a state is given a color multiple times, the first one counts
         let mut colors: Vec<Option<Q>> = vec![None; num_states];
@@ -250,15 +292,17 @@ impl<Q: Color, C: Color, S: Symbol> Builder<Q, C, S> {
                 *slot = Some(c);
             }
         }
-        for (i, color) in colors.into_iter().enumerate() {
-            let color = color
-                .or_else(|| self.default.clone())
-                .ok_or(BuilderError::MissingStateColor(i as u32))?;
-            ts.add_state(color);
-        }
+        let states = colors
+            .into_iter()
+            .enumerate()
+            .map(|(i, color)| {
+                color
+                    .or_else(|| self.default.clone())
+                    .ok_or(BuilderError::MissingStateColor(i as u32))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-        if <<T as Sproutable>::Storage as Storage<<T as TransitionSystem>::Alphabet>>::DETERMINISTIC
-        {
+        if deterministic {
             let mut seen = HashMap::<(u32, S), u32>::new();
             for &(q, e, _, p) in &self.edges {
                 if let Some(existing_target) = seen.insert((q, e), p) {
@@ -271,14 +315,7 @@ impl<Q: Color, C: Color, S: Symbol> Builder<Q, C, S> {
                 }
             }
         }
-
-        // linked storages iterate the edges of a state in reverse order of insertion, so we insert
-        // them back to front to get them in the order in which they were given
-        for edge in self.edges.into_iter().rev() {
-            let (q, e, c, p) = edge;
-            ts.add_edge((StateId::from(q), e, c, StateId::from(p)));
-        }
-        Ok(ts)
+        Ok((alphabet, states, self.edges))
     }
 
     /// Assigns the given `color` to the state with the given index `idx`.
@@ -401,6 +438,52 @@ impl<Q: Color, C: Color> Builder<Q, C> {
     /// See [`Self::try_build`].
     pub fn try_into_nts(self) -> Result<NTS<CharAlphabet, Q, C>, BuilderError> {
         self.try_build()
+    }
+
+    /// Builds a [`CsrTs`], an immutable non-deterministic transition system over a
+    /// [`CharAlphabet`]. Overlapping edges are allowed. Use [`Self::into_det_csr`] for a
+    /// deterministic one.
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_csr`].
+    ///
+    /// # Example
+    /// ```
+    /// use automata::ts::{Builder, PredecessorIterable, States};
+    ///
+    /// let ts = Builder::without_colors().with_edges([(0, 'a', 1), (0, 'a', 0)]).into_csr();
+    /// assert_eq!(ts.state_count(), 2);
+    /// assert_eq!(ts.predecessors(0u32.into()).unwrap().count(), 1);
+    /// ```
+    #[track_caller]
+    pub fn into_csr(self) -> CsrTs<CharAlphabet, Q, C> {
+        or_panic(self.try_into_csr())
+    }
+
+    /// Fallible version of [`Self::into_csr`].
+    ///
+    /// # Errors
+    /// See [`Self::try_build`].
+    pub fn try_into_csr(self) -> Result<CsrTs<CharAlphabet, Q, C>, BuilderError> {
+        self.try_build_csr(false)
+    }
+
+    /// Builds a [`Det<CsrTs>`](Det), an immutable deterministic transition system over a
+    /// [`CharAlphabet`].
+    ///
+    /// # Panics
+    /// Panics if the builder is inconsistent, see [`Self::try_into_det_csr`].
+    #[track_caller]
+    pub fn into_det_csr(self) -> Det<CsrTs<CharAlphabet, Q, C>> {
+        or_panic(self.try_into_det_csr())
+    }
+
+    /// Fallible version of [`Self::into_det_csr`].
+    ///
+    /// # Errors
+    /// See [`Self::try_build`]: an overlapping edge is an error.
+    pub fn try_into_det_csr(self) -> Result<Det<CsrTs<CharAlphabet, Q, C>>, BuilderError> {
+        self.try_build_csr(true).map(Det)
     }
 
     /// Builds a [`DTS`] and sets `initial` as its designated initial state.

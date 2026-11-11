@@ -24,10 +24,9 @@ Sibling crates that stay elsewhere:
 
 ## Commands
 
-To ensure code quality, run the following before committing:
-```shell
-./scripts/check                         # everything CI runs, incl. cargo-hack per-feature check,
-```
+To ensure code quality, we run `scripts/check` on every PR, and if any of the tests fails the PR will be rejected until the failure is fixed.
+Since the full script run takes a while, it is fine to run just a subset before committing and opening a PR. While this may occasionally waste some of Github's compute, running `scripts/check` can easily take 10 minutes and waste precious time when iterating.
+Especially if only small portions of code have changed, it is fine to run just clippy and local tests, on the off chance that something bigger went wrong we can simply rely on CI.
 
 - Examples in `examples/` (`dfa`, `parity`, `transition_system`, `dot`, `hoa`) are run by CI;
   `hoa` is declared with `required-features = ["hoa"]` in Cargo.toml.

@@ -88,7 +88,7 @@
 //! | [`LinkedTs`](ts::LinkedTs) | [`Linked`](ts::Linked) | the default; any alphabet, nondeterminism, cheap growth and removal (removed items leave tombstones so [`EdgeId`](ts::EdgeId)s stay valid, [`compact`](ts::LinkedTs::compact) renumbers) |
 //! | [`Det<T>`](ts::Det) | [`Det<Linked>`](ts::Det) | wraps another storage and makes determinism part of the type; adding an edge replaces overlapping ones. [`DTS`] is `Det<LinkedTs<..>>` |
 //! | [`DenseTs`](ts::DenseTs) | [`Dense`](ts::Dense) | deterministic, one slot per state and symbol, the fastest lookups, needs a small indexed alphabet |
-//! | [`CsrTs`](ts::CsrTs) | [`Csr`](ts::Csr) | immutable compressed rows, built in one go from another system, the most compact |
+//! | [`CsrTs`](ts::CsrTs) | [`Csr`](ts::Csr), [`Det<Csr>`](ts::Det) | immutable compressed rows, nondeterministic, any alphabet, built in one go from another system (or [`Builder::into_csr`](ts::Builder::into_csr)), the most compact; predecessors are collected on first use |
 //!
 //! The marker types let code be generic over the representation, for example a parser that is
 //! instantiated with [`Linked`](ts::Linked) or `Det<Linked>`.

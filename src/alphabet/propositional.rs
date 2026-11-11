@@ -904,6 +904,23 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
         left.overlaps(right)
     }
 
+    /// Joins the expressions, starting from the unsatisfiable one, and checks whether the result
+    /// is the universal one (equal functions have equal representations).
+    fn covers(&self, expressions: impl Iterator<Item = Self::Expression>) -> bool {
+        let num_aps = self.aps.len() as u8;
+        let universal = PropExpression::universal(num_aps);
+        let mut joined = PropExpression::unsatisfiable(num_aps);
+        for expression in expressions {
+            if let Some(union) = joined.union(&expression) {
+                joined = union;
+                if joined == universal {
+                    return true;
+                }
+            }
+        }
+        joined == universal
+    }
+
     type Universe<'this>
         = PropExpressionSymbols<'this, RawTy>
     where
@@ -942,6 +959,19 @@ impl<RawTy: RawSymbolRepr> Alphabet for PropAlphabet<RawTy> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn covers_joins_expressions_for_tables_and_bdds() {
+        for num_aps in [2_u8, 8] {
+            let names = (0..num_aps).map(|i| format!("p{i}")).collect();
+            let alphabet: PropAlphabet = PropAlphabet::new(names);
+            let p = PropExpression::<u32>::new(num_aps, "0");
+            let not_p = PropExpression::<u32>::new(num_aps, "!0");
+            assert!(!alphabet.covers([].into_iter()));
+            assert!(!alphabet.covers([p.clone()].into_iter()));
+            assert!(alphabet.covers([p, not_p].into_iter()));
+        }
+    }
+
     use super::*;
     use proptest::prelude::*;
 

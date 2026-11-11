@@ -92,15 +92,31 @@ impl<A: IndexedAlphabet> Storage<A> for Dense {
     }
 }
 
-/// The storage [`CsrTs`]: deterministic, works for [`IndexedAlphabet`]s, looks up edges in constant
-/// time and cannot be changed once built, see [`SproutableStorage`] for the ones that can.
+/// The storage [`CsrTs`]: non-deterministic, works for any alphabet and cannot be changed once
+/// built, see [`SproutableStorage`] for the ones that can. [`Det<Csr>`] is the deterministic
+/// variant.
+///
+/// [`Det<Csr>`]: crate::ts::Det
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Csr;
 
-impl<A: IndexedAlphabet> Storage<A> for Csr {
-    const DETERMINISTIC: bool = true;
+impl<A: Alphabet> Storage<A> for Csr {
+    const DETERMINISTIC: bool = false;
 
     type Ts<Q: Color, C: Color> = CsrTs<A, Q, C>;
+    type Semantics<C> = Existential<C>;
+
+    fn try_from_linked<Q: Color, C: Color>(
+        ts: LinkedTs<A, Q, C>,
+    ) -> Result<Self::Ts<Q, C>, LinkedTs<A, Q, C>> {
+        Ok(ts.collect())
+    }
+}
+
+impl<A: Alphabet> Storage<A> for Det<Csr> {
+    const DETERMINISTIC: bool = true;
+
+    type Ts<Q: Color, C: Color> = Det<CsrTs<A, Q, C>>;
     type Semantics<C> = C;
 
     fn try_from_linked<Q: Color, C: Color>(

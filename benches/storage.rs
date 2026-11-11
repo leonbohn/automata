@@ -11,7 +11,7 @@ use automata::automaton::DFA;
 use automata::representation::{FromTransitions, IntoTransitions};
 use automata::ts::operations::{MatchingProduct, ProductIndex};
 use automata::ts::{
-    CsrTs, DenseTs, Deterministic, ForAlphabet, PredecessorIterable, Shrinkable, Sproutable,
+    CsrTs, DenseTs, Det, Deterministic, ForAlphabet, PredecessorIterable, Shrinkable, Sproutable,
 };
 use automata::ts::{DenseId, StateId};
 use automata::{DTS, States, TransitionSystem, Void};
@@ -20,7 +20,7 @@ use std::hint::black_box;
 
 type Linked = DTS<CharAlphabet, bool, Void>;
 type Dense = DenseTs<CharAlphabet, bool, Void>;
-type Csr = CsrTs<CharAlphabet, bool, Void>;
+type Csr = Det<CsrTs<CharAlphabet, bool, Void>>;
 
 /// What the operations that only read need from a storage.
 trait ReadOnly:

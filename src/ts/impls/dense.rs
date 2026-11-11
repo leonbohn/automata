@@ -1,6 +1,5 @@
 use std::{borrow::Cow, sync::OnceLock};
 
-use super::csr::ReverseCsr;
 use crate::representation::{FromTransitions, IntoTransitions, Parts, sprout_from_parts};
 use crate::{
     Color, TransitionSystem, Void,
@@ -14,6 +13,62 @@ use crate::{
 
 /// The sentinel that stands for "no edge" in the target slots of [`DenseTs`].
 pub(super) const NONE: u32 = u32::MAX;
+
+/// The incoming edges of the states of a deterministic table in compressed sparse row form: the
+/// slots that lead to state `p` are `slots[offsets[p]..offsets[p + 1]]`, in increasing order.
+#[derive(Clone, Debug)]
+pub(super) struct ReverseCsr {
+    offsets: Vec<u32>,
+    slots: Vec<u32>,
+}
+
+impl ReverseCsr {
+    /// Collects the slots of the `n` states whose targets are given, where `NONE` marks an empty
+    /// slot, in O(number of slots).
+    pub(super) fn build(targets: &[u32], n: usize) -> Self {
+        let mut offsets = vec![0_u32; n + 1];
+        for target in targets.iter().filter(|t| **t != NONE) {
+            offsets[*target as usize + 1] += 1;
+        }
+        for p in 0..n {
+            offsets[p + 1] += offsets[p];
+        }
+        let mut fill = offsets.clone();
+        let mut slots = vec![NONE; offsets[n] as usize];
+        for (slot, target) in targets.iter().enumerate() {
+            if *target != NONE {
+                slots[fill[*target as usize] as usize] = slot as u32;
+                fill[*target as usize] += 1;
+            }
+        }
+        Self { offsets, slots }
+    }
+
+    /// The slots that lead to state `p`.
+    #[inline]
+    pub(super) fn to_state(&self, p: usize) -> &[u32] {
+        &self.slots[self.offsets[p] as usize..self.offsets[p + 1] as usize]
+    }
+
+    /// Panics unless this is the table of the given targets. If `stale` is set, it may also list
+    /// slots that no longer lead to the state, as left behind by removing edges.
+    pub(super) fn check_against(&self, targets: &[u32], n: usize, stale: bool) {
+        assert_eq!(self.offsets.len(), n + 1, "wrong number of offsets");
+        for p in 0..n {
+            let expected: Vec<_> = (0..targets.len())
+                .filter(|slot| targets[*slot] as usize == p)
+                .map(|slot| slot as u32)
+                .collect();
+            let listed: Vec<_> = self
+                .to_state(p)
+                .iter()
+                .copied()
+                .filter(|slot| !stale || targets[*slot as usize] as usize == p)
+                .collect();
+            assert_eq!(listed, expected, "wrong incoming edges of state {p}");
+        }
+    }
+}
 
 /// A deterministic transition system over an [`IndexedAlphabet`] that stores the transitions in a
 /// table with one slot per state and symbol.
