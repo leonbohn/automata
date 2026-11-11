@@ -35,6 +35,9 @@ pub enum HoaError {
     /// A parity automaton does not specify its number of acceptance sets.
     #[error("parity automaton without an Acceptance header item")]
     MissingAcceptanceSets,
+    /// The acceptance sets cannot be represented.
+    #[error(transparent)]
+    Acceptance(#[from] crate::automaton::AcceptanceError),
     /// The acceptance condition (given by its name) is not supported.
     #[error("unsupported acceptance condition: {0}")]
     UnsupportedAcceptance(String),

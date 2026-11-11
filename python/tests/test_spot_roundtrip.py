@@ -38,12 +38,6 @@ def test_state_based_acceptance_is_read():
     assert spot.are_equivalent(a, to_spot(o)), msg("state-based acceptance lost", text)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=automata.AcceptanceError,
-    reason="LIMITATION: parity edges without an acceptance set (legal in HOA, Spot's randaut writes "
-    "them) are an AcceptanceError, an edge needs exactly one color",
-)
 def test_parity_edges_without_color_are_read():
     a = spot.automaton("randaut -Q5 -A 'parity min even 3' --seed=1 -D 2 |")
     o = automata.parse_hoa(hoa(a))

@@ -206,14 +206,13 @@ def test_rabin_is_only_read_by_the_rabin_class():
         DBA_TEXT.replace("[0] 0 {0}", "[0 &] 0 {0}"),
         DBA_TEXT.replace("[0] 0 {0}", "[7] 0 {0}"),
         DPA_TEXT.replace("{1}", "{9}"),
-        DPA_TEXT.replace("{1}", ""),
         "\x00\x01--BODY--\n--END--",
         "--BODY--" * 1000 + "--END--",
     ],
 )
 def test_malformed_hoa_raises_hoa_error(text):
     for cls in (PropDBA, PropDPA, PropNBA, PropNPA):
-        # an edge without a parity color is an AcceptanceError, which is not a HoaError
+        # a priority out of range is an AcceptanceError, which is not a HoaError
         with pytest.raises((HoaError, automata.AcceptanceError)):
             cls.from_hoa(text)
     with pytest.raises(automata.Error):
