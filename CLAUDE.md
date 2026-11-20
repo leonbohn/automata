@@ -139,7 +139,7 @@ Two distinctions that recur everywhere:
   deterministic hashing, keeps benchmarks reproducible), `dag.rs`, `color.rs`
   (`Color` is `Clone + Debug`; `Int = u8`, `Void`, `Lattice`), `error.rs` (crate-wide `Error`).
 
-- `python/` (own crate `automata-py`, workspace-external, distribution `automatars`, import name
+- `python/` (own crate `automata-py`, workspace-external, distribution `automata-rs`, import name
   `automata`; maturin + pyo3, `abi3-py311`): `src/kind.rs` (`Kind`: `Chars` and `Props`, how symbols
   and words convert; every class exists once per kind, `Prop` prefix), `src/class.rs`
   (`automaton_class!`, the methods every class has incl. `to_dot`/`_repr_svg_`, and shared helpers),

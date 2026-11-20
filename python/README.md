@@ -1,7 +1,7 @@
-# automatars
+# automata-rs
 
 Python bindings for the Rust crate [`automata`](https://github.com/leonbohn/automata): transition
-systems and automata over finite and infinite words. The distribution is called `automatars`, the
+systems and automata over finite and infinite words. The distribution is called `automata-rs`, the
 module is imported as `automata`. See [Installation](#installation).
 
 ## Installation

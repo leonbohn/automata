@@ -3,7 +3,7 @@ requires = ["maturin>=1.12,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "automatars"
+name = "automata-rs"
 description = "Transition systems and automata over finite and infinite words."
 readme = "README.md"
 requires-python = ">=3.11"
