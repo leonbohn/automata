@@ -28,7 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   circles and the pairs (Rabin, Streett) or sets (Muller) of the condition are written in an extra
   `acceptance` node. `DotStyle::dot_header_statements` adds statements to the header of the graph
   and `MullerCondition::sets` returns the sets of the condition.
-- Python bindings in `python/` (distribution `automatars`, import name `automata`, built with maturin,
+- Python bindings in `python/` (distribution `automata-rs`, import name `automata`, built with maturin,
   `abi3-py311`; #143, WP4 and WP5). Every automaton class exists over a `CharAlphabet` and, with
   the prefix `Prop`, over a `PropAlphabet`:
   - `CharAlphabet`, `PropAlphabet`, `OmegaWord(prefix, period)`.
